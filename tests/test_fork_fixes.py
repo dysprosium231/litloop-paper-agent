@@ -643,6 +643,8 @@ def test_retraction_check_is_one_batched_openalex_request(monkeypatch):
             calls.append(params)
             return Resp()
 
+    import sys
+    monkeypatch.setitem(sys.modules, "litloop_journal_rank.retractions", None)  # no local copy
     monkeypatch.setattr(s, "_plain_session", lambda: Sess())
     monkeypatch.setattr(s, "load_config", lambda: {})
     rows = [{"doi": "10.1/BAD"}, {"doi": "10.1/ok"}, {"title": "no doi"}]
@@ -669,6 +671,7 @@ def test_retraction_flags_prefer_local_retraction_watch(monkeypatch):
     import sys, types
     from scansci_pdf import search as s
     fake = types.ModuleType("litloop_journal_rank.retractions")
+    fake.ensure_fresh = lambda proxy=None: "fresh"
     fake.lookup_papers = lambda dois: {
         "10.1/bad": {"retracted": True, "concern": False,
                      "notices": [{"nature": "Retraction", "date": "2023-07-01", "reasons": ["Paper Mill"],

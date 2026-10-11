@@ -398,7 +398,10 @@ def _flag_retractions(results: list[dict[str, Any]]) -> None:
     if not dois:
         return
     try:
-        from litloop_journal_rank.retractions import lookup_papers
+        from litloop_journal_rank.retractions import ensure_fresh, lookup_papers
+        # Missing or a week old: refresh in the background (GitLab is reached
+        # through the per-host proxy when one is configured).
+        ensure_fresh(proxy=str(load_config().get("host_proxy_url") or "") or None)
         local = lookup_papers(dois)
     except Exception:  # noqa: BLE001 - tool missing or data unreadable
         local = None
