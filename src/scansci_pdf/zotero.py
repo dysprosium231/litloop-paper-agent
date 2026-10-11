@@ -23,12 +23,162 @@ def _get_zotero_config(config: dict[str, Any]) -> tuple[str, str] | None:
     return api_key, f"{library_type}s/{library_id}" if library_id else ""
 
 
-def _zotero_mcp_python(config: dict[str, Any]) -> Path | None:
-    exe = str(config.get("zotero_mcp_python") or "").strip()
-    if not exe:
+_PY_NAMES = ("python.exe", "python") if os.name == "nt" else ("python3", "python")
+_VENV_BIN = "Scripts" if os.name == "nt" else "bin"
+_DISCOVERED: dict[str, Any] | None = None
+
+
+def _venv_python(bin_dir: Path) -> Path | None:
+    for name in _PY_NAMES:
+        p = bin_dir / name
+        if p.is_file():
+            return p
+    return None
+
+
+def _tool_venv_pythons() -> list[Path]:
+    """Interpreters of zotero-mcp installed with `uv tool` or pipx."""
+    import shutil
+    import subprocess
+
+    roots: list[Path] = []
+    if shutil.which("uv"):
+        try:
+            out = subprocess.run(["uv", "tool", "dir"], capture_output=True,
+                                 text=True, timeout=10).stdout.strip()
+            if out:
+                roots.append(Path(out))
+        except (OSError, subprocess.SubprocessError):
+            pass
+    home = Path.home()
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        roots.append(Path(appdata) / "uv" / "tools")
+    roots += [home / ".local" / "share" / "uv" / "tools",
+              home / ".local" / "pipx" / "venvs", home / "pipx" / "venvs"]
+    if os.environ.get("PIPX_HOME"):
+        roots.append(Path(os.environ["PIPX_HOME"]) / "venvs")
+    found = []
+    for root in roots:
+        py = _venv_python(root / "zotero-mcp-server" / _VENV_BIN)
+        if py and py not in found:
+            found.append(py)
+    return found
+
+
+def _resolve_server_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
+    """Map an MCP client's zotero server entry to the Python that runs it."""
+    import shutil
+
+    cmd = str(entry.get("command") or "")
+    args = [str(a) for a in entry.get("args") or []]
+    env = {k: str(v) for k, v in (entry.get("env") or {}).items()}
+    base = Path(cmd).name.lower()
+    exe = Path(cmd) if Path(cmd).is_absolute() else Path(shutil.which(cmd) or cmd)
+
+    if base.startswith("python") or base == "py.exe":
+        if not exe.is_file():
+            return None
+        # `python launcher.py`: the launcher sets env, as the server would see it.
+        script = next((a for a in args if a.lower().endswith(".py")), "")
+        return {"python": exe, "env": env, "env_script": script}
+    if base.startswith("zotero-mcp"):
+        py = _venv_python(exe.parent) if exe.is_file() else None
+        if py:
+            return {"python": py, "env": env, "env_script": ""}
+    if base.startswith(("uv", "uvx", "pipx", "zotero-mcp")):
+        for py in _tool_venv_pythons():
+            return {"python": py, "env": env, "env_script": ""}
+    return None
+
+
+def _mcp_client_configs() -> list[Path]:
+    home = Path.home()
+    paths = [home / ".claude.json", Path.cwd() / ".mcp.json"]
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        paths.append(Path(appdata) / "Claude" / "claude_desktop_config.json")
+    paths += [home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json",
+              home / ".config" / "Claude" / "claude_desktop_config.json"]
+    return [p for p in paths if p.is_file()]
+
+
+def _zotero_server_entries(cfg: dict[str, Any]) -> list[dict[str, Any]]:
+    blocks = [cfg.get("mcpServers") or {}]
+    for proj in (cfg.get("projects") or {}).values():
+        if isinstance(proj, dict):
+            blocks.append(proj.get("mcpServers") or {})
+    out = []
+    for block in blocks:
+        for name, entry in block.items():
+            if not isinstance(entry, dict):
+                continue
+            hay = " ".join([name, str(entry.get("command", ""))]
+                           + [str(a) for a in entry.get("args") or []]).lower()
+            if "zotero" in hay:
+                out.append(entry)
+    return out
+
+
+def discover_zotero_mcp(config: dict[str, Any]) -> dict[str, Any] | None:
+    """Find the Python that has zotero-mcp, plus the env its server runs with.
+
+    Order: explicit ``zotero_mcp_python``; zotero-mcp installed alongside
+    scansci-pdf; the zotero server registered in Claude Code / Claude Desktop;
+    `zotero-mcp` on PATH; uv-tool / pipx installs. ``zotero_mcp_python`` set to
+    "off" disables the route.
+    """
+    global _DISCOVERED
+    explicit = str(config.get("zotero_mcp_python") or "").strip()
+    if explicit.lower() == "off":
         return None
-    path = Path(exe).expanduser()
-    return path if path.is_file() else None
+    if explicit and explicit.lower() != "auto":
+        path = Path(explicit).expanduser()
+        if not path.is_file():
+            return None
+        return {"python": path, "env": {},
+                "env_script": str(config.get("zotero_mcp_env_script") or "").strip()}
+    if _DISCOVERED is not None:
+        return _DISCOVERED or None
+
+    import importlib.util
+    import shutil
+    import sys
+
+    found: dict[str, Any] = {}
+    if importlib.util.find_spec("zotero_mcp") is not None:
+        found = {"python": Path(sys.executable), "env": {}, "env_script": ""}
+    if not found:
+        for cfg_path in _mcp_client_configs():
+            try:
+                cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for entry in _zotero_server_entries(cfg):
+                hit = _resolve_server_entry(entry)
+                if hit:
+                    found = hit
+                    break
+            if found:
+                break
+    if not found and shutil.which("zotero-mcp"):
+        hit = _resolve_server_entry({"command": "zotero-mcp"})
+        found = hit or {}
+    if not found:
+        pys = _tool_venv_pythons()
+        if pys:
+            found = {"python": pys[0], "env": {}, "env_script": ""}
+    if found and not found.get("env_script"):
+        found["env_script"] = str(config.get("zotero_mcp_env_script") or "").strip()
+    _DISCOVERED = found
+    if found:
+        log.info(f"Zotero: using zotero-mcp at {found['python']}")
+    return found or None
+
+
+def _zotero_mcp_python(config: dict[str, Any]) -> Path | None:
+    found = discover_zotero_mcp(config)
+    return found["python"] if found else None
 
 
 def push_via_zotero_mcp(
@@ -46,11 +196,12 @@ def push_via_zotero_mcp(
     """
     import subprocess
 
-    python = _zotero_mcp_python(config)
-    if python is None:
-        return {"success": False, "error": "zotero_mcp_python not configured or missing"}
-
-    env_script = str(config.get("zotero_mcp_env_script") or "").strip()
+    found = discover_zotero_mcp(config)
+    if not found:
+        return {"success": False, "error": "zotero-mcp not found; install it "
+                "(pip install zotero-mcp-server) or set zotero_mcp_python"}
+    python = found["python"]
+    env_script = found.get("env_script") or ""
     req = {
         "identifier": identifier,
         "file": str(pdf_path.resolve()) if pdf_path and pdf_path.is_file() else "",
@@ -59,7 +210,8 @@ def push_via_zotero_mcp(
         "env_script": str(Path(env_script).expanduser()) if env_script else "",
     }
     bridge = Path(__file__).with_name("zotero_bridge.py")
-    env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+    # The MCP client's env block for the zotero server (API key, WebDAV...).
+    env = dict(os.environ, **found.get("env", {}), PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
     try:
         proc = subprocess.run(
             [str(python), str(bridge)],

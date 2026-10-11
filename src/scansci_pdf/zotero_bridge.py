@@ -38,18 +38,33 @@ def run(req: dict) -> dict:
         # its serve() call is guarded by __main__, so this only sets env.
         runpy.run_path(req["env_script"], run_name="zotero_env")
 
+    try:
+        # Same config the server reads: ~/.config/zotero-mcp/config.json and
+        # Claude Desktop's env block. Never overrides variables already set.
+        from zotero_mcp.cli import setup_zotero_environment
+        setup_zotero_environment()
+    except Exception:
+        pass
+
     from zotero_mcp.cli_standalone import CLIContext
     from zotero_mcp.tools import write
 
+    if not hasattr(write, "add_item") or not hasattr(write, "attach_file"):
+        return {"success": False, "error": "zotero-mcp is too old; "
+                "upgrade with: pip install -U zotero-mcp-server"}
     ctx = CLIContext()
-    added = write.add_item(
-        source=_source_for(req["identifier"]),
-        collections=req.get("collections") or None,
-        tags=req.get("tags") or None,
-        attach_mode="none",
-        if_exists="file",
-        ctx=ctx,
-    )
+    try:
+        added = write.add_item(
+            source=_source_for(req["identifier"]),
+            collections=req.get("collections") or None,
+            tags=req.get("tags") or None,
+            attach_mode="none",
+            if_exists="file",
+            ctx=ctx,
+        )
+    except TypeError as e:  # older signature without if_exists
+        return {"success": False, "error": f"zotero-mcp is too old ({e}); "
+                "upgrade with: pip install -U zotero-mcp-server"}
     m = _KEY_RE.search(added)
     if not m:
         return {"success": False, "error": added.strip()[:500]}

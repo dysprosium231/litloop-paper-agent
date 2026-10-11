@@ -225,6 +225,21 @@ ScienceDirect / Cell Press 等 Elsevier 论文走 API 直接下载，速度从 1
 
 </details>
 
+## Zotero
+
+`scansci_pdf_zotero_push` 优先交给 [zotero-mcp](https://github.com/54yyyu/zotero-mcp)（≥ 0.14.1）完成：按 DOI 建条目、用 CrossRef 元数据，库里已有就复用；PDF 作为附件上传，配了 WebDAV 就存到 WebDAV。可以带 `collections`（已有分类）和 `tags`。
+
+已经在 Claude Code / Claude Desktop 里装好 zotero-mcp 的话，什么都不用配，插件会自己找到它，并沿用它的 API Key、WebDAV 设置。查找顺序：
+
+1. `zotero_mcp_python` 指定的 Python（设为 `off` 则不用 zotero-mcp）
+2. 和本插件装在同一个环境里的 zotero-mcp（`pip install "scansci-pdf[zotero]"`）
+3. Claude Code（`~/.claude.json`、项目 `.mcp.json`）或 Claude Desktop 配置里名字或命令含 `zotero` 的服务器，连同它的 `env`
+4. PATH 上的 `zotero-mcp`，以及 `uv tool` / pipx 安装的 zotero-mcp
+
+zotero-mcp 需要能写库：配好 Web API Key（`zotero-mcp setup`）。只开了本地只读模式时推送会失败，并返回 zotero-mcp 的原始报错。
+
+都找不到时退回 Zotero Web API（`zotero_api_key` + `zotero_library_id`），这条路只建条目，**不上传 PDF**。
+
 ## 配置与策略
 
 <details>

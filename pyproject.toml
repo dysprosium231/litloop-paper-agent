@@ -30,6 +30,9 @@ cloakbrowser = ["cloakbrowser>=0.5.9"]
 camoufox = ["camoufox[geoip]>=0.4.11"]
 web = ["fastapi>=0.115", "jinja2>=3.1"]
 patchright = ["patchright>=1.61"]
+# zotero_push files papers through zotero-mcp; any install of it is found, this
+# extra just puts it in the same environment.
+zotero = ["zotero-mcp-server>=0.14.1"]
 dev = ["pytest>=8.0"]
 compile = ["cython>=3.0"]
 

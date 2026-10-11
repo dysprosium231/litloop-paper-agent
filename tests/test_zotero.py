@@ -28,6 +28,7 @@ def test_push_to_zotero_posts_item_as_raw_json_array(monkeypatch):
             "zotero_api_key": "test-key",
             "zotero_library_type": "user",
             "zotero_library_id": "123456",
+            "zotero_mcp_python": "off",
         },
     )
 
@@ -141,3 +142,69 @@ def test_zotero_bridge_parses_item_and_attachment_keys(monkeypatch):
     assert calls["add"]["source"] == "https://arxiv.org/abs/2301.00001"
     assert calls["add"]["attach_mode"] == "none" and calls["add"]["if_exists"] == "file"
     assert calls["att"]["item_key"] == "QWER5678"
+
+
+def _isolate_discovery(monkeypatch, tmp_path):
+    import importlib.util
+    monkeypatch.setattr(zotero, "_DISCOVERED", None)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("APPDATA", raising=False)
+    monkeypatch.delenv("PIPX_HOME", raising=False)
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    real_find = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec",
+                        lambda n, *a: None if n == "zotero_mcp" else real_find(n, *a))
+
+
+def _fake_venv(root):
+    bin_dir = root / zotero._VENV_BIN
+    bin_dir.mkdir(parents=True)
+    py = bin_dir / zotero._PY_NAMES[0]
+    py.write_bytes(b"")
+    return bin_dir, py
+
+
+def test_discovers_zotero_server_from_claude_code_config(tmp_path, monkeypatch):
+    import json
+    _isolate_discovery(monkeypatch, tmp_path)
+    bin_dir, py = _fake_venv(tmp_path / "venv")
+    exe = bin_dir / ("zotero-mcp.exe" if zotero.os.name == "nt" else "zotero-mcp")
+    exe.write_bytes(b"")
+    (tmp_path / ".claude.json").write_text(json.dumps({"projects": {"/p": {"mcpServers": {
+        "zotero": {"command": str(exe), "args": ["serve"], "env": {"ZOTERO_API_KEY": "k"}}}}}}),
+        encoding="utf-8")
+
+    found = zotero.discover_zotero_mcp({})
+
+    assert found["python"] == py
+    assert found["env"] == {"ZOTERO_API_KEY": "k"}
+
+
+def test_discovers_python_launcher_script_as_env_script(tmp_path, monkeypatch):
+    import json
+    _isolate_discovery(monkeypatch, tmp_path)
+    _, py = _fake_venv(tmp_path / "venv")
+    (tmp_path / ".mcp.json").write_text(json.dumps({"mcpServers": {
+        "refs": {"command": str(py), "args": [str(tmp_path / "run_zotero_mcp.py")]}}}),
+        encoding="utf-8")
+
+    found = zotero.discover_zotero_mcp({})
+
+    assert found["python"] == py
+    assert found["env_script"].endswith("run_zotero_mcp.py")
+
+
+def test_discovers_uv_tool_install_and_off_disables(tmp_path, monkeypatch):
+    _isolate_discovery(monkeypatch, tmp_path)
+    _, py = _fake_venv(tmp_path / ".local" / "share" / "uv" / "tools" / "zotero-mcp-server")
+
+    assert zotero.discover_zotero_mcp({"zotero_mcp_python": "off"}) is None
+    assert zotero.discover_zotero_mcp({})["python"] == py
+
+
+def test_no_zotero_mcp_anywhere_falls_back_to_web_api(tmp_path, monkeypatch):
+    _isolate_discovery(monkeypatch, tmp_path)
+    assert zotero.discover_zotero_mcp({}) is None
+    result = zotero.push_to_zotero("10.1/x", None, {})
+    assert result == {"success": False, "error": "Zotero API key not configured"}

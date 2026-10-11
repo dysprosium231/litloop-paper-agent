@@ -59,7 +59,7 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 | `scansci_pdf_search` | 关键词/作者搜索（OpenAlex） | `query`/`author`/`author_id`、`limit`、`year_from`、`year_to`、`sort` |
 | `scansci_pdf_parse_list` | 解析论文列表文件（APA/BibTeX/DOI 列表/表格） | `file_path`（必需） |
 | `scansci_pdf_citation` | 导出引文 | `identifier`（必需）、`format`（bibtex/ris/endnote/metadata） |
-| `scansci_pdf_zotero_push` | 推送已下载论文到 Zotero | `identifier`（必需，需先下载） |
+| `scansci_pdf_zotero_push` | 推送已下载论文和 PDF 到 Zotero（自动使用已安装的 zotero-mcp） | `identifier`（必需，需先下载）, `collections`, `tags` |
 
 **重要**：`verify`/`resolve_oa` 是轻量操作，预算 45 秒内返回；超时会返回结构化错误（`stage`/`timeout_seconds`/`retryable`），不会无反馈地等 180 秒。`resolve_oa` 依赖 Unpaywall 邮箱配置（`scansci_pdf_config(key='email', ...)`），缺失时直接返回 `blocked_configuration` 而不是逐条失败。
 
