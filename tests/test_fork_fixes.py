@@ -490,3 +490,10 @@ def test_known_landing_urls_skip_doi_org():
     assert f("10.1038/s41563-025-02281-z") == "https://www.nature.com/articles/s41563-025-02281-z"
     assert f("10.1007/978-3-030-1") == "https://link.springer.com/chapter/10.1007/978-3-030-1"
     assert f("10.1063/5.0282339") == ""  # AIP needs doi.org
+
+
+def test_direct_http_skipped_behind_bot_walls():
+    from scansci_pdf._publisher_strategies_core import _direct_pdf_urls
+    assert _direct_pdf_urls("10.1021/acsami.5c16640", "ACS") == []
+    springer = _direct_pdf_urls("10.1007/s10853-026-13435-y", "Springer")
+    assert springer and len(springer) == len(set(springer))

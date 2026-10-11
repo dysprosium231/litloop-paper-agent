@@ -905,8 +905,20 @@ def _try_browser_fetch_pdf(page: Any, paths: list[str]) -> bytes | None:
     return None
 
 
+# Sites whose bot wall answers plain HTTP clients with 403 whatever cookies
+# they carry (the clearance is bound to the browser fingerprint). The direct
+# HTTP try only delayed the browser: pubs.acs.org takes ~12.6 s to say 403.
+_HTTP_DIRECT_BLOCKED = frozenset({"ACS", "Wiley", "RSC", "IOP"})
+
+
 def _direct_pdf_urls(doi: str, publisher: str) -> list[str]:
-    """Build direct PDF URL candidates for a publisher."""
+    """Build direct PDF URL candidates for a publisher (deduplicated)."""
+    if publisher in _HTTP_DIRECT_BLOCKED:
+        return []
+    return list(dict.fromkeys(_direct_pdf_url_candidates(doi, publisher)))
+
+
+def _direct_pdf_url_candidates(doi: str, publisher: str) -> list[str]:
     urls: list[str] = []
 
     if publisher == "Elsevier":
