@@ -203,14 +203,18 @@ def resolve_doi(doi: str, config: dict[str, Any]) -> str | None:
     try:
         s = requests.Session()
         s.trust_env = False
-        resp = s.head(f"https://doi.org/{doi}", allow_redirects=True,
+        # doi.org's own redirect already names the publisher URL; following it
+        # to the publisher (6+ s on the slow route to Nature's CDN) adds nothing.
+        from ..network import apply_host_proxy
+        apply_host_proxy(s, config)  # doi.org may be on the proxy exception list
+        resp = s.head(f"https://doi.org/{doi}", allow_redirects=False,
                       timeout=10, headers={"User-Agent": USER_AGENT})
-        resolved = resp.url.lower()
+        url = resp.headers.get("location", "") if resp.is_redirect else resp.url
         known_patterns = []
         for pub in PUBLISHERS:
             known_patterns.extend(pub[2])
-        if any(p.lower() in resolved for p in known_patterns):
-            return resp.url
+        if url and any(p.lower() in url.lower() for p in known_patterns):
+            return url.replace("http://", "https://", 1)
     except Exception:
         pass
     return None

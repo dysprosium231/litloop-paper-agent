@@ -315,7 +315,12 @@ def _fetch_direct_via_socks5(url: str, config: dict[str, Any], *, stream: bool =
 def _resolve_doi_url(doi: str) -> str | None:
     """Resolve DOI to get the publisher URL."""
     try:
-        resp = requests.get(
+        from ..config import load_config
+        from ..network import apply_host_proxy
+        session = requests.Session()
+        session.trust_env = False
+        apply_host_proxy(session, load_config())
+        resp = session.get(
             f"https://doi.org/{doi}",
             allow_redirects=True,
             timeout=15,

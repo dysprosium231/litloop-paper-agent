@@ -441,6 +441,25 @@ def _wait_any(events: tuple[threading.Event, threading.Event], timeout: float) -
     return any(e.is_set() for e in events)
 
 
+def _promote_publisher_browser(launchable: list[tuple[Any, str]], doi: str) -> None:
+    """Launch the paper's own publisher browser lane second, not after every cheap lane.
+
+    The hedged cascade adds one lane per hedge delay; for a paywalled paper the
+    publisher's browser lane (the one that can actually get it) used to start
+    only after ~5 open-access lanes, 7-8 s in. Second place keeps the best
+    cheap lane first, so open-access papers still win in a second or two.
+    """
+    try:
+        from .publishers import get_publisher
+        own = f"{get_publisher(doi)}Browser"
+    except Exception:
+        return
+    for i, (_fn, label) in enumerate(launchable):
+        if label == own and i > 1:
+            launchable.insert(1, launchable.pop(i))
+            return
+
+
 def _run_tiers_parallel(
     tiers: list[tuple[list[tuple[Any, str]], str, int]],
     doi: str,
@@ -592,6 +611,7 @@ def _run_tiers_parallel(
             log.info(f"   SKIP {label} (negative cache: recently failed for this publisher)")
             continue
         launchable.append((fn, label))
+    _promote_publisher_browser(launchable, doi)
 
     log.info(f"   Racing {len(all_sources)} sources across {len(tiers)} tiers ({mode_label})...")
     deadline = time.time() + overall_timeout + 5

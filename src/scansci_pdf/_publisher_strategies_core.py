@@ -79,12 +79,37 @@ _PICK_INSTITUTION_JS = """
 """
 
 
+def _known_landing_url(doi: str) -> str:
+    """Article URL built from the DOI, for publishers whose pattern is fixed.
+
+    Saves the doi.org hop (and its occasional timeouts) when opening the page
+    in a browser. Publishers whose URL needs data the DOI lacks (AIP, RSC)
+    keep going through doi.org.
+    """
+    d = doi.strip()
+    low = d.lower()
+    suffix = d.split("/", 1)[1] if "/" in d else ""
+    if low.startswith("10.1126/"):
+        return f"https://www.science.org/doi/{d}"
+    if low.startswith("10.1021/"):
+        return f"https://pubs.acs.org/doi/{d}"
+    if low.startswith("10.1038/") and suffix:
+        return f"https://www.nature.com/articles/{suffix}"
+    if low.startswith("10.1007/") and suffix:
+        kind = "chapter" if suffix.startswith("978-") else "article"
+        return f"https://link.springer.com/{kind}/{d}"
+    return ""
+
+
 def _resolve_doi_landing(doi: str) -> str:
     """Publisher landing URL for a DOI via the doi.org handle API ("" if unknown)."""
     import requests
     try:
+        from .config import load_config
+        from .network import apply_host_proxy
         s = requests.Session()
         s.trust_env = False
+        apply_host_proxy(s, load_config())
         r = s.get(f"https://doi.org/api/handles/{doi}", params={"type": "URL"}, timeout=15)
         for v in r.json().get("values", []):
             if v.get("type") == "URL":
@@ -1850,7 +1875,13 @@ def _browser_download(
             # If the page already offers its own PDF link, the session is entitled:
             # take it directly (text-based paywall detection misfires on pages that
             # show "access through your institution" even when access is granted).
-            _href = find_page_pdf_link(_page, max_wait_s=10)
+            # On a challenge page there is no PDF link yet: don't spend 10 s
+            # looking for one, go straight to the challenge wait below.
+            try:
+                _on_challenge = _is_challenge_page(_page.content())
+            except Exception:
+                _on_challenge = False
+            _href = None if _on_challenge else find_page_pdf_link(_page, max_wait_s=10)
             if _href:
                 from .browser_pdf import capture_pdf_via_cdp
                 log.info(f"   [{publisher}] page PDF link: {_href[:80]}")
@@ -1931,8 +1962,12 @@ def _browser_download(
             # own PDF link first, as for a page that loaded without a challenge.
             _page = _resolve_tab(tab_id)
             if _page is not None:
-                wait_url_stable(_page)
-                _href = find_page_pdf_link(_page, max_wait_s=10)
+                # Poll for the link while the article page is still loading
+                # rather than first waiting for its URL to stop changing (slow
+                # Silverchair pages took ~30 s to "settle" after the challenge).
+                # 45 s: the old settle wait (<=45 s) + 10 s link poll, minus the
+                # time a fast page no longer spends waiting for a stable URL.
+                _href = find_page_pdf_link(_page, max_wait_s=45)
                 if _href:
                     from .browser_pdf import capture_pdf_via_cdp
                     log.info(f"   [{publisher}] page PDF link after challenge: {_href[:80]}")
@@ -2258,6 +2293,8 @@ def _browser_download_with_fallback(
     wait_for_loading: float = 0,
 ) -> bool:
     """Try headless browser download, fallback to visible browser if paywall detected."""
+    if article_url.startswith("https://doi.org/"):
+        article_url = _known_landing_url(doi) or article_url
     result = _browser_download(doi, article_url, output_path, config, publisher,
                                wait_for_loading=wait_for_loading)
     if result:
@@ -3062,6 +3099,8 @@ def _resolve_elsevier_pii(doi: str, config: dict[str, Any]) -> str | None:
         s = requests.Session()
         s.trust_env = False
         s.headers.update({"User-Agent": USER_AGENT, "Accept": "text/html"})
+        from .network import apply_host_proxy
+        apply_host_proxy(s, config)
         resp = s.get(f"https://doi.org/{doi}", timeout=10, allow_redirects=True)
         final_url = str(resp.url)
         html = resp.text

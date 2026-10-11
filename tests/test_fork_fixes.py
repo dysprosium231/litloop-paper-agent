@@ -476,3 +476,17 @@ def test_host_proxy_exception_routes_only_listed_domains(monkeypatch):
     assert args[0].startswith("--proxy-pac-url=") and "PROXY 127.0.0.1:10808; DIRECT" in pac
     monkeypatch.setattr(network, "_proxy_reachable", lambda url: False)  # proxy off: all direct
     assert bb._direct_args(bb.BACKEND_PATCHRIGHT, None, [], cfg) == ["--no-proxy-server"]
+
+
+def test_publisher_browser_lane_is_launched_second():
+    lanes = [(None, n) for n in ("Crossref", "Unpaywall", "OpenAlexOA", "CORE", "ACSBrowser")]
+    sources._promote_publisher_browser(lanes, "10.1021/acsami.5c16640")
+    assert [n for _, n in lanes][:2] == ["Crossref", "ACSBrowser"]
+
+
+def test_known_landing_urls_skip_doi_org():
+    from scansci_pdf._publisher_strategies_core import _known_landing_url as f
+    assert f("10.1126/science.aeg4972") == "https://www.science.org/doi/10.1126/science.aeg4972"
+    assert f("10.1038/s41563-025-02281-z") == "https://www.nature.com/articles/s41563-025-02281-z"
+    assert f("10.1007/978-3-030-1") == "https://link.springer.com/chapter/10.1007/978-3-030-1"
+    assert f("10.1063/5.0282339") == ""  # AIP needs doi.org

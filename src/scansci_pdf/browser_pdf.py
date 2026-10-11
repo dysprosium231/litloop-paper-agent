@@ -114,7 +114,10 @@ def find_page_pdf_link(page: Any, max_wait_s: float = 15.0) -> str | None:
     Publisher pages (e.g. ScienceDirect) render the "View PDF" link with JS after
     DOMContentLoaded, so poll for it instead of looking once.
     """
-    for _ in range(int(max_wait_s * 2)):
+    # Wall-clock bound: an evaluate() on a page that is still loading can itself
+    # take seconds, so counting iterations under-waits on slow sites.
+    deadline = time.monotonic() + max_wait_s
+    while time.monotonic() < deadline:
         try:
             href = page.evaluate(PAGE_PDF_LINK_JS)
             if href:

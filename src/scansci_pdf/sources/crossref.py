@@ -57,6 +57,8 @@ def try_crossref_page_scrape(doi: str, output_path: Path, config: dict[str, Any]
         s = requests.Session()
         s.trust_env = False
         s.headers.update({"User-Agent": USER_AGENT})
+        from ..network import apply_host_proxy
+        apply_host_proxy(s, config)
         doi_resp = s.head(f"https://doi.org/{doi}", allow_redirects=True,
                           timeout=10)
         if doi_resp.status_code >= 400:
