@@ -1912,7 +1912,8 @@ def _browser_download(
             # of closing it and opening the visible fallback (a second window).
             max_wait = 150 if visible else 8
             log.info(f"   [{publisher}] challenge detected, waiting "
-                     + ("for you to complete it in the open window..." if visible else "for auto-resolve..."))
+                     + ("(usually resolves by itself; click it only if a checkbox appears)..."
+                        if visible else "for auto-resolve..."))
             waited = 0
             while True:
                 time.sleep(3 if visible else 8)
