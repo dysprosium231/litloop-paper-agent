@@ -28,9 +28,11 @@ from .log import get_logger
 
 log = get_logger()
 
-# Module-level error tracking for caller introspection
-_last_error_type: str = ""
-_last_error_action: str = ""
+# Per-thread error tracking for caller introspection: racing lanes run in
+# parallel threads, so a module-global would let one lane's error leak into
+# another lane's fallback decision.
+_ERR_TLS = threading.local()
+_LAST_ANY_ERROR = ["", ""]
 
 # Global lock to prevent multiple visible browser windows in parallel racing
 _visible_browser_lock = threading.Lock()
@@ -39,19 +41,51 @@ _visible_browser_active = False
 
 def get_last_error() -> tuple[str, str]:
     """Return (error_type, action) from last _browser_download call."""
-    return _last_error_type, _last_error_action
+    if hasattr(_ERR_TLS, "type"):
+        return _ERR_TLS.type, _ERR_TLS.action
+    # A thread that ran no browser strategy (the download's own thread, which
+    # builds the failure message) sees the latest error any lane reported.
+    return _LAST_ANY_ERROR[0], _LAST_ANY_ERROR[1]
 
 
 def _set_error(error_type: str, action: str = "") -> None:
-    global _last_error_type, _last_error_action
-    _last_error_type = error_type
-    _last_error_action = action
+    _ERR_TLS.type = error_type
+    _ERR_TLS.action = action
+    if error_type:
+        _LAST_ANY_ERROR[:] = [error_type, action]
 
 
 def _clear_error() -> None:
-    global _last_error_type, _last_error_action
-    _last_error_type = ""
-    _last_error_action = ""
+    _set_error("", "")
+    _LAST_ANY_ERROR[:] = ["", ""]  # same reporting semantics as the old global
+
+
+# Click the institution in a search-result list. Containers (the whole result
+# panel, the "Access content through your institution" heading block) also
+# contain the name, so take the shortest visible match: the result row itself.
+_PICK_INSTITUTION_JS = """
+(name) => {
+    const items = document.querySelectorAll('[role="option"], [class*="result"], [class*="suggestion"], [class*="federation"], li, a, button');
+    let best = null;
+    for (const el of items) {
+        const text = (el.textContent || '').trim();
+        if (!text.toLowerCase().includes(name.toLowerCase()) || el.offsetParent === null) continue;
+        if (!best || text.length < best.text.length) best = {el, text};
+    }
+    if (!best) return null;
+    best.el.click();
+    return best.text.substring(0, 60);
+}
+"""
+
+
+def _user_waiting() -> None:
+    """Heartbeat while the user is logging in, so racing does not give up on us."""
+    try:
+        from .sources import note_user_waiting
+        note_user_waiting()
+    except Exception:
+        pass
 
 
 def _get_profile_dir(config: dict[str, Any], publisher: str = "shared") -> Path:
@@ -200,6 +234,7 @@ def _detect_paywall(html: str, status_code: int = 0) -> bool:
         "please log in", "register to continue",
         "access denied", "you do not have access",
         "institutional login", "shibboleth", "openathens",
+        "check access",  # Science (AAAS): the only access cue on its article page
     ]
     if any(sig in lower for sig in paywall_signals):
         return True
@@ -333,20 +368,7 @@ def _try_institutional_login(tab_id: str, config: dict[str, Any], publisher: str
         time.sleep(3)
 
         # Click matching institution result
-        clicked = evaluate_js(tab_id, f"""
-            (() => {{
-                const name = {json.dumps(idp_en)};
-                const items = document.querySelectorAll('[class*="result"], [class*="suggestion"], [class*="federation"], li, a, button');
-                for (const el of items) {{
-                    const text = el.textContent || '';
-                    if (text.includes(name) && el.offsetParent !== null) {{
-                        el.click();
-                        return text.trim().substring(0, 60);
-                    }}
-                }}
-                return null;
-            }})()
-        """, config)
+        clicked = evaluate_js(tab_id, f"({_PICK_INSTITUTION_JS})({json.dumps(idp_en)})", config)
 
         if clicked:
             log.info(f"   [{publisher}] selected institution: {clicked}")
@@ -398,12 +420,14 @@ def _wait_login_in_tab(tab_id: str, config: dict[str, Any], publisher: str, idp_
     print("  登录成功后会自动继续下载\n")
 
     for _ in range(100):  # ~5 min
+        _user_waiting()
         try:
             page.wait_for_timeout(3000)
             title = page.title() or ""
             url = page.url or ""
         except Exception:
             log.info(f"   [{publisher}] browser closed during login")
+            _set_error("login_abandoned", "retry_login")
             return False
         is_auth = any(x in title for x in _AUTH_TITLES) or any(x in url.lower() for x in _AUTH_KEYWORDS)
         if not is_auth:
@@ -416,6 +440,7 @@ def _wait_login_in_tab(tab_id: str, config: dict[str, Any], publisher: str, idp_
             return True
 
     log.info(f"   [{publisher}] login timed out")
+    _set_error("login_abandoned", "retry_login")
     return False
 
 
@@ -490,6 +515,7 @@ def _visible_institutional_login(
         print("  登录成功后浏览器会自动跳转回文章页面，程序会自动检测\n")
 
         for i in range(100):
+            _user_waiting()
             time.sleep(3)
             try:
                 title = page.title()
@@ -669,18 +695,7 @@ def _visible_browser_download(
                 if si:
                     si.fill(idp_en)
                     time.sleep(3)
-                    clicked = sso_page.evaluate(f"""
-                        (name) => {{
-                            const items = document.querySelectorAll('[class*="result"], [class*="suggestion"], [class*="federation"], li, a, button');
-                            for (const el of items) {{
-                                if (el.textContent.includes(name) && el.offsetParent !== null) {{
-                                    el.click();
-                                    return true;
-                                }}
-                            }}
-                            return false;
-                        }}
-                    """, idp_en)
+                    clicked = sso_page.evaluate(_PICK_INSTITUTION_JS, idp_en)
                     if clicked:
                         log.info(f"   [{publisher}] selected institution '{idp_en}'")
                         time.sleep(5)
@@ -692,6 +707,7 @@ def _visible_browser_download(
 
         login_ok = False
         for i in range(100):
+            _user_waiting()
             time.sleep(3)
             # Check ALL pages in context — SSO may happen in any tab
             any_auth = False
@@ -1531,6 +1547,7 @@ def _browser_download_visible(
 
             logged_in = False
             for _ in range(100):
+                _user_waiting()
                 time.sleep(3)
                 try:
                     cur_title = page.title()
@@ -1872,7 +1889,10 @@ def _browser_download(
                     _set_error("not_entitled", "no_subscription")
                     return False
             else:
-                _set_error("paywall", "login_required")
+                # Keep a more specific reason (login_abandoned: the user was
+                # already asked to log in — don't reopen another window).
+                if not get_last_error()[0]:
+                    _set_error("paywall", "login_required")
                 return False
 
         # Also detect paywall by absence of PDF links (Cell Press pattern)
@@ -2128,7 +2148,7 @@ def _browser_download(
                 return download_pdf_via_browser(pdf_url, output_path, config)
 
         log.info(f"   [{publisher}] no PDF link found on page")
-        if not _last_error_type:
+        if not get_last_error()[0]:
             _set_error("no_pdf_found", "try_other_source")
         return False
     finally:
@@ -2828,7 +2848,7 @@ def try_elsevier_browser(
 
     # Fallback to general browser download for ScienceDirect articles
     # Only try if we haven't already detected a paywall
-    if not _last_error_type:
+    if not get_last_error()[0]:
         # Resolve DOI to direct sciencedirect.com URL (avoid linkinghub)
         article_url = _resolve_elsevier_pii(doi, config) or f"https://doi.org/{doi}"
         if _browser_download_with_fallback(doi, article_url, output_path, config, "Elsevier"):

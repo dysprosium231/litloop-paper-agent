@@ -321,3 +321,82 @@ def test_openalex_source_sends_key_as_api_key(monkeypatch, tmp_path):
     monkeypatch.setattr(openalex, "fetch_json", lambda url, cfg: urls.append(url) or None)
     openalex.try_openalex_content_api("10.1/x", tmp_path / "o.pdf", {"openalex_api_key": "K123"})
     assert urls and "api_key=K123" in urls[0] and "mailto=K123" not in urls[0]
+
+
+# ---------------------------------------------------------------- login in progress
+
+def test_race_keeps_waiting_while_user_logs_in(tmp_path, monkeypatch, no_browser_kill):
+    """The race must not give up (and open the next phase's window) mid-login."""
+    from scansci_pdf import pdf_utils
+    real_wait = sources._wait_any
+    monkeypatch.setattr(sources, "_wait_any", lambda ev, t: real_wait(ev, min(t, 0.2)))
+    monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda p: False)
+
+    def logging_in(doi, out, config):
+        for _ in range(15):  # the user takes longer than the race's grace period
+            sources.note_user_waiting()
+            time.sleep(0.1)
+        out.write_bytes(b"%PDF-1.4 ok")
+        return {"success": True, "file": str(out)}
+
+    tiers = [([(logging_in, "ScienceBrowser"), (lambda *a: None, "Fast")], "T", 0)]
+    r = sources._run_tiers_parallel(tiers, "10.1/login", tmp_path, tmp_path / "o.pdf",
+                                    {"hedge_delay_seconds": 0},
+                                    False, 0)
+    assert r and r["success"]
+
+
+def test_waived_lane_cannot_launch_a_browser(monkeypatch):
+    import threading
+    monkeypatch.setattr(bb, "_launch_unregistered", lambda **kw: pytest.fail("launched"))
+    race = threading.Event()
+    sources._SOURCE_TLS.race = race
+    try:
+        assert sources._source_may_continue()
+        race.set()  # the race returned without this lane
+        with pytest.raises(RuntimeError):
+            bb.launch(headless=True)
+    finally:
+        sources._SOURCE_TLS.race = None
+
+
+def test_browser_errors_are_per_thread():
+    import threading
+    from scansci_pdf import _publisher_strategies_core as core
+    core._set_error("login_abandoned", "retry_login")
+    other = {}
+    t = threading.Thread(target=lambda: (core._clear_error(), other.update(e=core.get_last_error())))
+    t.start(); t.join()
+    assert other["e"] == ("", "")
+    assert core.get_last_error() == ("login_abandoned", "retry_login")
+    core._clear_error()
+
+
+def test_school_login_hosts_are_not_tsinghua_only():
+    from scansci_pdf.institutional.publisher_batch import _is_school_login_host as f
+    assert f("sso.buaa.edu.cn") and f("idp.tsinghua.edu.cn")
+    assert not f("ds.carsi.edu.cn") and not f("www.science.org")
+
+
+def test_science_check_access_is_a_paywall():
+    from scansci_pdf._publisher_strategies_core import _detect_paywall
+    assert _detect_paywall('<button>CHECK ACCESS</button>')
+
+
+def test_race_waits_for_download_after_login(tmp_path, monkeypatch, no_browser_kill):
+    """Login done (heartbeats stop), PDF capture still running: keep waiting."""
+    from scansci_pdf import pdf_utils
+    real_wait = sources._wait_any
+    monkeypatch.setattr(sources, "_wait_any", lambda ev, t: real_wait(ev, min(t, 0.2)))
+    monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda p: False)
+
+    def login_then_download(doi, out, config):
+        sources.note_user_waiting()  # last heartbeat: login finished
+        time.sleep(1.5)              # reopening the article + capturing the PDF
+        out.write_bytes(b"%PDF-1.4 ok")
+        return {"success": True, "file": str(out)}
+
+    tiers = [([(login_then_download, "ScienceBrowser"), (lambda *a: None, "Fast")], "T", 0)]
+    r = sources._run_tiers_parallel(tiers, "10.1/after-login", tmp_path, tmp_path / "o.pdf",
+                                    {"hedge_delay_seconds": 0}, False, 0)
+    assert r and r["success"]

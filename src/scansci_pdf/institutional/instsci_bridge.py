@@ -324,6 +324,13 @@ def _try_browser_batch_download(
 
     record = PaperRecord(doi=doi)
     institution_query = config.get("vpnsci_school", "")
+    # Publisher institution pickers are searched in English ("Beihang"),
+    # the configured school name is Chinese.
+    try:
+        from .._publisher_strategies_core import _IDP_MAP
+        institution_query = _IDP_MAP.get(institution_query, institution_query)
+    except Exception:
+        pass
     login_timeout = config.get("browser_login_timeout", 300)
 
     downloader = PublisherBatchDownloader(

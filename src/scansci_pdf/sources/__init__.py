@@ -530,14 +530,17 @@ def _run_tiers_parallel(
     submission_done = threading.Event()  # staggered scheduler finished launching lanes
     lanes_idle = threading.Event()       # every launched-so-far lane has answered
     shared_result: dict[str, Any] = {"result": None}
+    race_over = threading.Event()  # set when this race returns; waived lanes stop launching
 
     def _try_and_publish(fn, label, src_output):
         # Skip if another source already succeeded
         if cancel_event.is_set():
             return None
+        _SOURCE_TLS.race = race_over
         try:
             result = _try_source(fn, doi, src_output, config, label, use_tor=use_tor)
         finally:
+            _SOURCE_TLS.race = None
             # This pool is created per download (issue #57): once its worker
             # threads die, their thread-local shared browsers are unreachable
             # to close_shared_browser() and the atexit reaper only fires at
@@ -653,6 +656,15 @@ def _run_tiers_parallel(
             grace = 15
         log.info(f"   Racing timed out after {overall_timeout + 5}s, waiting up to {grace}s for late results...")
         _wait_any((success_event, all_done_event), grace)
+        # A lane is waiting for the user's login: keep waiting while its
+        # heartbeat is fresh instead of abandoning a login in progress.
+        if _user_waiting_for(doi):
+            log.info("   A source is waiting for your login — waiting for it...")
+            stop_at = time.time() + _USER_WAIT_MAX_S
+            while (not success_event.is_set() and not all_done_event.is_set()
+                   and not _cancelled() and time.time() < stop_at
+                   and _user_waiting_for(doi)):
+                _wait_any((success_event, all_done_event), 3.0)
         if shared_result["result"] is not None:
             result, label, src_output = shared_result["result"]
             final_path = Path(result.get("file", ""))
@@ -689,6 +701,7 @@ def _run_tiers_parallel(
         # pending futures and waive stragglers. Their own I/O deadlines
         # (connect/read timeouts, stream deadline in pdf_utils) bound how long
         # an abandoned worker thread can outlive the race.
+        race_over.set()
         alive = [f for f in futures if not f.done()]
         if alive:
             log.info(f"   Racing finished with {len(alive)} source(s) still running (waived)")
@@ -854,6 +867,28 @@ _INFLIGHT: set[str] = set()
 _SETTLED: set[str] = set()
 _SOURCE_TLS = threading.local()
 
+# Heartbeats from sources that are waiting for the user to log in, by DOI.
+# The race must not give up (and open the next phase's window) while the user
+# is in the middle of a login.
+_USER_WAIT: dict[str, float] = {}
+# Heartbeats stop the moment the login succeeds, but the source still has to
+# reopen the article and capture the PDF: keep waiting this long after the
+# last heartbeat so the race doesn't open the next phase's window meanwhile.
+_USER_WAIT_FRESH_S = 120.0
+_USER_WAIT_MAX_S = 600.0
+
+
+def note_user_waiting() -> None:
+    """Called by a source on every poll while it waits for the user's login."""
+    doi = getattr(_SOURCE_TLS, "doi", None)
+    if doi:
+        _USER_WAIT[doi] = time.time()
+
+
+def _user_waiting_for(doi: str) -> bool:
+    key = normalize_doi(doi) if not is_arxiv_identifier(doi) else doi
+    return time.time() - _USER_WAIT.get(key, 0.0) < _USER_WAIT_FRESH_S
+
 
 # Cooperative cancellation. cancel_downloads() bumps the generation; every
 # download() remembers the generation it started under (thread-local), so it
@@ -885,7 +920,10 @@ def cancel_downloads() -> dict[str, Any]:
 
 
 def _source_may_continue() -> bool:
-    """LAUNCH_GUARD hook: False when this thread's download has already finished."""
+    """LAUNCH_GUARD hook: False once this thread's race or download is over."""
+    race = getattr(_SOURCE_TLS, "race", None)
+    if race is not None and race.is_set():
+        return False  # waived lane: its race already returned
     doi = getattr(_SOURCE_TLS, "doi", None)
     return not (doi and doi in _SETTLED)
 
