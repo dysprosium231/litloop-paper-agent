@@ -23,17 +23,31 @@ _FINAL_BLOCK_MARKERS = ("浏览器不支持", "browser is not supported", "unsup
                         "your browser is not supported")
 
 PAGE_PDF_LINK_JS = """
-() => {
+(doi) => {
+    // "Recommended articles" lists may carry other papers' PDF links: prefer a
+    // link naming this DOI, else fall back to the first one in page order
+    // (the article's own button comes first; some URLs, e.g. ACS
+    // /article-pdf/.../am5c16640.pdf, do not contain the DOI).
+    const want = (doi || '').toLowerCase();
+    const suffix = want.includes('/') ? want.split('/').slice(1).join('/') : '';
+    let first = null;
     for (const a of document.querySelectorAll('a[href]')) {
         const href = a.getAttribute('href') || '';
         const low = href.toLowerCase();
         if (low.includes('pdfft') || low.includes('/doi/pdf') || low.includes('/pdfdirect/')
             || low.includes('/content/pdf/') || low.includes('/stamp/stamp.jsp')
             // Silverchair platforms (RSC since 2026, OUP): /article-pdf/doi/...pdf
-            || low.includes('/article-pdf/') || low.includes('/content/articlepdf/'))
-            return new URL(href, location.href).href;
+            || low.includes('/article-pdf/') || low.includes('/content/articlepdf/')) {
+            let abs;
+            try { abs = new URL(href, location.href).href; } catch (e) { continue; }
+            if (!want) return abs;
+            first = first || abs;
+            let plain = abs.toLowerCase();
+            try { plain = decodeURIComponent(plain); } catch (e) {}
+            if (plain.includes(want) || (suffix && plain.includes(suffix))) return abs;
+        }
     }
-    return null;
+    return first;
 }
 """
 
@@ -108,7 +122,7 @@ def wait_url_stable(page: Any, max_wait_s: float = 45.0) -> str:
     return prev
 
 
-def find_page_pdf_link(page: Any, max_wait_s: float = 15.0) -> str | None:
+def find_page_pdf_link(page: Any, max_wait_s: float = 15.0, doi: str = "") -> str | None:
     """Return the article page's own PDF link (carries page-issued tokens), if any.
 
     Publisher pages (e.g. ScienceDirect) render the "View PDF" link with JS after
@@ -119,7 +133,7 @@ def find_page_pdf_link(page: Any, max_wait_s: float = 15.0) -> str | None:
     deadline = time.monotonic() + max_wait_s
     while time.monotonic() < deadline:
         try:
-            href = page.evaluate(PAGE_PDF_LINK_JS)
+            href = page.evaluate(PAGE_PDF_LINK_JS, doi or "")
             if href:
                 return href
         except Exception:

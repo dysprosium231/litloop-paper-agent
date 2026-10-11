@@ -673,7 +673,7 @@ def _visible_browser_download(
 
         def _page_pdf_via_cdp() -> dict[str, Any] | None:
             """Open the page's own PDF link in the browser and read the body via CDP."""
-            href = find_page_pdf_link(page)
+            href = find_page_pdf_link(page, doi=doi)
             if not href:
                 return None
             log.info(f"   [{publisher}] page PDF link: {href[:80]}")
@@ -1893,7 +1893,7 @@ def _browser_download(
                 _on_challenge = _is_challenge_page(_page.content())
             except Exception:
                 _on_challenge = False
-            _href = None if _on_challenge else find_page_pdf_link(_page, max_wait_s=10)
+            _href = None if _on_challenge else find_page_pdf_link(_page, max_wait_s=10, doi=doi)
             if _href:
                 from .browser_pdf import capture_pdf_via_cdp
                 log.info(f"   [{publisher}] page PDF link: {_href[:80]}")
@@ -1979,7 +1979,7 @@ def _browser_download(
                 # Silverchair pages took ~30 s to "settle" after the challenge).
                 # 45 s: the old settle wait (<=45 s) + 10 s link poll, minus the
                 # time a fast page no longer spends waiting for a stable URL.
-                _href = find_page_pdf_link(_page, max_wait_s=45)
+                _href = find_page_pdf_link(_page, max_wait_s=45, doi=doi)
                 if _href:
                     from .browser_pdf import capture_pdf_via_cdp
                     log.info(f"   [{publisher}] page PDF link after challenge: {_href[:80]}")
@@ -2007,7 +2007,7 @@ def _browser_download(
                 _page = _resolve_tab(tab_id)
                 if _page is not None:
                     wait_url_stable(_page)
-                    _href = find_page_pdf_link(_page, max_wait_s=10)
+                    _href = find_page_pdf_link(_page, max_wait_s=10, doi=doi)
                     if _href:
                         from .browser_pdf import capture_pdf_via_cdp
                         log.info(f"   [{publisher}] page PDF link after login: {_href[:80]}")

@@ -957,7 +957,7 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
 
         # Strategy 0: the article page's own PDF link (carries page-issued tokens),
         # opened by the browser itself and read via CDP
-        page_pdf_href = find_page_pdf_link(page)
+        page_pdf_href = find_page_pdf_link(page, doi=doi)
         if page_pdf_href:
             log.info(f"   [WebVPN-Browser] Page PDF link: {page_pdf_href[:80]}")
             result = _save_bytes(capture_pdf_via_cdp(context, page, page_pdf_href))

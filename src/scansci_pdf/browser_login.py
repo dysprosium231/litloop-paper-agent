@@ -208,6 +208,10 @@ def _save_cookies_json(cookies: list[dict[str, Any]], cookie_file: Path) -> None
         encoding="utf-8",
     )
     # Also sync to legacy webvpn-cookies.json for PaperFetcher.auth compatibility
+    # — WebVPN logins only: CARSI/publisher logins save through here too and
+    # would overwrite the WebVPN session with unrelated cookies.
+    if cookie_file.name != "instsci-cookies.json":
+        return
     try:
         from .auth import _get_cookie_path
         auth_cookie_path = _get_cookie_path({})

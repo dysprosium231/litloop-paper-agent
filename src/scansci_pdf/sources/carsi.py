@@ -384,7 +384,7 @@ class CARSIClient:
 
                     # Step 5b: Fetch the page's own PDF link (carries page-issued tokens,
                     # e.g. ScienceDirect's /pdfft?md5=...&pid=...)
-                    page_pdf_href = find_page_pdf_link(page)
+                    page_pdf_href = find_page_pdf_link(page, doi=doi)
                     if page_pdf_href:
                         log.info(f"   [CARSI-Browser] Page PDF link: {page_pdf_href[:80]}")
                         saved = _try_fetch_pdf(page_pdf_href)
