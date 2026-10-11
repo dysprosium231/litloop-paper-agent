@@ -612,8 +612,9 @@ def test_journal_filters_and_drop_counts():
 
 
 def test_finalize_flags_and_optionally_drops_retracted(monkeypatch):
-    from scansci_pdf import search as s
+    from scansci_pdf import abstracts, search as s
     monkeypatch.setattr(s, "_add_journal_rank", lambda rows: rows)
+    monkeypatch.setattr(abstracts, "fill_abstracts", lambda rows, config=None: None)
 
     def fake_flag(rows):
         for r in rows:

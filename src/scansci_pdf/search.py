@@ -57,7 +57,8 @@ def _reconstruct_abstract(inverted_index: dict | None) -> str:
                 if isinstance(pos, int):
                     word_positions.append((pos, word))
     word_positions.sort()
-    return " ".join(w for _, w in word_positions)[:500]
+    # No cut here: clean_abstract caps very long ones, keeping the conclusion.
+    return " ".join(w for _, w in word_positions)
 
 
 def _search_openalex(
@@ -304,7 +305,7 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
                 seen.add(extra["doi"].lower())
                 extra["_matched"] = True  # OpenAlex matched it in title/abstract
                 results.append(extra)
-    results = _drop_off_topic(results, query)
+    results = _dedupe_titles(_drop_off_topic(results, query))
     if sort == "cited_by_count":
         results.sort(key=lambda x: x.get("cited_by_count", 0), reverse=True)
     elif sort == "publication_date":
@@ -329,7 +330,36 @@ def _finalize(results: list[dict[str, Any]], limit: int, *, max_cas_zone=None, m
         if stats is not None:
             stats["dropped_retracted"] = len(candidates) - len(kept)
         candidates = kept
-    return candidates[:limit]
+    shown = candidates[:limit]
+    # What the screener reads: clean abstracts, missing ones fetched
+    # (Semantic Scholar -> Scopus -> Crossref), short author lists.
+    from .abstracts import fill_abstracts, trim_authors
+    trim_authors(shown)
+    fill_abstracts(shown, load_config())
+    return shown
+
+
+def _dedupe_titles(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One record per paper: a preprint and its published version, or the same
+    paper from two sources under different DOIs/casing, share a title. The
+    first (best-ranked) wins; a DOI and a journal are borrowed if it lacks them."""
+    seen: dict[str, dict[str, Any]] = {}
+    out = []
+    for r in results:
+        key = re.sub(r"[^a-z0-9]+", "", str(r.get("title") or "").lower())
+        if len(key) < 20:  # too short to be sure
+            out.append(r)
+            continue
+        first = seen.get(key)
+        if first is None:
+            seen[key] = r
+            out.append(r)
+            continue
+        for field in ("doi", "journal", "issn", "abstract"):
+            if not first.get(field) and r.get(field):
+                first[field] = r[field]
+        first["cited_by_count"] = max(first.get("cited_by_count") or 0, r.get("cited_by_count") or 0)
+    return out
 
 
 def _filter_by_journal(results, max_cas_zone, max_jcr_quartile, exclude_warning, stats,

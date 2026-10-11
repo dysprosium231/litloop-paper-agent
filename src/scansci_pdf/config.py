@@ -123,6 +123,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Python that has zotero-mcp installed ("" = find it automatically, "off"
     # = use the web API), and an optional script that sets its ZOTERO_* env
     # vars (its serve call must be under __main__).
+    # Fetch abstracts missing from search results (Semantic Scholar, then
+    # Scopus with elsevier_api_key, then Crossref) so screening reads them.
+    "search_fill_abstracts": True,
     "zotero_mcp_python": "",
     "zotero_mcp_env_script": "",
     "zotero_push_timeout": 900,
