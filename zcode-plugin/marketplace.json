@@ -1,18 +1,18 @@
 {
   "name": "scansci-pdf",
-  "description": "ScanSci PDF plugin marketplace: academic literature triage, batch downloading, institutional access, and MCP server for ZCode.",
+  "description": "LitLoop plugin marketplace (derived from Rimagination/scansci-pdf): academic literature triage, batch downloading, institutional access, and MCP server for ZCode.",
   "owner": {
-    "name": "Rimagination"
+    "name": "dysprosium231"
   },
   "plugins": [
     {
       "name": "scansci-pdf",
       "source": "./",
-      "icon": "https://raw.githubusercontent.com/Rimagination/scansci-pdf/main/zcode-plugin/icon.png",
-      "description": "ScanSci 学术文献全家桶:大清单嗅探分类(sort)、单篇/批量下载、机构渠道(Elsevier API/WebVPN/CARSI)、检索发现、诊断排障。携带 scansci-pdf MCP server,即装即用。",
+      "icon": "https://raw.githubusercontent.com/dysprosium231/litloop-paper-agent/main/zcode-plugin/icon.png",
+      "description": "LitLoop 学术论文 Agent（衍生自 scansci-pdf）:大清单嗅探分类(sort)、单篇/批量下载、机构渠道(Elsevier API/WebVPN/CARSI)、检索发现、诊断排障。携带 scansci-pdf MCP server,即装即用。",
       "version": "1.18.0",
       "author": {
-        "name": "Rimagination"
+        "name": "dysprosium231"
       },
       "category": "productivity",
       "keywords": [
@@ -25,7 +25,7 @@
         "批量下载",
         "开放获取"
       ],
-      "homepage": "https://github.com/Rimagination/scansci-pdf"
+      "homepage": "https://github.com/dysprosium231/litloop-paper-agent"
     }
   ]
 }

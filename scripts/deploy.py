@@ -24,7 +24,7 @@ from pathlib import Path
 if sys.version_info < (3, 11):
     sys.exit("scansci-pdf needs Python 3.11+; run this script with a newer python.")
 
-REPO_URL = "https://github.com/dysprosium231/scansci-pdf.git"
+REPO_URL = "https://github.com/dysprosium231/litloop-paper-agent.git"
 FIND_URL = "git+https://github.com/dysprosium231/easyseek.git"
 SERVER = "scansci-pdf"
 SKILLS = ("scansci-pdf", "scansci-sort")
@@ -373,7 +373,8 @@ def main() -> int:
     if not any(r.startswith(("Claude", "Codex")) for r in REPORT["steps"]):
         REPORT["next"].append("No AI client was registered. Add this MCP server manually: "
                               + json.dumps({"command": server_cmd(py)[0], "args": server_cmd(py)[1:]}))
-    install_skills(args.dry_run)
+    if clients:
+        install_skills(args.dry_run)
     checks(py, args.dry_run)
 
     REPORT["next"].insert(0, "Restart Claude Code / Codex / Claude Desktop so they load the new version.")

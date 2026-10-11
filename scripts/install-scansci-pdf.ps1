@@ -2,7 +2,7 @@
 param(
     [string]$PluginDir = (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'plugins\scansci-pdf'),
     [string]$MarketplacePath = (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.agents\plugins\marketplace.json'),
-    [string]$Repo = 'https://github.com/Rimagination/scansci-pdf.git',
+    [string]$Repo = 'https://github.com/dysprosium231/litloop-paper-agent.git',
     [string]$Branch = 'main',
     [switch]$SkipPull,
     [switch]$SkipInstall,
@@ -70,7 +70,10 @@ if (Test-Path -LiteralPath $resolvedPluginDir) {
         try {
             Invoke-Native 'git' @('fetch', 'origin', $Branch)
             Invoke-Native 'git' @('checkout', $Branch)
-            Invoke-Native 'git' @('pull', '--ff-only', 'origin', $Branch)
+            & git merge --ff-only "origin/$Branch"
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Cannot fast-forward (the fork history was rewritten, or there are local commits). Run: python scripts/deploy.py'
+            }
         }
         finally {
             Pop-Location

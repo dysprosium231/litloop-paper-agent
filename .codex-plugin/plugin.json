@@ -1,13 +1,13 @@
 {
   "name": "scansci-pdf",
   "version": "1.18.0",
-  "description": "ScanSci PDF turns academic paper search, citation export, open-access discovery, and authorized institutional access into a reusable agent workflow.",
+  "description": "LitLoop (Academic Paper Agent) turns academic paper search, download, Zotero filing and citation export into a reusable agent workflow. Derived from Rimagination/scansci-pdf.",
   "author": {
-    "name": "Rimagination",
-    "url": "https://github.com/Rimagination"
+    "name": "dysprosium231",
+    "url": "https://github.com/dysprosium231"
   },
-  "homepage": "https://github.com/Rimagination/scansci-pdf",
-  "repository": "https://github.com/Rimagination/scansci-pdf",
+  "homepage": "https://github.com/dysprosium231/litloop-paper-agent",
+  "repository": "https://github.com/dysprosium231/litloop-paper-agent",
   "license": "Apache-2.0",
   "keywords": [
     "academic papers",
@@ -20,21 +20,21 @@
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
-    "displayName": "ScanSci PDF",
+    "displayName": "LitLoop",
     "shortDescription": "Search, organize, cite, and retrieve academic papers with MCP.",
-    "longDescription": "ScanSci PDF gives Codex a research-paper workflow built around DOI and arXiv discovery, citation export, batch queues, metadata checks, open-access resolution, and user-authorized institutional access. It reports the source and result for each retrieval and keeps the full workflow available through a local MCP server.",
-    "developerName": "Rimagination",
+    "longDescription": "LitLoop gives Codex a research-paper workflow built around DOI and arXiv discovery, citation export, batch queues, metadata checks, open-access resolution, and user-authorized institutional access. It reports the source and result for each retrieval and keeps the full workflow available through a local MCP server. Derived from Rimagination/scansci-pdf (Apache-2.0).",
+    "developerName": "dysprosium231",
     "category": "Science",
     "capabilities": [
       "Interactive",
       "Read",
       "Write"
     ],
-    "websiteURL": "https://github.com/Rimagination/scansci-pdf",
+    "websiteURL": "https://github.com/dysprosium231/litloop-paper-agent",
     "defaultPrompt": [
       "Search for papers and return verified DOI records",
       "Organize my paper list and export citations",
-      "Check ScanSci PDF access and download readiness"
+      "Check LitLoop access and download readiness"
     ],
     "brandColor": "#D71920",
     "composerIcon": "./assets/brand/scansci-pdf-icon.png",

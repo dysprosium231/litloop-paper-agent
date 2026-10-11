@@ -19,7 +19,7 @@ import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-REPO = os.environ.get("GITHUB_REPOSITORY", "Rimagination/scansci-pdf")
+REPO = os.environ.get("GITHUB_REPOSITORY", "dysprosium231/litloop-paper-agent")
 TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("STAR_HISTORY_TOKEN") or ""
 SVG_PATH = "star-history.svg"
 DATA_PATH = "stars.json"
@@ -176,7 +176,7 @@ def render_svg(series: list[tuple[str, int]]) -> str:
     )
     parts.append(
         f'<circle cx="{lx + 18}" cy="{ly + lh / 2}" r="5" fill="currentColor"/>'
-        f'<text x="{lx + 32}" y="{ly + lh / 2 + 6}" fill="currentColor">Rimagination/scansci-pdf</text>'
+        f'<text x="{lx + 32}" y="{ly + lh / 2 + 6}" fill="currentColor">dysprosium231/litloop-paper-agent</text>'
     )
     parts.append("</svg>")
     return "\n".join(parts)

@@ -1,19 +1,20 @@
 <div align="center">
-  <img src="./assets/brand/scansci-pdf-icon.png" alt="ScanSci PDF" width="96" />
-  <h1>ScanSci PDF</h1>
+  <h1>LitLoop</h1>
+  <p><strong>Academic Paper Agent</strong> · 学术论文 Agent：检索 → 下载 → Zotero 归档 → 分析归纳</p>
 
-  <a href="https://pypi.org/project/scansci-pdf/"><img alt="PyPI" src="https://img.shields.io/pypi/v/scansci-pdf?style=flat-square" /></a>
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0F766E?style=flat-square" /></a>
   <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/MCP-19%20tools-111827?style=flat-square" /></a>
 
-  让 Agent 替你下载学术论文 —— 20+ 数据源并行竞速，100+ 高校机构通道，一句自然语言拿下整份文献清单。
+  让 Agent 替你找论文、下论文、整理论文 —— 20+ 数据源并行竞速，100+ 高校机构通道（WebVPN / CARSI），下载后直接进 Zotero。
 
-  [能力](#能力) · [快速开始](#快速开始) · [怎么用](#怎么用) · [机构通道](#机构通道) · [社区](#交流群--community) · [致谢](#致谢)
+  [能力](#能力) · [快速开始](#快速开始) · [怎么用](#怎么用) · [机构通道](#机构通道) · [Zotero](#zotero) · [来源与致谢](#致谢)
 </div>
+
+> LitLoop 是 [Rimagination/scansci-pdf](https://github.com/Rimagination/scansci-pdf)（Apache-2.0）的独立衍生版，由 [dysprosium231](https://github.com/dysprosium231) 维护，与原作者无隶属关系。主要改动见 [NOTICE](NOTICE)。内部 Python 包名、命令和 MCP 工具名暂时仍为 `scansci_pdf` / `scansci-pdf` / `scansci_pdf_*`。
 
 ## 能力
 
-给出 DOI、arXiv 号或一份文献清单，ScanSci PDF 会自动挑最快能下的那条路：OA 直链、预印本、出版商 API、你的学校通道都试一遍，付费墙自动路由，结果落地成规整命名的 PDF 文件。
+给出 DOI、arXiv 号或一份文献清单，LitLoop 会自动挑最快能下的那条路：OA 直链、预印本、出版商 API、你的学校通道都试一遍，付费墙自动路由，结果落地成规整命名的 PDF 文件。
 
 - **单篇，一句话的事** — DOI / arXiv 进，`作者_年份_标题.pdf` 出；BibTeX / RIS / EndNote 引文顺手导出，可直推 Zotero。
 - **清单，整批拿下** — APA / BibTeX / DOI 列表直接喂，自动补全缺失 DOI；上千篇先分「OA / 灰色源 / 需机构」三桶再分批下载，不瞎跑不浪费。
@@ -35,10 +36,16 @@
 安装和更新是同一句话——对 Codex、ZCode、Claude Code 都这么说：
 
 ```text
-帮我安装或更新这个插件：https://github.com/Rimagination/scansci-pdf
+帮我安装或更新这个插件：https://github.com/dysprosium231/litloop-paper-agent
 ```
 
 Agent 会克隆（或原地更新）仓库、装好依赖并注册插件，然后你就能直接让它下论文了——例子见下一节[怎么用](#怎么用)。
+
+> **给 Agent 的步骤**（安装和更新相同）：
+> 1. 插件目录：`~/plugins/scansci-pdf` 已存在就直接用；否则 `git clone https://github.com/dysprosium231/litloop-paper-agent.git ~/plugins/scansci-pdf`。
+> 2. 用 Python 3.11+ 运行 `python ~/plugins/scansci-pdf/scripts/deploy.py`（Windows 用 `%USERPROFILE%\plugins\scansci-pdf\scripts\deploy.py`）。它会同步代码（含 fork 改写历史后的更新）、在 `~/.scansci-pdf/venv` 建独立环境并安装、向本机的 Claude Code / Claude Desktop（已有配置文件时）/ Codex 注册 MCP、复制 skills，最后自检。已注册且可用的安装会被保留并就地更新。
+> 3. 把脚本末尾的 summary（警告和下一步）转告用户，并提醒重启客户端。脚本以“本地有未推送改动”退出时，不要强行覆盖，问用户。
+> 4. 可选：`--with-find` 加装 scansci-find；`--extras fast,vpnsci,patchright,zotero` 把 zotero-mcp 装进同一环境；`--dry-run` 只看不改。没有 Python 3.11+ 或 Git 时，先请用户安装（Windows：`winget install Python.Python.3.12 Git.Git`）。
 
 <details>
 <summary><strong>手动安装 / pip / MCP 配置</strong>（不走对话流程时）</summary>
@@ -63,7 +70,7 @@ pip install scansci-pdf
 Codex App / Codex CLI（Windows 一键：克隆 + 装环境 + 注册插件）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command '$p=Join-Path $HOME "plugins\scansci-pdf"; if(Test-Path $p){ git -C $p pull --ff-only } else { git clone --branch main --single-branch https://github.com/Rimagination/scansci-pdf.git $p }; & (Join-Path $p "scripts\install-scansci-pdf.ps1")'
+powershell -NoProfile -ExecutionPolicy Bypass -Command '$p=Join-Path $HOME "plugins\scansci-pdf"; if(Test-Path $p){ git -C $p fetch origin main; git -C $p merge --ff-only origin/main } else { git clone --branch main --single-branch https://github.com/dysprosium231/litloop-paper-agent.git $p }; & (Join-Path $p "scripts\install-scansci-pdf.ps1")'
 ```
 
 ZCode：插件市场搜 `scansci-pdf` 一键安装，MCP、skills、快捷命令一次带齐。
@@ -353,7 +360,7 @@ scansci-pdf config-cmd proxy_pool "socks5://1.1.1.1:1080,http://2.2.2.2:8080"
 <details>
 <summary><strong>工作原理：五层竞速</strong></summary>
 
-下载一篇论文时，ScanSci PDF 同时启动多个数据源，按优先级分层竞速，第一个成功立即返回：
+下载一篇论文时，LitLoop 同时启动多个数据源，按优先级分层竞速，第一个成功立即返回：
 
 ```
 Tier 1 (4s)  ─ 出版商直链（OA/机构访问）
@@ -367,41 +374,9 @@ Tier 5 (20s) ─ WebVPN / CARSI 机构代理
 
 </details>
 
-## 交流群 / Community
+## 交流 / Community
 
-扫码加入微信交流群，一起聊 **AI for Science** —— 偏 AI 应用与科研工具，也欢迎讨论 ScanSci PDF 的用法、bug 和需求。
-
-<table>
-  <tr>
-    <td width="250" align="center">
-      <img src="assets/brand/wechat-group-qr.jpg" alt="微信群二维码" width="200">
-      <br>
-      <sub><strong>微信交流群</strong> / WeChat Group<br>群码 7 天有效，过期会更新</sub>
-    </td>
-    <td width="250" align="center">
-      <img src="assets/brand/wechat-contact-qr.jpg" alt="群主微信" width="200">
-      <br>
-      <sub><strong>加群主微信</strong> / Contact<br>群码失效？扫码备注 <em>scansci</em> 拉你进群</sub>
-    </td>
-    <td valign="middle">
-      <p><strong>群聊方向</strong></p>
-      <ul>
-        <li>AI 在科研场景的落地与工具链</li>
-        <li>论文检索、下载、阅读、整理的工作流</li>
-        <li>ScanSci PDF 使用问题与改进建议</li>
-      </ul>
-      <p><sub>二维码过期会更新；着急进群可直接加群主微信。</sub></p>
-    </td>
-  </tr>
-</table>
-
-更偏好异步交流？欢迎直接在 [Issues](https://github.com/Rimagination/scansci-pdf/issues) 或 [Discussions](https://github.com/Rimagination/scansci-pdf/discussions) 区开贴。
-
-## 赞助者
-
-<a href="https://github.com/qwlei328-maker"><img src="https://avatars.githubusercontent.com/u/257463305?v=4" width="50" height="50" alt="qwlei328-maker" title="Natasha"/></a>
-<a href="https://github.com/jingqingqiu1"><img src="https://avatars.githubusercontent.com/u/87510394?v=4" width="50" height="50" alt="jingqingqiu1" title="jingqingqiu1"/></a>
-<a href="https://github.com/minqifeng"><img src="https://avatars.githubusercontent.com/u/61303605?v=4" width="50" height="50" alt="minqifeng" title="minqifeng"/></a>
+使用问题、改进建议请到 [Issues](https://github.com/dysprosium231/litloop-paper-agent/issues) 或 [Discussions](https://github.com/dysprosium231/litloop-paper-agent/discussions) 开贴。
 
 ## 贡献者
 
@@ -411,7 +386,9 @@ Tier 5 (20s) ─ WebVPN / CARSI 机构代理
 
 ## 致谢
 
-本项目在开发过程中参考和借鉴了以下开源项目：
+LitLoop 基于 **[scansci-pdf](https://github.com/Rimagination/scansci-pdf)**（作者 [Rimagination](https://github.com/Rimagination)，Apache-2.0）开发，绝大部分下载与机构通道能力来自原项目。
+
+原项目在开发过程中参考和借鉴了以下开源项目：
 
 - **[FlareSolverr](https://github.com/FlareSolverr/FlareSolverr)** — 早期反 bot 绕过架构设计
 - **[ref-downloader](https://github.com/ltczding-gif/ref-downloader)** — Publisher 专用下载策略（Elsevier crasolve 检测、Wiley PDFDirect、AIP loading page 等）
@@ -423,14 +400,6 @@ Tier 5 (20s) ─ WebVPN / CARSI 机构代理
 
 ## 许可证
 
-[Apache License 2.0](LICENSE)
+[Apache License 2.0](LICENSE)。原项目版权声明保留在 LICENSE 中；衍生版的改动说明见 [NOTICE](NOTICE)。
 
 例外：`src/scansci_pdf/_core/` 中的 Cython 编译扩展（`.pyd`/`.so`）为预编译二进制，仅通过 PyPI 分发。其 Cython 源码（`.pyx`）为专有代码，不包含在本仓库中。
-
-## Star History
-
-<p align="center">
-  <img alt="Star History Chart" src="star-history.svg" width="860" />
-</p>
-
-> 手绘星标曲线，每日由仓库自建的 Action 自动更新——数据与图表都在本仓库内，不依赖任何第三方服务。

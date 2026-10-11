@@ -1,8 +1,8 @@
-# scansci-pdf
+# LitLoop（scansci-pdf 衍生版）
 
 ![logo](icon.png)
 
-ScanSci 学术文献全家桶 plugin:大清单嗅探分类 + 全场景下载检索排障,携带 scansci-pdf MCP server(stdio)。
+LitLoop 学术论文 Agent plugin:大清单嗅探分类 + 全场景下载检索排障,携带 scansci-pdf MCP server(stdio)。
 
 ## 组件
 

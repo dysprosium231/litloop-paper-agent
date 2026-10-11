@@ -1,0 +1,31 @@
+LitLoop (litloop-paper-agent)
+https://github.com/dysprosium231/litloop-paper-agent
+
+This product is a derivative work of scansci-pdf
+  https://github.com/Rimagination/scansci-pdf
+  Copyright 2024-2026 scansci-pdf contributors
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+LitLoop is maintained independently by dysprosium231 and is not affiliated
+with or endorsed by the original authors. The full commit history of the
+original project is preserved in this repository; changes made for LitLoop
+are the commits after upstream commit fb796df and include:
+
+- Institutional downloads: fixes for browser-based publisher logins (WebVPN,
+  CARSI/Shibboleth, school-agnostic IdP detection, login heartbeat so races
+  wait for a user who is logging in, cancellation of in-flight downloads).
+- Browser: option to drive a copy of the locally installed Chrome; stable
+  browser process name; per-host proxy exception for publishers that
+  authorise by cookie; challenge-page and PDF-capture fixes for Science,
+  Springer Nature, RSC, ACS, Wiley and AIP.
+- Sci-Hub: ALTCHA proof-of-work solved over HTTP so it works without a
+  browser; optional no-browser mode; mirror-probe fix.
+- Zotero: zotero_push files papers through zotero-mcp (CrossRef metadata,
+  duplicate reuse, PDF attachment to WebDAV) and finds it automatically.
+- Installation: scripts/deploy.py installs or updates the plugin end to end
+  and registers it with Claude Code, Claude Desktop and Codex.
+- Config output masks every API key; Springer OA-only keys are recognised.
+
+The compiled extensions of the original project (src/scansci_pdf/_core/*.pyd,
+*.so) are distributed by the original authors via PyPI only and are NOT part
+of this repository; LitLoop uses the pure-Python fallbacks.

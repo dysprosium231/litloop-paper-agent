@@ -14,7 +14,7 @@ from .config import load_config
 logger = logging.getLogger(__name__)
 
 _SEARCH_TIMEOUT = 30  # seconds, longer than default because these are public APIs
-_USER_AGENT = "scansci-pdf/1.5 (https://github.com/Rimagination/scansci-pdf)"
+_USER_AGENT = "scansci-pdf/1.5 (https://github.com/dysprosium231/litloop-paper-agent)"
 
 
 class _AcademicSession(requests.Session):
