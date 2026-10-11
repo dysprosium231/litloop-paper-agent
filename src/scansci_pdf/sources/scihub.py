@@ -242,17 +242,35 @@ def _probe_scihub_domains(config: dict[str, Any]) -> None:
     domains = config.get("scihub_domains") or DEFAULT_SCIHUB_DOMAINS
     timeout = (5, 10)
 
-    with ThreadPoolExecutor(max_workers=_SCIHUB_PROBE_WORKERS) as pool:
-        futures = {pool.submit(_probe_single_domain, d, proxy, timeout): d for d in domains}
+    pool = ThreadPoolExecutor(max_workers=_SCIHUB_PROBE_WORKERS)
+    futures = {pool.submit(_probe_single_domain, d, proxy, timeout): d for d in domains}
+    pending = set(futures)
+    try:
         for future in as_completed(futures, timeout=15):
+            pending.discard(future)
             domain, ok, latency = future.result()
             update_probe(domain, ok, round(latency, 1), config)
+    except TimeoutError:
+        # A mirror that hangs past the probe window is unreachable for now.
+        # Raising here used to abort the whole Sci-Hub source on every call
+        # (the probe timestamp was never set, so the next call re-probed).
+        for future in pending:
+            update_probe(futures[future], False, 15.0, config)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
     set_probe_timestamp(config)
 
 
 def _is_browser_available(config: dict[str, Any]) -> bool:
-    """Check if CloakBrowser is available. Returns False in asyncio context."""
+    """Check if CloakBrowser is available. Returns False in asyncio context.
+
+    scihub_use_browser=false turns every browser path of the grey sources off:
+    ALTCHA mirrors are handled over plain HTTP (sources/altcha.py), and
+    Turnstile-only mirrors are skipped instead of opening windows.
+    """
+    if not config.get("scihub_use_browser", True):
+        return False
     # A running asyncio loop normally means "user asyncio code — the Playwright
     # sync API cannot serve it". Exception: our persistent pool workers, where
     # the loop was created by the sync API itself (browser_engine tracks it).
@@ -574,6 +592,46 @@ def _browser_first_download(
         return None
 
 
+def _http_altcha_download(landing_url: str, domain: str, doi: str, output_path: Path,
+                          config: dict[str, Any]) -> dict[str, Any] | None:
+    """Open the mirror page over HTTP, solve an ALTCHA gate if any, fetch the PDF."""
+    from ..network import CHROME_UA
+    from . import altcha
+
+    session = requests.Session()
+    session.trust_env = False
+    session.headers.update({"User-Agent": CHROME_UA,
+                            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8"})
+    session.proxies = proxy_dict(select_proxy_for_url(landing_url, config)) or {}
+    timeout = (10, 25)
+    try:
+        resp = session.get(landing_url, timeout=timeout)
+    except Exception as exc:
+        log.info(f"   [altcha-http] {domain}: {type(exc).__name__}")
+        return None
+    if resp.status_code != 200:
+        return None
+    html = resp.text
+    if altcha.is_altcha_page(html):
+        # The article page behind the gate still embeds an ALTCHA widget (for
+        # its own buttons), so judge success by the PDF link, not by "altcha".
+        html = altcha.pass_gate(session, html, landing_url, timeout) or ""
+        if not html:
+            return None
+    elif _classify_mirror_page(html) == "turnstile":
+        return None  # needs a real browser: leave it to the browser-first path
+    pdf_url = extract_pdf_url_from_html(html, landing_url)
+    if not pdf_url:
+        return None
+    log.info(f"   [altcha-http] {domain}: PDF {pdf_url[:80]}")
+    result = download_pdf_from_scihub(pdf_url, output_path, config, f"Sci-Hub({domain})",
+                                      cookies=session.cookies, referer=landing_url)
+    if result:
+        result["doi"] = doi
+        result["identifier"] = doi
+    return result
+
+
 def try_scihub_domain(
     doi: str,
     domain: str,
@@ -583,6 +641,14 @@ def try_scihub_domain(
     fail_notes: list[str] | None = None,
 ) -> dict[str, Any] | None:
     landing_url = f"{domain.rstrip('/')}/{urllib.parse.quote(doi, safe='/')}"
+
+    # Plain HTTP first: an ALTCHA gate is a proof-of-work that Python solves in
+    # seconds, so mirrors behind it (sci-hub.ru) need no browser window at all.
+    # Only gates that need a real browser (Cloudflare Turnstile) fall through.
+    if config.get("scihub_http_altcha", True) and not use_tor:
+        result = _http_altcha_download(landing_url, domain, doi, output_path, config)
+        if result:
+            return result
 
     # Browser-first: bypass Cloudflare/CAPTCHA before HTTP attempt.
     # scihub_browser_first=false forces the pure-HTTP path — when the PDF
@@ -611,7 +677,7 @@ def try_scihub_domain(
         # Fallback to browser on Cloudflare/403/CAPTCHA
         if resp.status_code in (403, 503) or _is_cloudflare_block(resp):
             _mark_browser_required(domain, config)
-            resp = _try_browser(landing_url, config, resp)
+            resp = _try_browser(landing_url, config, resp) if _is_browser_available(config) else None
             if resp is None:
                 if fail_notes is not None:
                     fail_notes.append("challenge(browser bypass failed)")
@@ -629,7 +695,7 @@ def try_scihub_domain(
             if 'captcha' in content_sample or 'recaptcha' in content_sample:
                 log.info(f"   CAPTCHA detected, trying browser...")
                 # Use browser to bypass CAPTCHA
-                browser_resp = _try_browser(landing_url, config, resp)
+                browser_resp = _try_browser(landing_url, config, resp) if _is_browser_available(config) else None
                 if browser_resp is None:
                     log.warning(f"   browser bypass failed — is CloakBrowser installed? Run: pip install cloakbrowser")
                     if fail_notes is not None:
@@ -1033,7 +1099,9 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
         src_output = output_path.parent / f"{output_path.stem}_scihub_{domain.split('//')[1].replace('.', '_')}.pdf"
         futures[pool.submit(try_scihub_domain, doi, domain, src_output, config, use_tor, fail_notes)] = (domain, src_output)
     try:
-        for future in as_completed(futures, timeout=10):
+        # 10 s ended the race while the backups were still streaming PDFs they
+        # had already found (sci.bban.top serves at a few hundred KB/s here).
+        for future in as_completed(futures, timeout=45):
             domain, src_output = futures[future]
             try:
                 result = future.result(timeout=1)

@@ -497,3 +497,20 @@ def test_direct_http_skipped_behind_bot_walls():
     assert _direct_pdf_urls("10.1021/acsami.5c16640", "ACS") == []
     springer = _direct_pdf_urls("10.1007/s10853-026-13435-y", "Springer")
     assert springer and len(springer) == len(set(springer))
+
+
+def test_altcha_pow_solver_round_trip():
+    import base64, hashlib, json
+    from scansci_pdf.sources import altcha
+    target = hashlib.sha256(b"salt" + b"4242").hexdigest()
+    payload = altcha.solve({"algorithm": "SHA-256", "challenge": target, "salt": "salt",
+                            "maxnumber": 10000, "signature": "sig"})
+    decoded = json.loads(base64.b64decode(payload))
+    assert decoded["number"] == 4242 and decoded["signature"] == "sig"
+    assert altcha.is_altcha_page('<altcha-widget challengeurl="/altcha/challenge/x">')
+    assert not altcha.is_altcha_page("<html>plain article</html>")
+
+
+def test_scihub_use_browser_false_disables_grey_browsers():
+    from scansci_pdf.sources import scihub
+    assert scihub._is_browser_available({"scihub_use_browser": False}) is False

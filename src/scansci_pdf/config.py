@@ -124,6 +124,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # host_proxy_url, everything else stays direct. For publishers that grant
     # access by login cookie rather than campus IP, where the direct route is
     # slow (Springer Nature's CDN). Skipped while the proxy port is closed.
+    # false: Sci-Hub/LibGen never open a browser (ALTCHA is solved over HTTP;
+    # mirrors behind Cloudflare Turnstile are skipped).
+    "scihub_use_browser": True,
     "host_proxy_url": "",
     "host_proxy_hosts": [],
     "cookie_path": "",

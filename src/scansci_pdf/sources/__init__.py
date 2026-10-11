@@ -211,6 +211,8 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
 
     # Limit concurrency for browser-based sources
     is_browser = label in _BROWSER_SOURCE_LABELS
+    if label == "Sci-Hub" and not config.get("scihub_use_browser", True):
+        is_browser = False  # pure-HTTP Sci-Hub must not queue behind the browser lanes
     sem = _get_browser_semaphore(config) if is_browser else None
     if sem:
         sem.acquire()
