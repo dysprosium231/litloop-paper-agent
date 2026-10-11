@@ -514,3 +514,60 @@ def test_altcha_pow_solver_round_trip():
 def test_scihub_use_browser_false_disables_grey_browsers():
     from scansci_pdf.sources import scihub
     assert scihub._is_browser_available({"scihub_use_browser": False}) is False
+
+
+# --- search polish (2026-10-11) -------------------------------------------
+
+def test_search_sort_aliases():
+    from scansci_pdf.search import _normalize_sort
+    assert _normalize_sort("cited") == "cited_by_count"
+    assert _normalize_sort("Citations") == "cited_by_count"
+    assert _normalize_sort("newest") == "publication_date"
+    assert _normalize_sort("relevance") is None
+    assert _normalize_sort(None) is None
+
+
+def test_search_drops_off_topic_records():
+    from scansci_pdf.search import _drop_off_topic
+    rows = [
+        {"title": "High-entropy ceramics with low thermal conductivity", "abstract": ""},
+        {"title": "Endoscopic mucosal resection for lesions", "abstract": ""},
+        {"title": "Cytotoxicity of dental alloys, metals, and ceramics", "abstract": ""},
+        {"title": "Unrelated title", "abstract": "", "_matched": True},
+    ]
+    kept = _drop_off_topic(rows, "high-entropy ceramics thermal conductivity")
+    assert [r["title"] for r in kept] == [
+        "High-entropy ceramics with low thermal conductivity", "Unrelated title"]
+    assert "_matched" not in kept[1]
+    # CJK queries are left alone
+    assert len(_drop_off_topic(rows[:2], "高熵陶瓷 热导率")) == 2
+
+
+def test_discovery_results_report_real_citation_counts():
+    from scansci_pdf.discovery import to_legacy_results
+    out = to_legacy_results([{"doi": "10.1/x", "title": "t", "citation_count": 619,
+                              "source_hits": ["OpenAlex", "Crossref"]}])
+    assert out[0]["cited_by_count"] == 619
+    assert out[0]["sources"] == ["OpenAlex", "Crossref"]
+
+
+def test_openalex_cited_sort_matches_title_and_abstract(monkeypatch):
+    from scansci_pdf import search as s
+    seen = {}
+
+    class Resp:
+        status_code = 200
+        def json(self):
+            return {"results": []}
+
+    class Sess:
+        def get(self, url, params=None, timeout=None):
+            seen.update(params)
+            return Resp()
+
+    monkeypatch.setattr(s, "_plain_session", lambda: Sess())
+    monkeypatch.setattr(s, "load_config", lambda: {"openalex_api_key": "k"})
+    s._search_openalex("SiOC, oxidation", 5, 2022, None, "cited_by_count")
+    assert "search" not in seen
+    assert "title_and_abstract.search:SiOC  oxidation" in seen["filter"]
+    assert seen["api_key"] == "k" and seen["sort"] == "cited_by_count:desc"

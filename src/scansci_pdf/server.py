@@ -234,7 +234,7 @@ def scansci_pdf_search(
     author_id: str | None = None,
     out_file: str | None = None,
 ) -> str:
-    """Search papers by keyword or author (OpenAlex; year/sort filters). out_file writes a channel-annotated queue for scansci_pdf_batch_download."""
+    """Search papers by English keywords or author (OpenAlex; year filters; sort=cited|date). out_file writes a queue for scansci_pdf_batch_download."""
     results = search_papers(
         query,
         limit=min(limit, 50),

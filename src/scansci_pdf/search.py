@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+import math
+import os
+import re
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -64,8 +67,18 @@ def _search_openalex(
 ) -> list[dict[str, Any]]:
     try:
         session = _plain_session()
-        params: dict[str, Any] = {"search": query, "per_page": limit}
+        params: dict[str, Any] = {"per_page": limit}
+        # OpenAlex rejects keyless requests since 2026-02.
+        key = str(load_config().get("openalex_api_key") or "").strip()
+        if key:
+            params["api_key"] = key
         filters = []
+        if sort and query:
+            # `search=` also matches full text, so sorted by citations it
+            # returned famous off-topic papers; restrict to title + abstract.
+            filters.append("title_and_abstract.search:" + query.replace(",", " "))
+        elif query:
+            params["search"] = query
         if year_from or year_to:
             y_from = year_from or 1900
             y_to = year_to or 2026
@@ -115,6 +128,7 @@ def _parse_openalex_works(works: list[dict]) -> list[dict[str, Any]]:
             "is_oa": is_oa,
             "oa_url": oa_url,
             "source": "openalex",
+            "journal": ((work.get("primary_location") or {}).get("source") or {}).get("display_name") or "",
         })
     return results
 
@@ -238,6 +252,7 @@ def search_papers_v2(
     Result fields are unchanged (doi/title/authors/year/cited_by_count/is_oa/
     oa_url/source) so existing callers are unaffected.
     """
+    sort = _normalize_sort(sort)
     if author_id or author:
         return search_papers(
             query, limit=limit, year_from=year_from, year_to=year_to, sort=sort,
@@ -253,7 +268,7 @@ def search_papers_v2(
         with tempfile.TemporaryDirectory(prefix="scansci_find_") as tmp:
             payload = discovery_search(
                 query, tmp, depth="quick", limit=max(limit * 3, 30),
-                year_from=year_from, year_to=year_to,
+                year_from=year_from, year_to=year_to, sources=_quick_sources(),
             )
             results = to_legacy_results(payload.get("candidates") or [], limit=limit * 3)
         logger.info("search: discovery engine returned %d results", len(results))
@@ -262,10 +277,95 @@ def search_papers_v2(
         return search_papers(query, limit=limit, year_from=year_from, year_to=year_to, sort=sort)
 
     if sort == "cited_by_count":
+        # The relevance pool holds only the top ~30 matches; the field's most
+        # cited papers are often outside it, so ask OpenAlex for those too.
+        seen = {str(r.get("doi") or "").lower() for r in results if r.get("doi")}
+        for extra in _search_openalex(query, max(limit * 2, 25), year_from, year_to, "cited_by_count"):
+            if extra["doi"].lower() not in seen:
+                seen.add(extra["doi"].lower())
+                extra["_matched"] = True  # OpenAlex matched it in title/abstract
+                results.append(extra)
+    results = _drop_off_topic(results, query)
+    if sort == "cited_by_count":
         results.sort(key=lambda x: x.get("cited_by_count", 0), reverse=True)
     elif sort == "publication_date":
-        results.sort(key=lambda x: x.get("year", 0), reverse=True)
+        results.sort(key=lambda x: x.get("year") or 0, reverse=True)
     return results[:limit]
+
+
+def _quick_sources() -> list[str]:
+    """Sources for an interactive search.
+
+    OpenAlex indexes what Crossref has, ranks it better and answers in a few
+    seconds; Crossref took 7-26 s and mostly added off-topic records, so it is
+    used only when OpenAlex has no API key. Semantic Scholar joins when it has
+    a key (the keyless pool answers 429 almost every time).
+    """
+    sources = ["openalex"] if str(load_config().get("openalex_api_key") or "").strip() else ["crossref"]
+    if os.environ.get("SEMANTIC_SCHOLAR_API_KEY"):
+        sources.append("semantic")
+    return sources
+
+
+_STOPWORDS = frozenset(
+    "a an and the of in on for to with by from at as or via its their into using based "
+    "study studies effect effects analysis review".split()
+)
+
+
+def _query_terms(query: str) -> list[str]:
+    terms = []
+    for word in re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", query.lower()):
+        if word in _STOPWORDS or len(word) < 2:
+            continue
+        word = word.replace("-", " ")
+        # crude singular so "ceramics" matches "ceramic" (a substring test)
+        if len(word) > 4 and word.endswith("s") and not word.endswith("ss"):
+            word = word[:-1]
+        terms.append(word)
+    return list(dict.fromkeys(terms))
+
+
+def _drop_off_topic(results: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    """Drop records that share almost none of the query's terms.
+
+    Crossref's ranking returns highly cited papers that match one common word
+    ("oxidation", "ceramics"); sorted by citations they took the top slots.
+    A record stays when its title (plus abstract, when present) contains at
+    least 60% of the query terms. Queries in CJK scripts are left alone.
+    """
+    if re.search(r"[぀-ヿ㐀-鿿가-힯]", query or ""):
+        return results
+    terms = _query_terms(query or "")
+    if len(terms) < 2:
+        return results
+    need = max(1, math.ceil(0.6 * len(terms)))
+    kept = []
+    for r in results:
+        # The abstract we hold may be truncated; trust OpenAlex's own
+        # title/abstract match for records it returned from that filter.
+        if r.pop("_matched", False):
+            kept.append(r)
+            continue
+        text = f"{r.get('title') or ''} {r.get('abstract') or ''}".lower().replace("-", " ")
+        if sum(1 for t in terms if t in text) >= need:
+            kept.append(r)
+    return kept
+
+
+_SORT_ALIASES = {
+    "cited": "cited_by_count", "citations": "cited_by_count", "citation": "cited_by_count",
+    "cited_by_count": "cited_by_count", "citation_count": "cited_by_count",
+    "date": "publication_date", "year": "publication_date", "newest": "publication_date",
+    "recent": "publication_date", "publication_date": "publication_date",
+}
+
+
+def _normalize_sort(sort: str | None) -> str | None:
+    """Accept the spellings agents and users actually type; None = relevance."""
+    if not sort:
+        return None
+    return _SORT_ALIASES.get(str(sort).strip().lower(), None)
 
 
 def search_papers(
