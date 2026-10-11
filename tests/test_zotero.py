@@ -123,7 +123,7 @@ def test_zotero_bridge_parses_item_and_attachment_keys(monkeypatch):
     calls = {}
     write = types.SimpleNamespace(
         add_item=lambda **kw: calls.setdefault("add", kw) and "Added\n\nItem key: `QWER5678`\n",
-        attach_file=lambda **kw: calls.setdefault("att", kw) and "File attached: a.pdf (key `ZXCV0987`) via WebDAV",
+        attach_file=lambda **kw: calls.setdefault("att", kw) and "File attached to `QWER5678`: a.pdf (key `ZXCV0987`) via WebDAV",
     )
     tools = types.ModuleType("zotero_mcp.tools")
     tools.write = write
@@ -136,7 +136,7 @@ def test_zotero_bridge_parses_item_and_attachment_keys(monkeypatch):
     out = zotero_bridge.run({"identifier": "2301.00001", "file": "C:/a.pdf"})
 
     assert out == {"success": True, "zotero_key": "QWER5678", "reused": False,
-                   "pdf_attached": True, "attach_message": "File attached: a.pdf (key `ZXCV0987`) via WebDAV",
+                   "pdf_attached": True, "attach_message": "File attached to `QWER5678`: a.pdf (key `ZXCV0987`) via WebDAV",
                    "attachment_key": "ZXCV0987"}
     assert calls["add"]["source"] == "https://arxiv.org/abs/2301.00001"
     assert calls["add"]["attach_mode"] == "none" and calls["add"]["if_exists"] == "file"

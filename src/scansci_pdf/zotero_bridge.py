@@ -20,7 +20,8 @@ import runpy
 import sys
 
 _KEY_RE = re.compile(r"Item key: `([A-Z0-9]{8})`")
-_ATT_KEY_RE = re.compile(r"`([A-Z0-9]{8})`")
+# "File attached to `PARENT`: name.pdf (key `ATTKEY`) ..."
+_ATT_KEY_RE = re.compile(r"\(key `([A-Z0-9]{8})`\)")
 
 
 def _source_for(identifier: str) -> str:
