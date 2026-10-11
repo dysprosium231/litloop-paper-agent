@@ -362,6 +362,12 @@ def _add_journal_rank(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         from litloop_journal_rank import lookup
     except ImportError:
         return results
+    try:
+        # Monthly background check for new ShowJCR tables (CAS / JCR / XR).
+        from litloop_journal_rank.showjcr_sync import ensure_fresh
+        ensure_fresh(proxy=str(load_config().get("host_proxy_url") or "") or None)
+    except Exception:  # noqa: BLE001 - older tool version or no network
+        pass
     for r in results:
         if not (r.get("journal") or r.get("issn")):
             continue
