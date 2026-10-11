@@ -4,7 +4,7 @@
 Asserts that the version is identical across:
 
 - pyproject.toml
-- src/scansci_pdf/__init__.py
+- src/litloop/__init__.py
 - .codex-plugin/plugin.json
 - zcode-plugin/.zcode-plugin/plugin.json
 - zcode-plugin/marketplace.json
@@ -30,29 +30,29 @@ ROOT = Path(__file__).resolve().parent.parent
 # Legacy tool names merged away in the v1.11 tool diet; the skill must not
 # advertise them.
 RETIRED_TOOLS = (
-    "scansci_pdf_smart_download",
-    "scansci_pdf_resolve_and_download",
-    "scansci_pdf_import_bib",
-    "scansci_pdf_vpnsci_login",
-    "scansci_pdf_vpnsci_test",
-    "scansci_pdf_vpnsci_status",
-    "scansci_pdf_vpnsci_schools",
-    "scansci_pdf_vpnsci_set_school",
-    "scansci_pdf_auto_setup",
-    "scansci_pdf_setup_check",
-    "scansci_pdf_source_scores",
-    "scansci_pdf_network_diagnose",
-    "scansci_pdf_config_get",
-    "scansci_pdf_config_set",
-    "scansci_pdf_tor_install",
-    "scansci_pdf_tor_start",
-    "scansci_pdf_tor_stop",
-    "scansci_pdf_browser_login",
-    "scansci_pdf_browser_status",
-    "scansci_pdf_browser_import_cookies",
-    "scansci_pdf_import_browser_cookies",
-    "scansci_pdf_ezproxy_login",
-    "scansci_pdf_ezproxy_status",
+    "litloop_smart_download",
+    "litloop_resolve_and_download",
+    "litloop_import_bib",
+    "litloop_vpnsci_login",
+    "litloop_vpnsci_test",
+    "litloop_vpnsci_status",
+    "litloop_vpnsci_schools",
+    "litloop_vpnsci_set_school",
+    "litloop_auto_setup",
+    "litloop_setup_check",
+    "litloop_source_scores",
+    "litloop_network_diagnose",
+    "litloop_config_get",
+    "litloop_config_set",
+    "litloop_tor_install",
+    "litloop_tor_start",
+    "litloop_tor_stop",
+    "litloop_browser_login",
+    "litloop_browser_status",
+    "litloop_browser_import_cookies",
+    "litloop_import_browser_cookies",
+    "litloop_ezproxy_login",
+    "litloop_ezproxy_status",
 )
 
 EXPECTED_TOOL_COUNT = 20
@@ -65,9 +65,9 @@ def _read_version_sources() -> list[tuple[str, str]]:
     m = re.search(r'^\s*version\s*=\s*"([^"]+)"', pyproject.read_text(encoding="utf-8"), re.M)
     sources.append(("pyproject.toml", m.group(1) if m else ""))
 
-    init = ROOT / "src" / "scansci_pdf" / "__init__.py"
+    init = ROOT / "src" / "litloop" / "__init__.py"
     m = re.search(r'__version__\s*=\s*"([^"]+)"', init.read_text(encoding="utf-8"))
-    sources.append(("src/scansci_pdf/__init__.py", m.group(1) if m else ""))
+    sources.append(("src/litloop/__init__.py", m.group(1) if m else ""))
 
     for rel in (
         ".codex-plugin/plugin.json",
@@ -78,7 +78,7 @@ def _read_version_sources() -> list[tuple[str, str]]:
 
     marketplace = json.loads((ROOT / "zcode-plugin" / "marketplace.json").read_text(encoding="utf-8"))
     for plugin in marketplace.get("plugins", []):
-        if plugin.get("name") == "scansci-pdf":
+        if plugin.get("name") == "litloop":
             sources.append(("zcode-plugin/marketplace.json", str(plugin.get("version", ""))))
             break
 
@@ -88,7 +88,7 @@ def _read_version_sources() -> list[tuple[str, str]]:
 def _check_mcp_tool_count() -> list[str]:
     try:
         sys.path.insert(0, str(ROOT / "src"))
-        from scansci_pdf.server import mcp_app
+        from litloop.server import mcp_app
     except Exception as exc:  # pragma: no cover
         return [f"MCP tool count: could not import server ({exc})"]
     try:
@@ -109,7 +109,7 @@ def _check_mcp_tool_count() -> list[str]:
 
 def _check_skill_docs() -> list[str]:
     problems = []
-    for rel in ("skill/SKILL.md", "skills/scansci-pdf/SKILL.md"):
+    for rel in ("skill/SKILL.md", "skills/litloop/SKILL.md"):
         text = (ROOT / rel).read_text(encoding="utf-8")
         for retired in RETIRED_TOOLS:
             if retired in text:

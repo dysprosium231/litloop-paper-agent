@@ -20,7 +20,7 @@ class BuildPyWithEncryption(build_py):
 
     def _encrypt_webvpn_data(self):
         """Encrypt webvpn.json into webvpn.dat for IP protection."""
-        data_dir = Path("src/scansci_pdf/data")
+        data_dir = Path("src/litloop/data")
         json_file = data_dir / "webvpn.json"
         dat_file = data_dir / "webvpn.dat"
 
@@ -34,12 +34,12 @@ class BuildPyWithEncryption(build_py):
 
         # Try to use compiled core for encryption
         try:
-            from scansci_pdf._core.vpnsci_core import encrypt_data
+            from litloop._core.vpnsci_core import encrypt_data
             encrypted = encrypt_data(plaintext)
         except ImportError:
             # Fallback: use pycryptodome directly (for first build before .pyx is compiled)
             key = bytes.fromhex("9cad336032fda4cec3eb0d39740cf8cef9f1a9a65475c0b28c04642ab5c1323a")
-            iv = b"scansci_pdf_v1_dat"[:16].ljust(16, b'\0')
+            iv = b"litloop_v1_dat"[:16].ljust(16, b'\0')
             from Crypto.Cipher import AES
             pad_len = 16 - (len(plaintext) % 16)
             padded = plaintext + bytes([pad_len] * pad_len)
@@ -56,16 +56,16 @@ try:
 
     extensions = [
         Extension(
-            "scansci_pdf._core.vpnsci_core",
-            ["src/scansci_pdf/_core/vpnsci_core.pyx"],
+            "litloop._core.vpnsci_core",
+            ["src/litloop/_core/vpnsci_core.pyx"],
         ),
         Extension(
-            "scansci_pdf._core.scihub_core",
-            ["src/scansci_pdf/_core/scihub_core.pyx"],
+            "litloop._core.scihub_core",
+            ["src/litloop/_core/scihub_core.pyx"],
         ),
         Extension(
-            "scansci_pdf._core.racing",
-            ["src/scansci_pdf/_core/racing.pyx"],
+            "litloop._core.racing",
+            ["src/litloop/_core/racing.pyx"],
         ),
     ]
 

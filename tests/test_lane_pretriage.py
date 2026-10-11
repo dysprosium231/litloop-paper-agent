@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from scansci_pdf import pipeline
-from scansci_pdf.pipeline import (
+from litloop import pipeline
+from litloop.pipeline import (
     QueueEntry,
     _mdpi_variants,
     predict_channel,
@@ -137,7 +137,7 @@ class TestBatchDefaultLanes:
         }
 
     def test_mcp_defaults_to_lanes(self, monkeypatch, tmp_path):
-        import scansci_pdf.server as server
+        import litloop.server as server
 
         cfg = self._cfg(tmp_path)
         monkeypatch.setattr(server, "load_config", lambda: cfg)
@@ -145,7 +145,7 @@ class TestBatchDefaultLanes:
                   for i in range(4)]
         monkeypatch.setattr(pipeline, "run_lanes", lambda *a, **k: canned)
         written = []
-        import scansci_pdf.sources as sources_mod
+        import litloop.sources as sources_mod
         monkeypatch.setattr(
             sources_mod, "_write_download_results",
             lambda results, out: written.append(results))
@@ -159,7 +159,7 @@ class TestBatchDefaultLanes:
         assert written and len(written[0]) == 4
 
     def test_mcp_lanes_false_uses_racing(self, monkeypatch, tmp_path):
-        import scansci_pdf.server as server
+        import litloop.server as server
 
         monkeypatch.setattr(server, "load_config", lambda: self._cfg(tmp_path))
         racing = {"total": 4, "succeeded": 0, "results": [], "failed": 4}
@@ -171,7 +171,7 @@ class TestBatchDefaultLanes:
         assert "mode" not in data
 
     def test_mcp_grey_strategy_stays_on_racing(self, monkeypatch, tmp_path):
-        import scansci_pdf.server as server
+        import litloop.server as server
 
         monkeypatch.setattr(
             server, "load_config",
@@ -188,7 +188,7 @@ class TestBatchDefaultLanes:
         assert lanes_called == [], "grey-oriented strategies must keep racing"
 
     def test_small_lists_stay_on_racing(self, monkeypatch, tmp_path):
-        import scansci_pdf.server as server
+        import litloop.server as server
 
         monkeypatch.setattr(server, "load_config", lambda: self._cfg(tmp_path))
         lanes_called = []

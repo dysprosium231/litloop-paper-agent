@@ -36,25 +36,25 @@ class TestIsSuspiciousPdf:
         p = tmp_path / "preview.pdf"
         p.write_bytes(_make_pdf(1, min_size=150_000))
         assert p.stat().st_size > 100_000
-        from scansci_pdf.pdf_utils import is_suspicious_pdf
+        from litloop.pdf_utils import is_suspicious_pdf
         assert is_suspicious_pdf(p) is True
 
     def test_large_multi_page_is_not_suspicious(self, tmp_path: Path):
         p = tmp_path / "full.pdf"
         p.write_bytes(_make_pdf(3, min_size=150_000))
-        from scansci_pdf.pdf_utils import is_suspicious_pdf
+        from litloop.pdf_utils import is_suspicious_pdf
         assert is_suspicious_pdf(p) is False
 
     def test_small_file_is_suspicious(self, tmp_path: Path):
         p = tmp_path / "cover.pdf"
         p.write_bytes(_make_pdf(1))
-        from scansci_pdf.pdf_utils import is_suspicious_pdf
+        from litloop.pdf_utils import is_suspicious_pdf
         assert is_suspicious_pdf(p) is True
 
 
 class TestInstsciElsevierPreview:
     def test_try_elsevier_api_rejects_single_page_preview(self, tmp_path: Path):
-        from scansci_pdf.institutional import instsci_bridge
+        from litloop.institutional import instsci_bridge
 
         class _Resp:
             status_code = 200
@@ -69,7 +69,7 @@ class TestInstsciElsevierPreview:
         assert not out.exists(), "preview bytes must not be written to disk"
 
     def test_try_elsevier_api_accepts_full_text(self, tmp_path: Path):
-        from scansci_pdf.institutional import instsci_bridge
+        from litloop.institutional import instsci_bridge
 
         class _Resp:
             status_code = 200
@@ -85,7 +85,7 @@ class TestInstsciElsevierPreview:
 
     def test_institutional_fetch_pdf_rejects_single_page(self):
         """The second institutional Elsevier PDF path must reject previews too."""
-        from scansci_pdf.institutional.sources import elsevier_api as inst_api
+        from litloop.institutional.sources import elsevier_api as inst_api
 
         class _Resp:
             status_code = 200
@@ -98,7 +98,7 @@ class TestInstsciElsevierPreview:
 
 class TestRacingElsevierPreview:
     def test_valid_pdf_bytes_rejects_single_page(self):
-        from scansci_pdf.sources.elsevier_api import _valid_pdf_bytes
+        from litloop.sources.elsevier_api import _valid_pdf_bytes
 
         assert _valid_pdf_bytes(_make_pdf(1, min_size=150_000), "t", reject_single_page=True) is False
         assert _valid_pdf_bytes(_make_pdf(4, min_size=150_000), "t", reject_single_page=True) is True

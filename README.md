@@ -10,7 +10,7 @@
   [能力](#能力) · [快速开始](#快速开始) · [怎么用](#怎么用) · [机构通道](#机构通道) · [Zotero](#zotero) · [来源与致谢](#致谢)
 </div>
 
-> LitLoop 是 [Rimagination/scansci-pdf](https://github.com/Rimagination/scansci-pdf)（Apache-2.0）的独立衍生版，由 [dysprosium231](https://github.com/dysprosium231) 维护，与原作者无隶属关系。主要改动见 [NOTICE](NOTICE)。内部 Python 包名、命令和 MCP 工具名暂时仍为 `scansci_pdf` / `scansci-pdf` / `scansci_pdf_*`。
+> LitLoop 是 [Rimagination/scansci-pdf](https://github.com/Rimagination/scansci-pdf)（Apache-2.0）的独立衍生版，由 [dysprosium231](https://github.com/dysprosium231) 维护，与原作者无隶属关系。主要改动见 [NOTICE](NOTICE)。
 
 ## 能力
 
@@ -42,8 +42,8 @@
 Agent 会克隆（或原地更新）仓库、装好依赖并注册插件，然后你就能直接让它下论文了——例子见下一节[怎么用](#怎么用)。
 
 > **给 Agent 的步骤**（安装和更新相同）：
-> 1. 插件目录：`~/plugins/litloop-paper-agent`（或旧的 `~/plugins/scansci-pdf`）已存在就直接用；否则 `git clone https://github.com/dysprosium231/litloop-paper-agent.git ~/plugins/litloop-paper-agent`。
-> 2. 用 Python 3.11+ 运行该目录下的 `scripts/deploy.py`，如 `python ~/plugins/litloop-paper-agent/scripts/deploy.py`（Windows 用 `%USERPROFILE%\plugins\litloop-paper-agent\scripts\deploy.py`）。它会同步代码（含 fork 改写历史后的更新）、在 `~/.scansci-pdf/venv` 建独立环境并安装、向本机的 Claude Code / Claude Desktop（已有配置文件时）/ Codex 注册 MCP、复制 skills，最后自检。已注册且可用的安装会被保留并就地更新。
+> 1. 插件目录：`~/plugins/litloop-paper-agent`（或旧的 `~/plugins/litloop`）已存在就直接用；否则 `git clone https://github.com/dysprosium231/litloop-paper-agent.git ~/plugins/litloop-paper-agent`。
+> 2. 用 Python 3.11+ 运行该目录下的 `scripts/deploy.py`，如 `python ~/plugins/litloop-paper-agent/scripts/deploy.py`（Windows 用 `%USERPROFILE%\plugins\litloop-paper-agent\scripts\deploy.py`）。它会同步代码（含 fork 改写历史后的更新）、在 `~/.litloop/venv` 建独立环境并安装、向本机的 Claude Code / Claude Desktop（已有配置文件时）/ Codex 注册 MCP、复制 skills，最后自检。已注册且可用的安装会被保留并就地更新。
 > 3. 把脚本末尾的 summary（警告和下一步）转告用户，并提醒重启客户端。脚本以“本地有未推送改动”退出时，不要强行覆盖，问用户。
 > 4. 可选：`--with-find` 加装 scansci-find；`--extras fast,vpnsci,patchright,zotero` 把 zotero-mcp 装进同一环境；`--dry-run` 只看不改。没有 Python 3.11+ 或 Git 时，先请用户安装（Windows：`winget install Python.Python.3.12 Git.Git`）。
 
@@ -51,7 +51,7 @@ Agent 会克隆（或原地更新）仓库、装好依赖并注册插件，然�
 <summary><strong>手动安装 / pip / MCP 配置</strong>（不走对话流程时）</summary>
 
 ```bash
-pip install scansci-pdf
+pip install litloop
 ```
 
 标准 MCP 配置（Claude Desktop / Cursor / Windsurf / Cline / Cherry Studio…）：
@@ -59,8 +59,8 @@ pip install scansci-pdf
 ```json
 {
   "mcpServers": {
-    "scansci-pdf": {
-      "command": "scansci-pdf",
+    "litloop": {
+      "command": "litloop",
       "args": ["run"]
     }
   }
@@ -70,14 +70,14 @@ pip install scansci-pdf
 Codex App / Codex CLI（Windows 一键：克隆 + 装环境 + 注册插件）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command '$p=Join-Path $HOME "plugins\scansci-pdf"; if(Test-Path $p){ git -C $p fetch origin main; git -C $p merge --ff-only origin/main } else { git clone --branch main --single-branch https://github.com/dysprosium231/litloop-paper-agent.git $p }; & (Join-Path $p "scripts\install-scansci-pdf.ps1")'
+powershell -NoProfile -ExecutionPolicy Bypass -Command '$p=Join-Path $HOME "plugins\litloop"; if(Test-Path $p){ git -C $p fetch origin main; git -C $p merge --ff-only origin/main } else { git clone --branch main --single-branch https://github.com/dysprosium231/litloop-paper-agent.git $p }; & (Join-Path $p "scripts\install-litloop.ps1")'
 ```
 
-ZCode：插件市场搜 `scansci-pdf` 一键安装，MCP、skills、快捷命令一次带齐。
+ZCode：插件市场搜 `litloop` 一键安装，MCP、skills、快捷命令一次带齐。
 
-**插件入口**：Codex = `.codex-plugin/plugin.json` + `.mcp.json`（自动注册 MCP server）+ `skills/`；ZCode = [`zcode-plugin/`](./zcode-plugin/)（marketplace 包：skills + `/scansci` 快捷命令）；Claude Code = `.claude/skills/` + 上面的标准 MCP 配置。
+**插件入口**：Codex = `.codex-plugin/plugin.json` + `.mcp.json`（自动注册 MCP server）+ `skills/`；ZCode = [`zcode-plugin/`](./zcode-plugin/)（marketplace 包：skills + `/litloop` 快捷命令）；Claude Code = `.claude/skills/` + 上面的标准 MCP 配置。
 
-手动安装（Codex）：仓库放到 `%USERPROFILE%\plugins\scansci-pdf` → `python -m pip install -e .` → 插件管理页刷新个人 marketplace；Codex CLI 可用时执行 `codex plugin add scansci-pdf@local-plugins`。
+手动安装（Codex）：仓库放到 `%USERPROFILE%\plugins\litloop` → `python -m pip install -e .` → 插件管理页刷新个人 marketplace；Codex CLI 可用时执行 `codex plugin add litloop@local-plugins`。
 
 </details>
 
@@ -87,13 +87,13 @@ ZCode：插件市场搜 `scansci-pdf` 一键安装，MCP、skills、快捷命令
 HTTP 模式（远程部署或不支持 stdio 的场景，默认只监听本机）：
 
 ```bash
-scansci-pdf run --mode streamable_http --host 127.0.0.1 --port 8000
+litloop run --mode streamable_http --host 127.0.0.1 --port 8000
 ```
 
 Web UI：
 
 ```bash
-scansci-pdf web --port 8080   # 浏览器打开 http://localhost:8080
+litloop web --port 8080   # 浏览器打开 http://localhost:8080
 ```
 
 Docker（内置 MCP 服务器 + Tor，数据卷持久化）：
@@ -125,10 +125,10 @@ docker compose up -d
 不动 Agent、直接命令行也行：
 
 ```bash
-scansci-pdf get 10.1038/nature12373            # 单篇下载
-scansci-pdf batch 文献清单.xlsx --lanes        # 批量下载（xlsx/csv/队列通用，四车道调度）
-scansci-pdf search "carbon cycle" --out q.txt  # 检索结果落成队列文件，直接接 batch
-scansci-pdf check                             # 依赖与环境体检
+litloop get 10.1038/nature12373            # 单篇下载
+litloop batch 文献清单.xlsx --lanes        # 批量下载（xlsx/csv/队列通用，四车道调度）
+litloop search "carbon cycle" --out q.txt  # 检索结果落成队列文件，直接接 batch
+litloop check                             # 依赖与环境体检
 ```
 
 <!-- mcp-tools:start -->
@@ -137,15 +137,15 @@ scansci-pdf check                             # 依赖与环境体检
 
 | 想做什么 | 工具 |
 |---|---|
-| 下载单篇（可拉附件、转 Markdown） | `scansci_pdf_download` |
-| 批量下载（列表 / xlsx·csv·bib·APA 文件） | `scansci_pdf_batch_download` |
-| 检索、作者检索、系统性发现 | `scansci_pdf_search` · `scansci_pdf_find` · `scansci_pdf_expand_citations` |
-| 筛选记录（相关度 + 理由，记录选择，生成下载队列） | `scansci_pdf_screening` |
-| 准备队列（校验 / OA 定位 / 构建） | `scansci_pdf_prepare_queue` |
-| 机构登录与状态（WebVPN / CARSI / EZProxy / 出版商 SSO） | `scansci_pdf_login` · `scansci_pdf_channel_status` · `scansci_pdf_schools` |
-| 引文 / 元数据 / Zotero | `scansci_pdf_citation` · `scansci_pdf_zotero_push` |
-| 配置 / 诊断 / Tor / 缓存 / Elsevier Key | `scansci_pdf_config` · `scansci_pdf_diagnostics` · `scansci_pdf_tor` · `scansci_pdf_cache_clear` · `scansci_pdf_elsevier_setup` |
-| 取消进行中的下载 / 批量（停止竞速、跳过未开始的论文、关闭窗口） | `scansci_pdf_cancel` |
+| 下载单篇（可拉附件、转 Markdown） | `litloop_download` |
+| 批量下载（列表 / xlsx·csv·bib·APA 文件） | `litloop_batch_download` |
+| 检索、作者检索、系统性发现 | `litloop_search` · `litloop_find` · `litloop_expand_citations` |
+| 筛选记录（相关度 + 理由，记录选择，生成下载队列） | `litloop_screening` |
+| 准备队列（校验 / OA 定位 / 构建） | `litloop_prepare_queue` |
+| 机构登录与状态（WebVPN / CARSI / EZProxy / 出版商 SSO） | `litloop_login` · `litloop_channel_status` · `litloop_schools` |
+| 引文 / 元数据 / Zotero | `litloop_citation` · `litloop_zotero_push` |
+| 配置 / 诊断 / Tor / 缓存 / Elsevier Key | `litloop_config` · `litloop_diagnostics` · `litloop_tor` · `litloop_cache_clear` · `litloop_elsevier_setup` |
+| 取消进行中的下载 / 批量（停止竞速、跳过未开始的论文、关闭窗口） | `litloop_cancel` |
 
 每个工具的参数与说明由 MCP `tools/list` 自带，Agent 会自动看到。
 
@@ -161,37 +161,37 @@ scansci-pdf check                             # 依赖与环境体检
 ScienceDirect / Cell Press 等 Elsevier 论文走 API 直接下载，速度从 15–30 秒降到 1–2 秒。Key 申请免费、个人邮箱即可：
 
 1. 访问 [Elsevier Developer Portal](https://dev.elsevier.com/) 创建应用，勾选 **ScienceDirect Article Retrieval**
-2. 配置 Key：`scansci_pdf_elsevier_setup`（MCP 会打开浏览器引导）或 `scansci_pdf_config(key="elsevier_api_key", value="...")`
+2. 配置 Key：`litloop_elsevier_setup`（MCP 会打开浏览器引导）或 `litloop_config(key="elsevier_api_key", value="...")`
 
 ### WebVPN（高校代理）
 
 ```text
-1. scansci_pdf_schools(action="search", query="北京")  → 搜你的学校
-2. scansci_pdf_schools(action="set", school="你的学校")
-3. scansci_pdf_login(kind="webvpn")                    → 浏览器完成 CAS 认证
-4. scansci_pdf_channel_status(kind="webvpn_test")      → 确认连接正常
+1. litloop_schools(action="search", query="北京")  → 搜你的学校
+2. litloop_schools(action="set", school="你的学校")
+3. litloop_login(kind="webvpn")                    → 浏览器完成 CAS 认证
+4. litloop_channel_status(kind="webvpn_test")      → 确认连接正常
 ```
 
-支持 100+ 所中国高校，命令行等价：`scansci-pdf schools 北京` / `scansci-pdf setup 北京航空航天大学`。
+支持 100+ 所中国高校，命令行等价：`litloop schools 北京` / `litloop setup 北京航空航天大学`。
 
 ### CARSI（出版商联邦认证）
 
 ```text
-1. scansci_pdf_config(key="carsi_enabled", value="true")
-2. scansci_pdf_config(key="carsi_idp_name", value="你的学校名称")
-3. scansci_pdf_login(kind="carsi", publisher="sciencedirect")
+1. litloop_config(key="carsi_enabled", value="true")
+2. litloop_config(key="carsi_idp_name", value="你的学校名称")
+3. litloop_login(kind="carsi", publisher="sciencedirect")
 ```
 
 支持 sciencedirect、springer、wiley、ieee、tandfonline、nature 等。SAGE 中国站首次使用
-`scansci_pdf_login(kind="carsi", publisher="sage-cn")` 登录；之后下载会复用已保存会话，
+`litloop_login(kind="carsi", publisher="sage-cn")` 登录；之后下载会复用已保存会话，
 从文章页解析实际 `articleId` 并请求站点自身的 PDF 下载接口，无需反复开启浏览器。
 
 ### EZProxy（图书馆代理）
 
 ```text
-1. scansci_pdf_config(key="ezproxy_enabled", value="true")
-2. scansci_pdf_config(key="ezproxy_login_url", value="https://libproxy.你的学校.edu.cn/login?url={url}")
-3. scansci_pdf_login(kind="ezproxy")
+1. litloop_config(key="ezproxy_enabled", value="true")
+2. litloop_config(key="ezproxy_login_url", value="https://libproxy.你的学校.edu.cn/login?url={url}")
+3. litloop_login(kind="ezproxy")
 ```
 
 `ezproxy_login_url` 支持两种模板：
@@ -235,12 +235,12 @@ ScienceDirect / Cell Press 等 Elsevier 论文走 API 直接下载，速度从 1
 
 ## Zotero
 
-`scansci_pdf_zotero_push` 优先交给 [zotero-mcp](https://github.com/54yyyu/zotero-mcp)（≥ 0.14.1）完成：按 DOI 建条目、用 CrossRef 元数据，库里已有就复用；PDF 作为附件上传，配了 WebDAV 就存到 WebDAV。可以带 `collections`（已有分类）和 `tags`。
+`litloop_zotero_push` 优先交给 [zotero-mcp](https://github.com/54yyyu/zotero-mcp)（≥ 0.14.1）完成：按 DOI 建条目、用 CrossRef 元数据，库里已有就复用；PDF 作为附件上传，配了 WebDAV 就存到 WebDAV。可以带 `collections`（已有分类）和 `tags`。
 
 已经在 Claude Code / Claude Desktop 里装好 zotero-mcp 的话，什么都不用配，插件会自己找到它，并沿用它的 API Key、WebDAV 设置。查找顺序：
 
 1. `zotero_mcp_python` 指定的 Python（设为 `off` 则不用 zotero-mcp）
-2. 和本插件装在同一个环境里的 zotero-mcp（`pip install "scansci-pdf[zotero]"`）
+2. 和本插件装在同一个环境里的 zotero-mcp（`pip install "litloop[zotero]"`）
 3. Claude Code（`~/.claude.json`、项目 `.mcp.json`）或 Claude Desktop 配置里名字或命令含 `zotero` 的服务器，连同它的 `env`
 4. PATH 上的 `zotero-mcp`，以及 `uv tool` / pipx 安装的 zotero-mcp
 
@@ -253,15 +253,15 @@ zotero-mcp 需要能写库：配好 Web API Key（`zotero-mcp setup`）。只开
 <details>
 <summary><strong>配置参考</strong>（完整表）</summary>
 
-通过 `scansci_pdf_config` 或 `scansci-pdf config-cmd` 修改：
+通过 `litloop_config` 或 `litloop config-cmd` 修改：
 
 | 配置项 | 默认值 | 说明 |
 |---|---:|---|
-| `output_dir` | `~/.scansci-pdf/papers` | PDF 保存目录 |
+| `output_dir` | `~/.litloop/papers` | PDF 保存目录 |
 | `auto_rename` | `true` | 自动按作者/标题重命名 |
 | `download_strategy` | `fastest` | 下载策略 |
 | `scihub_enabled` | `true` | 启用 Sci-Hub/LibGen 类来源 |
-| `network_proxy` | 空 | HTTP/SOCKS 代理地址（机构 IP 授权类来源——Elsevier/Springer TDM API——必须走这里；`HTTP_PROXY`/`HTTPS_PROXY` 环境变量被有意忽略，也可用 `SCANSCI_PDF_PROXY` 环境变量） |
+| `network_proxy` | 空 | HTTP/SOCKS 代理地址（机构 IP 授权类来源——Elsevier/Springer TDM API——必须走这里；`HTTP_PROXY`/`HTTPS_PROXY` 环境变量被有意忽略，也可用 `LITLOOP_PROXY` 环境变量） |
 | `proxy_pool` | 空 | 逗号分隔的代理列表；非空时批量下载按代理轮换出口 IP |
 | `batch_workers` | `10` | 批量下载并发数（被封 IP 时建议调低到 2） |
 | `request_delay_min` | `2.0` | 请求间随机延迟下限（秒） |
@@ -310,15 +310,15 @@ zotero-mcp 需要能写库：配好 Web API Key（`zotero-mcp setup`）。只开
 **降低被封概率** —— 让请求像人：
 
 ```bash
-scansci-pdf config-cmd batch_workers 2          # 调低并发（默认 10）
-scansci-pdf config-cmd request_delay_min 5      # 拉大随机延迟下限（默认 2）
-scansci-pdf config-cmd request_delay_max 12     # 拉大随机延迟上限（默认 5）
+litloop config-cmd batch_workers 2          # 调低并发（默认 10）
+litloop config-cmd request_delay_min 5      # 拉大随机延迟下限（默认 2）
+litloop config-cmd request_delay_max 12     # 拉大随机延迟上限（默认 5）
 ```
 
 **代理池轮换（进阶）**：多个代理轮换出口 IP，每个代理一个独立浏览器上下文，登录一次 cookies 全复用；连续 3 次被封的代理自动剔除：
 
 ```bash
-scansci-pdf config-cmd proxy_pool "socks5://1.1.1.1:1080,http://2.2.2.2:8080"
+litloop config-cmd proxy_pool "socks5://1.1.1.1:1080,http://2.2.2.2:8080"
 ```
 
 > ⚠ **权衡**：同一登录态从多个 IP 并发访问，少数出版商可能视为异常。机构对这种检测敏感的话，保持 `proxy_pool` 为空即可。
@@ -329,15 +329,15 @@ scansci-pdf config-cmd proxy_pool "socks5://1.1.1.1:1080,http://2.2.2.2:8080"
 
 | 现象 | 先做 |
 |---|---|
-| 下载失败 | `scansci-pdf check`，会话问题再跑 `scansci-pdf session-doctor` |
+| 下载失败 | `litloop check`，会话问题再跑 `litloop session-doctor` |
 | Agent 说 Elsevier 需要 insttoken | 不需要：API key + 校园网出口即可（insttoken 仅拿不到校园出口时申请）；NOT_ENTITLED=未连校园网或学校未订阅，连网重试或转其他渠道 |
-| Elsevier 403 Requestor configuration settings insufficient | key 有效但 key+出口未配置全文：`scansci-pdf elsevier-check --doi <DOI>`——未走校园出口则配 `network_proxy`/`SCANSCI_PDF_PROXY`；已走校园出口则是机构未给 key 开 API 全文权限（找机构 Elsevier 管理员，insttoken 为替代路径） |
-| 新申请的 Elsevier key 一直 403 | 注册环节问题：机构邮箱注册 Elsevier 账号 + 校园网/学校 VPN 下创建 key（门户靠邮箱域 + 出口 IP 识别机构）；创建后当场 `scansci-pdf elsevier-check` 验证 |
-| 数据源全红 / 打不开 | Agent 里调 `scansci_pdf_diagnostics(check="network")`，给出针对性修复建议 |
-| 以前能下的站点突然 403 / 弹 Cloudflare | 大概率 cloakbrowser 过旧：`pip install -U cloakbrowser`（`scansci-pdf browser-doctor` 会标出 outdated） |
-| WebVPN / CARSI 登录失败 | `pip install "scansci-pdf[cloakbrowser,instsci]"`，在可见浏览器完成登录后重试 |
-| Sci-Hub 连不上 | 内嵌 Tor：`scansci_pdf_tor(action="start", use_bridges=true)`，或配置 `network_proxy` |
-| 下载速度慢 | 配置 Elsevier API Key；调 `batch_workers`；数据源延迟用 `scansci_pdf_diagnostics(check="health")` 查看 |
+| Elsevier 403 Requestor configuration settings insufficient | key 有效但 key+出口未配置全文：`litloop elsevier-check --doi <DOI>`——未走校园出口则配 `network_proxy`/`LITLOOP_PROXY`；已走校园出口则是机构未给 key 开 API 全文权限（找机构 Elsevier 管理员，insttoken 为替代路径） |
+| 新申请的 Elsevier key 一直 403 | 注册环节问题：机构邮箱注册 Elsevier 账号 + 校园网/学校 VPN 下创建 key（门户靠邮箱域 + 出口 IP 识别机构）；创建后当场 `litloop elsevier-check` 验证 |
+| 数据源全红 / 打不开 | Agent 里调 `litloop_diagnostics(check="network")`，给出针对性修复建议 |
+| 以前能下的站点突然 403 / 弹 Cloudflare | 大概率 cloakbrowser 过旧：`pip install -U cloakbrowser`（`litloop browser-doctor` 会标出 outdated） |
+| WebVPN / CARSI 登录失败 | `pip install "litloop[cloakbrowser,instsci]"`，在可见浏览器完成登录后重试 |
+| Sci-Hub 连不上 | 内嵌 Tor：`litloop_tor(action="start", use_bridges=true)`，或配置 `network_proxy` |
+| 下载速度慢 | 配置 Elsevier API Key；调 `batch_workers`；数据源延迟用 `litloop_diagnostics(check="health")` 查看 |
 
 <details>
 <summary><strong>ACS 提示 IP Address Blocked 怎么办</strong></summary>
@@ -403,4 +403,4 @@ LitLoop 基于 **[scansci-pdf](https://github.com/Rimagination/scansci-pdf)**（
 
 [Apache License 2.0](LICENSE)。原项目版权声明保留在 LICENSE 中；衍生版的改动说明见 [NOTICE](NOTICE)。
 
-例外：`src/scansci_pdf/_core/` 中的 Cython 编译扩展（`.pyd`/`.so`）为预编译二进制，仅通过 PyPI 分发。其 Cython 源码（`.pyx`）为专有代码，不包含在本仓库中。
+例外：`src/litloop/_core/` 中的 Cython 编译扩展（`.pyd`/`.so`）为预编译二进制，仅通过 PyPI 分发。其 Cython 源码（`.pyx`）为专有代码，不包含在本仓库中。

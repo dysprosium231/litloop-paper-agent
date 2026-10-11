@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from scansci_pdf.publisher_strategies import StrategyRegistry
+from litloop.publisher_strategies import StrategyRegistry
 
 STRATEGIES = StrategyRegistry.list_all()
 

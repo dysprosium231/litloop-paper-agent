@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import patch
 
-from scansci_pdf import elsevier_check as ec
+from litloop import elsevier_check as ec
 
 
 def _patch_key_valid(verdict: str, code: int = 200):

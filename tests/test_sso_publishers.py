@@ -27,7 +27,7 @@ from typing import Any
 _PROJECT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT / "src"))
 
-from scansci_pdf.publisher_strategies import (
+from litloop.publisher_strategies import (
     _PUBLISHER_SSO_CONFIG,
     _AUTH_KEYWORDS,
     _AUTH_TITLES,
@@ -118,8 +118,8 @@ def run_publisher_test(
     }
 
     try:
-        from scansci_pdf.browser_backend import launch  # noqa: F401
-        from scansci_pdf.browser_backend import is_available as _browser_backend_available
+        from litloop.browser_backend import launch  # noqa: F401
+        from litloop.browser_backend import is_available as _browser_backend_available
         if not _browser_backend_available():
             result["error"] = "no browser backend available"
             return result

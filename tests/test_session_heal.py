@@ -2,7 +2,7 @@
 
 import requests
 
-from scansci_pdf.session_heal import ensure_institutional_sessions, ensure_webvpn_session
+from litloop.session_heal import ensure_institutional_sessions, ensure_webvpn_session
 
 
 class FakeResponse:
@@ -43,21 +43,21 @@ def _jar_with_cookie():
 
 
 def test_session_status_none_without_cookies(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     monkeypatch.setattr(instsci, "_load_cookies", lambda config: requests.cookies.RequestsCookieJar())
     assert instsci.session_status({"cache_dir": "x"}) == "none"
 
 
 def test_session_status_none_without_base(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     monkeypatch.setattr(instsci, "_load_cookies", lambda config: _jar_with_cookie())
     assert instsci.session_status({"cache_dir": "x"}) == "none"
 
 
 def test_session_status_valid(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     monkeypatch.setattr(instsci, "_load_cookies", lambda config: _jar_with_cookie())
     monkeypatch.setattr(instsci, "_get_webvpn_base", lambda config: "https://vpn.example.org")
@@ -66,7 +66,7 @@ def test_session_status_valid(monkeypatch):
 
 
 def test_session_status_expired_on_login_redirect(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     monkeypatch.setattr(instsci, "_load_cookies", lambda config: _jar_with_cookie())
     monkeypatch.setattr(instsci, "_get_webvpn_base", lambda config: "https://vpn.example.org")
@@ -75,7 +75,7 @@ def test_session_status_expired_on_login_redirect(monkeypatch):
 
 
 def test_session_status_unreachable_on_exception(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     monkeypatch.setattr(instsci, "_load_cookies", lambda config: _jar_with_cookie())
     monkeypatch.setattr(instsci, "_get_webvpn_base", lambda config: "https://vpn.example.org")
@@ -93,7 +93,7 @@ def test_session_status_unreachable_on_exception(monkeypatch):
 
 
 def test_auto_relogin_disabled_never_logs_in(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     calls = []
     monkeypatch.setattr(instsci, "session_status", lambda config: "expired")
@@ -106,7 +106,7 @@ def test_auto_relogin_disabled_never_logs_in(monkeypatch):
 
 
 def test_valid_session_does_not_relogin(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     monkeypatch.setattr(instsci, "session_status", lambda config: "valid")
     monkeypatch.setattr(instsci, "instsci_login", lambda config: (_ for _ in ()).throw(AssertionError("login must not run")))
@@ -117,7 +117,7 @@ def test_valid_session_does_not_relogin(monkeypatch):
 
 
 def test_none_and_unreachable_sessions_do_not_relogin(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     for status in ("none", "unreachable"):
         monkeypatch.setattr(instsci, "session_status", lambda config, s=status: s)
@@ -126,7 +126,7 @@ def test_none_and_unreachable_sessions_do_not_relogin(monkeypatch):
 
 
 def test_expired_session_relogs_in_and_confirms(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     state = {"calls": 0}
 
@@ -143,7 +143,7 @@ def test_expired_session_relogs_in_and_confirms(monkeypatch):
 
 
 def test_expired_session_with_failed_login_is_reported(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     monkeypatch.setattr(instsci, "session_status", lambda config: "expired")
     monkeypatch.setattr(instsci, "instsci_login", lambda config: False)
@@ -159,7 +159,7 @@ def test_institutional_sessions_skipped_when_not_configured():
 
 
 def test_institutional_sessions_reports_webvpn_when_configured(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
 
     monkeypatch.setattr(instsci, "session_status", lambda config: "valid")
     monkeypatch.setattr(instsci, "instsci_login", lambda config: True)

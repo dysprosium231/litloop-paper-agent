@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from scansci_pdf import browser_backend as bb
+from litloop import browser_backend as bb
 
 
 def test_gate_passes_on_current(monkeypatch):
@@ -20,7 +20,7 @@ def test_gate_blocks_old_with_upgrade_hint(monkeypatch):
 
 def test_gate_bypass_env(monkeypatch):
     monkeypatch.setattr(bb, "_cloakbrowser_dist_version", lambda: (0, 4, 11))
-    monkeypatch.setenv("SCANSCI_ALLOW_OLD_CLOAKBROWSER", "1")
+    monkeypatch.setenv("LITLOOP_ALLOW_OLD_CLOAKBROWSER", "1")
     bb._enforce_cloakbrowser_floor()
 
 

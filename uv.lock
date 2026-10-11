@@ -1643,7 +1643,7 @@ wheels = [
 ]
 
 [[package]]
-name = "scansci-pdf"
+name = "litloop"
 version = "1.11.0"
 source = { editable = "." }
 dependencies = [

@@ -7,4 +7,4 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 import os
 
-os.environ.setdefault("SCANSCI_PROGRESS_BAR", "0")  # pytest 不得弹出 GUI
+os.environ.setdefault("LITLOOP_PROGRESS_BAR", "0")  # pytest 不得弹出 GUI

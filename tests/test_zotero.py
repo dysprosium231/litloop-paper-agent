@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scansci_pdf import zotero
+from litloop import zotero
 
 
 class FakeResponse:
@@ -98,7 +98,7 @@ def test_push_uses_zotero_mcp_when_configured(tmp_path, monkeypatch):
 
     result = zotero.push_to_zotero(
         "10.1234/x", pdf, {"zotero_mcp_python": sys.executable},
-        collections=["Ceramics"], tags=["scansci"],
+        collections=["Ceramics"], tags=["litloop"],
     )
 
     assert result["success"] and result["zotero_key"] == "ABCD1234"
@@ -106,7 +106,7 @@ def test_push_uses_zotero_mcp_when_configured(tmp_path, monkeypatch):
     req = json.loads(seen.read_text(encoding="utf-8"))
     assert req["identifier"] == "10.1234/x"
     assert Path(req["file"]).is_absolute()
-    assert req["collections"] == ["Ceramics"] and req["tags"] == ["scansci"]
+    assert req["collections"] == ["Ceramics"] and req["tags"] == ["litloop"]
 
 
 def test_zotero_mcp_bridge_garbage_output_is_an_error(tmp_path, monkeypatch):
@@ -119,7 +119,7 @@ def test_zotero_mcp_bridge_garbage_output_is_an_error(tmp_path, monkeypatch):
 
 def test_zotero_bridge_parses_item_and_attachment_keys(monkeypatch):
     import types, sys
-    from scansci_pdf import zotero_bridge
+    from litloop import zotero_bridge
 
     calls = {}
     write = types.SimpleNamespace(

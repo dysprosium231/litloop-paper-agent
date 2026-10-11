@@ -1,6 +1,6 @@
 """Build script for compiling Cython extensions.
 
-Compiles .pyx files in src/scansci_pdf/_core/ to .pyd (Windows) or .so (Linux/macOS).
+Compiles .pyx files in src/litloop/_core/ to .pyd (Windows) or .so (Linux/macOS).
 Run this before publishing to PyPI to include compiled binaries.
 
 Usage:
@@ -19,7 +19,7 @@ from pathlib import Path
 
 
 def build():
-    core_dir = Path(__file__).parent / "src" / "scansci_pdf" / "_core"
+    core_dir = Path(__file__).parent / "src" / "litloop" / "_core"
 
     if not core_dir.exists():
         print(f"ERROR: {core_dir} not found")

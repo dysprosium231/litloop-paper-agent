@@ -122,7 +122,7 @@ def check_unpaywall(failures: list[str]) -> None:
         try:
             resp = requests.get(
                 f"https://api.unpaywall.org/v2/{PROBE_DOI}",
-                params={"email": "canary@scansci-pdf.dev"},
+                params={"email": "canary@litloop.dev"},
                 headers=UA, timeout=30,
             )
             last_exc = None

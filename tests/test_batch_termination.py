@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from scansci_pdf.sources import _run_tiers_parallel, batch_download
+from litloop.sources import _run_tiers_parallel, batch_download
 
 
 def _make_source(delay: float, ok: bool, label: str):
@@ -44,7 +44,7 @@ def _make_source(delay: float, ok: bool, label: str):
 @pytest.fixture(autouse=True)
 def _force_pure_python_race(monkeypatch: pytest.MonkeyPatch):
     """The compiled core is a dev-only artifact; PyPI wheels ship pure Python."""
-    monkeypatch.setattr("scansci_pdf.sources._HAS_COMPILED_CORE", False)
+    monkeypatch.setattr("litloop.sources._HAS_COMPILED_CORE", False)
 
 
 def _race(tiers, overall_timeout: int, tmp_path: Path):
@@ -90,7 +90,7 @@ def test_batch_download_honors_wall_clock_budget(tmp_path: Path, monkeypatch: py
     """Batch must exit within batch_total_timeout and still write its report."""
     import threading
 
-    import scansci_pdf.sources as sources
+    import litloop.sources as sources
 
     wake = threading.Event()
 

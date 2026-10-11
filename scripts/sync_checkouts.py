@@ -8,7 +8,7 @@ overwritten by a test file). Usage:
     python scripts/sync_checkouts.py --test     # mirror + run the sync test
 
 What it does:
-1. Mirrors src/scansci_pdf, tests, docs from the repo into the plugins
+1. Mirrors src/litloop, tests, docs from the repo into the plugins
    checkout (add/update/delete), excluding __pycache__.
 2. Byte-compares every mirrored file and reports leftovers.
 3. Exit 1 on any mismatch (so CI/scripts can gate on it).
@@ -21,8 +21,8 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-PLUGINS = Path(r"C:\Users\Liang\plugins\scansci-pdf")
-TREES = ["src/scansci_pdf", "tests", "docs"]
+PLUGINS = Path(r"C:\Users\Liang\plugins\litloop")
+TREES = ["src/litloop", "tests", "docs"]
 EXCLUDE = {"__pycache__"}
 
 

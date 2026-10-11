@@ -11,7 +11,7 @@ Covers:
 import unittest
 from unittest.mock import patch
 
-from scansci_pdf.publisher_batch import (
+from litloop.publisher_batch import (
     IP_BLOCK_STOP_THRESHOLD,
     PublisherBatchDownloader,
     DownloadResult,
@@ -118,7 +118,7 @@ class AutoStopTests(unittest.TestCase):
         patcher_profile = patch.object(d, "_prepare_worker_profile", return_value=Path_tmp())
         patcher_ctx = patch.object(d, "_launch_context", return_value=_FakeContext())
         # _PagePool is constructed internally; patch the class to a stub.
-        patcher_pool = patch("scansci_pdf.publisher_batch._PagePool", _FakePagePool)
+        patcher_pool = patch("litloop.publisher_batch._PagePool", _FakePagePool)
         patcher_profile.start()
         patcher_ctx.start()
         patcher_pool.start()

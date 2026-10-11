@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import scansci_pdf.sources.scihub as scihub
+import litloop.sources.scihub as scihub
 
 
 class _Resp:
@@ -57,7 +57,7 @@ def test_referer_threaded_to_download(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(scihub, "fetch", lambda *a, **k: _Page())
     monkeypatch.setattr(
-        "scansci_pdf.pdf_utils.download_pdf",
+        "litloop.pdf_utils.download_pdf",
         lambda url, out, cfg, src, **kw: captured.update(kw) or None)
 
     scihub.try_scihub_domain(
@@ -71,7 +71,7 @@ def test_download_pdf_sets_referer_header(monkeypatch, tmp_path: Path):
     """download_pdf sends the Referer header on the cookie session path."""
     seen: dict = {}
 
-    import scansci_pdf.pdf_utils as pu
+    import litloop.pdf_utils as pu
 
     class _S:
         headers: dict = {}
@@ -95,8 +95,8 @@ def test_download_pdf_browser_ua(monkeypatch, tmp_path: Path):
     UA even with Referer) — and the CHROME_UA import must not NameError."""
     seen: dict = {}
 
-    import scansci_pdf.pdf_utils as pu
-    from scansci_pdf.network import CHROME_UA
+    import litloop.pdf_utils as pu
+    from litloop.network import CHROME_UA
 
     class _S:
         headers: dict = {}

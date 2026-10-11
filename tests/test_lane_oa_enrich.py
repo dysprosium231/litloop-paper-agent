@@ -13,8 +13,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from scansci_pdf import pipeline
-from scansci_pdf.pipeline import QueueEntry, _enrich_oa_urls, _looks_like_pdf_url
+from litloop import pipeline
+from litloop.pipeline import QueueEntry, _enrich_oa_urls, _looks_like_pdf_url
 
 
 def _cfg(tmp: Path) -> dict:
@@ -144,7 +144,7 @@ class RoutingTests(unittest.TestCase):
 
         with patch.object(pipeline, "_fetch_oa_pdf", side_effect=fake_fetch), \
              patch.object(pipeline, "_run_fast_lane", side_effect=fake_fast), \
-             patch("scansci_pdf.sources.batch_download", return_value=[]):
+             patch("litloop.sources.batch_download", return_value=[]):
             pipeline.run_lanes(entries, Path(self.tmp.name), config=_cfg(Path(self.tmp.name)))
 
         self.assertEqual(seen["fast"], ["10.1093/nar/gkac1052"],

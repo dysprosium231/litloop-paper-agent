@@ -24,7 +24,7 @@ URL = ("https://api.semanticscholar.org/graph/v1/paper/batch"
 def post(ids):
     req = Request(URL, data=json.dumps({"ids": ids}).encode(),
                   headers={"Content-Type": "application/json",
-                           "User-Agent": "scansci-sort/1.0"})
+                           "User-Agent": "litloop-sort/1.0"})
     with urlopen(req, timeout=60) as r:
         return json.loads(r.read())
 

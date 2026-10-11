@@ -1,19 +1,19 @@
 services:
-  scansci-pdf:
+  litloop:
     build: .
     ports:
       - "8000:8000"
     environment:
       - TOR_PROXY=socks5h://tor:1080
       - CAMOFOX_URL=http://camofox:9377
-      - SCANSCI_PDF_DATA_DIR=/data/paper-fetch
+      - LITLOOP_DATA_DIR=/data/paper-fetch
       - NO_PROXY=localhost,127.0.0.1,camofox,tor
     volumes:
-      - scansci-pdf-data:/data/paper-fetch
+      - litloop-data:/data/paper-fetch
     depends_on:
       - tor
     networks:
-      - scansci-pdf-net
+      - litloop-net
     restart: unless-stopped
 
   camofox:
@@ -21,7 +21,7 @@ services:
     ports:
       - "9377:9377"
     networks:
-      - scansci-pdf-net
+      - litloop-net
     restart: unless-stopped
 
   tor:
@@ -29,12 +29,12 @@ services:
     ports:
       - "1080:1080"
     networks:
-      - scansci-pdf-net
+      - litloop-net
     restart: unless-stopped
 
 networks:
-  scansci-pdf-net:
+  litloop-net:
     driver: bridge
 
 volumes:
-  scansci-pdf-data:
+  litloop-data:

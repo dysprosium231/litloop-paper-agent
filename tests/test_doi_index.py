@@ -4,7 +4,7 @@ and legacy format compatibility."""
 import json
 import time
 
-from scansci_pdf.sources import (
+from litloop.sources import (
     _EXPLICIT_STRATEGIES,
     _index_entry,
     _index_entry_is_fresh,
@@ -104,7 +104,7 @@ def _download_config(tmp_path, strategy="fastest"):
 
 
 def _install_config(monkeypatch, config, config_file):
-    import scansci_pdf.config as config_module
+    import litloop.config as config_module
 
     config_file.parent.mkdir(parents=True, exist_ok=True)
     config_file.write_text(json.dumps(config), encoding="utf-8")
@@ -112,10 +112,10 @@ def _install_config(monkeypatch, config, config_file):
 
 
 def _patch_download_network(monkeypatch):
-    monkeypatch.setattr("scansci_pdf.identifiers.validate_doi", lambda doi: (True, "https://doi.org/" + doi))
-    monkeypatch.setattr("scansci_pdf.citation.fetch_metadata", lambda doi, config: None)
-    monkeypatch.setattr("scansci_pdf.sources._build_free_sources", lambda doi, config: [])
-    monkeypatch.setattr("scansci_pdf.sources._build_institutional_sources", lambda doi, config, **kw: [])
+    monkeypatch.setattr("litloop.identifiers.validate_doi", lambda doi: (True, "https://doi.org/" + doi))
+    monkeypatch.setattr("litloop.citation.fetch_metadata", lambda doi, config: None)
+    monkeypatch.setattr("litloop.sources._build_free_sources", lambda doi, config: [])
+    monkeypatch.setattr("litloop.sources._build_institutional_sources", lambda doi, config, **kw: [])
 
 
 def test_download_serves_fresh_indexed_file(monkeypatch, tmp_path):

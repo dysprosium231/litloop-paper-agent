@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import pytest
 
-from scansci_pdf.pipeline import grey_allowed, run_lanes
-from scansci_pdf.publisher_strategies.registry import StrategyRegistry
-from scansci_pdf.pipeline import QueueEntry
+from litloop.pipeline import grey_allowed, run_lanes
+from litloop.publisher_strategies.registry import StrategyRegistry
+from litloop.pipeline import QueueEntry
 
 
 class TestGreyAllowed:
@@ -39,7 +39,7 @@ class TestRunLanesNoAuthorizationWidening:
     def test_grey_disabled_skips_grey_batch(self, tmp_path, monkeypatch):
         called = {}
         monkeypatch.setattr(
-            "scansci_pdf.sources.batch_download",
+            "litloop.sources.batch_download",
             lambda *a, **k: called.setdefault("batch", k) or {"results": []},
         )
         results = run_lanes(
@@ -51,7 +51,7 @@ class TestRunLanesNoAuthorizationWidening:
     def test_grey_enabled_runs_grey_batch(self, tmp_path, monkeypatch):
         called = {}
         monkeypatch.setattr(
-            "scansci_pdf.sources.batch_download",
+            "litloop.sources.batch_download",
             lambda *a, **k: called.setdefault("batch", k) or {"results": []},
         )
         run_lanes(
@@ -68,7 +68,7 @@ class TestGetForDoiGenericFallback:
         assert strategy.name.lower() == "generic"
 
     def test_known_prefix_prefers_specific_strategy(self):
-        from scansci_pdf.publisher_strategies import StrategyRegistry as Reg
+        from litloop.publisher_strategies import StrategyRegistry as Reg
         generic = Reg._by_name.get("generic")
         strategy = Reg.get_for_doi("10.1016/j.foo.2026.01.001")
         assert strategy is not None

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from scansci_pdf import pipeline
-from scansci_pdf.pipeline import QueueEntry, _mdpi_variants, _PDF_URL_HINT
+from litloop import pipeline
+from litloop.pipeline import QueueEntry, _mdpi_variants, _PDF_URL_HINT
 
 
 class TestMdpiSlugExtensions:
@@ -69,7 +69,7 @@ class TestLaneResultGuarantee:
 
 class TestAuthConnectorGate:
     def test_proxy_with_cookies_still_loads_them(self, monkeypatch, caplog):
-        from scansci_pdf.auth import WebVPNAuth
+        from litloop.auth import WebVPNAuth
 
         auth = WebVPNAuth({"network_proxy": "http://x:1",
                            "instsci_base_url": "https://w.example"})
@@ -81,7 +81,7 @@ class TestAuthConnectorGate:
         assert loaded  # cookies honored even with proxy set
 
     def test_proxy_without_cookies_warns_loudly(self, monkeypatch, caplog):
-        from scansci_pdf.auth import WebVPNAuth
+        from litloop.auth import WebVPNAuth
 
         auth = WebVPNAuth({"network_proxy": "http://x:1",
                            "instsci_base_url": "https://w.example"})

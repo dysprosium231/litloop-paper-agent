@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from scansci_pdf.sources import springer_tdm
-from scansci_pdf.sources.springer_tdm import try_springer_tdm
+from litloop.sources import springer_tdm
+from litloop.sources.springer_tdm import try_springer_tdm
 
 
 class _Resp:
@@ -111,17 +111,17 @@ class TestValidation:
 
 class TestWiring:
     def test_springer_publisher_maps_tdm_first(self):
-        from scansci_pdf.sources.publishers import PUBLISHER_TOOL_MAP
+        from litloop.sources.publishers import PUBLISHER_TOOL_MAP
 
         assert PUBLISHER_TOOL_MAP["Springer"][0] == "SpringerTDM"
 
     def test_fast_lane_hits_springer(self, tmp_path: Path, monkeypatch):
-        from scansci_pdf import pipeline
-        from scansci_pdf.pipeline import QueueEntry
+        from litloop import pipeline
+        from litloop.pipeline import QueueEntry
 
         called = []
         monkeypatch.setattr(
-            "scansci_pdf.sources.springer_tdm.try_springer_tdm",
+            "litloop.sources.springer_tdm.try_springer_tdm",
             lambda doi, out_path, config: called.append(doi) or {
                 "success": True, "file": str(out_path.with_suffix(".xml")),
                 "source": "SpringerTDM",
@@ -133,12 +133,12 @@ class TestWiring:
         assert results[0]["success"] and results[0]["source"] == "springer_tdm"
 
     def test_fast_lane_skips_springer_without_key(self, tmp_path: Path, monkeypatch):
-        from scansci_pdf import pipeline
-        from scansci_pdf.pipeline import QueueEntry
+        from litloop import pipeline
+        from litloop.pipeline import QueueEntry
 
         called = []
         monkeypatch.setattr(
-            "scansci_pdf.sources.springer_tdm.try_springer_tdm",
+            "litloop.sources.springer_tdm.try_springer_tdm",
             lambda doi, out_path, config: called.append(doi) or None)
         entries = [QueueEntry(identifier=DOI)]
         pipeline._run_fast_lane(entries, tmp_path, {})
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 class TestScihubBrowserFirstKnob:
     def test_knob_off_skips_browser_first(self, tmp_path: Path, monkeypatch):
         """scihub_browser_first=false must go straight to the HTTP lane."""
-        import scansci_pdf.sources.scihub as scihub
+        import litloop.sources.scihub as scihub
 
         called = []
         monkeypatch.setattr(
@@ -170,7 +170,7 @@ class TestScihubBrowserFirstKnob:
         assert called == [] and r is None
 
     def test_default_still_browser_first(self, tmp_path: Path, monkeypatch):
-        import scansci_pdf.sources.scihub as scihub
+        import litloop.sources.scihub as scihub
 
         called = []
         monkeypatch.setattr(

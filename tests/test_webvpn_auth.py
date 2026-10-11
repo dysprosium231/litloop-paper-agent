@@ -2,7 +2,7 @@
 
 import pytest
 
-from scansci_pdf.auth import WebVPNAuth
+from litloop.auth import WebVPNAuth
 
 
 CFG = {"instsci_school": "", "vpnsci_school": "", "instsci_base_url": "",
@@ -33,7 +33,7 @@ class TestBrowserLoginFailFast:
         """The leak: _browser_login used to launch the persistent context
         FIRST and only then discover the empty gateway, returning without
         closing it — poisoning the thread's Playwright loop."""
-        import scansci_pdf.auth as auth_mod
+        import litloop.auth as auth_mod
 
         launched = []
 
@@ -42,7 +42,7 @@ class TestBrowserLoginFailFast:
             raise AssertionError("browser must not be launched when webvpn base is empty")
 
         monkeypatch.setattr(auth_mod, "_HAS_CLOAKBROWSER", True)
-        monkeypatch.setattr("scansci_pdf.browser_backend.launch_persistent_context", _fake_launch)
+        monkeypatch.setattr("litloop.browser_backend.launch_persistent_context", _fake_launch)
         monkeypatch.setattr(auth_mod, "_get_profile_dir", lambda cfg: tmp_path)
 
         auth = WebVPNAuth(dict(CFG))

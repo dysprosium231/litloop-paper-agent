@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scansci_pdf.pipeline import (
+from litloop.pipeline import (
     QueueEntry,
     collect_failures,
     entries_from_table,
@@ -15,7 +15,7 @@ from scansci_pdf.pipeline import (
     read_table,
     write_queue,
 )
-from scansci_pdf.supplementary import extract_supplementary_links
+from litloop.supplementary import extract_supplementary_links
 
 
 # --- channel prediction -------------------------------------------------------

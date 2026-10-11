@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from scansci_pdf.sources.openaire import extract_openaire_fulltext_urls, _extract_from_xml
+from litloop.sources.openaire import extract_openaire_fulltext_urls, _extract_from_xml
 
 
 def test_extracts_nested_webresource_urls():

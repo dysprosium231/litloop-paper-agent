@@ -1,12 +1,12 @@
 {
-  "name": "scansci-pdf",
+  "name": "litloop",
   "version": "1.18.0",
-  "description": "LitLoop 学术论文 Agent（衍生自 scansci-pdf）:大清单嗅探分类、单篇/批量下载、机构渠道(Elsevier API/WebVPN/CARSI)、检索发现、诊断排障。携带 scansci-pdf MCP server,即装即用。",
+  "description": "LitLoop 学术论文 Agent（衍生自 litloop）:大清单嗅探分类、单篇/批量下载、机构渠道(Elsevier API/WebVPN/CARSI)、检索发现、诊断排障。携带 litloop MCP server,即装即用。",
   "skills": "skills",
   "commands": "commands",
   "mcpServers": {
-    "scansci-pdf": {
-      "command": "scansci-pdf",
+    "litloop": {
+      "command": "litloop",
       "args": [
         "run"
       ]

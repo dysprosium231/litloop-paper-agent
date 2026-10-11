@@ -1,8 +1,8 @@
-# LitLoop（scansci-pdf 衍生版）
+# LitLoop（litloop 衍生版）
 
 ![logo](icon.png)
 
-LitLoop 学术论文 Agent plugin:大清单嗅探分类 + 全场景下载检索排障,携带 scansci-pdf MCP server(stdio)。
+LitLoop 学术论文 Agent plugin:大清单嗅探分类 + 全场景下载检索排障,携带 litloop MCP server(stdio)。
 
 ## 组件
 
@@ -10,27 +10,27 @@ LitLoop 学术论文 Agent plugin:大清单嗅探分类 + 全场景下载检索�
 
 | Skill | 场景 |
 |---|---|
-| `scansci-sort` | 大清单(数百篇+)分类摸底:OA / Sci-Hub / 需机构,嗅探优先不下载,产出分桶队列 |
-| `scansci-pdf` | 其余一切:单篇/批量下载、检索引文、机构渠道(Elsevier API/WebVPN/CARSI)、排障(本插件已内置;用户目录若有同名 skill 则优先) |
+| `litloop-sort` | 大清单(数百篇+)分类摸底:OA / Sci-Hub / 需机构,嗅探优先不下载,产出分桶队列 |
+| `litloop` | 其余一切:单篇/批量下载、检索引文、机构渠道(Elsevier API/WebVPN/CARSI)、排障(本插件已内置;用户目录若有同名 skill 则优先) |
 
 **Commands(4 个,快捷入口,不占上下文):**
 
 | Command | 用途 |
 |---|---|
-| `/scansci:sort <文件>` | 嗅探分类摸底,产出报告+分桶队列 |
-| `/scansci:paper <DOI> [策略]` | 单篇下载 |
-| `/scansci:batch <文件>` | 批量下载(自动分批) |
-| `/scansci:doctor <症状>` | 诊断排障 |
+| `/litloop:sort <文件>` | 嗅探分类摸底,产出报告+分桶队列 |
+| `/litloop:paper <DOI> [策略]` | 单篇下载 |
+| `/litloop:batch <文件>` | 批量下载(自动分批) |
+| `/litloop:doctor <症状>` | 诊断排障 |
 
 ## 依赖
 
-- `scansci-pdf` CLI 在 PATH(`pip install -e <本仓库>` 或 `uv pip install -e .`;插件清单不负责安装 Python CLI,此为前置条件)
-- MCP server 由 plugin 自动注册:`scansci-pdf run`(stdio),无需手动配置
+- `litloop` CLI 在 PATH(`pip install -e <本仓库>` 或 `uv pip install -e .`;插件清单不负责安装 Python CLI,此为前置条件)
+- MCP server 由 plugin 自动注册:`litloop run`(stdio),无需手动配置
 - 可选:`scansci-find` CLI(`pip install git+https://github.com/dysprosium231/easyseek.git`)——Find 系深度检索工具(plan/estimate/find/smoke/calibrate 等)依赖它;未安装时主 skill 会自动降级到本地工具链
 
 ## 安装
 
-Settings → Plugin Management → Discover → 添加本地目录(本目录)→ 启用 scansci-pdf。
+Settings → Plugin Management → Discover → 添加本地目录(本目录)→ 启用 litloop。
 
 ## 跨 agent 共享
 

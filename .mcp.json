@@ -1,7 +1,7 @@
 {
   "mcpServers": {
-    "scansci-pdf": {
-      "command": "scansci-pdf",
+    "litloop": {
+      "command": "litloop",
       "args": [
         "run"
       ]

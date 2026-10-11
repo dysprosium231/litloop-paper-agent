@@ -6,7 +6,7 @@ which is how stale-code incidents happen (a test exercising old code while
 the repo holds the fix). The true installed location is discovered in a
 subprocess with a neutral cwd because pytest injects the repo's ``src`` into
 ``sys.path``, which would make an in-process import resolve to the repo
-itself. This test walks the repo's ``src/scansci_pdf`` tree and fails when
+itself. This test walks the repo's ``src/litloop`` tree and fails when
 any file diverges from the installed copy.
 """
 
@@ -17,12 +17,12 @@ from pathlib import Path
 
 import pytest
 
-REPO_SRC = Path(__file__).resolve().parents[1] / "src" / "scansci_pdf"
+REPO_SRC = Path(__file__).resolve().parents[1] / "src" / "litloop"
 
 
 def _installed_pkg_dir() -> Path | None:
     probe = subprocess.run(
-        [sys.executable, "-c", "import scansci_pdf; print(scansci_pdf.__file__)"],
+        [sys.executable, "-c", "import litloop; print(litloop.__file__)"],
         cwd=tempfile.gettempdir(),
         capture_output=True,
         text=True,

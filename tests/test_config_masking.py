@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from scansci_pdf import config as config_mod
-from scansci_pdf.config import get_config_safe, mask_config_value
+from litloop import config as config_mod
+from litloop.config import get_config_safe, mask_config_value
 
 
 def test_mask_sensitive_key():

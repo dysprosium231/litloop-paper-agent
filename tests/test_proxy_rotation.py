@@ -14,8 +14,8 @@ from unittest.mock import patch
 
 import tempfile
 
-from scansci_pdf.config import parse_proxy_pool
-from scansci_pdf.publisher_batch import (
+from litloop.config import parse_proxy_pool
+from litloop.publisher_batch import (
     PublisherBatchDownloader,
     DownloadResult,
     PaperRecord,
@@ -107,14 +107,14 @@ class LaunchContextProxyMappingTests(unittest.TestCase):
         # Patch at the source module — _launch_context does a local `from
         # .browser_engine import get_persistent_context` so the name must be
         # patched on browser_engine, not publisher_batch.
-        with patch("scansci_pdf.browser_engine.get_persistent_context", side_effect=lambda *a, **k: FakeContext()):
+        with patch("litloop.browser_engine.get_persistent_context", side_effect=lambda *a, **k: FakeContext()):
             ctx = d._launch_context(proxy="socks5://p:1080")
         self.assertIn(id(ctx), d._context_proxy)
         self.assertEqual(d._context_proxy[id(ctx)], "socks5://p:1080")
 
     def test_no_mapping_when_no_proxy(self):
         d = _make_downloader()
-        with patch("scansci_pdf.browser_engine.get_persistent_context", side_effect=lambda *a, **k: FakeContext()):
+        with patch("litloop.browser_engine.get_persistent_context", side_effect=lambda *a, **k: FakeContext()):
             ctx = d._launch_context()
         self.assertEqual(d._context_proxy.get(id(ctx)), None)
 
@@ -136,7 +136,7 @@ class RotationOrchestrationTests(unittest.TestCase):
             patch.object(d, "_login_and_export_cookies", return_value=[{"name": "test"}]),
             patch.object(d, "_inject_cookies"),
             patch.object(d, "_prepare_worker_profile", return_value=_tmp_run_dir()),
-            patch("scansci_pdf.publisher_batch._PagePool", _FakePagePool),
+            patch("litloop.publisher_batch._PagePool", _FakePagePool),
             patch.object(d, "_write_results"),
             patch.object(d, "_append_attempt"),
         ]
@@ -209,7 +209,7 @@ class RotationOrchestrationTests(unittest.TestCase):
         # The original path would try to launch a real browser, so we mock
         # _launch_context and _PagePool.
         with patch.object(d, "_launch_context", return_value=FakeContext()), \
-             patch("scansci_pdf.publisher_batch._PagePool", _FakePagePool), \
+             patch("litloop.publisher_batch._PagePool", _FakePagePool), \
              patch.object(d, "_prepare_worker_profile", return_value=_tmp_run_dir()), \
              patch.object(d, "_write_results"), \
              patch.object(d, "_append_attempt"), \

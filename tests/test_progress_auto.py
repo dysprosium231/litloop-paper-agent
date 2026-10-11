@@ -13,11 +13,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from scansci_pdf import progress_reporter as pr
+from litloop import progress_reporter as pr
 
 
 def _enabled_env():
-    return {"SCANSCI_PROGRESS_BAR": "1", "SCANSCI_PROGRESS_BAR_CHILD": "0"}
+    return {"LITLOOP_PROGRESS_BAR": "1", "LITLOOP_PROGRESS_BAR_CHILD": "0"}
 
 
 class PidAliveTests(unittest.TestCase):
@@ -54,7 +54,7 @@ class EnsureProgressBarTests(unittest.TestCase):
             pr.ensure_progress_bar(self.cfg)
         popen.assert_called_once()
         argv = popen.call_args[0][0]
-        self.assertIn("scansci_pdf.progress_bar", " ".join(argv))
+        self.assertIn("litloop.progress_bar", " ".join(argv))
 
     def test_no_spawn_when_bar_alive(self):
         self._lock(os.getpid())  # a very alive pid
@@ -71,7 +71,7 @@ class EnsureProgressBarTests(unittest.TestCase):
         popen.assert_called_once()
 
     def test_env_kill_switch(self):
-        env = dict(_enabled_env(), SCANSCI_PROGRESS_BAR="0")
+        env = dict(_enabled_env(), LITLOOP_PROGRESS_BAR="0")
         with patch.dict(os.environ, env), \
              patch("subprocess.Popen") as popen:
             pr.ensure_progress_bar(self.cfg)
@@ -85,7 +85,7 @@ class EnsureProgressBarTests(unittest.TestCase):
         popen.assert_not_called()
 
     def test_child_flag_prevents_recursion(self):
-        env = dict(_enabled_env(), SCANSCI_PROGRESS_BAR_CHILD="1")
+        env = dict(_enabled_env(), LITLOOP_PROGRESS_BAR_CHILD="1")
         with patch.dict(os.environ, env), \
              patch("subprocess.Popen") as popen:
             pr.ensure_progress_bar(self.cfg)
@@ -106,7 +106,7 @@ class StartTaskAutoLaunchTests(unittest.TestCase):
     def test_start_task_spawns_bar_and_writes_state(self):
         with patch.dict(os.environ, _enabled_env()), \
              patch("subprocess.Popen") as popen, \
-             patch("scansci_pdf.config.load_config", return_value=self.cfg):
+             patch("litloop.config.load_config", return_value=self.cfg):
             pr.start_task("文献下载", total=10)
         popen.assert_called_once()
         state = json.loads((Path(self.tmp.name) / "progress" / "current.json")
@@ -131,10 +131,10 @@ class SetOutputDirTests(unittest.TestCase):
 
     def test_set_output_dir_persists_to_state_file(self):
         pr.start_task("文献下载", total=5)
-        pr.set_output_dir(r"D:\scansci-deliverables\L3-Elsevier")
+        pr.set_output_dir(r"D:\litloop-deliverables\L3-Elsevier")
         state = json.loads((Path(self.tmp.name) / "progress" / "current.json")
                            .read_text(encoding="utf-8"))
-        self.assertEqual(state["output_dir"], r"D:\scansci-deliverables\L3-Elsevier")
+        self.assertEqual(state["output_dir"], r"D:\litloop-deliverables\L3-Elsevier")
 
     def test_set_output_dir_before_task_is_ignored(self):
         pr.set_output_dir(r"D:\nowhere")  # 没有活动任务时不产生状态

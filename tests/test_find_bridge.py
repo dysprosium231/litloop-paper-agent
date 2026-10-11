@@ -1,4 +1,4 @@
-"""Tests for the ScanSci Find <-> scansci-pdf bridge: download result
+"""Tests for the ScanSci Find <-> litloop bridge: download result
 write-back, preprint fallback retries, fallback-map building, and the
 discovery gate (light budgets, email precheck, structured timeouts)."""
 
@@ -7,8 +7,8 @@ import subprocess
 
 import pytest
 
-from scansci_pdf.discovery import build_preprint_fallbacks
-from scansci_pdf.sources import _apply_preprint_fallbacks, _write_download_results
+from litloop.discovery import build_preprint_fallbacks
+from litloop.sources import _apply_preprint_fallbacks, _write_download_results
 
 
 class TestDownloadResultsWriteBack:
@@ -44,8 +44,8 @@ class TestPreprintFallbacks:
         def fake_save(batch_id, ident, result):
             progress_saved[ident] = result
 
-        monkeypatch.setattr("scansci_pdf.sources.download", fake_download)
-        monkeypatch.setattr("scansci_pdf.sources._save_progress", fake_save)
+        monkeypatch.setattr("litloop.sources.download", fake_download)
+        monkeypatch.setattr("litloop.sources._save_progress", fake_save)
 
         _apply_preprint_fallbacks(
             {"10.1000/x": ["2401.00001"]}, ["10.1000/x"], results, "batch-1",
@@ -61,7 +61,7 @@ class TestPreprintFallbacks:
         def fake_download(identifier, **kwargs):
             raise AssertionError("fallback must not run for successful identifiers")
 
-        monkeypatch.setattr("scansci_pdf.sources.download", fake_download)
+        monkeypatch.setattr("litloop.sources.download", fake_download)
 
         results = {"10.1000/x": {"success": True, "identifier": "10.1000/x"}}
         _apply_preprint_fallbacks({"10.1000/x": ["2401.00001"]}, ["10.1000/x"], results, "batch-1", output_dir=None, scihub_enabled=True, use_tor=False, use_vpnsci=True)
@@ -69,7 +69,7 @@ class TestPreprintFallbacks:
 
     def test_fallback_failure_keeps_original_result(self, monkeypatch):
         monkeypatch.setattr(
-            "scansci_pdf.sources.download",
+            "litloop.sources.download",
             lambda identifier, output_dir=None, **kwargs: {"success": False, "identifier": identifier, "reason": "not found"},
         )
 
@@ -103,7 +103,7 @@ class TestDiscoveryGate:
     """DISCOVERY-01: light budgets, Unpaywall email precheck, structured errors."""
 
     def test_resolve_oa_blocked_without_email(self, monkeypatch):
-        from scansci_pdf import discovery
+        from litloop import discovery
 
         monkeypatch.setattr(discovery, "_build_env", lambda: {"OPENALEX_API_KEY": "x"})
         payload = discovery.resolve_oa([{"doi": "10.1000/x"}])
@@ -113,7 +113,7 @@ class TestDiscoveryGate:
         assert "hint" in payload
 
     def test_resolve_oa_proceeds_with_email(self, monkeypatch):
-        from scansci_pdf import discovery
+        from litloop import discovery
 
         monkeypatch.setattr(discovery, "_build_env", lambda: {"UNPAYWALL_EMAIL": "a@b.com"})
         monkeypatch.setattr(
@@ -124,14 +124,14 @@ class TestDiscoveryGate:
         assert payload["status"] == "ok"  # did not short-circuit at the email gate
 
     def test_light_timeout_is_shorter_than_systematic_budget(self):
-        from scansci_pdf import discovery
+        from litloop import discovery
 
         assert discovery.LIGHT_TIMEOUT < discovery.DEFAULT_TIMEOUT
         assert discovery.LIGHT_TIMEOUT == 45
 
     def test_timeout_raises_structured_discovery_timeout_error(self, monkeypatch):
-        from scansci_pdf import discovery
-        from scansci_pdf.discovery import DiscoveryTimeoutError
+        from litloop import discovery
+        from litloop.discovery import DiscoveryTimeoutError
 
         def slow_run(cmd, *a, **kw):
             raise subprocess.TimeoutExpired(cmd, timeout=kw.get("timeout", 45))
@@ -146,13 +146,13 @@ class TestDiscoveryGate:
 
     def test_timeout_error_fields_survive_server_wrapper(self, monkeypatch):
         """server.py maps DiscoveryTimeoutError to a structured payload."""
-        from scansci_pdf import discovery, server
+        from litloop import discovery, server
 
         def slow_run(cmd, *a, **kw):
             raise subprocess.TimeoutExpired(cmd, timeout=kw.get("timeout", 45))
 
         monkeypatch.setattr(discovery.subprocess, "run", slow_run)
-        payload = json.loads(server.scansci_pdf_verify_identifiers('[{"doi": "10.1000/x"}]'))
+        payload = json.loads(server.litloop_verify_identifiers('[{"doi": "10.1000/x"}]'))
         assert payload.get("stage") == "discovery"
         assert payload["timeout_seconds"] == discovery.LIGHT_TIMEOUT
         assert payload["retryable"] is True

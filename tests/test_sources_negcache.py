@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import scansci_pdf.sources as src
-from scansci_pdf.sources import _neg_blocked, _neg_record
+import litloop.sources as src
+from litloop.sources import _neg_blocked, _neg_record
 
 
 def setup_function():

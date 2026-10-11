@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scansci_pdf.publisher_batch import (
+from litloop.publisher_batch import (
     DownloadResult,
     PaperRecord,
     PublisherBatchDownloader,

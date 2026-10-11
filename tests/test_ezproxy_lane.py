@@ -9,7 +9,7 @@ import json
 import unittest
 from unittest.mock import Mock, patch
 
-from scansci_pdf.sources import ezproxy
+from litloop.sources import ezproxy
 
 PREFIX_CONFIG = {"ezproxy_login_url": "https://ezproxy.lib.foo.edu/login?url={url}"}
 REWRITE_CONFIG = {"ezproxy_login_url": "https://{host_dashed}.lib.ezproxy.hkust.edu.hk"}
@@ -78,7 +78,7 @@ def _cookieJar_response(status=200, url="https://lib.ezproxy.hkust.edu.hk/menu",
 class ValidateSessionTests(unittest.TestCase):
     def setUp(self):
         import tempfile
-        self._tmp = tempfile.mkdtemp(prefix="scansci-ezproxy-test-")
+        self._tmp = tempfile.mkdtemp(prefix="litloop-ezproxy-test-")
 
     def _write_cookies(self, config, cookies):
         from pathlib import Path

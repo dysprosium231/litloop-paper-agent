@@ -22,7 +22,7 @@ def _spawn_server():
     # Binary pipes: Windows console encoding produces GBK bytes on stderr for
     # Chinese log lines; decoding happens manually with errors="replace".
     return subprocess.Popen(
-        [sys.executable, "-m", "scansci_pdf.main", "run"],
+        [sys.executable, "-m", "litloop.main", "run"],
         cwd=str(REPO),
         env=env,
         stdin=subprocess.PIPE,

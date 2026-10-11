@@ -13,8 +13,8 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from scansci_pdf import domain_db
-from scansci_pdf.sources import scihub
+from litloop import domain_db
+from litloop.sources import scihub
 
 
 def _cfg():

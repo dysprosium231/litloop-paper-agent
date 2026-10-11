@@ -2,7 +2,7 @@
 
 ## 更新与维护
 
-- [ ] **真 Chrome 副本自动跟随**：启动浏览器前比较系统 Chrome 与 `~/.scansci-pdf/chrome-real` 的版本号，不一致就重新复制（含 `scansci-chrome.exe` 硬链接）。版本落后会让出版商更容易识别为机器人。
+- [ ] **真 Chrome 副本自动跟随**：启动浏览器前比较系统 Chrome 与 `~/.litloop/chrome-real` 的版本号，不一致就重新复制（含 `litloop-chrome.exe` 硬链接）。版本落后会让出版商更容易识别为机器人。
 - [ ] **新版本提醒**：每周后台检查 LitLoop、scansci-find（easyseek）、zotero-mcp 是否有新版本，有则在检索/下载结果里提示“运行 scripts/deploy.py 更新”。只提醒，不自动安装。
 
 ## 检索

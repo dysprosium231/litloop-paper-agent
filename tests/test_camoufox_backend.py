@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-import scansci_pdf.browser_backend as bb
+import litloop.browser_backend as bb
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ class TestResolveBackend:
     def test_stale_cloakbrowser_redirects_to_camoufox(self, monkeypatch):
         monkeypatch.setattr(bb, "is_available", lambda name=None: True)
         monkeypatch.setattr(bb, "_cloakbrowser_dist_version", lambda: (0, 4, 0))
-        monkeypatch.delenv("SCANSCI_ALLOW_OLD_CLOAKBROWSER", raising=False)
+        monkeypatch.delenv("LITLOOP_ALLOW_OLD_CLOAKBROWSER", raising=False)
         assert bb.resolve_backend({"browser_backend": "cloakbrowser"}) == "camoufox"
 
 

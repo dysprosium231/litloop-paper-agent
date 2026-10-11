@@ -1,7 +1,7 @@
-# ScanSci PDF - Quick Install Script (Windows)
+# LitLoop - Quick Install Script (Windows)
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== ScanSci PDF Installer ===" -ForegroundColor Cyan
+Write-Host "=== LitLoop Installer ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Check Python
@@ -29,14 +29,14 @@ if ([int]$pyMajor -lt 3 -or ([int]$pyMajor -eq 3 -and [int]$pyMinor -lt 11)) {
 }
 
 # Create virtual environment
-$venvDir = if ($env:SCANSCI_PDF_VENV) { $env:SCANSCI_PDF_VENV } else { "$env:USERPROFILE\.scansci-pdf\venv" }
+$venvDir = if ($env:LITLOOP_VENV) { $env:LITLOOP_VENV } else { "$env:USERPROFILE\.litloop\venv" }
 Write-Host "Creating virtual environment at $venvDir ..."
 New-Item -ItemType Directory -Force -Path (Split-Path $venvDir) | Out-Null
 & $python -m venv $venvDir
 
 # Activate and install
 & "$venvDir\Scripts\Activate.ps1"
-Write-Host "Installing scansci-pdf with recommended optional dependencies (fast + vpnsci) ..."
+Write-Host "Installing litloop with recommended optional dependencies (fast + vpnsci) ..."
 pip install --upgrade pip -q
 pip install ".[fast,vpnsci]" -q
 
@@ -48,17 +48,17 @@ Write-Host "  # Activate virtual environment"
 Write-Host "  & `"$venvDir\Scripts\Activate.ps1`""
 Write-Host ""
 Write-Host "  # Run as stdio MCP server (for Claude Code)"
-Write-Host "  scansci-pdf run --mode stdio"
+Write-Host "  litloop run --mode stdio"
 Write-Host ""
 Write-Host "  # Run as HTTP server"
-Write-Host "  scansci-pdf run --mode streamable_http"
+Write-Host "  litloop run --mode streamable_http"
 Write-Host ""
 Write-Host "  # Check dependencies"
-Write-Host "  scansci-pdf check"
+Write-Host "  litloop check"
 Write-Host ""
 Write-Host "  # Or use Docker (recommended)"
 Write-Host "  docker compose up -d"
 Write-Host ""
 
 # Check dependencies
-scansci-pdf check
+litloop check

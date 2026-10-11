@@ -1,8 +1,8 @@
 #!/bin/bash
-# ScanSci PDF - Quick Install Script
+# LitLoop - Quick Install Script
 set -e
 
-echo "=== ScanSci PDF Installer ==="
+echo "=== LitLoop Installer ==="
 echo ""
 
 # Check Python
@@ -29,14 +29,14 @@ if [ "$PY_MAJOR" -lt 3 ] || ([ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]); t
 fi
 
 # Create virtual environment
-VENV_DIR="${SCANSCI_PDF_VENV:-$HOME/.scansci-pdf/venv}"
+VENV_DIR="${LITLOOP_VENV:-$HOME/.litloop/venv}"
 echo "Creating virtual environment at $VENV_DIR ..."
 mkdir -p "$(dirname "$VENV_DIR")"
 $PYTHON -m venv "$VENV_DIR"
 
 # Activate and install
 source "$VENV_DIR/bin/activate"
-echo "Installing scansci-pdf with recommended optional dependencies (fast + vpnsci) ..."
+echo "Installing litloop with recommended optional dependencies (fast + vpnsci) ..."
 pip install --upgrade pip -q
 pip install ".[fast,vpnsci]" -q
 
@@ -48,17 +48,17 @@ echo "  # Activate virtual environment"
 echo "  source $VENV_DIR/bin/activate"
 echo ""
 echo "  # Run as stdio MCP server (for Claude Code)"
-echo "  scansci-pdf run --mode stdio"
+echo "  litloop run --mode stdio"
 echo ""
 echo "  # Run as HTTP server"
-echo "  scansci-pdf run --mode streamable_http"
+echo "  litloop run --mode streamable_http"
 echo ""
 echo "  # Check dependencies"
-echo "  scansci-pdf check"
+echo "  litloop check"
 echo ""
 echo "  # Or use Docker (recommended)"
 echo "  docker compose up -d"
 echo ""
 
 # Check dependencies
-scansci-pdf check
+litloop check

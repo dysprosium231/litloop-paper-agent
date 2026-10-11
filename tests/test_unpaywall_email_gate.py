@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from scansci_pdf.sources.unpaywall import _is_placeholder_email, try_unpaywall
+from litloop.sources.unpaywall import _is_placeholder_email, try_unpaywall
 
 
 class _Resp:
@@ -27,7 +27,7 @@ def _no_network(monkeypatch: pytest.MonkeyPatch):
     def _boom(*a, **k):
         raise AssertionError("network must not be reached in these tests")
 
-    monkeypatch.setattr("scansci_pdf.sources.unpaywall.fetch", _boom)
+    monkeypatch.setattr("litloop.sources.unpaywall.fetch", _boom)
 
 
 class TestPlaceholderEmail:
@@ -45,7 +45,7 @@ class TestPlaceholderEmail:
 
     def test_is_placeholder_email(self):
         assert _is_placeholder_email("")
-        assert _is_placeholder_email("scansci-pdf@example.invalid")
+        assert _is_placeholder_email("litloop@example.invalid")
         assert _is_placeholder_email("a@example.com")
         assert not _is_placeholder_email("liang@tsinghua.edu.cn")
 
@@ -54,7 +54,7 @@ class TestStatusHandling:
     """With a real email configured, HTTP statuses are classified, not folded."""
 
     def _run(self, tmp_path: Path, status: int):
-        import scansci_pdf.sources.unpaywall as upw
+        import litloop.sources.unpaywall as upw
 
         upw.fetch = lambda *a, **k: _Resp(status)  # type: ignore[assignment]
         return try_unpaywall(
@@ -75,7 +75,7 @@ class TestStatusHandling:
         assert self._run(tmp_path, 404) is None
 
     def test_network_error_lets_race_continue(self, tmp_path: Path):
-        import scansci_pdf.sources.unpaywall as upw
+        import litloop.sources.unpaywall as upw
 
         def _raise(*a, **k):
             raise OSError("down")
@@ -88,7 +88,7 @@ class TestStatusHandling:
 class TestRaceFailureCollector:
     def test_single_source_failure_is_recorded(self, tmp_path: Path,
                                                monkeypatch: pytest.MonkeyPatch):
-        import scansci_pdf.sources as sources
+        import litloop.sources as sources
 
         monkeypatch.setattr(sources, "_HAS_COMPILED_CORE", False)
         failures: list = []
@@ -114,7 +114,7 @@ class TestRaceFailureCollector:
         pool worker threads (a thread-local collector silently lost these)."""
         import time as _time
 
-        import scansci_pdf.sources as sources
+        import litloop.sources as sources
 
         monkeypatch.setattr(sources, "_HAS_COMPILED_CORE", False)
         failures: list = []

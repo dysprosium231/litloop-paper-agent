@@ -18,7 +18,7 @@ COPY pyproject.toml .
 
 EXPOSE 8000
 
-ENV SCANSCI_PDF_DATA_DIR=/data/paper-fetch
+ENV LITLOOP_DATA_DIR=/data/paper-fetch
 ENV MCP_MODE=streamable_http
 
-CMD ["python", "-m", "scansci_pdf", "run", "--mode", "streamable_http"]
+CMD ["python", "-m", "litloop", "run", "--mode", "streamable_http"]

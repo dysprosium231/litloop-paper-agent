@@ -1,4 +1,4 @@
-from scansci_pdf import abstracts as a
+from litloop import abstracts as a
 
 
 def test_clean_jats_formula_entities_and_boilerplate():
@@ -60,7 +60,7 @@ def test_trim_authors():
 
 
 def test_dedupe_titles_merges_preprint_and_published():
-    from scansci_pdf.search import _dedupe_titles
+    from litloop.search import _dedupe_titles
     rows = [{"title": "High-Entropy Fluorite Oxides for barrier coatings", "doi": "", "cited_by_count": 3},
             {"title": "High-entropy fluorite oxides for barrier coatings.", "doi": "10.1/x",
              "journal": "J", "cited_by_count": 650},

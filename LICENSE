@@ -174,7 +174,7 @@
 
    END OF TERMS AND CONDITIONS
 
-   Copyright 2024-2026 scansci-pdf contributors
+   Copyright 2024-2026 litloop contributors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -190,7 +190,7 @@
 
 ---
 
-EXCEPTION: The compiled Cython extensions in src/scansci_pdf/_core/ (*.pyd, *.so)
+EXCEPTION: The compiled Cython extensions in src/litloop/_core/ (*.pyd, *.so)
 are distributed as pre-compiled binaries via PyPI only. Their Cython source
 code (*.pyx) is proprietary and not included in this repository. The pure
 Python fallback implementations in the main source files are fully functional

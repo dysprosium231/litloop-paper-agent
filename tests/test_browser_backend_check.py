@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-import scansci_pdf.browser_backend as bb
-from scansci_pdf import browser_engine
+import litloop.browser_backend as bb
+from litloop import browser_engine
 
 
 @pytest.fixture(autouse=True)

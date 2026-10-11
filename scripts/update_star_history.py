@@ -49,7 +49,7 @@ def fetch_stargazers(repo: str, token: str) -> list[str]:
             f"https://api.github.com/repos/{repo}/stargazers"
             f"?per_page=100&page={page}"
         )
-        headers = {"Accept": "application/vnd.github.star+json", "User-Agent": "scansci-pdf-star-history"}
+        headers = {"Accept": "application/vnd.github.star+json", "User-Agent": "litloop-star-history"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
         req = urllib.request.Request(url, headers=headers)

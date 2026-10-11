@@ -2,7 +2,7 @@
 
 import unittest
 
-from scansci_pdf.pipeline import QueueEntry, extract_identifier, parse_queue
+from litloop.pipeline import QueueEntry, extract_identifier, parse_queue
 
 
 class ExtractIdentifierArxivTests(unittest.TestCase):

@@ -4,7 +4,7 @@ from contextlib import redirect_stdout
 import io
 import json
 
-from scansci_pdf import main, search
+from litloop import main, search
 
 
 def test_search_json_is_ascii_safe_and_contains_author_match(monkeypatch):

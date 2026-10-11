@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-import scansci_pdf.sources as sources
-from scansci_pdf.sources import _run_tiers_parallel
+import litloop.sources as sources
+from litloop.sources import _run_tiers_parallel
 
 
 @pytest.fixture(autouse=True)

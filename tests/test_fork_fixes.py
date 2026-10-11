@@ -14,9 +14,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from scansci_pdf import browser_backend as bb
-from scansci_pdf import browser_pdf
-from scansci_pdf import sources
+from litloop import browser_backend as bb
+from litloop import browser_pdf
+from litloop import sources
 
 
 # ---------------------------------------------------------------- browser setup
@@ -31,7 +31,7 @@ def test_direct_args_bypass_system_proxy():
 
 
 def test_launch_config_falls_back_to_saved_config(monkeypatch):
-    import scansci_pdf.config as cfg_mod
+    import litloop.config as cfg_mod
     monkeypatch.setattr(cfg_mod, "load_config", lambda: {"browser_backend": "cloakbrowser"})
     assert bb._resolve_launch_config(None) == {"browser_backend": "cloakbrowser"}
     assert bb._resolve_launch_config({"a": 1}) == {"a": 1}
@@ -53,7 +53,7 @@ def test_stable_browser_alias_created_and_refreshed(tmp_path):
 
 
 def test_close_browsers_since_kills_only_newer(monkeypatch):
-    import scansci_pdf.browser_engine as be
+    import litloop.browser_engine as be
     killed = []
     monkeypatch.setattr(be, "_tree_kill", lambda proc: killed.append(proc))
 
@@ -101,7 +101,7 @@ def test_late_finisher_drops_its_copy(tmp_path, monkeypatch):
 
 
 def test_rename_removes_duplicate_source_copies(tmp_path, monkeypatch):
-    import scansci_pdf.citation as citation
+    import litloop.citation as citation
     doi = "10.1038/s1"
     safe = sources.safe_filename(doi)
     winner = tmp_path / f"{safe}.pdf"
@@ -121,7 +121,7 @@ def test_rename_removes_duplicate_source_copies(tmp_path, monkeypatch):
 
 def test_elsevier_pii_keeps_check_char(monkeypatch):
     import requests
-    from scansci_pdf import _publisher_strategies_core as core
+    from litloop import _publisher_strategies_core as core
 
     class _Sess:
         trust_env = True
@@ -138,7 +138,7 @@ def test_elsevier_pii_keeps_check_char(monkeypatch):
 # ---------------------------------------------------------------- session checks
 
 def test_webvpn_session_probe_hits_gateway_root(monkeypatch):
-    from scansci_pdf.sources import instsci
+    from litloop.sources import instsci
     seen = []
 
     class _Sess:
@@ -157,7 +157,7 @@ def test_webvpn_session_probe_hits_gateway_root(monkeypatch):
 
 
 def test_carsi_cloudflare_probe_trusts_fresh_cookies(tmp_path, monkeypatch):
-    from scansci_pdf.sources import carsi
+    from litloop.sources import carsi
     client = carsi.CARSIClient.__new__(carsi.CARSIClient)
     client._publisher_configs = {"sd": SimpleNamespace(domains=["www.sciencedirect.com"])}
     cookie = tmp_path / "sd.json"
@@ -252,9 +252,9 @@ def test_capture_pdf_via_cdp_reads_paused_document():
 # ---------------------------------------------------------------- logging
 
 def test_plugin_logger_does_not_duplicate_to_root():
-    from scansci_pdf.log import get_logger
+    from litloop.log import get_logger
     assert get_logger().propagate is False
-    assert isinstance(logging.getLogger("scansci_pdf"), logging.Logger)
+    assert isinstance(logging.getLogger("litloop"), logging.Logger)
 
 
 # ---------------------------------------------------------------- cancellation
@@ -303,7 +303,7 @@ def test_wait_any_returns_early_once_cancelled(no_browser_kill):
 
 def test_openalex_key_only_sent_to_openalex(monkeypatch):
     import requests
-    import scansci_pdf.search as search_mod
+    import litloop.search as search_mod
     monkeypatch.setattr(search_mod, "load_config", lambda: {"openalex_api_key": "K123"})
     sent = {}
     monkeypatch.setattr(requests.Session, "request",
@@ -316,7 +316,7 @@ def test_openalex_key_only_sent_to_openalex(monkeypatch):
 
 
 def test_openalex_source_sends_key_as_api_key(monkeypatch, tmp_path):
-    from scansci_pdf.sources import openalex
+    from litloop.sources import openalex
     urls = []
     monkeypatch.setattr(openalex, "fetch_json", lambda url, cfg: urls.append(url) or None)
     openalex.try_openalex_content_api("10.1/x", tmp_path / "o.pdf", {"openalex_api_key": "K123"})
@@ -327,7 +327,7 @@ def test_openalex_source_sends_key_as_api_key(monkeypatch, tmp_path):
 
 def test_race_keeps_waiting_while_user_logs_in(tmp_path, monkeypatch, no_browser_kill):
     """The race must not give up (and open the next phase's window) mid-login."""
-    from scansci_pdf import pdf_utils
+    from litloop import pdf_utils
     real_wait = sources._wait_any
     monkeypatch.setattr(sources, "_wait_any", lambda ev, t: real_wait(ev, min(t, 0.2)))
     monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda *a: False)
@@ -362,7 +362,7 @@ def test_waived_lane_cannot_launch_a_browser(monkeypatch):
 
 def test_browser_errors_are_per_thread():
     import threading
-    from scansci_pdf import _publisher_strategies_core as core
+    from litloop import _publisher_strategies_core as core
     core._set_error("login_abandoned", "retry_login")
     other = {}
     t = threading.Thread(target=lambda: (core._clear_error(), other.update(e=core.get_last_error())))
@@ -373,19 +373,19 @@ def test_browser_errors_are_per_thread():
 
 
 def test_school_login_hosts_are_not_tsinghua_only():
-    from scansci_pdf.institutional.publisher_batch import _is_school_login_host as f
+    from litloop.institutional.publisher_batch import _is_school_login_host as f
     assert f("sso.buaa.edu.cn") and f("idp.tsinghua.edu.cn")
     assert not f("ds.carsi.edu.cn") and not f("www.science.org")
 
 
 def test_science_check_access_is_a_paywall():
-    from scansci_pdf._publisher_strategies_core import _detect_paywall
+    from litloop._publisher_strategies_core import _detect_paywall
     assert _detect_paywall('<button>CHECK ACCESS</button>')
 
 
 def test_race_waits_for_download_after_login(tmp_path, monkeypatch, no_browser_kill):
     """Login done (heartbeats stop), PDF capture still running: keep waiting."""
-    from scansci_pdf import pdf_utils
+    from litloop import pdf_utils
     real_wait = sources._wait_any
     monkeypatch.setattr(sources, "_wait_any", lambda ev, t: real_wait(ev, min(t, 0.2)))
     monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda *a: False)
@@ -405,7 +405,7 @@ def test_race_waits_for_download_after_login(tmp_path, monkeypatch, no_browser_k
 def test_http_pdf_download_has_wall_clock_deadline(tmp_path, monkeypatch):
     """A trickling server must not hold a racing lane for minutes."""
     import requests
-    from scansci_pdf import _publisher_strategies_core as core
+    from litloop import _publisher_strategies_core as core
 
     class Resp:
         status_code = 200
@@ -425,7 +425,7 @@ def test_http_pdf_download_has_wall_clock_deadline(tmp_path, monkeypatch):
 
 
 def test_navigate_retries_transient_network_error(monkeypatch):
-    from scansci_pdf import browser_engine as be
+    from litloop import browser_engine as be
     calls = []
 
     class Page:
@@ -441,7 +441,7 @@ def test_navigate_retries_transient_network_error(monkeypatch):
 
 def test_one_page_article_pdf_is_not_a_preview(tmp_path, monkeypatch):
     fitz = pytest.importorskip("fitz")
-    from scansci_pdf import pdf_utils
+    from litloop import pdf_utils
     pdf = tmp_path / "a.pdf"
     doc = fitz.open(); doc.new_page(); doc.save(pdf); doc.close()
     pdf.write_bytes(pdf.read_bytes() + b"%" + b"0" * 60_000)  # past the size floor
@@ -451,7 +451,7 @@ def test_one_page_article_pdf_is_not_a_preview(tmp_path, monkeypatch):
 
 
 def test_pdf_capture_recognises_bounce_to_article():
-    from scansci_pdf.browser_pdf import _is_bounce_to_html
+    from litloop.browser_pdf import _is_bounce_to_html
     html = [{"name": "Content-Type", "value": "text/html; charset=utf-8"}]
     pdf = "https://www.nature.com/articles/x.pdf"
     bounce = {"responseStatusCode": 200, "responseHeaders": html,
@@ -464,7 +464,7 @@ def test_pdf_capture_recognises_bounce_to_article():
 
 def test_host_proxy_exception_routes_only_listed_domains(monkeypatch):
     import base64
-    from scansci_pdf import network
+    from litloop import network
     monkeypatch.setattr(network, "_proxy_reachable", lambda url: True)
     cfg = {"host_proxy_url": "http://127.0.0.1:10808", "host_proxy_hosts": ["nature.com"]}
     url, hosts = network.host_proxy(cfg)
@@ -485,7 +485,7 @@ def test_publisher_browser_lane_is_launched_second():
 
 
 def test_known_landing_urls_skip_doi_org():
-    from scansci_pdf._publisher_strategies_core import _known_landing_url as f
+    from litloop._publisher_strategies_core import _known_landing_url as f
     assert f("10.1126/science.aeg4972") == "https://www.science.org/doi/10.1126/science.aeg4972"
     assert f("10.1038/s41563-025-02281-z") == "https://www.nature.com/articles/s41563-025-02281-z"
     assert f("10.1007/978-3-030-1") == "https://link.springer.com/chapter/10.1007/978-3-030-1"
@@ -493,7 +493,7 @@ def test_known_landing_urls_skip_doi_org():
 
 
 def test_direct_http_skipped_behind_bot_walls():
-    from scansci_pdf._publisher_strategies_core import _direct_pdf_urls
+    from litloop._publisher_strategies_core import _direct_pdf_urls
     assert _direct_pdf_urls("10.1021/acsami.5c16640", "ACS") == []
     springer = _direct_pdf_urls("10.1007/s10853-026-13435-y", "Springer")
     assert springer and len(springer) == len(set(springer))
@@ -501,7 +501,7 @@ def test_direct_http_skipped_behind_bot_walls():
 
 def test_altcha_pow_solver_round_trip():
     import base64, hashlib, json
-    from scansci_pdf.sources import altcha
+    from litloop.sources import altcha
     target = hashlib.sha256(b"salt" + b"4242").hexdigest()
     payload = altcha.solve({"algorithm": "SHA-256", "challenge": target, "salt": "salt",
                             "maxnumber": 10000, "signature": "sig"})
@@ -512,14 +512,14 @@ def test_altcha_pow_solver_round_trip():
 
 
 def test_scihub_use_browser_false_disables_grey_browsers():
-    from scansci_pdf.sources import scihub
+    from litloop.sources import scihub
     assert scihub._is_browser_available({"scihub_use_browser": False}) is False
 
 
 # --- search polish (2026-10-11) -------------------------------------------
 
 def test_search_sort_aliases():
-    from scansci_pdf.search import _normalize_sort
+    from litloop.search import _normalize_sort
     assert _normalize_sort("cited") == "cited_by_count"
     assert _normalize_sort("Citations") == "cited_by_count"
     assert _normalize_sort("newest") == "publication_date"
@@ -528,7 +528,7 @@ def test_search_sort_aliases():
 
 
 def test_search_drops_off_topic_records():
-    from scansci_pdf.search import _drop_off_topic
+    from litloop.search import _drop_off_topic
     rows = [
         {"title": "High-entropy ceramics with low thermal conductivity", "abstract": ""},
         {"title": "Endoscopic mucosal resection for lesions", "abstract": ""},
@@ -544,7 +544,7 @@ def test_search_drops_off_topic_records():
 
 
 def test_discovery_results_report_real_citation_counts():
-    from scansci_pdf.discovery import to_legacy_results
+    from litloop.discovery import to_legacy_results
     out = to_legacy_results([{"doi": "10.1/x", "title": "t", "citation_count": 619,
                               "source_hits": ["OpenAlex", "Crossref"]}])
     assert out[0]["cited_by_count"] == 619
@@ -552,7 +552,7 @@ def test_discovery_results_report_real_citation_counts():
 
 
 def test_openalex_cited_sort_matches_title_and_abstract(monkeypatch):
-    from scansci_pdf import search as s
+    from litloop import search as s
     seen = {}
 
     class Resp:
@@ -575,7 +575,7 @@ def test_openalex_cited_sort_matches_title_and_abstract(monkeypatch):
 
 def test_search_results_get_journal_rank_when_tool_installed(monkeypatch):
     import sys, types
-    from scansci_pdf import search as s
+    from litloop import search as s
     fake = types.ModuleType("litloop_journal_rank")
     fake.lookup = lambda journal="", issn=None: (
         {"found": True, "label": "中科院2区", "warnings": [{"year": 2025}]} if issn == ["0272-8842"]
@@ -589,14 +589,14 @@ def test_search_results_get_journal_rank_when_tool_installed(monkeypatch):
 
 def test_search_works_without_journal_rank_tool(monkeypatch):
     import sys
-    from scansci_pdf import search as s
+    from litloop import search as s
     monkeypatch.setitem(sys.modules, "litloop_journal_rank", None)  # import fails
     rows = [{"journal": "X"}]
     assert s._add_journal_rank(rows) == [{"journal": "X"}]
 
 
 def test_journal_filters_and_drop_counts():
-    from scansci_pdf.search import _filter_by_journal
+    from litloop.search import _filter_by_journal
     rows = [
         {"title": "a", "cas_zone": 1, "jcr_quartile": 1},
         {"title": "b", "cas_zone": 3, "jcr_quartile": 1},
@@ -612,7 +612,7 @@ def test_journal_filters_and_drop_counts():
 
 
 def test_finalize_flags_and_optionally_drops_retracted(monkeypatch):
-    from scansci_pdf import abstracts, search as s
+    from litloop import abstracts, search as s
     monkeypatch.setattr(s, "_add_journal_rank", lambda rows: rows)
     monkeypatch.setattr(abstracts, "fill_abstracts", lambda rows, config=None: None)
 
@@ -630,7 +630,7 @@ def test_finalize_flags_and_optionally_drops_retracted(monkeypatch):
 
 
 def test_retraction_check_is_one_batched_openalex_request(monkeypatch):
-    from scansci_pdf import search as s
+    from litloop import search as s
     calls = []
 
     class Resp:
@@ -655,7 +655,7 @@ def test_retraction_check_is_one_batched_openalex_request(monkeypatch):
 
 
 def test_subcategory_zone_filter_keeps_niche_top_journals():
-    from scansci_pdf.search import _filter_by_journal
+    from litloop.search import _filter_by_journal
     rows = [
         {"title": "jecs", "cas_zone": 2, "cas_sub_zone": 1},   # 大类2区, 小类1区
         {"title": "ci", "cas_zone": 2, "cas_sub_zone": 2},
@@ -670,7 +670,7 @@ def test_subcategory_zone_filter_keeps_niche_top_journals():
 
 def test_retraction_flags_prefer_local_retraction_watch(monkeypatch):
     import sys, types
-    from scansci_pdf import search as s
+    from litloop import search as s
     fake = types.ModuleType("litloop_journal_rank.retractions")
     fake.ensure_fresh = lambda proxy=None: "fresh"
     fake.lookup_papers = lambda dois: {

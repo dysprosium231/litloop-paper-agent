@@ -7,10 +7,10 @@ from pathlib import Path
 
 import requests
 
-from scansci_pdf import _publisher_strategies_core as core
-from scansci_pdf.publisher_strategies import StrategyRegistry
-from scansci_pdf.sources.carsi import detect_publisher
-from scansci_pdf.sources.sage_cn import (
+from litloop import _publisher_strategies_core as core
+from litloop.publisher_strategies import StrategyRegistry
+from litloop.sources.carsi import detect_publisher
+from litloop.sources.sage_cn import (
     extract_article_id,
     has_saved_sage_cn_session,
     try_sage_cn_authorized,
@@ -129,7 +129,7 @@ def test_try_sage_browser_prefers_authorized_cn_route(monkeypatch, tmp_path):
     output_path = tmp_path / "paper.pdf"
     output_path.write_bytes(b"%PDF-1.7\n" + (b"x" * 1500) + b"\n%%EOF")
     monkeypatch.setattr(
-        "scansci_pdf.sources.sage_cn.try_sage_cn_authorized",
+        "litloop.sources.sage_cn.try_sage_cn_authorized",
         lambda doi, path, config: True,
     )
 
@@ -140,7 +140,7 @@ def test_try_sage_browser_prefers_authorized_cn_route(monkeypatch, tmp_path):
 
 
 def test_visible_browser_forwards_selected_backend_config(monkeypatch, tmp_path):
-    from scansci_pdf import browser_engine
+    from litloop import browser_engine
 
     config = {
         "cache_dir": str(tmp_path),

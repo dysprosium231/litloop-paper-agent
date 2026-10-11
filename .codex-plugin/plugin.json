@@ -1,5 +1,5 @@
 {
-  "name": "scansci-pdf",
+  "name": "litloop",
   "version": "1.18.0",
   "description": "LitLoop (Academic Paper Agent) turns academic paper search, download, Zotero filing and citation export into a reusable agent workflow. Derived from Rimagination/scansci-pdf.",
   "author": {
@@ -37,8 +37,8 @@
       "Check LitLoop access and download readiness"
     ],
     "brandColor": "#D71920",
-    "composerIcon": "./assets/brand/scansci-pdf-icon.png",
-    "logo": "./assets/brand/scansci-pdf-icon.png",
-    "logoDark": "./assets/brand/scansci-pdf-icon.png"
+    "composerIcon": "./assets/brand/litloop-icon.png",
+    "logo": "./assets/brand/litloop-icon.png",
+    "logoDark": "./assets/brand/litloop-icon.png"
   }
 }

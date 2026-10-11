@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from scansci_pdf import progress_reporter
+from litloop import progress_reporter
 
 
 def test_manual_attention_lifecycle(tmp_path, monkeypatch):
-    monkeypatch.setenv("SCANSCI_PDF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
 
     progress_reporter.start_task("文献下载", total=3)
     assert progress_reporter.read_state()["attention"] == {}
@@ -37,10 +37,10 @@ def test_manual_attention_lifecycle(tmp_path, monkeypatch):
 
 
 def test_challenge_wait_publishes_and_clears_attention(tmp_path, monkeypatch):
-    monkeypatch.setenv("SCANSCI_PDF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
     progress_reporter.start_task("文献下载", total=1)
 
-    from scansci_pdf import fetcher
+    from litloop import fetcher
 
     class FakePage:
         def __init__(self):
@@ -63,10 +63,10 @@ def test_challenge_wait_publishes_and_clears_attention(tmp_path, monkeypatch):
 
 
 def test_publisher_challenge_wait_uses_the_same_attention_channel(tmp_path, monkeypatch):
-    monkeypatch.setenv("SCANSCI_PDF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
     progress_reporter.start_task("出版商下载", total=1)
 
-    from scansci_pdf.publisher_batch import DownloadResult, PublisherBatchDownloader
+    from litloop.publisher_batch import DownloadResult, PublisherBatchDownloader
 
     downloader = PublisherBatchDownloader.__new__(PublisherBatchDownloader)
     events = []
@@ -88,7 +88,7 @@ def test_publisher_challenge_wait_uses_the_same_attention_channel(tmp_path, monk
         return page.calls == 1
 
     downloader._is_challenge_page = is_challenge
-    monkeypatch.setattr("scansci_pdf.publisher_batch.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("litloop.publisher_batch.time.sleep", lambda _seconds: None)
     result = DownloadResult(doi="10.1000/a", status="failed")
     assert downloader._wait_for_challenge(page, result)
 

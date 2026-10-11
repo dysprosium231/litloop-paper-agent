@@ -1,4 +1,4 @@
-# ScanSci-PDF 反爬作战手册（PLAYBOOK）
+# LitLoop-PDF 反爬作战手册（PLAYBOOK）
 
 > **给每个接手本项目的 Agent 和开发者**：反爬相关代码的机制、位置、参数、历史教训全部记录在这里。
 > 这个项目反复出现过"同一类问题在不同版本重造轮子"的事故，根源是会话失忆 + 造轮子前没搜家底。
@@ -9,7 +9,7 @@
 1. **造轮子前先 grep 家底。** 镜像健康存储先后被造过三代（探测系统 → domain_db → 内存 dict），三代平行存在的维护成本远高于合并。
 2. **修复必须变成测试。** 没有测试的修复在下一个会话里等于不存在。
 3. **修复必须发布。** 不发 PyPI，用户手里的永远是旧版（"我这里好好的，用户那里不行"的根源之一）。
-4. **双 checkout 必须同步。** 编辑在 `D:\scansci-pdf`，运行在 `C:\Users\Liang\plugins\scansci-pdf`。`tests/test_checkout_sync.py` 会拦——它已抓出 268 文件漂移和多次单文件遗漏。
+4. **双 checkout 必须同步。** 编辑在 `D:\litloop`，运行在 `C:\Users\Liang\plugins\litloop`。`tests/test_checkout_sync.py` 会拦——它已抓出 268 文件漂移和多次单文件遗漏。
 5. **多文件 cp 必须用显式目标路径。** `cp a b dest/` 曾三次把 `sources/` 下的文件错误复制到平面层（同步测试抓的）。
 8. **用户数据永不进仓库树。** 用户的文献清单、DOI 集合、state JSON、下载产物只存在于 Downloads/数据目录——仓库是公开的，`git add -A` 前先想一遍今天动了什么。发布后跑一遍清单特征 grep（2026-08-31 审计模式：4 渠道全查）。
 6. **Playwright sync 对象线程亲和。**（2026-08-31：退出收割时跨线程 close 失败 + Windows 杀父不杀子，4 个 chrome 残留）
@@ -62,8 +62,8 @@ insttoken 只是前两条拿不全时的替代凭证（找机构管理员，或 
 
 1. **机构邮箱**注册 Elsevier 账号——个人邮箱也能建 key，但账号绑不上机构，key 从创建那刻就拿不到全文权益
 2. **校园网/学校 VPN 下**创建 key——dev.elsevier.com 靠注册时的邮箱域 + 出口 IP 识别机构，校外创建大概率识别失败
-3. 创建后**当场 `scansci-pdf elsevier-check`**：无 key 基线 406、大刊样本 200 = 绑定成功；大刊 403 → 见下一节
-4. 下载也从校园出口走；校外配 `network_proxy`/`SCANSCI_PDF_PROXY`
+3. 创建后**当场 `litloop elsevier-check`**：无 key 基线 406、大刊样本 200 = 绑定成功；大刊 403 → 见下一节
+4. 下载也从校园出口走；校外配 `network_proxy`/`LITLOOP_PROXY`
 5. 校园出口仍 403 "Requestor configuration settings insufficient" → 机构级 API enablement 缺失，
    找图书馆（电子资源部）向 Elsevier 申请——唯一需要"求人"的情形
 
@@ -78,7 +78,7 @@ insttoken 只是前两条拿不全时的替代凭证（找机构管理员，或 
 即 "Requestor configuration settings insufficient"，没有 XML 就没有 attachment-EID，
 后面步骤无从谈起。两种成因现象完全相同，按是否已走配置出口区分：
 
-1. **未走校园出口**：出口 IP 不在机构注册段（校外直连的典型表现）→ 配 `network_proxy`/`SCANSCI_PDF_PROXY` 走校园出口重试
+1. **未走校园出口**：出口 IP 不在机构注册段（校外直连的典型表现）→ 配 `network_proxy`/`LITLOOP_PROXY` 走校园出口重试
 2. **已走校园出口仍 403**：机构未在 Elsevier 侧给该 key 开 API 全文权限 → 找机构 Elsevier 管理员配置；insttoken 是校外无校园出口时的替代路径
 
 双路由探测（`elsevier-check`）对 403 样本追加一次 `view=META` GET 诊断读 `<statusText>`，

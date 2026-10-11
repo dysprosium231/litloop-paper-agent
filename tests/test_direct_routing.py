@@ -9,7 +9,7 @@ direct by default; Tor keeps top priority; direct_domains extends the set.
 import unittest
 from unittest.mock import patch
 
-from scansci_pdf.network import select_proxy_for_url
+from litloop.network import select_proxy_for_url
 
 PROXY = "http://127.0.0.1:7890"
 
@@ -44,7 +44,7 @@ class DirectRoutingTests(unittest.TestCase):
 
     def test_tor_still_wins(self):
         cfg = {"network_proxy": PROXY}
-        with patch("scansci_pdf.tor.ensure_tor", return_value="socks5://127.0.0.1:9050"):
+        with patch("litloop.tor.ensure_tor", return_value="socks5://127.0.0.1:9050"):
             self.assertEqual(
                 select_proxy_for_url("https://sci-hub.ru/x", cfg, use_tor=True),
                 "socks5://127.0.0.1:9050",

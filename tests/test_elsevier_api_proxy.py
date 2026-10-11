@@ -3,15 +3,15 @@
 背景（用户实测，2026-09）：权限探测（elsevier_check 双路由）认 network_proxy，
 但快车道/API 下载器（sources/elsevier_api）忽略所有代理设置——用户挂了
 校园网代理仍全员 403 NOT_ENTITLED。修复后整条链统一走
-SCANSCI_PDF_PROXY / network_proxy（HTTP_PROXY/HTTPS_PROXY 项目级忽略）。
+LITLOOP_PROXY / network_proxy（HTTP_PROXY/HTTPS_PROXY 项目级忽略）。
 """
 
 import os
 import unittest
 from unittest.mock import patch
 
-from scansci_pdf import elsevier_check as ec
-from scansci_pdf.sources import elsevier_api as ea
+from litloop import elsevier_check as ec
+from litloop.sources import elsevier_api as ea
 
 CAMPUS_PROXY = "http://127.0.0.1:7890"
 
@@ -54,7 +54,7 @@ class ResolveProxiesTests(unittest.TestCase):
         )
 
     def test_env_overrides_config(self):
-        with patch.dict(os.environ, {"SCANSCI_PDF_PROXY": "socks5://127.0.0.1:1080"}):
+        with patch.dict(os.environ, {"LITLOOP_PROXY": "socks5://127.0.0.1:1080"}):
             self.assertEqual(
                 ea._resolve_proxies({"network_proxy": CAMPUS_PROXY}),
                 {"http": "socks5://127.0.0.1:1080", "https": "socks5://127.0.0.1:1080"},
@@ -95,7 +95,7 @@ class FetchPdfProxyTests(unittest.TestCase):
 
     def test_chain_uses_env_proxy_without_config(self):
         _FakeSession.instances = []
-        with patch.dict(os.environ, {"SCANSCI_PDF_PROXY": CAMPUS_PROXY}), \
+        with patch.dict(os.environ, {"LITLOOP_PROXY": CAMPUS_PROXY}), \
              patch.object(ea.requests, "Session", _FakeSession):
             ea.fetch_pdf("10.1016/j.aaa.2023.01.001", "KEY")
         for s in _FakeSession.instances:
@@ -112,7 +112,7 @@ class FetchPdfProxyTests(unittest.TestCase):
 
 class InstitutionalMirrorTests(unittest.TestCase):
     def test_fetch_pdf_applies_config_proxy(self):
-        from scansci_pdf.institutional.sources import elsevier_api as inst
+        from litloop.institutional.sources import elsevier_api as inst
 
         _FakeSession.instances = []
         with patch.object(inst.requests, "Session", _FakeSession):
@@ -128,7 +128,7 @@ class ProbeEnvProxyTests(unittest.TestCase):
 
     def test_probe_dual_route_uses_env_proxy(self):
         captured = []
-        with patch.dict(os.environ, {"SCANSCI_PDF_PROXY": CAMPUS_PROXY}), \
+        with patch.dict(os.environ, {"LITLOOP_PROXY": CAMPUS_PROXY}), \
              patch.object(ec.time, "sleep"):
             def _capture(doi, key, proxies, **kw):
                 captured.append(proxies)

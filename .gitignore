@@ -12,7 +12,7 @@ build/
 Thumbs.db
 .env
 .venv/
-.scansci-pdf/
+.litloop/
 piao_top30.json
 piao_top30_dois.txt
 webvpn.dat
@@ -41,7 +41,7 @@ ISSUE_REPORT*.md
 
 # Browser profile/cache directories (Chrome user data, CloakBrowser kernels)
 carsi_sciencedirect/
-src/scansci_pdf/_browsers/
+src/litloop/_browsers/
 GrShaderCache/
 GraphiteDawnCache/
 BrowserMetrics-spare.pma

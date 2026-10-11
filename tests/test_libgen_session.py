@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import scansci_pdf.sources.libgen as lg
+import litloop.sources.libgen as lg
 
 PAGE = ('<html><a href="get.php?md5=abc&key=K&doi=10.1/x">download</a></html>')
 

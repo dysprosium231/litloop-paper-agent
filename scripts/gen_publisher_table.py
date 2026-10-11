@@ -18,7 +18,7 @@ END = "<!-- publisher-table:end -->"
 
 
 def build_table() -> str:
-    from scansci_pdf.publisher_strategies import StrategyRegistry
+    from litloop.publisher_strategies import StrategyRegistry
 
     lines = [
         "| 策略 | DOI 前缀 | 域名 |",

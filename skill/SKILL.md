@@ -1,9 +1,9 @@
 ---
-name: scansci-pdf
+name: litloop
 description: >
   Use this skill whenever the user wants to download academic papers, search for research literature,
   get citations (BibTeX/RIS/EndNote), manage WebVPN institutional proxy for paper access,
-  import .bib files, or batch-download papers. This skill orchestrates the scansci-pdf MCP server
+  import .bib files, or batch-download papers. This skill orchestrates the litloop MCP server
   which exposes 17 high-level tools covering download (OA/grey/institutional channels),
   discovery, queue preparation, diagnostics, and login.
   TRIGGER when: user mentions downloading papers, DOI, arXiv ID, Sci-Hub, paper search,
@@ -13,7 +13,7 @@ description: >
   or user asks about non-academic PDFs (invoices, reports, etc.).
 ---
 
-# scansci-pdf — 学术论文下载 MCP 服务
+# litloop — 学术论文下载 MCP 服务
 
 
 ## ⚠️ 修改反爬/嗅探/镜像相关代码前必读
@@ -23,7 +23,7 @@ description: >
 镜像健康存储曾被重复造过三代）。
 ## 概述
 
-scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学术论文的搜索、下载（开放获取 / 灰色源 / 机构渠道）、发现与队列准备、引文导出和诊断排障。下载引擎支持 13+ 数据源并行竞速、100+ 中国高校 WebVPN。
+litloop 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学术论文的搜索、下载（开放获取 / 灰色源 / 机构渠道）、发现与队列准备、引文导出和诊断排障。下载引擎支持 13+ 数据源并行竞速、100+ 中国高校 WebVPN。
 
 ## MCP 工具参考（17 个）
 
@@ -31,9 +31,9 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 
 | 工具 | 功能 | 关键参数 |
 |------|------|----------|
-| `scansci_pdf_download` | 单篇下载（OA/灰色源/机构级联） | `identifier`（必需）、`strategy`（可覆盖全局策略）、`markdown`/`bibtex`/`download_si`（可选） |
-| `scansci_pdf_batch_download` | 批量下载 | `identifiers`（必需）、`scihub_enabled`、`batch_id`（断点续传）、`resume`（默认 true） |
-| `scansci_pdf_cache_clear` | 清理下载缓存 | `identifier`（可选，省略清全部） |
+| `litloop_download` | 单篇下载（OA/灰色源/机构级联） | `identifier`（必需）、`strategy`（可覆盖全局策略）、`markdown`/`bibtex`/`download_si`（可选） |
+| `litloop_batch_download` | 批量下载 | `identifiers`（必需）、`scihub_enabled`、`batch_id`（断点续传）、`resume`（默认 true） |
+| `litloop_cache_clear` | 清理下载缓存 | `identifier`（可选，省略清全部） |
 
 **identifier 格式**：DOI（`10.1038/nature12373`）、DOI URL、arXiv ID（`2301.00001`）。
 
@@ -53,44 +53,44 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 
 | 工具 | 功能 | 关键参数 |
 |------|------|----------|
-| `scansci_pdf_find` | ScanSci Find 引擎：`action=plan\|estimate\|smoke\|calibrate` 系统综述搜索协议 | `action`、`query`、`domain`、`depth`、`sample_size` |
-| `scansci_pdf_expand_citations` | 引文追踪（Semantic Scholar/OpenCitations） | `query`、`rounds`（≤5）、`citation_source` |
-| `scansci_pdf_prepare_queue` | 准备下载队列：`action=verify\|resolve_oa\|build\|full` | `candidates_json`、`query`、`limit` |
-| `scansci_pdf_search` | 关键词/作者搜索（OpenAlex），带摘要、期刊分区、撤稿标记 | `query`/`author`/`author_id`、`limit`、`year_from`、`year_to`、`sort`（cited/date）、`max_cas_zone`、`max_cas_sub_zone`、`max_jcr_quartile`、`exclude_warning`、`exclude_retracted` |
-| `scansci_pdf_screening` | 保存筛选记录、记录用户选择 | `action`=save/decide/list/show、`question`、`criteria`、`items`、`session`、`selected`、`out_file` |
-| `scansci_pdf_parse_list` | 解析论文列表文件（APA/BibTeX/DOI 列表/表格） | `file_path`（必需） |
-| `scansci_pdf_citation` | 导出引文 | `identifier`（必需）、`format`（bibtex/ris/endnote/metadata） |
-| `scansci_pdf_zotero_push` | 推送已下载论文和 PDF 到 Zotero（自动使用已安装的 zotero-mcp） | `identifier`（必需，需先下载）, `collections`, `tags` |
+| `litloop_find` | ScanSci Find 引擎：`action=plan\|estimate\|smoke\|calibrate` 系统综述搜索协议 | `action`、`query`、`domain`、`depth`、`sample_size` |
+| `litloop_expand_citations` | 引文追踪（Semantic Scholar/OpenCitations） | `query`、`rounds`（≤5）、`citation_source` |
+| `litloop_prepare_queue` | 准备下载队列：`action=verify\|resolve_oa\|build\|full` | `candidates_json`、`query`、`limit` |
+| `litloop_search` | 关键词/作者搜索（OpenAlex），带摘要、期刊分区、撤稿标记 | `query`/`author`/`author_id`、`limit`、`year_from`、`year_to`、`sort`（cited/date）、`max_cas_zone`、`max_cas_sub_zone`、`max_jcr_quartile`、`exclude_warning`、`exclude_retracted` |
+| `litloop_screening` | 保存筛选记录、记录用户选择 | `action`=save/decide/list/show、`question`、`criteria`、`items`、`session`、`selected`、`out_file` |
+| `litloop_parse_list` | 解析论文列表文件（APA/BibTeX/DOI 列表/表格） | `file_path`（必需） |
+| `litloop_citation` | 导出引文 | `identifier`（必需）、`format`（bibtex/ris/endnote/metadata） |
+| `litloop_zotero_push` | 推送已下载论文和 PDF 到 Zotero（自动使用已安装的 zotero-mcp） | `identifier`（必需，需先下载）, `collections`, `tags` |
 
-**重要**：`verify`/`resolve_oa` 是轻量操作，预算 45 秒内返回；超时会返回结构化错误（`stage`/`timeout_seconds`/`retryable`），不会无反馈地等 180 秒。`resolve_oa` 依赖 Unpaywall 邮箱配置（`scansci_pdf_config(key='email', ...)`），缺失时直接返回 `blocked_configuration` 而不是逐条失败。
+**重要**：`verify`/`resolve_oa` 是轻量操作，预算 45 秒内返回；超时会返回结构化错误（`stage`/`timeout_seconds`/`retryable`），不会无反馈地等 180 秒。`resolve_oa` 依赖 Unpaywall 邮箱配置（`litloop_config(key='email', ...)`），缺失时直接返回 `blocked_configuration` 而不是逐条失败。
 
 ### 配置、通道与诊断
 
 | 工具 | 功能 | 关键参数 |
 |------|------|----------|
-| `scansci_pdf_config` | 读取/设置配置（值会脱敏） | `key`（可选）、`value`（可选） |
-| `scansci_pdf_channel_status` | 机构渠道状态：`kind=webvpn\|carsi\|ezproxy\|browser\|webvpn_test` | `kind`、`doi`（仅测试） |
-| `scansci_pdf_schools` | 搜索/设置 WebVPN 高校 | `action=search\|set`、`query`、`school` |
-| `scansci_pdf_diagnostics` | 健康/网络/来源/设置诊断 | `check=health\|network\|sources\|setup` |
-| `scansci_pdf_tor` | 内嵌 Tor：`action=install\|start\|stop` | `action`、`use_bridges` |
+| `litloop_config` | 读取/设置配置（值会脱敏） | `key`（可选）、`value`（可选） |
+| `litloop_channel_status` | 机构渠道状态：`kind=webvpn\|carsi\|ezproxy\|browser\|webvpn_test` | `kind`、`doi`（仅测试） |
+| `litloop_schools` | 搜索/设置 WebVPN 高校 | `action=search\|set`、`query`、`school` |
+| `litloop_diagnostics` | 健康/网络/来源/设置诊断 | `check=health\|network\|sources\|setup` |
+| `litloop_tor` | 内嵌 Tor：`action=install\|start\|stop` | `action`、`use_bridges` |
 
 ### 登录（机构渠道）
 
 | 工具 | 功能 | 关键参数 |
 |------|------|----------|
-| `scansci_pdf_login` | 统一登录：`kind=publisher\|webvpn\|carsi\|ezproxy\|custom\|cookie_import` | `kind`（默认 publisher）、`identifier`、`publisher`、`custom_url`、`cookie_file` |
-| `scansci_pdf_elsevier_setup` | Elsevier API Key 配置向导（免费，无需机构邮箱） | `test`（验证 key） |
+| `litloop_login` | 统一登录：`kind=publisher\|webvpn\|carsi\|ezproxy\|custom\|cookie_import` | `kind`（默认 publisher）、`identifier`、`publisher`、`custom_url`、`cookie_file` |
+| `litloop_elsevier_setup` | Elsevier API Key 配置向导（免费，无需机构邮箱） | `test`（验证 key） |
 
 ## 工作流编排
 
 ### 流程 1：模糊研究查询 → 下载
 
 ```
-1. scansci_pdf_find(action="plan"|"estimate", query="植物功能性状 气候变化")
-   或 scansci_pdf_search(query="plant functional traits climate change", limit=20, sort="cited_by_count")
-2. scansci_pdf_prepare_queue(action="full", candidates_json=<candidates>)
+1. litloop_find(action="plan"|"estimate", query="植物功能性状 气候变化")
+   或 litloop_search(query="plant functional traits climate change", limit=20, sort="cited_by_count")
+2. litloop_prepare_queue(action="full", candidates_json=<candidates>)
    → 验证 DOI + 解析 OA 位置（45s 预算，超时给出结构化错误）
-3. scansci_pdf_batch_download(identifiers=[...])
+3. litloop_batch_download(identifiers=[...])
 ```
 
 **关键点**：搜索后必须让用户确认，不要自动下载所有结果。
@@ -98,18 +98,18 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 ### 流程 2：论文列表全文下载
 
 ```
-1. scansci_pdf_parse_list(file_path="papers.md") → 查看解析结果
-2. scansci_pdf_batch_download(identifiers=entries)（或 resolve_and_download 的等价组合）
+1. litloop_parse_list(file_path="papers.md") → 查看解析结果
+2. litloop_batch_download(identifiers=entries)（或 resolve_and_download 的等价组合）
 ```
 
 ### 流程 3：WebVPN 机构代理
 
 ```
-1. scansci_pdf_schools(action="search", query="清华") → 找到学校
-2. scansci_pdf_schools(action="set", school="清华大学")
-3. scansci_pdf_login(kind="webvpn") → 浏览器 CAS 认证
-4. scansci_pdf_channel_status(kind="webvpn_test", doi="10.1038/nature12373") → 确认连通
-5. scansci_pdf_download(identifier="...") → 自动走 WebVPN 渠道
+1. litloop_schools(action="search", query="清华") → 找到学校
+2. litloop_schools(action="set", school="清华大学")
+3. litloop_login(kind="webvpn") → 浏览器 CAS 认证
+4. litloop_channel_status(kind="webvpn_test", doi="10.1038/nature12373") → 确认连通
+5. litloop_download(identifier="...") → 自动走 WebVPN 渠道
 ```
 
 ### 流程 4：付费论文登录下载（出版社 SSO）
@@ -117,11 +117,11 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 当下载返回 `error_type="paywall"` 和 `action="login_required"` 时：
 
 ```
-1. scansci_pdf_download(identifier="10.1126/science.aec6396")
+1. litloop_download(identifier="10.1126/science.aec6396")
    → 返回 {"error_type": "paywall", "action": "login_required", ...}
-2. scansci_pdf_login(identifier="10.1126/science.aec6396")  # kind=publisher 默认
+2. litloop_login(identifier="10.1126/science.aec6396")  # kind=publisher 默认
    → 打开浏览器到论文页 → 用户点 "Access through your institution" → 选择机构 → SSO → 关闭浏览器
-3. scansci_pdf_download(identifier="10.1126/science.aec6396") → 用已保存 cookies 成功下载
+3. litloop_download(identifier="10.1126/science.aec6396") → 用已保存 cookies 成功下载
 ```
 
 **要点**：
@@ -132,9 +132,9 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 ### 流程 5：Elsevier API 快速通道（1-2 秒下载）
 
 ```
-1. scansci_pdf_elsevier_setup → 浏览器注册指引 → 复制 API Key
-2. scansci_pdf_config(key="elsevier_api_key", value="...")
-3. scansci_pdf_elsevier_setup(test=true) → 验证
+1. litloop_elsevier_setup → 浏览器注册指引 → 复制 API Key
+2. litloop_config(key="elsevier_api_key", value="...")
+3. litloop_elsevier_setup(test=true) → 验证
 4. 后续 10.1016/ 开头 DOI 自动走 API 直接下载（无需 insttoken：校园网出口 + API key 即可）
 ```
 
@@ -143,9 +143,9 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 ### 流程 6：内嵌 Tor（灰色源被墙时）
 
 ```
-1. scansci_pdf_tor(action="install")   # 首次下载 Tor Expert Bundle
-2. scansci_pdf_tor(action="start")     # 受限网络可 use_bridges=true
-3. scansci_pdf_download(identifier="...", strategy="scihub_only")
+1. litloop_tor(action="install")   # 首次下载 Tor Expert Bundle
+2. litloop_tor(action="start")     # 受限网络可 use_bridges=true
+3. litloop_download(identifier="...", strategy="scihub_only")
 ```
 
 ## 能力边界
@@ -170,7 +170,7 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 ## 环境安装引导
 
 ```
-1. scansci_pdf_diagnostics(check="setup") → 环境状态
+1. litloop_diagnostics(check="setup") → 环境状态
 2. 按 readiness 处理：ready / partial / limited
 3. 缺少组件时按建议安装（pymupdf4llm 用于 markdown、cloakbrowser 用于反爬登录）
 ```
@@ -178,7 +178,7 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 ## 快速安装
 
 ```
-pip install -U scansci-pdf
+pip install -U litloop
 pip install -U cloakbrowser    # 反爬浏览器（Chromium 内核）
-scansci-pdf doctor             # 或 MCP: scansci_pdf_diagnostics(check="health")
+litloop doctor             # 或 MCP: litloop_diagnostics(check="health")
 ```
