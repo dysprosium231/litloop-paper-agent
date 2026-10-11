@@ -243,6 +243,7 @@ def search_papers_v2(
     author: str | None = None,
     author_id: str | None = None,
     max_cas_zone: int | None = None,
+    max_cas_sub_zone: int | None = None,
     max_jcr_quartile: int | None = None,
     exclude_warning: bool = False,
     exclude_retracted: bool = False,
@@ -256,15 +257,18 @@ def search_papers_v2(
 
     Every result is labelled with its journal's partitions (when
     litloop-journal-rank is installed) and a retraction flag. The journal
-    filters (max_cas_zone=2 keeps CAS zones 1-2, max_jcr_quartile=1 keeps Q1,
+    filters (max_cas_zone=2 keeps CAS major-category zones 1-2, max_cas_sub_zone=1
+    keeps journals in zone 1 of any of their subcategories, max_jcr_quartile=1 keeps Q1,
     exclude_warning drops warning-listed journals) drop records whose journal
     is unranked as well; ``stats`` receives how many were dropped and why.
     """
     sort = _normalize_sort(sort)
-    filtering = bool(max_cas_zone or max_jcr_quartile or exclude_warning or exclude_retracted)
+    filtering = bool(max_cas_zone or max_cas_sub_zone or max_jcr_quartile
+                     or exclude_warning or exclude_retracted)
     pool = limit * 3 if filtering else limit
     results = _collect(query, pool, limit, year_from, year_to, sort, author, author_id)
-    return _finalize(results, limit, max_cas_zone=max_cas_zone, max_jcr_quartile=max_jcr_quartile,
+    return _finalize(results, limit, max_cas_zone=max_cas_zone, max_cas_sub_zone=max_cas_sub_zone,
+                     max_jcr_quartile=max_jcr_quartile,
                      exclude_warning=exclude_warning, exclude_retracted=exclude_retracted, stats=stats)
 
 
@@ -308,16 +312,17 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
     return results
 
 
-def _finalize(results: list[dict[str, Any]], limit: int, *, max_cas_zone=None, max_jcr_quartile=None,
+def _finalize(results: list[dict[str, Any]], limit: int, *, max_cas_zone=None, max_cas_sub_zone=None,
+              max_jcr_quartile=None,
               exclude_warning=False, exclude_retracted=False,
               stats: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-    filtering = bool(max_cas_zone or max_jcr_quartile or exclude_warning or exclude_retracted)
+    journal_filter = bool(max_cas_zone or max_cas_sub_zone or max_jcr_quartile or exclude_warning)
     # Label only what can be shown, unless a filter needs the whole pool.
-    candidates = results if filtering else results[:limit]
+    candidates = results if (journal_filter or exclude_retracted) else results[:limit]
     _add_journal_rank(candidates)
-    if max_cas_zone or max_jcr_quartile or exclude_warning:
+    if journal_filter:
         candidates = _filter_by_journal(candidates, max_cas_zone, max_jcr_quartile,
-                                        exclude_warning, stats)
+                                        exclude_warning, stats, max_cas_sub_zone)
     _flag_retractions(candidates[: limit * 2] if exclude_retracted else candidates[:limit])
     if exclude_retracted:
         kept = [r for r in candidates if not r.get("retracted")]
@@ -327,18 +332,21 @@ def _finalize(results: list[dict[str, Any]], limit: int, *, max_cas_zone=None, m
     return candidates[:limit]
 
 
-def _filter_by_journal(results, max_cas_zone, max_jcr_quartile, exclude_warning, stats):
+def _filter_by_journal(results, max_cas_zone, max_jcr_quartile, exclude_warning, stats,
+                       max_cas_sub_zone=None):
     kept, dropped = [], {"unranked": 0, "below_threshold": 0, "warning": 0}
     for r in results:
         if exclude_warning and r.get("journal_warning"):
             dropped["warning"] += 1
             continue
-        if max_cas_zone or max_jcr_quartile:
-            cas, q = r.get("cas_zone"), r.get("jcr_quartile")
-            if (max_cas_zone and cas is None) or (max_jcr_quartile and q is None):
+        if max_cas_zone or max_cas_sub_zone or max_jcr_quartile:
+            cas, sub, q = r.get("cas_zone"), r.get("cas_sub_zone"), r.get("jcr_quartile")
+            if ((max_cas_zone and cas is None) or (max_cas_sub_zone and sub is None)
+                    or (max_jcr_quartile and q is None)):
                 dropped["unranked"] += 1
                 continue
-            if (max_cas_zone and cas > max_cas_zone) or (max_jcr_quartile and q > max_jcr_quartile):
+            if ((max_cas_zone and cas > max_cas_zone) or (max_cas_sub_zone and sub > max_cas_sub_zone)
+                    or (max_jcr_quartile and q > max_jcr_quartile)):
                 dropped["below_threshold"] += 1
                 continue
         kept.append(r)
@@ -366,6 +374,9 @@ def _add_journal_rank(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         r["journal_rank"] = info["label"]
         if (info.get("cas") or {}).get("zone"):
             r["cas_zone"] = info["cas"]["zone"]
+        sub_zones = [s["zone"] for s in (info.get("cas") or {}).get("subcategories", []) if s.get("zone")]
+        if sub_zones:
+            r["cas_sub_zone"] = min(sub_zones)  # best subcategory zone
         quartile = (info.get("jcr") or {}).get("best_quartile") or ""
         if quartile[1:].isdigit():
             r["jcr_quartile"] = int(quartile[1:])

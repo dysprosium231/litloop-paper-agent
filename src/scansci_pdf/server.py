@@ -234,11 +234,12 @@ def scansci_pdf_search(
     author_id: str | None = None,
     out_file: str | None = None,
     max_cas_zone: int | None = None,
+    max_cas_sub_zone: int | None = None,
     max_jcr_quartile: int | None = None,
     exclude_warning: bool = False,
     exclude_retracted: bool = False,
 ) -> str:
-    """Search papers by English keywords/author; sort=cited|date; filter by journal (max_cas_zone=2: CAS 1-2) or drop warning/retracted. out_file queues results."""
+    """Search papers by English keywords/author; sort=cited|date; journal filters (max_cas_zone / max_cas_sub_zone / max_jcr_quartile) are off unless set. out_file queues."""
     stats: dict = {}
     results = search_papers(
         query,
@@ -249,6 +250,7 @@ def scansci_pdf_search(
         author=author,
         author_id=author_id,
         max_cas_zone=max_cas_zone,
+        max_cas_sub_zone=max_cas_sub_zone,
         max_jcr_quartile=max_jcr_quartile,
         exclude_warning=exclude_warning,
         exclude_retracted=exclude_retracted,

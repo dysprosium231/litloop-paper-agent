@@ -649,3 +649,17 @@ def test_retraction_check_is_one_batched_openalex_request(monkeypatch):
     s._flag_retractions(rows)
     assert len(calls) == 1 and calls[0]["filter"] == "doi:10.1/bad|10.1/ok"
     assert rows[0]["retracted"] is True and "retracted" not in rows[1]
+
+
+def test_subcategory_zone_filter_keeps_niche_top_journals():
+    from scansci_pdf.search import _filter_by_journal
+    rows = [
+        {"title": "jecs", "cas_zone": 2, "cas_sub_zone": 1},   # 大类2区, 小类1区
+        {"title": "ci", "cas_zone": 2, "cas_sub_zone": 2},
+        {"title": "no-sub", "cas_zone": 1},
+    ]
+    stats = {}
+    kept = _filter_by_journal(rows, None, None, False, stats, max_cas_sub_zone=1)
+    assert [r["title"] for r in kept] == ["jecs"]
+    assert stats["dropped_below_threshold"] == 1 and stats["dropped_unranked"] == 1
+    assert [r["title"] for r in _filter_by_journal(rows, 1, None, False, None)] == ["no-sub"]
