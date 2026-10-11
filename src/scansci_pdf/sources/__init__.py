@@ -230,7 +230,7 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
                 if file_path:
                     from ..pdf_utils import is_suspicious_pdf, suspicious_pdf
                     fp = Path(file_path)
-                    if fp.exists() and is_suspicious_pdf(fp):
+                    if fp.exists() and is_suspicious_pdf(fp, doi):
                         log.info(f"   SUSPICIOUS {label}: PDF appears to be a preview/cover page, not full text")
                         record_result(label, False, latency_ms, "suspicious_pdf")
                         return suspicious_pdf(doi, fp, label)
@@ -684,7 +684,7 @@ def _run_tiers_parallel(
         from ..pdf_utils import is_pdf_file, is_suspicious_pdf, suspicious_pdf
         for label, src_output in futures.values():
             if src_output.exists() and is_pdf_file(src_output):
-                if is_suspicious_pdf(src_output):
+                if is_suspicious_pdf(src_output, doi):
                     log.info(f"   SUSPICIOUS {label} (file scan): skipping suspicious PDF")
                     continue
                 output_path.parent.mkdir(parents=True, exist_ok=True)

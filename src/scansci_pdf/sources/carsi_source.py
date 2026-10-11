@@ -52,7 +52,10 @@ def try_carsi(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str, 
         if cfg:
             resolved_host = urlparse(resolved_url).hostname or ""
             primary_domain = cfg.domains[0]
-            if resolved_host and primary_domain not in resolved_host:
+            # Only a host outside every known domain is a mirror: nature.com is
+            # one of Springer's own domains, and moving a Nature article onto
+            # link.springer.com gives "Page Unavailable".
+            if resolved_host and not any(d in resolved_host for d in cfg.domains):
                 # Reconstruct URL using primary domain + same path
                 from urllib.parse import urlunparse
                 parsed = urlparse(resolved_url)

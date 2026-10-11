@@ -63,14 +63,37 @@ def _response_looks_pdf(resp: requests.Response, first_chunk: bytes) -> bool:
     return first_chunk.startswith(b"%PDF-") or "application/pdf" in ctype
 
 
-def is_suspicious_pdf(path: Path) -> bool:
+_SINGLE_PAGE_CACHE: dict[str, bool] = {}
+
+
+def _article_is_single_page(doi: str) -> bool:
+    """True when Crossref says the article itself has one page (e.g. "1503")."""
+    if not doi or not doi.startswith("10."):
+        return False
+    if doi not in _SINGLE_PAGE_CACHE:
+        try:
+            s = requests.Session()
+            s.trust_env = False
+            r = s.get(f"https://api.crossref.org/works/{doi}", timeout=10)
+            page = str(r.json().get("message", {}).get("page", "") or "")
+        except Exception:
+            return False  # unknown: don't cache, keep the strict heuristic
+        # Only an explicit range proves it ("1503-1503"): a lone number is often
+        # an article number (Elsevier "117511"), saying nothing about length.
+        start, _, end = page.partition("-")
+        _SINGLE_PAGE_CACHE[doi] = bool(end) and start.strip() == end.strip()
+    return _SINGLE_PAGE_CACHE[doi]
+
+
+def is_suspicious_pdf(path: Path, doi: str = "") -> bool:
     """Check if a PDF looks like a cover page or preview (not full text).
 
     Heuristics:
       - Very small file (< 50 KB): likely a 1-page cover
       - At most 1 readable page: preview/cover page. File size alone is NOT
         trusted — Elsevier serves >100KB single-page previews to API keys
-        without full-text entitlement.
+        without full-text entitlement. Unless Crossref says the article
+        itself is one page (comments, News & Views): then it is the full text.
     """
     try:
         size = path.stat().st_size
@@ -86,12 +109,13 @@ def is_suspicious_pdf(path: Path) -> bool:
             # Count PDF page objects: look for "/Type /Page" not followed by "s"
             import re
             pages = len(re.findall(rb"/Type\s*/Page\b", content))
-            return pages <= 1
+            return pages <= 1 and not _article_is_single_page(doi)
         try:
             with fitz.open(path) as doc:
-                return int(doc.page_count) <= 1
+                single = int(doc.page_count) <= 1
         except Exception:
             return True  # unreadable PDF — treat as suspicious
+        return single and not _article_is_single_page(doi)
     except OSError:
         return False
 

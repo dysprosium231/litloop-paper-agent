@@ -330,7 +330,7 @@ def test_race_keeps_waiting_while_user_logs_in(tmp_path, monkeypatch, no_browser
     from scansci_pdf import pdf_utils
     real_wait = sources._wait_any
     monkeypatch.setattr(sources, "_wait_any", lambda ev, t: real_wait(ev, min(t, 0.2)))
-    monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda p: False)
+    monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda *a: False)
 
     def logging_in(doi, out, config):
         for _ in range(15):  # the user takes longer than the race's grace period
@@ -388,7 +388,7 @@ def test_race_waits_for_download_after_login(tmp_path, monkeypatch, no_browser_k
     from scansci_pdf import pdf_utils
     real_wait = sources._wait_any
     monkeypatch.setattr(sources, "_wait_any", lambda ev, t: real_wait(ev, min(t, 0.2)))
-    monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda p: False)
+    monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda *a: False)
 
     def login_then_download(doi, out, config):
         sources.note_user_waiting()  # last heartbeat: login finished
@@ -422,3 +422,29 @@ def test_http_pdf_download_has_wall_clock_deadline(tmp_path, monkeypatch):
                                  {"download_deadline_seconds": 0.5})
     assert ok is False and time.monotonic() - t < 3
     assert not (tmp_path / "a.pdf.part").exists()
+
+
+def test_navigate_retries_transient_network_error(monkeypatch):
+    from scansci_pdf import browser_engine as be
+    calls = []
+
+    class Page:
+        def goto(self, url, **kw):
+            calls.append(url)
+            if len(calls) == 1:
+                raise RuntimeError("Page.goto: net::ERR_TIMED_OUT at " + url)
+
+    monkeypatch.setattr(be, "_resolve_tab", lambda tab_id: Page())
+    assert be.navigate_tab("t", "https://example.org", {}) is True
+    assert len(calls) == 2
+
+
+def test_one_page_article_pdf_is_not_a_preview(tmp_path, monkeypatch):
+    fitz = pytest.importorskip("fitz")
+    from scansci_pdf import pdf_utils
+    pdf = tmp_path / "a.pdf"
+    doc = fitz.open(); doc.new_page(); doc.save(pdf); doc.close()
+    pdf.write_bytes(pdf.read_bytes() + b"%" + b"0" * 60_000)  # past the size floor
+    monkeypatch.setattr(pdf_utils, "_article_is_single_page", lambda doi: doi == "10.1/one-page")
+    assert pdf_utils.is_suspicious_pdf(pdf, "10.1/long-article")
+    assert not pdf_utils.is_suspicious_pdf(pdf, "10.1/one-page")

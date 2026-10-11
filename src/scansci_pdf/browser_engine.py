@@ -620,12 +620,26 @@ def navigate_tab(tab_id: str, url: str, config: dict[str, Any], *, timeout: floa
     if not page:
         logger.info(f"browser_engine: navigate_tab - tab {tab_id} not found")
         return False
-    try:
-        page.goto(url, wait_until="domcontentloaded", timeout=int(timeout * 1000))
-        return True
-    except Exception as e:
-        logger.info(f"browser_engine: navigate failed - {e}")
-        return False
+    for attempt in (1, 2):
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=int(timeout * 1000))
+            return True
+        except Exception as e:
+            # A connection that never came up (net::ERR_TIMED_OUT/RESET/...) is
+            # usually a transient network hiccup: retry once in this same tab
+            # rather than failing the source and opening a fallback window.
+            transient = any(code in str(e) for code in _TRANSIENT_NET_ERRORS)
+            logger.info(f"browser_engine: navigate failed - {str(e).splitlines()[0]}"
+                        + (" (retrying)" if transient and attempt == 1 else ""))
+            if not (transient and attempt == 1):
+                return False
+    return False
+
+
+_TRANSIENT_NET_ERRORS = (
+    "net::ERR_TIMED_OUT", "net::ERR_CONNECTION_TIMED_OUT", "net::ERR_CONNECTION_RESET",
+    "net::ERR_CONNECTION_CLOSED", "net::ERR_NETWORK_CHANGED", "net::ERR_EMPTY_RESPONSE",
+)
 
 
 def get_snapshot(tab_id: str, config: dict[str, Any], *, timeout: float = 15.0) -> dict[str, Any]:
