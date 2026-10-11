@@ -386,12 +386,32 @@ def _add_journal_rank(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _flag_retractions(results: list[dict[str, Any]]) -> None:
-    """Mark retracted papers (OpenAlex is_retracted, fed by Retraction Watch).
+    """Mark retracted papers and expressions of concern.
 
-    One batched request for up to 50 DOIs; a failure leaves results unflagged.
+    Prefers the local Retraction Watch copy kept by litloop-journal-rank
+    (`ljr retractions update`): offline, and it also knows expressions of
+    concern, corrections and the reasons. Without it, one batched OpenAlex
+    request (is_retracted only) for up to 50 DOIs; a failure leaves results
+    unflagged. Corrections are recorded in `notices` but not flagged.
     """
     dois = [str(r["doi"]).lower() for r in results if r.get("doi")][:50]
     if not dois:
+        return
+    try:
+        from litloop_journal_rank.retractions import lookup_papers
+        local = lookup_papers(dois)
+    except Exception:  # noqa: BLE001 - tool missing or data unreadable
+        local = None
+    if local is not None:
+        for r in results:
+            info = local.get(str(r.get("doi") or "").lower())
+            if not info:
+                continue
+            if info["retracted"]:
+                r["retracted"] = True
+            if info["concern"]:
+                r["concern"] = True
+            r["notices"] = [{k: n[k] for k in ("nature", "date", "reasons")} for n in info["notices"]]
         return
     params: dict[str, Any] = {"filter": "doi:" + "|".join(dois), "select": "doi,is_retracted",
                               "per_page": 50}

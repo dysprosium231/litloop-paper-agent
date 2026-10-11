@@ -663,3 +663,24 @@ def test_subcategory_zone_filter_keeps_niche_top_journals():
     assert [r["title"] for r in kept] == ["jecs"]
     assert stats["dropped_below_threshold"] == 1 and stats["dropped_unranked"] == 1
     assert [r["title"] for r in _filter_by_journal(rows, 1, None, False, None)] == ["no-sub"]
+
+
+def test_retraction_flags_prefer_local_retraction_watch(monkeypatch):
+    import sys, types
+    from scansci_pdf import search as s
+    fake = types.ModuleType("litloop_journal_rank.retractions")
+    fake.lookup_papers = lambda dois: {
+        "10.1/bad": {"retracted": True, "concern": False,
+                     "notices": [{"nature": "Retraction", "date": "2023-07-01", "reasons": ["Paper Mill"],
+                                  "notice_doi": "x", "record_id": "1"}]},
+        "10.1/eoc": {"retracted": False, "concern": True,
+                     "notices": [{"nature": "Expression of concern", "date": "2024-01-02", "reasons": [],
+                                  "notice_doi": "", "record_id": "2"}]},
+    }
+    monkeypatch.setitem(sys.modules, "litloop_journal_rank.retractions", fake)
+    monkeypatch.setattr(s, "_plain_session", lambda: (_ for _ in ()).throw(AssertionError("went online")))
+    rows = [{"doi": "10.1/BAD"}, {"doi": "10.1/eoc"}, {"doi": "10.1/ok"}]
+    s._flag_retractions(rows)
+    assert rows[0]["retracted"] is True and rows[0]["notices"][0]["reasons"] == ["Paper Mill"]
+    assert rows[1]["concern"] is True and "retracted" not in rows[1]
+    assert rows[2] == {"doi": "10.1/ok"}
