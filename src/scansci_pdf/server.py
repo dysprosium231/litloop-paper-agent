@@ -880,11 +880,17 @@ def scansci_pdf_paper_metadata(doi: str) -> str:
 
 
 @mcp_app.tool()
-def scansci_pdf_zotero_push(identifier: str) -> str:
-    """Push a downloaded paper to Zotero.
+def scansci_pdf_zotero_push(
+    identifier: str,
+    collections: list[str] | None = None,
+    tags: list[str] | None = None,
+) -> str:
+    """Push a downloaded paper + PDF to Zotero (via zotero-mcp if configured).
 
     Args:
-        identifier: DOI or arXiv ID of a previously downloaded paper
+        identifier: DOI or arXiv ID of a downloaded paper
+        collections: existing collections
+        tags: tags to add
     """
     from .identifiers import normalize_doi
     from .zotero import push_to_zotero
@@ -898,11 +904,14 @@ def scansci_pdf_zotero_push(identifier: str) -> str:
     doi = cached.get("doi", normalize_doi(identifier))
     pdf_path = Path(cached.get("file", "")) if cached.get("file") else None
 
-    # Fetch metadata for better Zotero entry
-    from .citation import fetch_metadata
-    metadata = fetch_metadata(doi, config)
+    from .zotero import _zotero_mcp_python
+    metadata = None
+    if _zotero_mcp_python(config) is None:
+        # Web API route builds the item itself from Crossref metadata.
+        from .citation import fetch_metadata
+        metadata = fetch_metadata(doi, config)
 
-    result = push_to_zotero(doi, pdf_path, config, metadata)
+    result = push_to_zotero(doi, pdf_path, config, metadata, collections, tags)
     return json.dumps(result, ensure_ascii=False)
 
 

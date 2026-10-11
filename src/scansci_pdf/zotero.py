@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -22,16 +23,92 @@ def _get_zotero_config(config: dict[str, Any]) -> tuple[str, str] | None:
     return api_key, f"{library_type}s/{library_id}" if library_id else ""
 
 
+def _zotero_mcp_python(config: dict[str, Any]) -> Path | None:
+    exe = str(config.get("zotero_mcp_python") or "").strip()
+    if not exe:
+        return None
+    path = Path(exe).expanduser()
+    return path if path.is_file() else None
+
+
+def push_via_zotero_mcp(
+    identifier: str,
+    pdf_path: Path | None,
+    config: dict[str, Any],
+    collections: list[str] | None = None,
+    tags: list[str] | None = None,
+) -> dict[str, Any]:
+    """File the paper with zotero-mcp's own add/attach code (zotero_bridge.py).
+
+    Runs in zotero-mcp's interpreter, so the item gets CrossRef metadata,
+    duplicates are reused, and the PDF goes to WebDAV when zotero-mcp is
+    configured for it.
+    """
+    import subprocess
+
+    python = _zotero_mcp_python(config)
+    if python is None:
+        return {"success": False, "error": "zotero_mcp_python not configured or missing"}
+
+    env_script = str(config.get("zotero_mcp_env_script") or "").strip()
+    req = {
+        "identifier": identifier,
+        "file": str(pdf_path.resolve()) if pdf_path and pdf_path.is_file() else "",
+        "collections": collections or [],
+        "tags": tags or [],
+        "env_script": str(Path(env_script).expanduser()) if env_script else "",
+    }
+    bridge = Path(__file__).with_name("zotero_bridge.py")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+    try:
+        proc = subprocess.run(
+            [str(python), str(bridge)],
+            input=json.dumps(req, ensure_ascii=False),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+            # WebDAV uploads of large PDFs are allowed up to 600 s by zotero-mcp.
+            timeout=int(config.get("zotero_push_timeout", 900)),
+        )
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "zotero-mcp bridge timed out"}
+    except OSError as e:
+        return {"success": False, "error": f"cannot start zotero-mcp python: {e}"}
+
+    lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+    try:
+        result = json.loads(lines[-1]) if lines else None
+    except json.JSONDecodeError:
+        result = None
+    if not isinstance(result, dict):
+        tail = (proc.stderr or proc.stdout or "").strip()[-500:]
+        return {"success": False, "error": f"zotero-mcp bridge failed (exit {proc.returncode}): {tail}"}
+    result["via"] = "zotero-mcp"
+    if result.get("success"):
+        log.info(f"Zotero (zotero-mcp): item {result.get('zotero_key')}, "
+                 f"pdf_attached={result.get('pdf_attached')}")
+    return result
+
+
 def push_to_zotero(
     doi: str,
     pdf_path: Path | None,
     config: dict[str, Any],
     metadata: dict[str, Any] | None = None,
+    collections: list[str] | None = None,
+    tags: list[str] | None = None,
 ) -> dict[str, Any]:
     """Push a paper and its PDF to Zotero.
 
-    Returns dict with success status and zotero_key if successful.
+    Uses zotero-mcp when ``zotero_mcp_python`` is set; otherwise the Zotero
+    web API with ``zotero_api_key``. Returns dict with success status and
+    zotero_key if successful.
     """
+    if _zotero_mcp_python(config) is not None:
+        return push_via_zotero_mcp(doi, pdf_path, config, collections, tags)
+
     import requests
 
     creds = _get_zotero_config(config)
@@ -81,10 +158,12 @@ def push_to_zotero(
         log.info(f"Zotero: created item {zotero_key}")
 
         # Upload PDF attachment if available
+        pdf_attached = False
         if pdf_path and pdf_path.exists():
-            _upload_attachment(base_url, headers, zotero_key, pdf_path)
+            pdf_attached = _upload_attachment(base_url, headers, zotero_key, pdf_path)
 
-        return {"success": True, "zotero_key": zotero_key}
+        return {"success": True, "zotero_key": zotero_key, "pdf_attached": pdf_attached,
+                "via": "web-api"}
 
     except Exception as e:
         return {"success": False, "error": str(e)}
