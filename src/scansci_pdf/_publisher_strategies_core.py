@@ -79,6 +79,21 @@ _PICK_INSTITUTION_JS = """
 """
 
 
+def _resolve_doi_landing(doi: str) -> str:
+    """Publisher landing URL for a DOI via the doi.org handle API ("" if unknown)."""
+    import requests
+    try:
+        s = requests.Session()
+        s.trust_env = False
+        r = s.get(f"https://doi.org/api/handles/{doi}", params={"type": "URL"}, timeout=15)
+        for v in r.json().get("values", []):
+            if v.get("type") == "URL":
+                return str(v.get("data", {}).get("value", ""))
+    except Exception:
+        pass
+    return ""
+
+
 def _user_waiting() -> None:
     """Heartbeat while the user is logging in, so racing does not give up on us."""
     try:
@@ -1800,6 +1815,14 @@ def _browser_download(
         # Now navigate to the actual article page
         log.info(f"   [{publisher}] navigating to {article_url[:80]}")
         nav_ok = navigate_tab(tab_id, article_url, config, timeout=60.0)
+        if not nav_ok and "doi.org/" in article_url:
+            # doi.org itself sometimes times out from here: ask its API for the
+            # publisher URL and go there directly.
+            landing = _resolve_doi_landing(doi)
+            if landing:
+                log.info(f"   [{publisher}] doi.org timed out, opening {landing[:80]}")
+                article_url = landing
+                nav_ok = navigate_tab(tab_id, article_url, config, timeout=60.0)
         if not nav_ok:
             log.info(f"   [{publisher}] navigation failed, tab may be destroyed")
             _set_error("navigate_failed", "cloudflare_timeout")
@@ -1878,13 +1901,44 @@ def _browser_download(
 
         # Check for anti-bot challenges
         if _is_challenge_page(html):
-            log.info(f"   [{publisher}] challenge detected, waiting for auto-resolve...")
-            time.sleep(8)
-            html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or ""
+            visible = not bool(config.get("scihub_browser_headless", config.get("browser_headless", False)))
+            # Headless: a short grace for auto-resolving challenges. Visible:
+            # the user can click it in this very window — wait for them instead
+            # of closing it and opening the visible fallback (a second window).
+            max_wait = 150 if visible else 8
+            log.info(f"   [{publisher}] challenge detected, waiting "
+                     + ("for you to complete it in the open window..." if visible else "for auto-resolve..."))
+            waited = 0
+            while True:
+                time.sleep(3 if visible else 8)
+                waited += 3 if visible else 8
+                if visible:
+                    _user_waiting()
+                html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or ""
+                if not _is_challenge_page(html) or waited >= max_wait:
+                    break
             if _is_challenge_page(html):
                 log.info(f"   [{publisher}] challenge did not resolve")
                 _set_error("cloudflare_blocked", "use_proxy_or_browser")
                 return False
+            # Past the challenge: the real article page is now loaded — take its
+            # own PDF link first, as for a page that loaded without a challenge.
+            _page = _resolve_tab(tab_id)
+            if _page is not None:
+                wait_url_stable(_page)
+                _href = find_page_pdf_link(_page, max_wait_s=10)
+                if _href:
+                    from .browser_pdf import capture_pdf_via_cdp
+                    log.info(f"   [{publisher}] page PDF link after challenge: {_href[:80]}")
+                    _body = capture_pdf_via_cdp(_page.context, _page, _href)
+                    if _body:
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                        output_path.write_bytes(_body)
+                        from .pdf_utils import success
+                        if is_pdf_file(output_path):
+                            close_tab(tab_id, config)
+                            return success(doi, output_path, f"{publisher}(Browser)")
+                html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or html
 
         # Check for paywall AFTER challenge resolution
         if _detect_paywall(html):

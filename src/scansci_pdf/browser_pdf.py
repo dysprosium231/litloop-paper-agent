@@ -28,7 +28,9 @@ PAGE_PDF_LINK_JS = """
         const href = a.getAttribute('href') || '';
         const low = href.toLowerCase();
         if (low.includes('pdfft') || low.includes('/doi/pdf') || low.includes('/pdfdirect/')
-            || low.includes('/content/pdf/') || low.includes('/stamp/stamp.jsp'))
+            || low.includes('/content/pdf/') || low.includes('/stamp/stamp.jsp')
+            // Silverchair platforms (RSC since 2026, OUP): /article-pdf/doi/...pdf
+            || low.includes('/article-pdf/') || low.includes('/content/articlepdf/'))
             return new URL(href, location.href).href;
     }
     return null;
