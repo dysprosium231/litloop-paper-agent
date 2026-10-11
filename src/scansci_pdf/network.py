@@ -63,6 +63,66 @@ def configured_proxy(config: dict[str, Any] | None = None) -> str:
     return os.environ.get("SCANSCI_PDF_PROXY") or (config or {}).get("network_proxy") or ""
 
 
+_PROXY_UP: dict[str, tuple[float, bool]] = {}
+
+
+def _proxy_reachable(proxy_url: str) -> bool:
+    """Is the proxy's port accepting connections? Cached for 30 s."""
+    import socket
+    from urllib.parse import urlparse
+    now = time.monotonic()
+    cached = _PROXY_UP.get(proxy_url)
+    if cached and now - cached[0] < 30:
+        return cached[1]
+    u = urlparse(proxy_url)
+    try:
+        with socket.create_connection((u.hostname or "127.0.0.1", u.port or 80), timeout=1):
+            up = True
+    except OSError:
+        up = False
+    _PROXY_UP[proxy_url] = (now, up)
+    return up
+
+
+def host_proxy(config: dict[str, Any] | None) -> tuple[str, tuple[str, ...]]:
+    """(proxy_url, domains) of the per-host proxy exception, or ("", ()) when off/down."""
+    config = config or {}
+    url = str(config.get("host_proxy_url") or "").strip()
+    hosts = tuple(str(h).strip().lstrip(".").lower() for h in config.get("host_proxy_hosts") or [] if str(h).strip())
+    if not url or not hosts or not _proxy_reachable(url):
+        return "", ()
+    return url, hosts
+
+
+def host_uses_proxy(host: str, hosts: tuple[str, ...]) -> bool:
+    host = (host or "").lower()
+    return any(host == h or host.endswith("." + h) for h in hosts)
+
+
+class _HostProxyAdapter(HTTPAdapter):
+    """Sends requests for the configured domains through the exception proxy."""
+
+    def __init__(self, proxy_url: str, hosts: tuple[str, ...]) -> None:
+        super().__init__()
+        self._proxy = proxy_url
+        self._hosts = hosts
+
+    def send(self, request, **kwargs):  # type: ignore[override]
+        from urllib.parse import urlparse
+        if host_uses_proxy(urlparse(request.url).hostname or "", self._hosts):
+            kwargs["proxies"] = {"http": self._proxy, "https": self._proxy}
+        return super().send(request, **kwargs)
+
+
+def apply_host_proxy(session: requests.Session, config: dict[str, Any] | None) -> None:
+    """Route the per-host proxy exception's domains through its proxy (no-op when off)."""
+    url, hosts = host_proxy(config)
+    if url:
+        adapter = _HostProxyAdapter(url, hosts)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+
+
 def _get_session(config: dict[str, Any]) -> requests.Session:
     proxy = configured_proxy(config)
     key = proxy or "__none__"

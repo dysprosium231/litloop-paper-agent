@@ -41,6 +41,8 @@ def _session(config: dict[str, Any]):
     from ..network import USER_AGENT
 
     s.headers.update({"User-Agent": USER_AGENT})
+    from ..network import apply_host_proxy
+    apply_host_proxy(s, config)
     return s
 
 

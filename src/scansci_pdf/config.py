@@ -120,6 +120,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "zotero_library_type": "user",
     "zotero_library_id": "",
     "flaresolverr_url": "http://127.0.0.1:8191/v1",
+    # Per-host proxy exception: these domains (and subdomains) go through
+    # host_proxy_url, everything else stays direct. For publishers that grant
+    # access by login cookie rather than campus IP, where the direct route is
+    # slow (Springer Nature's CDN). Skipped while the proxy port is closed.
+    "host_proxy_url": "",
+    "host_proxy_hosts": [],
     "cookie_path": "",
     "chrome_profile_dir": "",
     "carsi_cookie_dir": "",

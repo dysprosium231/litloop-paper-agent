@@ -16,7 +16,9 @@ from .crossref import try_crossref
 
 
 def _load_publisher_cookies(session: requests.Session, config: dict[str, Any]) -> None:
-    """Load saved publisher cookies into a session."""
+    """Load saved publisher cookies into a session (and its per-host proxy routes)."""
+    from ..network import apply_host_proxy
+    apply_host_proxy(session, config)
     try:
         from ..browser_cookies import inject_cookies
         inject_cookies(session, config)

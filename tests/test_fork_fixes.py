@@ -460,3 +460,19 @@ def test_pdf_capture_recognises_bounce_to_article():
                 "request": {"url": "https://www.sciencedirect.com/science/article/pii/S1/pdfft?md5=1"}}
     assert _is_bounce_to_html(bounce, pdf)
     assert not _is_bounce_to_html(crasolve, "https://www.sciencedirect.com/science/article/pii/S1/pdfft")
+
+
+def test_host_proxy_exception_routes_only_listed_domains(monkeypatch):
+    import base64
+    from scansci_pdf import network
+    monkeypatch.setattr(network, "_proxy_reachable", lambda url: True)
+    cfg = {"host_proxy_url": "http://127.0.0.1:10808", "host_proxy_hosts": ["nature.com"]}
+    url, hosts = network.host_proxy(cfg)
+    assert network.host_uses_proxy("www.nature.com", hosts) and network.host_uses_proxy("nature.com", hosts)
+    assert not network.host_uses_proxy("www.sciencedirect.com", hosts)
+    assert not network.host_uses_proxy("notnature.com", hosts)
+    args = bb._direct_args(bb.BACKEND_PATCHRIGHT, None, [], cfg)
+    pac = base64.b64decode(args[0].split("base64,", 1)[1]).decode()
+    assert args[0].startswith("--proxy-pac-url=") and "PROXY 127.0.0.1:10808; DIRECT" in pac
+    monkeypatch.setattr(network, "_proxy_reachable", lambda url: False)  # proxy off: all direct
+    assert bb._direct_args(bb.BACKEND_PATCHRIGHT, None, [], cfg) == ["--no-proxy-server"]

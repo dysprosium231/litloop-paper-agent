@@ -644,14 +644,33 @@ def _resolve_launch_config(config: dict[str, Any] | None) -> dict[str, Any] | No
         return None
 
 
-def _direct_args(backend: str, proxy: Any, args: list[str] | None) -> list[str] | None:
-    """Chromium backends bypass the OS/system proxy unless an explicit proxy is given."""
+def _direct_args(backend: str, proxy: Any, args: list[str] | None,
+                 config: dict[str, Any] | None = None) -> list[str] | None:
+    """Chromium backends bypass the OS/system proxy unless an explicit proxy is given.
+
+    With a per-host proxy exception configured (host_proxy_url/_hosts), a PAC
+    script sends only those domains through it — falling back to DIRECT if the
+    proxy goes away mid-session — and everything else stays direct.
+    """
     if proxy is not None or backend == BACKEND_CAMOUFOX:
         return args
     args = list(args or [])
-    if not any(a.startswith(("--no-proxy-server", "--proxy-server")) for a in args):
-        args.append("--no-proxy-server")
+    if not any(a.startswith(("--no-proxy-server", "--proxy-server", "--proxy-pac-url")) for a in args):
+        from .network import host_proxy
+        url, hosts = host_proxy(config)
+        args.append(_pac_arg(url, hosts) if url else "--no-proxy-server")
     return args
+
+
+def _pac_arg(proxy_url: str, hosts: tuple[str, ...]) -> str:
+    import base64
+    from urllib.parse import urlparse
+    u = urlparse(proxy_url)
+    kind = "SOCKS5" if (u.scheme or "").startswith("socks") else "PROXY"
+    cond = " || ".join(f'host == "{h}" || dnsDomainIs(host, ".{h}")' for h in hosts)
+    pac = (f"function FindProxyForURL(url, host) {{ if ({cond}) "
+           f'return "{kind} {u.hostname}:{u.port}; DIRECT"; return "DIRECT"; }}')
+    return "--proxy-pac-url=data:application/x-ns-proxy-autoconfig;base64," + base64.b64encode(pac.encode()).decode()
 
 
 def _launch_unregistered(
@@ -673,7 +692,7 @@ def _launch_unregistered(
     backend = resolve_backend(config)
     if backend == BACKEND_CAMOUFOX and proxy is None:
         proxy = _proxy_from_config(config)
-    args = _direct_args(backend, proxy, args)
+    args = _direct_args(backend, proxy, args, config)
     if backend == BACKEND_PATCHRIGHT:
         if humanize:
             logger.debug("browser_backend: humanize not supported by patchright, ignored")
@@ -701,7 +720,7 @@ def _launch_persistent_unregistered(
     backend = resolve_backend(config)
     if backend == BACKEND_CAMOUFOX and proxy is None:
         proxy = _proxy_from_config(config)
-    args = _direct_args(backend, proxy, args)
+    args = _direct_args(backend, proxy, args, config)
     if backend == BACKEND_PATCHRIGHT:
         if humanize:
             logger.debug("browser_backend: humanize not supported by patchright, ignored")
