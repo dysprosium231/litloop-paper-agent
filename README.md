@@ -42,8 +42,8 @@
 Agent 会克隆（或原地更新）仓库、装好依赖并注册插件，然后你就能直接让它下论文了——例子见下一节[怎么用](#怎么用)。
 
 > **给 Agent 的步骤**（安装和更新相同）：
-> 1. 插件目录：`~/plugins/scansci-pdf` 已存在就直接用；否则 `git clone https://github.com/dysprosium231/litloop-paper-agent.git ~/plugins/scansci-pdf`。
-> 2. 用 Python 3.11+ 运行 `python ~/plugins/scansci-pdf/scripts/deploy.py`（Windows 用 `%USERPROFILE%\plugins\scansci-pdf\scripts\deploy.py`）。它会同步代码（含 fork 改写历史后的更新）、在 `~/.scansci-pdf/venv` 建独立环境并安装、向本机的 Claude Code / Claude Desktop（已有配置文件时）/ Codex 注册 MCP、复制 skills，最后自检。已注册且可用的安装会被保留并就地更新。
+> 1. 插件目录：`~/plugins/litloop-paper-agent`（或旧的 `~/plugins/scansci-pdf`）已存在就直接用；否则 `git clone https://github.com/dysprosium231/litloop-paper-agent.git ~/plugins/litloop-paper-agent`。
+> 2. 用 Python 3.11+ 运行该目录下的 `scripts/deploy.py`，如 `python ~/plugins/litloop-paper-agent/scripts/deploy.py`（Windows 用 `%USERPROFILE%\plugins\litloop-paper-agent\scripts\deploy.py`）。它会同步代码（含 fork 改写历史后的更新）、在 `~/.scansci-pdf/venv` 建独立环境并安装、向本机的 Claude Code / Claude Desktop（已有配置文件时）/ Codex 注册 MCP、复制 skills，最后自检。已注册且可用的安装会被保留并就地更新。
 > 3. 把脚本末尾的 summary（警告和下一步）转告用户，并提醒重启客户端。脚本以“本地有未推送改动”退出时，不要强行覆盖，问用户。
 > 4. 可选：`--with-find` 加装 scansci-find；`--extras fast,vpnsci,patchright,zotero` 把 zotero-mcp 装进同一环境；`--dry-run` 只看不改。没有 Python 3.11+ 或 Git 时，先请用户安装（Windows：`winget install Python.Python.3.12 Git.Git`）。
 
