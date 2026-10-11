@@ -128,6 +128,19 @@ def find_page_pdf_link(page: Any, max_wait_s: float = 15.0) -> str | None:
     return None
 
 
+def _is_bounce_to_html(ev: dict[str, Any], pdf_url: str) -> bool:
+    """A 2xx HTML document at a URL without "pdf" in it, reached while loading a PDF URL.
+
+    ScienceDirect's /pdfft first answers with an HTML check page but stays on a
+    pdfft URL, so it is not mistaken for a bounce.
+    """
+    status = ev.get("responseStatusCode") or 0
+    headers = {h["name"].lower(): h["value"] for h in ev.get("responseHeaders") or []}
+    req_url = str((ev.get("request") or {}).get("url", ""))
+    return (200 <= status < 300 and "text/html" in headers.get("content-type", "").lower()
+            and "pdf" not in req_url.lower() and req_url != pdf_url)
+
+
 def capture_pdf_via_cdp(context: Any, page: Any, url: str, timeout_s: float = 90.0) -> bytes | None:
     """Navigate ``page`` to ``url`` and return the PDF body the browser receives."""
     if not url or not url.startswith("http"):
@@ -174,11 +187,21 @@ def capture_pdf_via_cdp(context: Any, page: Any, url: str, timeout_s: float = 90
         # Large PDFs behind ScienceDirect's crasolve check can take ~1 min; bound
         # the wait by wall-clock time rather than by iterations.
         deadline = time.monotonic() + timeout_s
+        bounced_at = 0.0
         while time.monotonic() < deadline:
             page.wait_for_timeout(500)
             while paused:
-                _handle(paused.pop(0))
+                ev = paused.pop(0)
+                if _is_bounce_to_html(ev, url):
+                    bounced_at = bounced_at or time.monotonic()
+                _handle(ev)
             if bodies:
+                break
+            # The PDF URL redirected to an ordinary page (no entitlement: Nature
+            # sends .pdf back to the article). Waiting the full timeout for a
+            # PDF that will never come cost 90 s per attempt.
+            if bounced_at and time.monotonic() - bounced_at > 3:
+                log.info(f"   [browser-pdf] PDF URL redirected to an HTML page, not entitled: {page.url[:60]}")
                 break
     finally:
         try:

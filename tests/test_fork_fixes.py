@@ -448,3 +448,15 @@ def test_one_page_article_pdf_is_not_a_preview(tmp_path, monkeypatch):
     monkeypatch.setattr(pdf_utils, "_article_is_single_page", lambda doi: doi == "10.1/one-page")
     assert pdf_utils.is_suspicious_pdf(pdf, "10.1/long-article")
     assert not pdf_utils.is_suspicious_pdf(pdf, "10.1/one-page")
+
+
+def test_pdf_capture_recognises_bounce_to_article():
+    from scansci_pdf.browser_pdf import _is_bounce_to_html
+    html = [{"name": "Content-Type", "value": "text/html; charset=utf-8"}]
+    pdf = "https://www.nature.com/articles/x.pdf"
+    bounce = {"responseStatusCode": 200, "responseHeaders": html,
+              "request": {"url": "https://www.nature.com/articles/x"}}
+    crasolve = {"responseStatusCode": 200, "responseHeaders": html,
+                "request": {"url": "https://www.sciencedirect.com/science/article/pii/S1/pdfft?md5=1"}}
+    assert _is_bounce_to_html(bounce, pdf)
+    assert not _is_bounce_to_html(crasolve, "https://www.sciencedirect.com/science/article/pii/S1/pdfft")
