@@ -29,6 +29,7 @@ EXPECTED = {
     "scansci_pdf_prepare_queue",
     "scansci_pdf_schools",
     "scansci_pdf_search",
+    "scansci_pdf_screening",
     "scansci_pdf_springer_setup",
     "scansci_pdf_tor",
     "scansci_pdf_zotero_push",
@@ -38,7 +39,7 @@ EXPECTED = {
 def test_tool_surface_matches_expected():
     tools = asyncio.run(mcp_app.list_tools())
     assert {t.name for t in tools} == EXPECTED
-    assert len(tools) == 19
+    assert len(tools) == 20
 
 
 def test_tool_descriptions_are_diet_sized():

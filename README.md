@@ -3,7 +3,7 @@
   <p><strong>Academic Paper Agent</strong> · 学术论文 Agent：检索 → 下载 → Zotero 归档 → 分析归纳</p>
 
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0F766E?style=flat-square" /></a>
-  <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/MCP-19%20tools-111827?style=flat-square" /></a>
+  <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/MCP-20%20tools-111827?style=flat-square" /></a>
 
   让 Agent 替你找论文、下论文、整理论文 —— 20+ 数据源并行竞速，100+ 高校机构通道（WebVPN / CARSI），下载后直接进 Zotero。
 
@@ -20,7 +20,7 @@
 - **清单，整批拿下** — APA / BibTeX / DOI 列表直接喂，自动补全缺失 DOI；上千篇先分「OA / 灰色源 / 需机构」三桶再分批下载，不瞎跑不浪费。
 - **付费墙，走你的学校** — 100+ 高校 WebVPN、CARSI 联邦认证、EZProxy、Elsevier API 快速通道（1–2 秒/篇）；登录在你自己的浏览器完成，密码不经过工具。
 - **对抗与自愈全自动** — Cloudflare / CAPTCHA / SSO 分层处理；出版商封 IP 自动停损；机构会话过期自动重登，登录一次全程复用。
-- **Agent 原生** — 标准 MCP 服务器、19 个工具即装即用；Codex App、ZCode、Claude Code 都有现成的插件或配置。
+- **Agent 原生** — 标准 MCP 服务器、20 个工具即装即用；Codex App、ZCode、Claude Code 都有现成的插件或配置。
 
 ### 近期更新
 
@@ -133,13 +133,14 @@ scansci-pdf check                             # 依赖与环境体检
 
 <!-- mcp-tools:start -->
 <details>
-<summary><strong>MCP 工具全表</strong>（19 个，按意图分组）</summary>
+<summary><strong>MCP 工具全表</strong>（20 个，按意图分组）</summary>
 
 | 想做什么 | 工具 |
 |---|---|
 | 下载单篇（可拉附件、转 Markdown） | `scansci_pdf_download` |
 | 批量下载（列表 / xlsx·csv·bib·APA 文件） | `scansci_pdf_batch_download` |
 | 检索、作者检索、系统性发现 | `scansci_pdf_search` · `scansci_pdf_find` · `scansci_pdf_expand_citations` |
+| 筛选记录（相关度 + 理由，记录选择，生成下载队列） | `scansci_pdf_screening` |
 | 准备队列（校验 / OA 定位 / 构建） | `scansci_pdf_prepare_queue` |
 | 机构登录与状态（WebVPN / CARSI / EZProxy / 出版商 SSO） | `scansci_pdf_login` · `scansci_pdf_channel_status` · `scansci_pdf_schools` |
 | 引文 / 元数据 / Zotero | `scansci_pdf_citation` · `scansci_pdf_zotero_push` |

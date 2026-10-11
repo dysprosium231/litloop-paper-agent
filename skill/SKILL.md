@@ -56,7 +56,8 @@ scansci-pdf 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学�
 | `scansci_pdf_find` | ScanSci Find 引擎：`action=plan\|estimate\|smoke\|calibrate` 系统综述搜索协议 | `action`、`query`、`domain`、`depth`、`sample_size` |
 | `scansci_pdf_expand_citations` | 引文追踪（Semantic Scholar/OpenCitations） | `query`、`rounds`（≤5）、`citation_source` |
 | `scansci_pdf_prepare_queue` | 准备下载队列：`action=verify\|resolve_oa\|build\|full` | `candidates_json`、`query`、`limit` |
-| `scansci_pdf_search` | 关键词/作者搜索（OpenAlex） | `query`/`author`/`author_id`、`limit`、`year_from`、`year_to`、`sort` |
+| `scansci_pdf_search` | 关键词/作者搜索（OpenAlex），带摘要、期刊分区、撤稿标记 | `query`/`author`/`author_id`、`limit`、`year_from`、`year_to`、`sort`（cited/date）、`max_cas_zone`、`max_cas_sub_zone`、`max_jcr_quartile`、`exclude_warning`、`exclude_retracted` |
+| `scansci_pdf_screening` | 保存筛选记录、记录用户选择 | `action`=save/decide/list/show、`question`、`criteria`、`items`、`session`、`selected`、`out_file` |
 | `scansci_pdf_parse_list` | 解析论文列表文件（APA/BibTeX/DOI 列表/表格） | `file_path`（必需） |
 | `scansci_pdf_citation` | 导出引文 | `identifier`（必需）、`format`（bibtex/ris/endnote/metadata） |
 | `scansci_pdf_zotero_push` | 推送已下载论文和 PDF 到 Zotero（自动使用已安装的 zotero-mcp） | `identifier`（必需，需先下载）, `collections`, `tags` |

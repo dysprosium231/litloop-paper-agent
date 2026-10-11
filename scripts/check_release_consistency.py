@@ -9,7 +9,7 @@ Asserts that the version is identical across:
 - zcode-plugin/.zcode-plugin/plugin.json
 - zcode-plugin/marketplace.json
 
-and that the MCP tool surface is still 19 tools and the skill no longer
+and that the MCP tool surface is still 20 tools and the skill no longer
 references retired tool names. Exit code 1 with a diff report on any mismatch.
 
 Usage (from the repo root):
@@ -55,7 +55,7 @@ RETIRED_TOOLS = (
     "scansci_pdf_ezproxy_status",
 )
 
-EXPECTED_TOOL_COUNT = 19
+EXPECTED_TOOL_COUNT = 20
 
 
 def _read_version_sources() -> list[tuple[str, str]]:
