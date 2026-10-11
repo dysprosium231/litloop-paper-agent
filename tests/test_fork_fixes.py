@@ -571,3 +571,25 @@ def test_openalex_cited_sort_matches_title_and_abstract(monkeypatch):
     assert "search" not in seen
     assert "title_and_abstract.search:SiOC  oxidation" in seen["filter"]
     assert seen["api_key"] == "k" and seen["sort"] == "cited_by_count:desc"
+
+
+def test_search_results_get_journal_rank_when_tool_installed(monkeypatch):
+    import sys, types
+    from scansci_pdf import search as s
+    fake = types.ModuleType("litloop_journal_rank")
+    fake.lookup = lambda journal="", issn=None: (
+        {"found": True, "label": "中科院2区", "warnings": [{"year": 2025}]} if issn == ["0272-8842"]
+        else {"found": False, "label": ""})
+    monkeypatch.setitem(sys.modules, "litloop_journal_rank", fake)
+    out = s._add_journal_rank([{"journal": "Ceramics International", "issn": ["0272-8842"]},
+                               {"journal": "Unknown", "issn": []}, {"title": "no journal"}])
+    assert out[0]["journal_rank"] == "中科院2区" and out[0]["journal_warning"] is True
+    assert "journal_rank" not in out[1] and "journal_rank" not in out[2]
+
+
+def test_search_works_without_journal_rank_tool(monkeypatch):
+    import sys
+    from scansci_pdf import search as s
+    monkeypatch.setitem(sys.modules, "litloop_journal_rank", None)  # import fails
+    rows = [{"journal": "X"}]
+    assert s._add_journal_rank(rows) == [{"journal": "X"}]

@@ -129,6 +129,7 @@ def _parse_openalex_works(works: list[dict]) -> list[dict[str, Any]]:
             "oa_url": oa_url,
             "source": "openalex",
             "journal": ((work.get("primary_location") or {}).get("source") or {}).get("display_name") or "",
+            "issn": list(((work.get("primary_location") or {}).get("source") or {}).get("issn") or []),
         })
     return results
 
@@ -290,7 +291,28 @@ def search_papers_v2(
         results.sort(key=lambda x: x.get("cited_by_count", 0), reverse=True)
     elif sort == "publication_date":
         results.sort(key=lambda x: x.get("year") or 0, reverse=True)
-    return results[:limit]
+    return _add_journal_rank(results[:limit])
+
+
+def _add_journal_rank(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Label each result with its journal's partitions when litloop-journal-rank
+    is installed (CAS / JCR / XR zones, warning lists, user catalogues)."""
+    try:
+        from litloop_journal_rank import lookup
+    except ImportError:
+        return results
+    for r in results:
+        if not (r.get("journal") or r.get("issn")):
+            continue
+        try:
+            info = lookup(journal=r.get("journal") or "", issn=r.get("issn") or None)
+        except Exception:  # noqa: BLE001 - a ranking problem must not break search
+            continue
+        if info.get("found"):
+            r["journal_rank"] = info["label"]
+            if info.get("warnings") or (info.get("xr") or {}).get("under_review"):
+                r["journal_warning"] = True
+    return results
 
 
 def _quick_sources() -> list[str]:

@@ -396,6 +396,7 @@ def to_legacy_results(candidates: list[dict[str, Any]], *, limit: int = 20) -> l
             "source": "discovery",
             "abstract": candidate.get("abstract") or "",
             "journal": candidate.get("journal") or "",
+            "issn": [x for x in (candidate.get("issn"), candidate.get("eissn")) if x],
         })
     return results
 
