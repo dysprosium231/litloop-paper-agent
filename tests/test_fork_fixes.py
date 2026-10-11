@@ -400,3 +400,25 @@ def test_race_waits_for_download_after_login(tmp_path, monkeypatch, no_browser_k
     r = sources._run_tiers_parallel(tiers, "10.1/after-login", tmp_path, tmp_path / "o.pdf",
                                     {"hedge_delay_seconds": 0}, False, 0)
     assert r and r["success"]
+
+
+def test_http_pdf_download_has_wall_clock_deadline(tmp_path, monkeypatch):
+    """A trickling server must not hold a racing lane for minutes."""
+    import requests
+    from scansci_pdf import _publisher_strategies_core as core
+
+    class Resp:
+        status_code = 200
+        headers = {"content-type": "application/pdf"}
+        def iter_content(self, chunk_size=8192):
+            yield b"%PDF-1.4\n"
+            while True:
+                time.sleep(0.05)
+                yield b"x" * 10
+
+    monkeypatch.setattr(requests.Session, "get", lambda self, *a, **k: Resp())
+    t = time.monotonic()
+    ok = core._try_http_download("https://example.org/a.pdf", tmp_path / "a.pdf",
+                                 {"download_deadline_seconds": 0.5})
+    assert ok is False and time.monotonic() - t < 3
+    assert not (tmp_path / "a.pdf.part").exists()

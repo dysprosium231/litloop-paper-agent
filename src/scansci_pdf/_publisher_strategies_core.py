@@ -562,7 +562,9 @@ def _visible_browser_download(
     # Publisher-specific SSO config
     sso_cfg = _PUBLISHER_SSO_CONFIG.get(publisher, _PUBLISHER_SSO_CONFIG["_default"])
     sso_link_js = sso_cfg["sso_link_js"]
-    search_selectors = sso_cfg["search_selectors"]
+    # Publisher-specific selectors first, then the shared generic ones.
+    search_selectors = list(sso_cfg["search_selectors"]) + [
+        s for s in _INSTITUTION_SEARCH_SELECTORS if s not in sso_cfg["search_selectors"]]
     pdf_paths = sso_cfg["pdf_paths"](doi)
 
     with _visible_browser(config, publisher) as (context, page):
@@ -671,6 +673,17 @@ def _visible_browser_download(
             log.info(f"   [{publisher}] starting SSO login...")
             page.evaluate(sso_link_js)
             time.sleep(8)
+            if not any(any(x in (pg.url or "").lower() for x in _AUTH_KEYWORDS) for pg in context.pages):
+                # The click went nowhere (e.g. Springer's "Log in via an
+                # institution" is a JS widget): follow the page's SSO/WAYF link.
+                try:
+                    sso_href = page.evaluate(_SSO_LINK_FINDER_JS)
+                    if sso_href:
+                        log.info(f"   [{publisher}] opening SSO link: {sso_href[:80]}")
+                        page.goto(sso_href, wait_until="domcontentloaded", timeout=30000)
+                        time.sleep(5)
+                except Exception as e:
+                    log.info(f"   [{publisher}] SSO link fallback: {e}")
 
             # SSO click may have navigated the page or opened a popup
             # Check all pages in the context for the SSO/IDP page
@@ -706,9 +719,14 @@ def _visible_browser_download(
         print("  登录成功后会自动下载 PDF\n")
 
         login_ok = False
+        # "No tab is on a login page" only means success once one was: if the
+        # SSO click never left the article, it is not a login.
+        seen_auth = already_on_auth
         for i in range(100):
             _user_waiting()
             time.sleep(3)
+            if not seen_auth and i >= 10:
+                break  # ~30 s and the login page never appeared
             # Check ALL pages in context — SSO may happen in any tab
             any_auth = False
             for ctx_page in context.pages:
@@ -722,12 +740,18 @@ def _visible_browser_download(
                         break
                 except Exception:
                     pass
-            if not any_auth:
+            if any_auth:
+                seen_auth = True
+            elif seen_auth:
                 login_ok = True
                 break
 
         if not login_ok:
-            log.info(f"   [{publisher}] visible login timed out")
+            if not seen_auth:
+                log.info(f"   [{publisher}] SSO entry did not reach a login page")
+            else:
+                log.info(f"   [{publisher}] visible login timed out")
+                _set_error("login_abandoned", "retry_login")
             return None
 
         log.info(f"   [{publisher}] login successful, downloading PDF...")
@@ -1094,6 +1118,11 @@ _INSTITUTION_SEARCH_SELECTORS: list[str] = [
     "#searchInstitution", "#bdd-email", 'input[name="institution"]',
     "#institution-search", 'input[placeholder*="institution"]',
     'input[placeholder*="University"]',
+    # Generic fallbacks (e.g. wayf.springernature.com renders an unlabelled
+    # text box under "Find your institution").
+    'input[id*="institution" i]', 'input[name*="institution" i]',
+    'input[aria-label*="institution" i]', 'input[placeholder*="institution" i]',
+    'input[type="search"]', 'main input[type="text"]', 'form input[type="text"]',
 ]
 
 # Shared JS snippets for SSO/institutional login interaction.
@@ -1114,21 +1143,9 @@ _SSO_LINK_FINDER_JS: str = (
     "}"
 )
 
-# Click institution result that matches the given name
-_INSTITUTION_CLICK_JS: str = (
-    "(name) => {"
-    "  const items = document.querySelectorAll("
-    "    '[class*=\"result\"], [class*=\"suggestion\"], [class*=\"federation\"], li, a, button');"
-    "  for (const el of items) {"
-    "    const text = el.textContent || '';"
-    "    if (text.includes(name) && el.offsetParent !== null) {"
-    "      el.click();"
-    "      return text.trim().substring(0, 60);"
-    "    }"
-    "  }"
-    "  return null;"
-    "}"
-)
+# Click institution result that matches the given name (shortest match, see
+# _PICK_INSTITUTION_JS: the first match used to be a container or heading)
+_INSTITUTION_CLICK_JS: str = _PICK_INSTITUTION_JS
 
 # Publisher-specific SSO configuration for visible browser download
 # Each entry: sso_link_js (JS to click institutional login), search_selectors, pdf_paths(doi)
@@ -1368,7 +1385,19 @@ def _try_http_download(
         if not _response_looks_pdf(resp, first):
             return False
 
-        if not _write_pdf_atomic(output_path, first, iterator):
+        # timeout=20 bounds each read, not the transfer: a server that trickles
+        # bytes (seen on link.springer.com) kept this lane — and the whole race —
+        # waiting for minutes. Same wall-clock bound as pdf_utils' streams.
+        deadline = time.monotonic() + float(config.get("download_deadline_seconds", 60))
+
+        def _bounded(chunks):
+            for chunk in chunks:
+                if time.monotonic() > deadline:
+                    log.info(f"   HTTP PDF download too slow, giving up: {pdf_url[:80]}")
+                    raise TimeoutError("stream deadline exceeded")
+                yield chunk
+
+        if not _write_pdf_atomic(output_path, first, _bounded(iterator)):
             return False
         return is_pdf_file(output_path)
     except Exception:
