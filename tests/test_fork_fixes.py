@@ -593,3 +593,59 @@ def test_search_works_without_journal_rank_tool(monkeypatch):
     monkeypatch.setitem(sys.modules, "litloop_journal_rank", None)  # import fails
     rows = [{"journal": "X"}]
     assert s._add_journal_rank(rows) == [{"journal": "X"}]
+
+
+def test_journal_filters_and_drop_counts():
+    from scansci_pdf.search import _filter_by_journal
+    rows = [
+        {"title": "a", "cas_zone": 1, "jcr_quartile": 1},
+        {"title": "b", "cas_zone": 3, "jcr_quartile": 1},
+        {"title": "c"},  # journal not in any table
+        {"title": "d", "cas_zone": 1, "jcr_quartile": 1, "journal_warning": True},
+    ]
+    stats = {}
+    kept = _filter_by_journal(rows, 2, None, True, stats)
+    assert [r["title"] for r in kept] == ["a"]
+    assert stats == {"dropped_unranked": 1, "dropped_below_threshold": 1, "dropped_warning": 1}
+    # warning filter alone keeps unranked journals
+    assert [r["title"] for r in _filter_by_journal(rows, None, None, True, None)] == ["a", "b", "c"]
+
+
+def test_finalize_flags_and_optionally_drops_retracted(monkeypatch):
+    from scansci_pdf import search as s
+    monkeypatch.setattr(s, "_add_journal_rank", lambda rows: rows)
+
+    def fake_flag(rows):
+        for r in rows:
+            if r["doi"] == "10.1/bad":
+                r["retracted"] = True
+    monkeypatch.setattr(s, "_flag_retractions", fake_flag)
+    rows = lambda: [{"doi": "10.1/bad"}, {"doi": "10.1/ok"}]
+    shown = s._finalize(rows(), 5)
+    assert shown[0]["retracted"] is True and len(shown) == 2
+    stats = {}
+    assert s._finalize(rows(), 5, exclude_retracted=True, stats=stats) == [{"doi": "10.1/ok"}]
+    assert stats["dropped_retracted"] == 1
+
+
+def test_retraction_check_is_one_batched_openalex_request(monkeypatch):
+    from scansci_pdf import search as s
+    calls = []
+
+    class Resp:
+        status_code = 200
+        def json(self):
+            return {"results": [{"doi": "https://doi.org/10.1/bad", "is_retracted": True},
+                                {"doi": "https://doi.org/10.1/ok", "is_retracted": False}]}
+
+    class Sess:
+        def get(self, url, params=None, timeout=None):
+            calls.append(params)
+            return Resp()
+
+    monkeypatch.setattr(s, "_plain_session", lambda: Sess())
+    monkeypatch.setattr(s, "load_config", lambda: {})
+    rows = [{"doi": "10.1/BAD"}, {"doi": "10.1/ok"}, {"title": "no doi"}]
+    s._flag_retractions(rows)
+    assert len(calls) == 1 and calls[0]["filter"] == "doi:10.1/bad|10.1/ok"
+    assert rows[0]["retracted"] is True and "retracted" not in rows[1]

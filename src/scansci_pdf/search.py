@@ -242,46 +242,60 @@ def search_papers_v2(
     *,
     author: str | None = None,
     author_id: str | None = None,
+    max_cas_zone: int | None = None,
+    max_jcr_quartile: int | None = None,
+    exclude_warning: bool = False,
+    exclude_retracted: bool = False,
+    stats: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Keyword search via ScanSci Find's 13-source discovery when available.
+    """Keyword search via ScanSci Find's discovery engine when available.
 
     Falls back transparently to the built-in three-source ``search_papers``
     when the scansci-find CLI is missing or the discovery call fails. Author
-    search always stays on the built-in OpenAlex path (ScanSci Find exposes
-    no author-specific endpoint through its CLI).
+    search always stays on the built-in OpenAlex path.
 
-    Result fields are unchanged (doi/title/authors/year/cited_by_count/is_oa/
-    oa_url/source) so existing callers are unaffected.
+    Every result is labelled with its journal's partitions (when
+    litloop-journal-rank is installed) and a retraction flag. The journal
+    filters (max_cas_zone=2 keeps CAS zones 1-2, max_jcr_quartile=1 keeps Q1,
+    exclude_warning drops warning-listed journals) drop records whose journal
+    is unranked as well; ``stats`` receives how many were dropped and why.
     """
     sort = _normalize_sort(sort)
+    filtering = bool(max_cas_zone or max_jcr_quartile or exclude_warning or exclude_retracted)
+    pool = limit * 3 if filtering else limit
+    results = _collect(query, pool, limit, year_from, year_to, sort, author, author_id)
+    return _finalize(results, limit, max_cas_zone=max_cas_zone, max_jcr_quartile=max_jcr_quartile,
+                     exclude_warning=exclude_warning, exclude_retracted=exclude_retracted, stats=stats)
+
+
+def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) -> list[dict[str, Any]]:
     if author_id or author:
         return search_papers(
-            query, limit=limit, year_from=year_from, year_to=year_to, sort=sort,
+            query, limit=pool, year_from=year_from, year_to=year_to, sort=sort,
             author=author, author_id=author_id,
         )
     if not query:
         return []
-
     try:
         from .discovery import find_cli_available, search as discovery_search, to_legacy_results
         if not find_cli_available():
-            return search_papers(query, limit=limit, year_from=year_from, year_to=year_to, sort=sort)
+            return search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort)
         with tempfile.TemporaryDirectory(prefix="scansci_find_") as tmp:
             payload = discovery_search(
-                query, tmp, depth="quick", limit=max(limit * 3, 30),
+                query, tmp, depth="quick", limit=max(pool * 2, 30),
                 year_from=year_from, year_to=year_to, sources=_quick_sources(),
             )
-            results = to_legacy_results(payload.get("candidates") or [], limit=limit * 3)
+            results = to_legacy_results(payload.get("candidates") or [], limit=pool * 3)
         logger.info("search: discovery engine returned %d results", len(results))
     except Exception as exc:  # noqa: BLE001 - degrade gracefully to 3-source search
         logger.warning("search: discovery engine failed (%s), falling back to 3-source", exc)
-        return search_papers(query, limit=limit, year_from=year_from, year_to=year_to, sort=sort)
+        return search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort)
 
     if sort == "cited_by_count":
         # The relevance pool holds only the top ~30 matches; the field's most
         # cited papers are often outside it, so ask OpenAlex for those too.
         seen = {str(r.get("doi") or "").lower() for r in results if r.get("doi")}
-        for extra in _search_openalex(query, max(limit * 2, 25), year_from, year_to, "cited_by_count"):
+        for extra in _search_openalex(query, max(pool * 2, 25), year_from, year_to, "cited_by_count"):
             if extra["doi"].lower() not in seen:
                 seen.add(extra["doi"].lower())
                 extra["_matched"] = True  # OpenAlex matched it in title/abstract
@@ -291,7 +305,46 @@ def search_papers_v2(
         results.sort(key=lambda x: x.get("cited_by_count", 0), reverse=True)
     elif sort == "publication_date":
         results.sort(key=lambda x: x.get("year") or 0, reverse=True)
-    return _add_journal_rank(results[:limit])
+    return results
+
+
+def _finalize(results: list[dict[str, Any]], limit: int, *, max_cas_zone=None, max_jcr_quartile=None,
+              exclude_warning=False, exclude_retracted=False,
+              stats: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    filtering = bool(max_cas_zone or max_jcr_quartile or exclude_warning or exclude_retracted)
+    # Label only what can be shown, unless a filter needs the whole pool.
+    candidates = results if filtering else results[:limit]
+    _add_journal_rank(candidates)
+    if max_cas_zone or max_jcr_quartile or exclude_warning:
+        candidates = _filter_by_journal(candidates, max_cas_zone, max_jcr_quartile,
+                                        exclude_warning, stats)
+    _flag_retractions(candidates[: limit * 2] if exclude_retracted else candidates[:limit])
+    if exclude_retracted:
+        kept = [r for r in candidates if not r.get("retracted")]
+        if stats is not None:
+            stats["dropped_retracted"] = len(candidates) - len(kept)
+        candidates = kept
+    return candidates[:limit]
+
+
+def _filter_by_journal(results, max_cas_zone, max_jcr_quartile, exclude_warning, stats):
+    kept, dropped = [], {"unranked": 0, "below_threshold": 0, "warning": 0}
+    for r in results:
+        if exclude_warning and r.get("journal_warning"):
+            dropped["warning"] += 1
+            continue
+        if max_cas_zone or max_jcr_quartile:
+            cas, q = r.get("cas_zone"), r.get("jcr_quartile")
+            if (max_cas_zone and cas is None) or (max_jcr_quartile and q is None):
+                dropped["unranked"] += 1
+                continue
+            if (max_cas_zone and cas > max_cas_zone) or (max_jcr_quartile and q > max_jcr_quartile):
+                dropped["below_threshold"] += 1
+                continue
+        kept.append(r)
+    if stats is not None:
+        stats.update({f"dropped_{k}": v for k, v in dropped.items()})
+    return kept
 
 
 def _add_journal_rank(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -308,12 +361,43 @@ def _add_journal_rank(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
             info = lookup(journal=r.get("journal") or "", issn=r.get("issn") or None)
         except Exception:  # noqa: BLE001 - a ranking problem must not break search
             continue
-        if info.get("found"):
-            r["journal_rank"] = info["label"]
-            if info.get("warnings") or (info.get("xr") or {}).get("under_review"):
-                r["journal_warning"] = True
+        if not info.get("found"):
+            continue
+        r["journal_rank"] = info["label"]
+        if (info.get("cas") or {}).get("zone"):
+            r["cas_zone"] = info["cas"]["zone"]
+        quartile = (info.get("jcr") or {}).get("best_quartile") or ""
+        if quartile[1:].isdigit():
+            r["jcr_quartile"] = int(quartile[1:])
+        if info.get("warnings") or (info.get("xr") or {}).get("under_review"):
+            r["journal_warning"] = True
     return results
 
+
+def _flag_retractions(results: list[dict[str, Any]]) -> None:
+    """Mark retracted papers (OpenAlex is_retracted, fed by Retraction Watch).
+
+    One batched request for up to 50 DOIs; a failure leaves results unflagged.
+    """
+    dois = [str(r["doi"]).lower() for r in results if r.get("doi")][:50]
+    if not dois:
+        return
+    params: dict[str, Any] = {"filter": "doi:" + "|".join(dois), "select": "doi,is_retracted",
+                              "per_page": 50}
+    key = str(load_config().get("openalex_api_key") or "").strip()
+    if key:
+        params["api_key"] = key
+    try:
+        resp = _plain_session().get("https://api.openalex.org/works", params=params,
+                                    timeout=_SEARCH_TIMEOUT)
+        works = resp.json().get("results", []) if resp.status_code == 200 else []
+    except Exception:  # noqa: BLE001
+        return
+    retracted = {str(w.get("doi") or "").lower().replace("https://doi.org/", "")
+                 for w in works if w.get("is_retracted")}
+    for r in results:
+        if str(r.get("doi") or "").lower() in retracted:
+            r["retracted"] = True
 
 def _quick_sources() -> list[str]:
     """Sources for an interactive search.

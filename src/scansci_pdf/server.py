@@ -233,8 +233,13 @@ def scansci_pdf_search(
     author: str | None = None,
     author_id: str | None = None,
     out_file: str | None = None,
+    max_cas_zone: int | None = None,
+    max_jcr_quartile: int | None = None,
+    exclude_warning: bool = False,
+    exclude_retracted: bool = False,
 ) -> str:
-    """Search papers by English keywords or author (OpenAlex; year filters; sort=cited|date). out_file writes a queue for scansci_pdf_batch_download."""
+    """Search papers by English keywords/author; sort=cited|date; filter by journal (max_cas_zone=2: CAS 1-2) or drop warning/retracted. out_file queues results."""
+    stats: dict = {}
     results = search_papers(
         query,
         limit=min(limit, 50),
@@ -243,7 +248,13 @@ def scansci_pdf_search(
         sort=sort,
         author=author,
         author_id=author_id,
+        max_cas_zone=max_cas_zone,
+        max_jcr_quartile=max_jcr_quartile,
+        exclude_warning=exclude_warning,
+        exclude_retracted=exclude_retracted,
+        stats=stats,
     )
+    filtered = {k: v for k, v in stats.items() if v}
     if out_file and results:
         from .pipeline import QueueEntry, predict_channel, write_queue
 
@@ -258,10 +269,12 @@ def scansci_pdf_search(
         ]
         path = write_queue(qe, out_file)
         return json.dumps(
-            {"results": results, "queue_file": str(path), "queued": len(qe)},
+            {"results": results, "queue_file": str(path), "queued": len(qe),
+             **({"filtered": filtered} if filtered else {})},
             ensure_ascii=False,
         )
-    return json.dumps({"results": results}, ensure_ascii=False)
+    return json.dumps({"results": results, **({"filtered": filtered} if filtered else {})},
+                      ensure_ascii=False)
 
 
 def scansci_pdf_plan_search(
