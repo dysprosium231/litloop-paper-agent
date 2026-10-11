@@ -844,9 +844,13 @@ class PublisherBatchDownloader:
                     text: textOf(el).slice(0, 180),
                     href: ((el.href || el.getAttribute('href') || '') + '').toLowerCase().slice(0, 240)
                   });
+                  const here = location.href.toLowerCase().split('#')[0];
                   const matches = (el) => {
                     const text = textOf(el);
                     const href = ((el.href || el.getAttribute('href') || el.getAttribute('formaction') || '') + '').toLowerCase();
+                    // In-page anchors ("skip to main content" on Science's own
+                    // ssostart page) point back at this very page: not an entry.
+                    if (href.includes('#') && href.split('#')[0] === here) return false;
                     return exactMarkers.some(marker => text.includes(marker) || href.includes(marker))
                         || markers.some(marker => text.includes(marker) || href.includes(marker))
                         || href.includes('ssostart');

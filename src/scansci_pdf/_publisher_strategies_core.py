@@ -1839,6 +1839,10 @@ def _browser_download(
         time.sleep(3)
         from .browser_engine import _resolve_tab
         from .browser_pdf import find_page_pdf_link, wait_url_stable
+        # The page offered a PDF link but the PDF itself was refused (bounced
+        # back to the article): that is a paywall even when the page's text
+        # does not say so — go to the institutional login in this window.
+        pdf_refused = False
         _page = _resolve_tab(tab_id)
         if _page is not None:
             settled_url = wait_url_stable(_page)
@@ -1858,6 +1862,7 @@ def _browser_download(
                     if is_pdf_file(output_path):
                         close_tab(tab_id, config)
                         return success(doi, output_path, f"{publisher}(Browser)")
+                pdf_refused = True
 
         # Detect meta-refresh redirects (e.g., linkinghub.elsevier.com)
         # Wait longer if we're on a redirect page
@@ -1938,10 +1943,14 @@ def _browser_download(
                         if is_pdf_file(output_path):
                             close_tab(tab_id, config)
                             return success(doi, output_path, f"{publisher}(Browser)")
+                    pdf_refused = True
+                    wait_url_stable(_page)  # the refused PDF navigates back to the article
                 html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or html
 
         # Check for paywall AFTER challenge resolution
-        if _detect_paywall(html):
+        if pdf_refused:
+            log.info(f"   [{publisher}] PDF refused — no access with the current session")
+        if pdf_refused or _detect_paywall(html):
             log.info(f"   [{publisher}] paywall detected — trying institutional login...")
             if _try_institutional_login(tab_id, config, publisher):
                 # Login succeeded. The IdP may return to the site's homepage, so
