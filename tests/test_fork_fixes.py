@@ -6,6 +6,7 @@ all run offline with fakes — no browser, no network.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -110,7 +111,7 @@ def test_rename_removes_duplicate_source_copies(tmp_path, monkeypatch):
         (tmp_path / f"{safe}_{label}.pdf").write_bytes(b"%PDF")
     final = tmp_path / "Wu2024_Bridging.pdf"
     monkeypatch.setattr(citation, "fetch_metadata", lambda d, c: {"title": ["x"]})
-    monkeypatch.setattr(sources, "rename_pdf", lambda p, m: Path(p).rename(final) or final)
+    monkeypatch.setattr(sources, "rename_pdf", lambda p, m, **kw: Path(p).rename(final) or final)
     monkeypatch.setattr(sources, "_update_doi_index", lambda *a, **k: None)
     result = {"success": True, "file": str(winner)}
     sources._auto_rename(result, doi, {"auto_rename": True}, doi=doi, target_dir=tmp_path)
@@ -688,3 +689,31 @@ def test_retraction_flags_prefer_local_retraction_watch(monkeypatch):
     assert rows[0]["retracted"] is True and rows[0]["notices"][0]["reasons"] == ["Paper Mill"]
     assert rows[1]["concern"] is True and "retracted" not in rows[1]
     assert rows[2] == {"doi": "10.1/ok"}
+
+
+# ---------------------------------------------------------------- same-name cache hits
+
+def _pdf_with_text(path, text):
+    import pymupdf
+    doc = pymupdf.open()
+    doc.new_page().insert_text((72, 72), text)
+    doc.save(path)
+    doc.close()
+
+
+def test_name_match_requires_doi_in_pdf(tmp_path):
+    pdf = tmp_path / "Jiang2024_Lightweight.pdf"
+    _pdf_with_text(pdf, "Chemical Engineering Journal\nhttps://doi.org/10.1016/j.cej.2024.\n148878")
+    assert sources._pdf_mentions_doi(pdf, "10.1016/j.cej.2024.148878")
+    assert not sources._pdf_mentions_doi(pdf, "10.1016/j.cej.2024.157656")
+
+
+def test_index_claims_block_other_dois(tmp_path):
+    pdf = tmp_path / "Jiang2024_Lightweight.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    (tmp_path / ".doi_index.json").write_text(json.dumps(
+        {"10.1016/j.cej.2024.148878": {"file": str(pdf), "source": "x", "strategy": "", "ts": 0}}),
+        encoding="utf-8")
+    claimed = sources._files_claimed_by_other_dois(tmp_path, "10.1016/j.cej.2024.157656")
+    assert sources._norm_path(pdf) in claimed
+    assert not sources._files_claimed_by_other_dois(tmp_path, "10.1016/j.cej.2024.148878")

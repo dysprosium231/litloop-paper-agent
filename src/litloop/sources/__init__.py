@@ -788,6 +788,36 @@ def _index_strategy_compatible(entry: dict[str, Any], config: dict[str, Any]) ->
     return recorded == current
 
 
+def _norm_path(p: Path | str) -> str:
+    return str(Path(p).resolve()).lower()
+
+
+def _files_claimed_by_other_dois(target_dir: Path, doi: str) -> set[str]:
+    """Files the DOI index already assigns to a different DOI."""
+    try:
+        idx = json.loads((target_dir / ".doi_index.json").read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    claimed = set()
+    for key, raw in idx.items():
+        entry = _index_entry(raw)
+        if key != doi and entry and entry.get("file"):
+            claimed.add(_norm_path(entry["file"]))
+    return claimed
+
+
+def _pdf_mentions_doi(path: Path, doi: str, pages: int = 3) -> bool:
+    """True when the DOI appears in the first pages' text (publisher PDFs print it)."""
+    try:
+        import pymupdf
+        with pymupdf.open(path) as pdf:
+            text = "".join(pdf[i].get_text() for i in range(min(pages, pdf.page_count)))
+    except Exception:
+        return False
+    flat = "".join(text.lower().split())
+    return doi.lower() in flat
+
+
 def _update_doi_index(
     target_dir: Path,
     doi: str,
@@ -842,7 +872,7 @@ def _auto_rename(result: dict[str, Any], identifier: str, config: dict[str, Any]
     _doi = doi or result.get("doi", identifier)
     metadata = fetch_metadata(_doi, config)
     if metadata:
-        new_path = rename_pdf(file_path, metadata)
+        new_path = rename_pdf(file_path, metadata, doi=_doi)
         if new_path and new_path != file_path:
             result["file"] = str(new_path)
             result["renamed"] = True
@@ -1127,11 +1157,16 @@ def _download_impl(
     from ..citation import fetch_metadata
     metadata = fetch_metadata(doi, config)
     if metadata:
-        expected_name = rename_pdf_generate_filename(metadata)
+        expected_name = rename_pdf_generate_filename(metadata, doi=doi)
         if expected_name:
-            for suffix in ("", "_1", "_2", "_3", "_4", "_5", "_6", "_7", "_8", "_9"):
+            # Generated names can collide across papers, so a name match
+            # alone is not proof: skip files the index gives to
+            # another DOI and require this DOI inside the PDF.
+            claimed = _files_claimed_by_other_dois(target_dir, doi)
+            for suffix in ("", "_2", "_3", "_4", "_5"):
                 candidate = target_dir / f"{expected_name}{suffix}.pdf"
-                if candidate.exists():
+                if (candidate.exists() and _norm_path(candidate) not in claimed
+                        and _pdf_mentions_doi(candidate, doi)):
                     log.info(f"   Found existing file: {candidate.name}")
                     result = {
                         "success": True, "identifier": identifier,

@@ -144,6 +144,33 @@ def test_zotero_bridge_parses_item_and_attachment_keys(monkeypatch):
     assert calls["att"]["item_key"] == "QWER5678"
 
 
+def test_zotero_bridge_flags_attachment_without_file(monkeypatch):
+    """zotero-mcp skips upload when the filename exists; an empty record is not a PDF."""
+    import types, sys
+    from litloop import zotero_bridge
+
+    write = types.SimpleNamespace(
+        add_item=lambda **kw: "Already in library:\n\nItem key: `QWER5678`\n",
+        attach_file=lambda **kw: "Attachment already present on `QWER5678`: a.pdf (key `EMPTY123`) — not re-uploaded.",
+    )
+    tools = types.ModuleType("zotero_mcp.tools")
+    tools.write = write
+    cli = types.ModuleType("zotero_mcp.cli_standalone")
+    cli.CLIContext = lambda: None
+    client = types.ModuleType("zotero_mcp.client")
+    client.get_zotero_client = lambda: types.SimpleNamespace(
+        item=lambda key: {"data": {"key": key, "filename": "a.pdf", "md5": None}})
+    monkeypatch.setitem(sys.modules, "zotero_mcp", types.ModuleType("zotero_mcp"))
+    monkeypatch.setitem(sys.modules, "zotero_mcp.tools", tools)
+    monkeypatch.setitem(sys.modules, "zotero_mcp.cli_standalone", cli)
+    monkeypatch.setitem(sys.modules, "zotero_mcp.client", client)
+
+    out = zotero_bridge.run({"identifier": "10.1/x", "file": "C:/a.pdf"})
+
+    assert out["pdf_attached"] is False
+    assert "EMPTY123" in out["attach_message"] and "attachment_key" not in out
+
+
 def _isolate_discovery(monkeypatch, tmp_path):
     import importlib.util
     monkeypatch.setattr(zotero, "_DISCOVERED", None)

@@ -22,7 +22,7 @@ LitLoop 是一个 MCP 服务器加命令行工具，装进 Claude Code、Codex �
 
 - **检索：结果少而准。** 同时查 OpenAlex、Semantic Scholar、Crossref，合并去重，去掉离题结果。可以按真实被引数排序，年份过滤在数据源一侧完成。每条结果带清洗过的完整摘要，并标出撤稿和关注声明。
 - **筛选：AI 给理由，你来拍板。** Agent 读摘要，把每篇评为 高 / 中 / 低 / 不相关，并写一句理由。你选定要哪些，选择记录存在本地，可以直接生成下载队列。
-- **下载：自动选最快的路。** 开放获取直链、预印本、出版商 API、你学校的机构通道同时竞速，先成功的那条胜出。论文按 `作者_年份_标题.pdf` 命名。支持 100 多所高校的 WebVPN、CARSI 联邦认证、EZProxy，以及 Elsevier API 快速通道。
+- **下载：自动选最快的路。** 开放获取直链、预印本、出版商 API、你学校的机构通道同时竞速，先成功的那条胜出。论文按 `作者年份_标题前几个词_DOI.pdf` 命名，文件名和论文一一对应。支持 100 多所高校的 WebVPN、CARSI 联邦认证、EZProxy，以及 Elsevier API 快速通道。
 - **归档：直接进 Zotero。** 按 DOI 建条目，库里已有就复用，PDF 作为附件上传，配了 WebDAV 就存到 WebDAV。
 
 登录都在你自己的浏览器里完成，密码不经过 LitLoop。
@@ -305,7 +305,7 @@ zotero-mcp 需要写入权限，要配好 Web API Key（`zotero-mcp setup`）。
 | 配置项 | 默认值 | 说明 |
 |---|---:|---|
 | `output_dir` | `~/.litloop/papers` | PDF 保存目录 |
-| `auto_rename` | `true` | 按作者、年份、标题重命名 |
+| `auto_rename` | `true` | 按作者、年份、标题和 DOI 重命名 |
 | `download_strategy` | `fastest` | 可选 `fastest`、`oa_first`、`legal_only`（不用 Sci-Hub/LibGen）、`scihub_first`、`scihub_only` |
 | `scihub_enabled` | `true` | 是否使用 Sci-Hub/LibGen 类来源 |
 | `search_fill_abstracts` | `true` | 检索结果自动补全摘要 |

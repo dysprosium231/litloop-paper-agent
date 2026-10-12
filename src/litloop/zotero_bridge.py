@@ -79,13 +79,28 @@ def run(req: dict) -> dict:
     if file_path:
         att = write.attach_file(item_key=m.group(1), file_path=file_path, ctx=ctx)
         ok = not att.lstrip().startswith("Error") and "FAILED" not in att
+        k = _ATT_KEY_RE.search(att)
+        if ok and k and "already present" in att and not _has_stored_file(k.group(1)):
+            # zotero-mcp dedupes by filename only; an upload that was cut off
+            # leaves an attachment record with no file behind it.
+            ok = False
+            att = (f"Attachment `{k.group(1)}` exists but holds no file (an earlier upload "
+                   "was interrupted). Move it to the trash and push again.")
         result["pdf_attached"] = ok
         result["attach_message"] = att.strip()[:500]
-        if ok:
-            k = _ATT_KEY_RE.search(att)
-            if k:
-                result["attachment_key"] = k.group(1)
+        if ok and k:
+            result["attachment_key"] = k.group(1)
     return result
+
+
+def _has_stored_file(attachment_key: str) -> bool:
+    """Whether Zotero has file content for the attachment (an md5 is recorded)."""
+    try:
+        from zotero_mcp.client import get_zotero_client
+        data = get_zotero_client().item(attachment_key).get("data", {})
+    except Exception:
+        return True  # cannot tell: keep zotero-mcp's verdict
+    return bool(data.get("md5"))
 
 
 def main() -> int:
