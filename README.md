@@ -6,10 +6,13 @@
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0F766E?style=flat-square" /></a>
   <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/MCP-20%20tools-111827?style=flat-square" /></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square" />
+  <img alt="Status" src="https://img.shields.io/badge/%E7%8A%B6%E6%80%81-%E5%BC%80%E5%8F%91%E4%B8%AD-F59E0B?style=flat-square" />
 
-  [它能做什么](#它能做什么) · [安装](#安装) · [怎么用](#怎么用) · [检索与筛选](#检索与筛选) · [下载与机构通道](#下载与机构通道) · [Zotero](#zotero) · [路线图](#路线图)
+  [它能做什么](#它能做什么) · [安装](#安装) · [怎么用](#怎么用) · [检索与筛选](#检索与筛选) · [下载与机构通道](#下载与机构通道) · [Zotero](#zotero) · [项目状态](#项目状态)
 </div>
 
+> **项目还在开发中。** 检索、筛选、下载、存进 Zotero 这条流程已经能用，并在真实课题上验收过；深度检索、系统综述、分析归纳还没做。详见[项目状态](#项目状态)。
+>
 > LitLoop 是 [Rimagination/scansci-pdf](https://github.com/Rimagination/scansci-pdf)（Apache-2.0）的独立衍生项目，由 [dysprosium231](https://github.com/dysprosium231) 维护，与原作者无隶属关系。下载和机构通道的大部分能力来自原项目，LitLoop 的改动见 [NOTICE](NOTICE)。
 
 ## 它能做什么
@@ -23,7 +26,7 @@ LitLoop 是一个 MCP 服务器加命令行工具，装进 Claude Code、Codex �
 - **检索：结果少而准。** 同时查 OpenAlex、Semantic Scholar、Crossref，合并去重，去掉离题结果。可以按真实被引数排序，年份过滤在数据源一侧完成。每条结果带清洗过的完整摘要，并标出撤稿和关注声明。
 - **筛选：AI 给理由，你来拍板。** Agent 读摘要，把每篇评为 高 / 中 / 低 / 不相关，并写一句理由。你选定要哪些，选择记录存在本地，可以直接生成下载队列。
 - **下载：自动选最快的路。** 开放获取直链、预印本、出版商 API、你学校的机构通道同时竞速，先成功的那条胜出。论文按 `作者年份_标题前几个词_DOI.pdf` 命名，文件名和论文一一对应。支持 100 多所高校的 WebVPN、CARSI 联邦认证、EZProxy，以及 Elsevier API 快速通道。
-- **归档：直接进 Zotero。** 按 DOI 建条目，库里已有就复用，PDF 作为附件上传，配了 WebDAV 就存到 WebDAV。
+- **归档：直接进 Zotero。** 按 DOI 建条目，库里已有就复用，PDF 直接写进你本机的 Zotero，同步交给 Zotero 自己。
 
 登录都在你自己的浏览器里完成，密码不经过 LitLoop。
 
@@ -283,8 +286,9 @@ litloop_login(kind="ezproxy")
 
 `litloop_zotero_push` 交给 [zotero-mcp](https://github.com/54yyyu/zotero-mcp)（0.14.1 及以上）完成：
 - 按 DOI 用 Crossref 元数据建条目，库里已有就复用；
-- PDF 作为附件上传，配了 WebDAV 就存到 WebDAV；
-- 可以指定已有的分类（`collections`）和标签（`tags`）。
+- PDF 作为附件挂到条目上；
+- 可以指定已有的分类（`collections`）和标签（`tags`）；
+- 推送后会核对附件确实有文件，上传中断留下的空附件会报出来，不会当作成功。
 
 如果你已经在 Claude Code 或 Claude Desktop 里装了 zotero-mcp，什么都不用配。LitLoop 会自己找到它，并沿用它的 API Key 和 WebDAV 设置。查找顺序：
 
@@ -293,7 +297,11 @@ litloop_login(kind="ezproxy")
 3. Claude Code（`~/.claude.json`、项目 `.mcp.json`）或 Claude Desktop 配置里名字或命令含 `zotero` 的服务器，连同它的环境变量；
 4. PATH 上的 `zotero-mcp`，以及用 `uv tool` 或 pipx 装的 zotero-mcp。
 
-zotero-mcp 需要写入权限，要配好 Web API Key（`zotero-mcp setup`）。都找不到时，会退回 Zotero Web API（`zotero_api_key` + `zotero_library_id`）。这条路只建条目，**不上传 PDF**。
+**推荐用本地写入。** Zotero 7 以上开着时，让 zotero-mcp 申请一次本地写入权限：调用 `zotero_authorize_local_writes`，在 Zotero 弹出的对话框里点「始终允许」。之后条目和 PDF 直接写进你电脑上的 Zotero，一篇几秒钟；同步到 Zotero 云端或 WebDAV 交给 Zotero 自己完成。
+
+没有授权本地写入时，zotero-mcp 走 Zotero 网络接口（需要 `zotero-mcp setup` 配好 Web API Key），PDF 直接传到 WebDAV。从国内上传大文件到境外的 WebDAV 又慢又容易中断，所以不推荐。
+
+都找不到 zotero-mcp 时，会退回 Zotero Web API（`zotero_api_key` + `zotero_library_id`）。这条路只建条目，**不上传 PDF**。
 
 ## 配置
 
@@ -349,14 +357,41 @@ ACS 出现 “IP Address Blocked” 时，封禁在出版商那边，代码解�
 | 以前能下的站点突然出 Cloudflare | `litloop browser-doctor`，按提示更新浏览器组件 |
 | 想中止正在进行的下载 | `litloop_cancel` |
 
-## 路线图
+## 项目状态
 
-LitLoop 的目标是把文献工作做成一个闭环。待办事项见 [TODO.md](TODO.md)，主要方向：
+2026 年 10 月：开发中，维护者自己在用，也欢迎试用和反馈。每次改动都在 Linux、Windows、macOS × Python 3.11–3.13 上跑全部测试。
 
-- 分析归纳：读全文、抽取要点、做综述草稿；
-- 中文文献来源；
-- 浏览器副本跟随本机 Chrome 自动更新，以及新版本提醒；
-- 期刊分区插件接入机构订阅数据后公开。
+### 已经可用
+
+在真实课题（先驱体陶瓷 SiBCN 的隔热与吸波）上完整跑过“检索 → 筛选 → 下载 → Zotero”：
+
+| 环节 | 状态 |
+|---|---|
+| 检索 | 三个数据源合并去重；过滤离题结果和垃圾记录；预印本并入正式版；补全并清洗摘要；标出撤稿和关注声明；可按被引数或年份排序 |
+| 筛选 | AI 逐篇给相关度和理由，你按编号挑选，记录存在本地，可直接生成下载队列 |
+| 下载 | 多来源竞速；Elsevier API、WebVPN、CARSI、EZProxy；文件名带 DOI，不会把一篇论文的 PDF 当成另一篇 |
+| Zotero | 本地写入，几秒一篇；会检查附件是不是空的 |
+
+### 已知限制
+
+- 一次检索约 10–25 秒，还没达到 15 秒以内的目标。
+- 每组检索词只看前 10–20 条候选。要查全，目前得换几组检索词多搜几次，这正是下一阶段要解决的。
+- 期刊分区和本地撤稿库依赖配套插件 litloop-journal-rank，它还没公开；没装时检索照常可用，只是没有分区信息，撤稿标记改用 OpenAlex 的数据。
+- 还不支持中文文献（知网、万方）。
+- 浏览器用的是本机 Chrome 的副本，Chrome 升级后要手动重新复制。
+- ZCode 插件里的技能文档比主版本旧，缺少筛选流程。
+
+### 待开发
+
+按计划顺序（检索部分的设计见 [docs/SEARCH_SPEC.md](docs/SEARCH_SPEC.md)，零散待办见 [TODO.md](TODO.md)）：
+
+1. **深度检索**：把一个课题拆成多组英文检索词并行检索，合并去重并记录每一轮；再沿核心文章的参考文献和施引文献往外扩展，直到新增很少为止。验收标准：你指定的 5–10 篇核心文章全部找到。
+2. **系统综述支持**：记录每个数据源的检索量、去重数、纳入和排除的数量及理由，生成 PRISMA 式统计，中断后可以接着做。
+3. **定期追踪**：保存检索式，定期运行，只推送上次之后的新文章。
+4. **分析归纳**：PDF 转 Markdown 已经有了。下一步是从全文抽取要点、做对比表、起草综述，完成整个闭环。
+5. **中文文献**：接入知网、万方。
+6. **维护类**：浏览器副本跟随本机 Chrome 自动更新；LitLoop、zotero-mcp 有新版本时提醒。
+7. **期刊分区插件公开**：分区数据有版权，公开前要改成由用户自己提供数据。
 
 ## 致谢
 
