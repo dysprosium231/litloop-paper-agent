@@ -50,6 +50,22 @@ def test_tool_descriptions_are_diet_sized():
         )
 
 
+def test_tool_docstrings_fit_before_dedent():
+    """Python < 3.13 keeps docstring indentation, so the raw text is what
+    clients see there; measure it so a 3.13 run catches overruns too."""
+    import ast
+    import inspect
+
+    import litloop.server as server
+
+    tree = ast.parse(inspect.getsource(server))
+    names = {t.name for t in asyncio.run(mcp_app.list_tools())}
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name in names:
+            raw = ast.get_docstring(node, clean=False) or ""
+            assert len(raw) <= 200, f"{node.name}: {len(raw)} chars before dedent"
+
+
 def test_login_dispatch_unknown_kind_lists_allowed():
     out = json.loads(litloop_login(kind="nope"))
     assert "error" in out and set(out["allowed"]) == {

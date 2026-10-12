@@ -137,6 +137,7 @@ class TestDiscoveryGate:
             raise subprocess.TimeoutExpired(cmd, timeout=kw.get("timeout", 45))
 
         monkeypatch.setattr(discovery.subprocess, "run", slow_run)
+        monkeypatch.setattr(discovery, "_which_cli", lambda: "scansci-find")
         with pytest.raises(DiscoveryTimeoutError) as excinfo:
             discovery.verify([{"doi": "10.1000/x"}])
         err = excinfo.value
@@ -152,6 +153,7 @@ class TestDiscoveryGate:
             raise subprocess.TimeoutExpired(cmd, timeout=kw.get("timeout", 45))
 
         monkeypatch.setattr(discovery.subprocess, "run", slow_run)
+        monkeypatch.setattr(discovery, "_which_cli", lambda: "scansci-find")
         payload = json.loads(server.litloop_verify_identifiers('[{"doi": "10.1000/x"}]'))
         assert payload.get("stage") == "discovery"
         assert payload["timeout_seconds"] == discovery.LIGHT_TIMEOUT

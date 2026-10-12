@@ -935,12 +935,12 @@ def litloop_zotero_push(
     collections: list[str] | None = None,
     tags: list[str] | None = None,
 ) -> str:
-    """Push a downloaded paper + PDF to Zotero (via zotero-mcp if configured).
+    """Push a downloaded paper and its PDF to Zotero (via zotero-mcp).
 
     Args:
-        identifier: DOI or arXiv ID of a downloaded paper
+        identifier: DOI/arXiv ID of a downloaded paper
         collections: existing collections
-        tags: tags to add
+        tags: tags
     """
     from .identifiers import normalize_doi
     from .zotero import push_to_zotero
