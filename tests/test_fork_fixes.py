@@ -717,3 +717,11 @@ def test_index_claims_block_other_dois(tmp_path):
     claimed = sources._files_claimed_by_other_dois(tmp_path, "10.1016/j.cej.2024.157656")
     assert sources._norm_path(pdf) in claimed
     assert not sources._files_claimed_by_other_dois(tmp_path, "10.1016/j.cej.2024.148878")
+
+
+def test_cli_downloads_default_to_the_configured_papers_dir(monkeypatch, tmp_path):
+    from litloop import main as cli
+    import litloop.config as cfg
+    monkeypatch.setattr(cfg, "load_config", lambda: {"output_dir": str(tmp_path / "papers")})
+    assert cli._default_output_dir("") == str(tmp_path / "papers")
+    assert cli._default_output_dir("D:/x") == "D:/x"

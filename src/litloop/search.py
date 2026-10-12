@@ -305,7 +305,7 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
                 seen.add(extra["doi"].lower())
                 extra["_matched"] = True  # OpenAlex matched it in title/abstract
                 results.append(extra)
-    results = _dedupe_titles(_drop_off_topic(results, query))
+    results = _dedupe_titles(_require_compounds(_drop_off_topic(_drop_junk_titles(results), query), query))
     if sort == "cited_by_count":
         results.sort(key=lambda x: x.get("cited_by_count", 0), reverse=True)
     elif sort == "publication_date":
@@ -330,13 +330,91 @@ def _finalize(results: list[dict[str, Any]], limit: int, *, max_cas_zone=None, m
         if stats is not None:
             stats["dropped_retracted"] = len(candidates) - len(kept)
         candidates = kept
-    shown = candidates[:limit]
+    # A few spares: merging a preprint into its published version, which is
+    # only recognisable once both abstracts are in, must not shorten the list.
+    shown = candidates[: limit + 3]
     # What the screener reads: clean abstracts, missing ones fetched
     # (Semantic Scholar -> Scopus -> Crossref), short author lists.
     from .abstracts import fill_abstracts, trim_authors
     trim_authors(shown)
     fill_abstracts(shown, load_config())
-    return shown
+    shown = _merge_preprints(shown, stats)
+    _note_unverified_venues(shown)
+    return shown[:limit]
+
+
+_PREPRINT_DOI = re.compile(
+    r"^10\.(2139/ssrn|21203/rs\.|1101/|20944/preprints|48550/arxiv|31219/osf|26434/chemrxiv"
+    r"|22541/au|36227/techrxiv|31224/)", re.I)
+
+
+def _is_preprint(r: dict[str, Any]) -> bool:
+    doi = str(r.get("doi") or "")
+    return bool(_PREPRINT_DOI.match(doi)) or (not doi and bool(r.get("arxiv_id")))
+
+
+def _surname(r: dict[str, Any]) -> str:
+    authors = r.get("authors") or []
+    first = authors[0] if authors else ""
+    if isinstance(first, dict):
+        first = first.get("family") or first.get("name") or ""
+    parts = re.findall(r"[a-z]+", str(first).lower())
+    return parts[-1] if parts else ""
+
+
+def _same_work(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    """Same first author and near-identical abstracts (titles often change on publication)."""
+    if not _surname(a) or _surname(a) != _surname(b):
+        return False
+    wa = set(re.findall(r"[a-z0-9]{4,}", str(a.get("abstract") or "").lower()))
+    wb = set(re.findall(r"[a-z0-9]{4,}", str(b.get("abstract") or "").lower()))
+    if len(wa) < 20 or len(wb) < 20:
+        return False
+    return len(wa & wb) / len(wa | wb) >= 0.6
+
+
+def _merge_preprints(results: list[dict[str, Any]], stats: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Fold a preprint into its published version: keep the journal record,
+    remember the preprint DOI (useful as an open copy), drop the duplicate."""
+    published = [r for r in results if not _is_preprint(r)]
+    out, merged = [], 0
+    for r in results:
+        if _is_preprint(r):
+            twin = next((p for p in published if _same_work(r, p)), None)
+            if twin is not None:
+                twin.setdefault("preprint_doi", r.get("doi") or r.get("arxiv_id"))
+                if not twin.get("oa_url") and r.get("oa_url"):
+                    twin["preprint_url"] = r["oa_url"]
+                merged += 1
+                continue
+        out.append(r)
+    if merged and stats is not None:
+        stats["merged_preprints"] = merged
+    return out
+
+
+def _note_unverified_venues(results: list[dict[str, Any]]) -> None:
+    """Without a DOI the venue comes from the index alone, and repositories
+    are sometimes filed under an unrelated journal; say so."""
+    for r in results:
+        if r.get("journal") and not r.get("doi"):
+            r["venue_unverified"] = True
+
+
+_ABBREV_ONLY = re.compile(r"(?:[A-Z][A-Za-z]{0,9}\.\s*){2,}")
+
+
+def _drop_junk_titles(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop index records whose "title" is a journal abbreviation
+    ("Appl. Organomet. Chem.") or just the journal's name."""
+    kept = []
+    for r in results:
+        title = str(r.get("title") or "").strip()
+        journal = str(r.get("journal") or "").strip().lower()
+        if _ABBREV_ONLY.fullmatch(title) or (journal and title.lower() == journal):
+            continue
+        kept.append(r)
+    return kept
 
 
 def _dedupe_titles(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -525,6 +603,30 @@ def _drop_off_topic(results: list[dict[str, Any]], query: str) -> list[dict[str,
             continue
         text = f"{r.get('title') or ''} {r.get('abstract') or ''}".lower().replace("-", " ")
         if sum(1 for t in terms if t in text) >= need:
+            kept.append(r)
+    return kept
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"[\s\-\u2010-\u2015/]+", "", text.lower())
+
+
+def _require_compounds(results: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    """A hyphenated query term ("polymer-derived", "Si-B-C-N") is one concept:
+    "polymers ... derived" in an abstract is not a match. Spaces and dashes
+    are ignored, so "SiBCN" matches "Si-B-C-N". Records without an abstract
+    are kept, since a title alone may not spell the compound out."""
+    compounds = {_squash(c) for c in re.findall(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+", query or "")}
+    compounds = {c for c in compounds if len(c) >= 4}
+    if not compounds:
+        return results
+    kept = []
+    for r in results:
+        if not r.get("abstract"):
+            kept.append(r)
+            continue
+        text = _squash(f"{r.get('title') or ''} {r.get('abstract') or ''}")
+        if all(c in text for c in compounds):
             kept.append(r)
     return kept
 

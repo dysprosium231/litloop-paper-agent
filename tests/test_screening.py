@@ -67,3 +67,25 @@ def test_mcp_tool_roundtrip():
     assert json.loads(tool(action="decide", session=saved["session"], selected=["1"]))["selected"] == 1
     assert "error" in json.loads(tool(action="show"))
     assert "error" in json.loads(tool(action="bogus"))
+
+def test_save_returns_the_numbering_the_user_picks_from():
+    r = screening.save("q", ITEMS)  # sent low, high, mid; stored high, mid, low
+    assert [(x["n"], x["doi"]) for x in r["numbering"]] == [(1, "10.1/HIGH"), (2, "10.1/mid"), (3, "10.1/low")]
+
+
+def test_decide_replaces_the_earlier_choice_and_echoes_titles():
+    sid = screening.save("q", ITEMS)["session"]
+    screening.decide(sid, selected=["1", "3"])
+    r = screening.decide(sid, selected=["2"], rejected=["1"])  # corrected pick
+    assert [x["doi"] for x in r["chosen"]] == ["10.1/mid"] and r["chosen"][0]["title"] == "HE oxide"
+    assert [x["doi"] for x in r["rejected"]] == ["10.1/HIGH"]
+    decisions = {it["doi"]: it["decision"] for it in screening.load(sid)["items"]}
+    assert decisions == {"10.1/HIGH": "rejected", "10.1/mid": "selected", "10.1/low": None}
+
+
+def test_decide_with_unknown_number_records_nothing():
+    sid = screening.save("q", ITEMS)["session"]
+    screening.decide(sid, selected=["1"])
+    r = screening.decide(sid, selected=["2", "13"])
+    assert r["unknown"] == ["13"] and "error" in r and len(r["numbering"]) == 3
+    assert [it["decision"] for it in screening.load(sid)["items"]] == ["selected", None, None]

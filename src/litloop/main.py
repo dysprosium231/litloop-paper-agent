@@ -19,6 +19,14 @@ class ServerMode(str, Enum):
     WEB = "web"
 
 
+
+def _default_output_dir(output: str) -> str:
+    """CLI downloads land where MCP downloads do (config output_dir), not in the cwd."""
+    if output:
+        return output
+    from .config import load_config
+    return str(Path(load_config().get("output_dir") or ".").expanduser())
+
 @app.command("run")
 def run_server(
     mode: ServerMode = typer.Option(ServerMode.STDIO, help="Transport mode"),
@@ -121,13 +129,14 @@ def login(
 @app.command("get")
 def get_paper(
     identifier: str = typer.Argument(help="DOI or arXiv ID"),
-    output: str = typer.Option(".", help="Output directory (default: current directory)"),
+    output: str = typer.Option("", help="Output directory (default: output_dir in config, ~/.litloop/papers)"),
     no_bibtex: bool = typer.Option(False, help="Skip BibTeX citation"),
     strategy: str = typer.Option("", help="Override download strategy: fastest, grey_only(all 3 grey sources), scihub_only(Sci-Hub only), scihub_first, oa_first, legal_only"),
     si: bool = typer.Option(False, "--si", help="Also fetch Supplementary Information attachments"),
     md: bool = typer.Option(False, "--md", help="Also export the PDF as agent-ready markdown"),
 ) -> None:
     """Download a paper with zero configuration. Just give a DOI."""
+    output = _default_output_dir(output)
     from .sources import download
     from .config import load_config, update_config
 
@@ -392,7 +401,7 @@ def list_schools_cmd(
 @app.command("fetch")
 def fetch_paper_cmd(
     identifier: str = typer.Argument(help="DOI or article URL"),
-    output: str = typer.Option(".", help="Output directory (default: current directory)"),
+    output: str = typer.Option("", help="Output directory (default: output_dir in config, ~/.litloop/papers)"),
     format: str = typer.Option("markdown", help="Output format: markdown, json, text"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Skip cache"),
 ) -> None:
@@ -400,6 +409,7 @@ def fetch_paper_cmd(
     
     Cascade: cache → OA → Elsevier API → DOI resolve → CARSI → publisher → browser → gateway.
     """
+    output = _default_output_dir(output)
     from .institutional.config_adapter import ConfigAdapter
     from .institutional.fetcher import PaperFetcher
 
@@ -444,7 +454,7 @@ def _write_retry_file(output: str, results: list) -> None:
 @app.command("batch")
 def batch_fetch_cmd(
     input_file: str = typer.Argument(help="File with one DOI/URL per line, a queue TSV, a csv/xlsx table, APA or BibTeX"),
-    output: str = typer.Option(".", help="Output directory (default: current directory)"),
+    output: str = typer.Option("", help="Output directory (default: output_dir in config, ~/.litloop/papers)"),
     format: str = typer.Option("json", help="Output format: json, text"),
     scihub: bool = typer.Option(False, "--scihub", help="Use Sci-Hub racing engine (includes grey sources) instead of institutional cascade"),
     runs_dir: str = typer.Option("", "--runs-dir", help="ScanSci Find run directory: use its download queue as input and its preprint arXiv IDs as fallbacks for failed DOIs"),
@@ -452,6 +462,7 @@ def batch_fetch_cmd(
     retry: str = typer.Option("", "--retry", help="Retry failed identifiers from a previous batch_results.json"),
 ) -> None:
     """Batch fetch papers. Default: institutional cascade. Use --scihub for grey-source racing."""
+    output = _default_output_dir(output)
     import json as _json
     from .config import load_config as _load_config
 
@@ -759,10 +770,11 @@ def federated_login(
 def publisher_batch_cmd(
     input_file: str = typer.Argument(help="File with one DOI per line"),
     publisher: str = typer.Option("", help="Publisher key (auto-detected if omitted)"),
-    output: str = typer.Option(".", help="Output directory (default: current directory)"),
+    output: str = typer.Option("", help="Output directory (default: output_dir in config, ~/.litloop/papers)"),
     max_workers: str = typer.Option("1", help="Number of parallel workers"),
 ) -> None:
     """Batch download papers via publisher-specific workflows."""
+    output = _default_output_dir(output)
     from .config import load_config
 
     dois = [

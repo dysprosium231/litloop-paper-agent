@@ -101,36 +101,45 @@ def save(question: str, items: list[dict[str, Any]], criteria: list[str] | str |
     for n, it in enumerate(data["items"], 1):
         it["n"] = n
     paths = _write(data)
+    # Items are re-sorted by relevance, so the numbers the user picks from are
+    # these, not the order they were sent in: show the user this list.
     return {"session": data["id"], "added": added, "total": len(data["items"]),
             "by_relevance": {r: sum(1 for it in data["items"] if it["relevance"] == r) for r in RELEVANCE},
+            "numbering": [_brief(it) for it in data["items"]],
             **paths}
+
+
+def _brief(it: dict[str, Any]) -> dict[str, Any]:
+    return {"n": it["n"], "relevance": it["relevance"], "title": str(it.get("title") or "")[:90],
+            "doi": it.get("doi")}
 
 
 def decide(session: str, selected: list[int | str], rejected: list[int | str] | None = None,
            out_file: str | None = None) -> dict[str, Any]:
-    """Record the user's choice by item number or DOI; optionally write a download queue."""
+    """Record the user's whole choice by item number or DOI, replacing any
+    earlier decision (a corrected pick must not leave the wrong one behind);
+    optionally write a download queue."""
     data = load(session)
     index: dict[str, dict[str, Any]] = {}
     for it in data["items"]:
         index[str(it["n"])] = it
         if it.get("doi"):
             index[str(it["doi"]).lower()] = it
-
-    def pick(refs, decision):
-        unknown = []
-        for ref in refs or []:
-            it = index.get(str(ref).strip().lower())
-            if it is None:
-                unknown.append(ref)
-            else:
-                it["decision"] = decision
-        return unknown
-
-    unknown = pick(selected, "selected") + pick(rejected, "rejected")
+    refs = [(ref, "selected") for ref in selected or []] + [(ref, "rejected") for ref in rejected or []]
+    unknown = [ref for ref, _ in refs if str(ref).strip().lower() not in index]
+    if unknown:  # a mistyped number must not wipe the earlier choice
+        return {"session": session, "error": "unknown item numbers/DOIs; nothing recorded",
+                "unknown": unknown, "numbering": [_brief(it) for it in data["items"]]}
+    for it in data["items"]:
+        it["decision"] = None
+    for ref, decision in refs:
+        index[str(ref).strip().lower()]["decision"] = decision
     paths = _write(data)
     chosen = [it for it in data["items"] if it.get("decision") == "selected"]
     result: dict[str, Any] = {"session": session, "selected": len(chosen),
                               "identifiers": [it["doi"] for it in chosen if it.get("doi")],
+                              "chosen": [_brief(it) for it in chosen],
+                              "rejected": [_brief(it) for it in data["items"] if it.get("decision") == "rejected"],
                               "unknown": unknown, **paths}
     if out_file and chosen:
         from .pipeline import QueueEntry, predict_channel, write_queue
