@@ -999,7 +999,7 @@ def download(
             )
         _INFLIGHT.add(key)
         _SETTLED.discard(key)
-    t0 = time.monotonic()
+    t0 = time.perf_counter()  # same clock as browser_backend._remember
     prev_gen = getattr(_DL_TLS, "gen", None)
     if prev_gen is None:  # nested calls (batch phase 2) keep the batch's generation
         _DL_TLS.gen = _CANCEL_GEN[0]
@@ -1655,7 +1655,7 @@ def batch_download(
 ) -> dict[str, Any]:
     config = load_config()
     workers = config.get("batch_workers", 5)
-    batch_t0 = time.monotonic()
+    batch_t0 = time.perf_counter()
 
     # Duplicate detection via DOI normalization
     seen_dois: set[str] = set()

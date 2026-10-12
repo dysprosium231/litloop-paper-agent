@@ -800,7 +800,7 @@ _LAUNCHED_LOCK = _threading.Lock()
 
 def _remember(obj: Any) -> Any:
     with _LAUNCHED_LOCK:
-        _LAUNCHED.append((_time.monotonic(), obj))
+        _LAUNCHED.append((_time.perf_counter(), obj))
     return obj
 
 
@@ -829,7 +829,7 @@ def launch_persistent_context(user_data_dir: str, **kwargs: Any) -> Any:
 
 
 def close_browsers_since(t0: float) -> int:
-    """Force-close every browser launched at or after monotonic time ``t0``.
+    """Force-close every browser launched at or after ``time.perf_counter()`` value ``t0``.
 
     Sync-API objects are bound to the thread that created them, so they cannot
     be closed from here; kill the driver process tree instead. The owning

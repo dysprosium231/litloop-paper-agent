@@ -63,7 +63,7 @@ def test_close_browsers_since_kills_only_newer(monkeypatch):
 
     monkeypatch.setattr(bb, "_LAUNCHED", [])
     bb._remember(fake("old"))
-    t0 = time.monotonic()
+    t0 = time.perf_counter()
     bb._remember(fake("new"))
     assert bb.close_browsers_since(t0) == 1
     assert killed == ["new"]
