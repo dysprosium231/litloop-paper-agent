@@ -164,11 +164,39 @@ def test_zotero_bridge_flags_attachment_without_file(monkeypatch):
     monkeypatch.setitem(sys.modules, "zotero_mcp.tools", tools)
     monkeypatch.setitem(sys.modules, "zotero_mcp.cli_standalone", cli)
     monkeypatch.setitem(sys.modules, "zotero_mcp.client", client)
+    webdav = types.ModuleType("zotero_mcp.webdav")
+    webdav.get_webdav_config = lambda: None
+    monkeypatch.setitem(sys.modules, "zotero_mcp.webdav", webdav)
 
     out = zotero_bridge.run({"identifier": "10.1/x", "file": "C:/a.pdf"})
 
     assert out["pdf_attached"] is False
     assert "EMPTY123" in out["attach_message"] and "attachment_key" not in out
+
+
+def test_zotero_bridge_accepts_file_stored_on_webdav(monkeypatch):
+    """A WebDAV upload leaves no md5 on the item; the .prop sidecar proves the file."""
+    import types, sys
+    import requests
+    from litloop import zotero_bridge
+
+    client = types.ModuleType("zotero_mcp.client")
+    client.get_zotero_client = lambda: types.SimpleNamespace(item=lambda key: {"data": {"md5": None}})
+    webdav = types.ModuleType("zotero_mcp.webdav")
+    webdav.get_webdav_config = lambda: ("https://dav.example/zotero/", "u", "p")
+    monkeypatch.setitem(sys.modules, "zotero_mcp", types.ModuleType("zotero_mcp"))
+    monkeypatch.setitem(sys.modules, "zotero_mcp.client", client)
+    monkeypatch.setitem(sys.modules, "zotero_mcp.webdav", webdav)
+    seen = {}
+
+    def head(url, **kw):
+        seen["url"] = url
+        return types.SimpleNamespace(status_code=200 if "FULL" in url else 404)
+
+    monkeypatch.setattr(requests, "head", head)
+    assert zotero_bridge._has_stored_file("FULL1234")
+    assert seen["url"] == "https://dav.example/zotero/FULL1234.prop"
+    assert not zotero_bridge._has_stored_file("EMPTY123")
 
 
 def _isolate_discovery(monkeypatch, tmp_path):
@@ -235,3 +263,15 @@ def test_no_zotero_mcp_anywhere_falls_back_to_web_api(tmp_path, monkeypatch):
     assert zotero.discover_zotero_mcp({}) is None
     result = zotero.push_to_zotero("10.1/x", None, {})
     assert result == {"success": False, "error": "Zotero API key not configured"}
+
+
+def test_zotero_bridge_resolves_localhost_to_ipv4(monkeypatch):
+    import socket
+    from litloop import zotero_bridge
+
+    seen = []
+    monkeypatch.setattr(socket, "getaddrinfo", lambda host, *a, **kw: seen.append(host) or [])
+    zotero_bridge._localhost_ipv4_only()
+    socket.getaddrinfo("localhost", 23119)
+    socket.getaddrinfo("api.zotero.org", 443)
+    assert seen == ["127.0.0.1", "api.zotero.org"]

@@ -17,6 +17,7 @@ import contextlib
 import json
 import re
 import runpy
+import socket
 import sys
 
 _KEY_RE = re.compile(r"Item key: `([A-Z0-9]{8})`")
@@ -94,17 +95,52 @@ def run(req: dict) -> dict:
 
 
 def _has_stored_file(attachment_key: str) -> bool:
-    """Whether Zotero has file content for the attachment (an md5 is recorded)."""
+    """Whether the attachment has file content behind it.
+
+    Zotero records an md5 for files it stores itself. A file that went
+    straight to WebDAV has no md5 on the item; there the ``<KEY>.prop``
+    sidecar, written only after the zip upload completes, is the proof.
+    """
     try:
         from zotero_mcp.client import get_zotero_client
         data = get_zotero_client().item(attachment_key).get("data", {})
     except Exception:
         return True  # cannot tell: keep zotero-mcp's verdict
-    return bool(data.get("md5"))
+    if data.get("md5"):
+        return True
+    try:
+        import requests
+        from zotero_mcp.webdav import get_webdav_config
+        config = get_webdav_config()
+        if not config:
+            return False
+        base, user, password = config
+        r = requests.head(f"{base}{attachment_key}.prop", auth=(user, password), timeout=15)
+    except Exception:
+        return True
+    return r.status_code != 404
+
+
+def _localhost_ipv4_only() -> None:
+    """Resolve ``localhost`` to 127.0.0.1 only.
+
+    Zotero's local API listens on IPv4; on Windows ``localhost`` tries ::1
+    first and every request then waits ~2 s for that to fail, which made a
+    single push take 30-60 s.
+    """
+    orig = socket.getaddrinfo
+
+    def getaddrinfo(host, *args, **kwargs):
+        if host == "localhost":
+            host = "127.0.0.1"
+        return orig(host, *args, **kwargs)
+
+    socket.getaddrinfo = getaddrinfo
 
 
 def main() -> int:
     req = json.loads(sys.stdin.read())
+    _localhost_ipv4_only()
     # zotero-mcp may print progress; keep stdout for the one result line.
     with contextlib.redirect_stdout(sys.stderr):
         try:
