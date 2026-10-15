@@ -43,7 +43,11 @@ logger = get_logger()
 
 OPENALEX = "https://api.openalex.org/works"
 _FIELDS = ("id,doi,title,publication_year,cited_by_count,referenced_works,"
-           "abstract_inverted_index,primary_location,authorships")
+           "abstract_inverted_index,primary_location,authorships,type")
+# Not research papers: never worth a reader's time. Book chapters, theses and
+# conference papers stay; the ranking model learns where they belong.
+NON_PAPER = {"dataset", "paratext", "erratum", "reference-entry", "book-review", "editorial",
+             "peer-review", "grant", "standard", "retraction", "supplementary-materials", "libguides"}
 QUERY_WEIGHT = 2
 ABSTRACT_CHARS = 1500
 PREFILL = 150          # fetch missing abstracts for this many top candidates before ranking
@@ -92,6 +96,7 @@ def _record(w: dict[str, Any]) -> dict[str, Any]:
         "cited_by_count": w.get("cited_by_count") or 0,
         "abstract": _reconstruct_abstract(w.get("abstract_inverted_index")),
         "refs": [_short(r) for r in (w.get("referenced_works") or [])],
+        "type": w.get("type") or "",
     }
 
 
@@ -206,7 +211,7 @@ def _key(rec: dict[str, Any]) -> str:
 
 def _add(pool: dict[str, dict], rec: dict[str, Any], via: str) -> None:
     k = _key(rec)
-    if not k or not rec.get("title"):
+    if not k or not rec.get("title") or rec.get("type") in NON_PAPER:
         return
     have = pool.get(k)
     if have is None:

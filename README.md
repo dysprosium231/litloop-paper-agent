@@ -8,7 +8,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square" />
   <img alt="Status" src="https://img.shields.io/badge/%E7%8A%B6%E6%80%81-%E5%BC%80%E5%8F%91%E4%B8%AD-F59E0B?style=flat-square" />
 
-  [它能做什么](#它能做什么) · [安装](#安装) · [怎么用](#怎么用) · [检索与筛选](#检索与筛选) · [下载与机构通道](#下载与机构通道) · [Zotero](#zotero) · [项目状态](#项目状态)
+  [它能做什么](#它能做什么) · [安装](#安装) · [依赖与 Key](#依赖与-key) · [怎么用](#怎么用) · [检索与筛选](#检索与筛选) · [下载与机构通道](#下载与机构通道) · [Zotero](#zotero) · [项目状态](#项目状态)
 </div>
 
 > **项目还在开发中。** 检索、筛选、下载、存进 Zotero 这条流程已经能用，并在真实课题上验收过；深度检索已在两个测试集上验收；系统综述、分析归纳还没做，可视化界面在规划中。详见[项目状态](#项目状态)。
@@ -101,6 +101,22 @@ docker compose up -d                                              # MCP 服务�
 ```
 
 </details>
+
+## 依赖与 Key
+
+装好就能用；下面几样配上以后效果明显更好。Key 都可以用 `litloop_config` 写进配置，也可以设成环境变量（配置文件优先，来自环境变量的 Key 不会被写进文件）。
+
+| 组件 | 必需吗 | 用来做什么 | 没有时 | 怎么获取 |
+|---|---|---|---|---|
+| Python 3.11+、Git | 必需 | 运行和更新 LitLoop | 装不上 | Windows：`winget install Python.Python.3.12 Git.Git` |
+| OpenAlex API Key | **强烈推荐** | 快速检索和深度检索的主要数据源（目前唯一） | 走公共接口，请求多时容易被限流，深度检索会变慢或中断 | 在 [openalex.org](https://openalex.org) 注册后免费获取；`openalex_api_key` 或环境变量 `OPENALEX_API_KEY` |
+| Elsevier API Key | **强烈推荐** | ScienceDirect 全文下载（需校园网出口）；从 Scopus 补摘要 | Elsevier 期刊多的领域大量文章缺摘要，深度检索只能凭标题排序。PDC 测试集上，26 篇目标里 16 篇的摘要靠它补；去掉后，下一批能读到的目标明显变少 | [dev.elsevier.com](https://dev.elsevier.com) 免费申请；`litloop_elsevier_setup`，或 `elsevier_api_key` / 环境变量 `ELSEVIER_API_KEY` |
+| scansci-find（发现引擎） | 推荐 | 快速检索和深度检索的关键词路线 | 自动退回内置的三源检索，较慢 | 安装时加 `--with-find` |
+| Zotero 桌面版 + zotero-mcp | 可选 | 把文献和 PDF 直接写进本机 Zotero | 只能下载到本地文件夹 | 见下文 [Zotero](#zotero) |
+| 本机 Chrome | 可选 | 需要浏览器的出版商和机构通道 | 这些通道不可用，开放获取和 API 照常 | 正常安装 Chrome 即可，LitLoop 会自动复制一份私有副本 |
+| 学校账号（WebVPN / CARSI / EZProxy） | 可选 | 下载学校订阅的论文 | 只能下开放获取和 API 能拿到的 | 见下文 [下载与机构通道](#下载与机构通道) |
+| Semantic Scholar API Key | 可选 | 多一个检索来源；补摘要更快 | 不影响使用：补摘要时几个来源同时问，它慢也不会拖住别的来源 | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api)，审批较严，不一定能通过；环境变量 `SEMANTIC_SCHOLAR_API_KEY` |
+| litloop-journal-rank | 可选（未公开） | 期刊分区、预警名单、本地撤稿库 | 没有分区信息，撤稿标记改用 OpenAlex 的数据 | 暂未公开 |
 
 ## 怎么用
 
@@ -330,8 +346,8 @@ litloop_login(kind="ezproxy")
 | `download_strategy` | `fastest` | 可选 `fastest`、`oa_first`、`legal_only`（不用 Sci-Hub/LibGen）、`scihub_first`、`scihub_only` |
 | `scihub_enabled` | `true` | 是否使用 Sci-Hub/LibGen 类来源 |
 | `search_fill_abstracts` | `true` | 检索结果自动补全摘要 |
-| `openalex_api_key` | 空 | OpenAlex Key，可提高检索稳定性 |
-| `elsevier_api_key` | 空 | Elsevier Key，用于全文下载和 Scopus 摘要 |
+| `openalex_api_key` | 空 | OpenAlex Key（强烈推荐，见[依赖与 Key](#依赖与-key)）；也可用环境变量 `OPENALEX_API_KEY` |
+| `elsevier_api_key` | 空 | Elsevier Key，用于全文下载和 Scopus 摘要；也可用环境变量 `ELSEVIER_API_KEY` |
 | `network_proxy` | 空 | HTTP/SOCKS 代理；环境变量 `HTTP(S)_PROXY` 会被忽略 |
 | `host_proxy_url` | 空 | 只给指定出版商域名走的代理 |
 | `browser_executable` | 空 | 指定浏览器程序，例如本机 Chrome 的副本 |

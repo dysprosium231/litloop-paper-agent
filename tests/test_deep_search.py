@@ -244,3 +244,10 @@ def test_citation_query_that_hits_the_cap_is_split(monkeypatch):
     out = deep_search._cites_refs_on_topic(["A", "B", "C", "D"], ["x"], [], max_records=3)
     assert len({r["doi"] for r in out}) == 8          # nothing lost to the cap
     assert sorted(seen) == [1, 1, 1, 1]               # over the cap: split before fetching anything
+
+
+def test_non_papers_stay_out_of_the_pool():
+    pool = {}
+    deep_search._add(pool, dict(rec("10.1/data", "Survey data"), type="dataset"), "cites_seed")
+    deep_search._add(pool, dict(rec("10.1/chap", "A chapter"), type="book-chapter"), "cites_seed")
+    assert list(pool) == ["10.1/chap"]
