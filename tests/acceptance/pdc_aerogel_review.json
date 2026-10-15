@@ -1,0 +1,903 @@
+{
+  "name": "PDC 陶瓷气凝胶（综述参考文献）",
+  "role": "auxiliary",
+  "purpose": "Recall-only check with an expert-curated answer key: the research papers a 2021 review cites on polymer-derived ceramic aerogels.",
+  "question": "聚合物先驱体转化（PDC）路线制备的陶瓷气凝胶（SiOC、SiCN、SiOCN、SiBCN、SiC 等）：前驱体与凝胶化、干燥、热解与结构演变，以及隔热、吸波、储能、吸附、催化等应用。",
+  "year_to": 2021,
+  "source": {
+    "review_doi": "10.1016/j.cossms.2021.100936",
+    "review_title": "Polymer derived ceramic aerogels",
+    "review_year": 2021,
+    "references_listed": 148,
+    "references_resolved": 141,
+    "curated": "2026-10-15; titles and abstracts read by the agent (missing abstracts fetched via Scopus); the user decided carbothermal-route aerogels are borderline, not targets"
+  },
+  "rules": {
+    "target": "research article on a ceramic aerogel made by the polymer-derived ceramic route, or on materials made from such an aerogel",
+    "borderline": "porous PDC that is not an aerogel, ceramic aerogels made by carbothermal reduction of hybrid gels, or route unknown; reported separately, not required",
+    "excluded": "reviews and books, background on dense PDC glasses, other aerogel families (silica, carbon, graphene, polymer, oxide), ceramic aerogels made by CVD, methods and theory"
+  },
+  "seeds": [
+    {
+      "doi": "10.1016/j.ceramint.2014.11.111",
+      "openalex": "W2010906868",
+      "year": 2014,
+      "title": "Synthesis, structure, and properties of silicon oxycarbide aerogels derived from tetraethylortosilicate /polydimethylsiloxane"
+    },
+    {
+      "doi": "10.1016/j.jeurceramsoc.2015.04.018",
+      "openalex": "W2077422600",
+      "year": 2015,
+      "title": "Synthesis and characterization of polymer-derived SiCN aerogel"
+    },
+    {
+      "doi": "10.1016/j.jeurceramsoc.2017.04.068",
+      "openalex": "W2610991310",
+      "year": 2017,
+      "title": "Ultralight polymer-derived ceramic aerogels with wide bandwidth and effective electromagnetic absorption properties"
+    }
+  ],
+  "targets": [
+    {
+      "doi": "10.1016/j.micromeso.2010.12.033",
+      "openalex": "W2073584123",
+      "year": 2011,
+      "title": "Porous silicon oxycarbide glasses from hybrid ambigels"
+    },
+    {
+      "doi": "10.1002/adem.201400134",
+      "openalex": "W1924404247",
+      "year": 2014,
+      "title": "Novel SiC/C Aerogels Through Pyrolysis of Polycarbosilane Precursors"
+    },
+    {
+      "doi": "10.1016/j.electacta.2015.01.088",
+      "openalex": "W2012950308",
+      "year": 2015,
+      "title": "High Rate Capability of SiOC Ceramic Aerogels with Tailored Porosity as Anode Materials for Li-ion Batteries"
+    },
+    {
+      "doi": "10.1016/j.jeurceramsoc.2015.10.038",
+      "openalex": "W2191795834",
+      "year": 2015,
+      "title": "Out-of-furnace oxidation of SiCN polymer-derived ceramic aerogel pyrolized at intermediate temperature (600–800 °C)"
+    },
+    {
+      "doi": "10.1039/c5ta06669g",
+      "openalex": "W1951793085",
+      "year": 2015,
+      "title": "Synthesis and characterization of the first transparent silicon oxycarbide aerogel obtained through H 2 decarbonization"
+    },
+    {
+      "doi": "10.1039/c6ta00589f",
+      "openalex": "W2283704028",
+      "year": 2016,
+      "title": "Nitrogen doped carbide derived carbon aerogels by chlorine etching of a SiCN aerogel"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2016.04.101",
+      "openalex": "W2338583322",
+      "year": 2016,
+      "title": "Polymer-derived SiOC aerogel with hierarchical porosity through HF etching"
+    },
+    {
+      "doi": "10.1111/jace.14323",
+      "openalex": "W2417609708",
+      "year": 2016,
+      "title": "Structural Design of Polymer‐Derived Si OC Ceramic Aerogels for High‐Rate Li Ion Storage Applications"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2016.07.213",
+      "openalex": "W2492500728",
+      "year": 2016,
+      "title": "Synthesis of SiC–TiO2 hybrid aerogel via supercritical drying combined PDCs route"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2017.04.175",
+      "openalex": "W2610263328",
+      "year": 2017,
+      "title": "In-situ synthesis and textural evolution of the novel carbonaceous SiC/mullite aerogel via polymer-derived ceramics route"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2017.01.124",
+      "openalex": "W2582440061",
+      "year": 2017,
+      "title": "Large size and low density SiOC aerogel monolith prepared from triethoxyvinylsilane/tetraethoxysilane"
+    },
+    {
+      "doi": "10.1111/jace.15241",
+      "openalex": "W2754966899",
+      "year": 2017,
+      "title": "Polymer‐derived ceramic aerogels as sorbent materials for the removal of organic dyes from aqueous solutions"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2017.09.212",
+      "openalex": "W2759208852",
+      "year": 2017,
+      "title": "Preparation and structural evolution of SiOC preceramic aerogel during high-temperature treatment"
+    },
+    {
+      "doi": "10.1111/jace.16100",
+      "openalex": "W2892567526",
+      "year": 2018,
+      "title": "Facile preparation of ultralight polymer‐derived Si OCN ceramic aerogels with hierarchical pore structure"
+    },
+    {
+      "doi": "10.3390/nano9010040",
+      "openalex": "W2908118602",
+      "year": 2018,
+      "title": "Preparation and Properties of SiBCO Aerogel and Its Composites"
+    },
+    {
+      "doi": "10.1002/adem.201701130",
+      "openalex": "W2791519378",
+      "year": 2018,
+      "title": "Reactive Atmosphere Synthesis of Polymer‐Derived Si–O–C–N Aerogels and Their Cr Adsorption from Aqueous Solutions"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2018.09.098",
+      "openalex": "W2890529121",
+      "year": 2018,
+      "title": "SiBCN-ZrO2 hybrid ceramic aerogels through the polymer-derived ceramics (PDCs) route"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2018.05.115",
+      "openalex": "W2803819700",
+      "year": 2018,
+      "title": "Sol-gel synthesis of preceramic polyphenylsilsesquioxane aerogels and their application toward monolithic porous SiOC ceramics"
+    },
+    {
+      "doi": "10.3390/ma11122589",
+      "openalex": "W2904492466",
+      "year": 2018,
+      "title": "Towards Porous Silicon Oxycarbide Materials: Effects of Solvents on Microstructural Features of Poly(methylhydrosiloxane)/Divynilbenzene Aerogels"
+    },
+    {
+      "doi": "10.1016/j.jallcom.2019.152007",
+      "openalex": "W2970533447",
+      "year": 2019,
+      "title": "Co decorated polymer-derived SiCN ceramic aerogel composites with ultrabroad microwave absorption performance"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2019.07.321",
+      "openalex": "W2965872142",
+      "year": 2019,
+      "title": "Flexible and recoverable SiC nanofiber aerogels for electromagnetic wave absorption",
+      "note": "abstract says electrospun SiC fibres, freeze-dried and heat-treated; electrospinning SiC implies a preceramic polymer (e.g. polycarbosilane), so classed as PDC route (inferred)"
+    },
+    {
+      "doi": "10.1016/j.matdes.2019.108217",
+      "openalex": "W2979821306",
+      "year": 2019,
+      "title": "New BN/SiOC aerogel composites fabricated by the sol-gel method with excellent thermal insulation performance at high temperature"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2019.10.267",
+      "openalex": "W2990656536",
+      "year": 2019,
+      "title": "SiBCN ceramic aerogel/graphene composites prepared via sol-gel infiltration process and polymer-derived ceramics (PDCs) route"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2019.09.204",
+      "openalex": "W2973418779",
+      "year": 2019,
+      "title": "SiC/C aerogels from biphenylene-bridged polysilsesquioxane/clay mineral nanocomposite aerogels"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2020.11.157",
+      "openalex": "W3106750670",
+      "year": 2020,
+      "title": "Synthesis and thermal evolution of polysilazane-derived SiCN(O) aerogels with variable C content stable at 1600 °C"
+    },
+    {
+      "doi": "10.1016/j.micromeso.2020.110164",
+      "openalex": "W3011833597",
+      "year": 2020,
+      "title": "Synthesis of Si/O/C/N quaternary composite aerogels with micro/mesoporous structures and their selective adsorption property for volatile carbonyl compounds in cigarette smoke"
+    }
+  ],
+  "borderline": [
+    {
+      "doi": "10.1039/b913992c",
+      "openalex": "W2103143397",
+      "year": 2009,
+      "title": "Fabrication of macroporous silicon carbide ceramics by intramolecular carbothermal reduction of phenyl-bridged polysilsesquioxane",
+      "why": "多孔 SiC 陶瓷（桥联聚倍半硅氧烷），非气凝胶"
+    },
+    {
+      "doi": "10.1021/cm9034616",
+      "openalex": "W1979680393",
+      "year": 2010,
+      "title": "A New Route to Monolithic Macroporous SiC/C Composites from Biphenylene-bridged Polysilsesquioxane Gels",
+      "why": "大孔 SiC/C（桥联聚倍半硅氧烷凝胶），非气凝胶"
+    },
+    {
+      "doi": "10.1021/cm903031d",
+      "openalex": "W2058227771",
+      "year": 2010,
+      "title": "Sol−Gel Processing of a Glycolated Cyclic Organosilane and Its Pyrolysis to Silicon Oxycarbide Monoliths with Multiscale Porosity and Large Surface Areas",
+      "why": "溶胶-凝胶 SiOC 多级孔块体，非气凝胶"
+    },
+    {
+      "doi": "10.1016/j.micromeso.2011.09.008",
+      "openalex": "W2077315139",
+      "year": 2011,
+      "title": "Synthesis of resorcinol–formaldehyde/silica composite aerogels and their low-temperature conversion to mesoporous silicon carbide",
+      "why": "RF/SiO2 复合气凝胶碳热还原成 SiC，非 PDC 路线"
+    },
+    {
+      "doi": "10.1016/j.jnoncrysol.2012.08.029",
+      "openalex": "W2063275324",
+      "year": 2012,
+      "title": "Facile synthesis of resorcinol–formaldehyde/silica composite aerogels and their transformation to monolithic carbon/silica and carbon/silicon carbide composite aerogels",
+      "why": "RF/SiO2 复合气凝胶碳热还原成 SiC，非 PDC 路线"
+    },
+    {
+      "doi": "10.1111/jace.12491",
+      "openalex": "W2035776948",
+      "year": 2013,
+      "title": "Gas Sensing Behavior of Mesoporous SiOC Glasses",
+      "why": "介孔 SiOC 玻璃用于气敏，非气凝胶"
+    },
+    {
+      "doi": "10.1016/j.matlet.2013.02.047",
+      "openalex": "W2067257565",
+      "year": 2013,
+      "title": "Synthesis of monolithic mesoporous silicon carbide from resorcinol–formaldehyde/silica composites",
+      "why": "RF/SiO2 复合物碳热还原成介孔 SiC，非 PDC 路线"
+    },
+    {
+      "doi": "10.1016/j.proeng.2014.11.608",
+      "openalex": "W2069390384",
+      "year": 2014,
+      "title": "High Carbon-high Porous SiOC Glasses for Room Temperature NO2 Sensing",
+      "why": "高碳多孔 SiOC 用于 NO2 传感，非气凝胶"
+    },
+    {
+      "doi": "10.1016/j.jnoncrysol.2015.06.011",
+      "openalex": "W624559432",
+      "year": 2015,
+      "title": "Preparation and characterization of C/SiO2/SiC aerogels based on novolac/silica hybrid hyperporous materials",
+      "why": "酚醛/SiO2 杂化气凝胶转 C/SiO2/SiC，碳热还原路线"
+    },
+    {
+      "doi": "10.1016/j.jnoncrysol.2015.12.021",
+      "openalex": "W2224606991",
+      "year": 2016,
+      "title": "Investigation of microstructure and mechanical properties of novolac/silica and C/SiO2/SiC aerogels using mercury porosimetry method",
+      "why": "酚醛/SiO2 与 C/SiO2/SiC 气凝胶，碳热还原路线"
+    },
+    {
+      "doi": "10.1016/j.cej.2017.08.052",
+      "openalex": "W2749302371",
+      "year": 2017,
+      "title": "Evolution of the novel C/SiO2/SiC ternary aerogel with high specific surface area and improved oxidation resistance",
+      "why": "C/SiO2/SiC 三元气凝胶，碳热还原路线"
+    },
+    {
+      "doi": "10.1111/jace.15423",
+      "openalex": "W2782752818",
+      "year": 2018,
+      "title": "Polymer‐derived ceramic adsorbent for pollutant removal from water",
+      "why": "多孔 SiOC 吸附剂，非气凝胶"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2019.05.160",
+      "openalex": "W2946373940",
+      "year": 2019,
+      "title": "Monolithic silicon nitride-based aerogels with large specific surface area and low thermal conductivity",
+      "why": "RF/SiO2 气凝胶碳热氮化成 Si3N4，碳热路线"
+    },
+    {
+      "doi": "10.1016/j.cej.2019.122880",
+      "openalex": "W2974186207",
+      "year": 2019,
+      "title": "Synthesis and textural evolution of mesoporous Si3N4 aerogel with high specific surface area and excellent thermal insulation property via the urea assisted sol-gel technique",
+      "why": "尿素辅助溶胶-凝胶后碳热还原成 Si3N4，碳热路线"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2019.02.216",
+      "openalex": "W2921102249",
+      "year": 2019,
+      "title": "Synthesis of monolithic SiC aerogels with high mechanical strength and low thermal conductivity",
+      "why": "邻苯二酚-甲醛/SiO2 气凝胶碳热还原成 SiC，碳热路线"
+    },
+    {
+      "doi": "10.1021/acsapm.0c00734",
+      "openalex": "W3063852033",
+      "year": 2020,
+      "title": "Hot Air Permeable Preceramic Polymer Derived Reticulated Ceramic Foams",
+      "why": "PDC 网状泡沫陶瓷，非气凝胶"
+    },
+    {
+      "doi": "10.1021/acsami.0c12376",
+      "openalex": "W3088763420",
+      "year": 2020,
+      "title": "Polymer-Derived SiOC Integrated with a Graphene Aerogel As a Highly Stable Li-Ion Battery Anode",
+      "why": "PDC SiOC 负载于石墨烯气凝胶，气凝胶本身是碳"
+    },
+    {
+      "doi": "10.1039/d0ma00917b",
+      "openalex": "W3123159535",
+      "year": 2021,
+      "title": "Silicon oxycarbonitride ceramic containing nickel nanoparticles: from design to catalytic application",
+      "why": "Ni/SiOCN 高比表面催化剂，非气凝胶"
+    }
+  ],
+  "excluded": {
+    "background": [
+      {
+        "doi": "10.1038/127741a0",
+        "openalex": "W2042079661",
+        "year": 1931,
+        "title": "Coherent Expanded Aerogels and Jellies"
+      },
+      {
+        "doi": "10.1111/j.1151-2916.1990.tb05143.x",
+        "openalex": "W2123847529",
+        "year": 1990,
+        "title": "Synthesis and Characterization of Silicon Oxycarbide Glasses"
+      },
+      {
+        "doi": "10.1016/s0022-3093(05)80630-1",
+        "openalex": "W2071502371",
+        "year": 1992,
+        "title": "Silicon oxycarbides via sol-gel route: characterization of the pyrolysis process"
+      },
+      {
+        "doi": "10.1557/proc-271-795",
+        "openalex": "W2164522324",
+        "year": 1992,
+        "title": "The Role of Si-H Functionality in Oxycarbide Glass Synthesis"
+      },
+      {
+        "doi": "10.1007/bf00486362",
+        "openalex": "W2316983792",
+        "year": 1994,
+        "title": "Silicon oxycarbide glasses from gels"
+      },
+      {
+        "doi": "10.1038/382796a0",
+        "openalex": "W2042367586",
+        "year": 1996,
+        "title": "A silicoboron carbonitride ceramic stable to 2,000°C"
+      },
+      {
+        "doi": "10.1111/j.1151-2916.1998.tb02780.x",
+        "openalex": "W2153945461",
+        "year": 1998,
+        "title": "Amorphous Silicoboron Carbonitride Ceramic with Very High Viscosity at Temperatures above 1500°C"
+      },
+      {
+        "doi": "10.1023/a:1008779915809",
+        "openalex": "W143426376",
+        "year": 1999,
+        "title": "High Temperature Behavior of a Gel-Derived SiOC Glass: Elasticity and Viscosity"
+      },
+      {
+        "doi": "10.1023/a:1008765829012",
+        "openalex": "W1508015035",
+        "year": 1999,
+        "title": "Silicon Oxycarbide Glasses"
+      },
+      {
+        "doi": "10.1016/s0955-2219(99)00063-1",
+        "openalex": "W2092142082",
+        "year": 1999,
+        "title": "Thermal evolution and crystallisation of polydimethylsiloxane–zirconia nanocomposites prepared by the sol–gel method"
+      },
+      {
+        "doi": "10.1111/j.1151-2916.2001.tb00981.x",
+        "openalex": "W2108705976",
+        "year": 2001,
+        "title": "Sol‐Gel‐Derived Silicon‐Boron Oxycarbide Glasses Containing Mixed Silicon Oxycarbide (SiC x O 4− x ) and Boron Oxycarbide (BC y O 3− y ) Units"
+      },
+      {
+        "doi": "10.1111/j.1151-2916.2002.tb00308.x",
+        "openalex": "W2065906124",
+        "year": 2002,
+        "title": "Chemical Durability of Silicon Oxycarbide Glasses"
+      },
+      {
+        "doi": "10.1111/j.1551-2916.2009.03343.x",
+        "openalex": "W2109774183",
+        "year": 2009,
+        "title": "White Luminescence from Sol–Gel‐Derived SiOC Thin Films"
+      },
+      {
+        "doi": "10.1016/j.jeurceramsoc.2010.02.024",
+        "openalex": "W2076515440",
+        "year": 2010,
+        "title": "Giant piezoresistivity of polymer-derived ceramics at high temperatures"
+      },
+      {
+        "doi": "10.1111/jace.13233",
+        "openalex": "W1998453247",
+        "year": 2014,
+        "title": "White Si–O–C Ceramic: Structure and Thermodynamic Stability"
+      },
+      {
+        "doi": "10.1039/c7ta09236a",
+        "openalex": "W2768506669",
+        "year": 2017,
+        "title": "The Li-storage capacity of SiOC glasses with and without mixed silicon oxycarbide bonds"
+      }
+    ],
+    "review_or_book": [
+      {
+        "doi": "10.1021/cr0101306",
+        "openalex": "W2051194659",
+        "year": 2002,
+        "title": "Chemistry of Aerogels and Their Applications"
+      },
+      {
+        "doi": "10.2109/jcersj.114.425",
+        "openalex": "W2596223632",
+        "year": 2006,
+        "title": "Silicon-Based Polymer-Derived Ceramics: Synthesis Properties and Applications-A Review"
+      },
+      {
+        "doi": "10.1002/9780470320167.ch2",
+        "openalex": "W1479855267",
+        "year": 2008,
+        "title": "Carbon-Containing Monolithic Glasses via the Sol-Gel Process"
+      },
+      {
+        "doi": "10.1016/j.enbuild.2010.12.012",
+        "openalex": "W2056585993",
+        "year": 2010,
+        "title": "Aerogel insulation for building applications: A state-of-the-art review"
+      },
+      {
+        "doi": "10.1007/s10971-010-2164-2",
+        "openalex": "W2064390491",
+        "year": 2010,
+        "title": "Ambient pressure drying: a successful approach for the preparation of silica and silica based mixed oxide aerogels"
+      },
+      {
+        "doi": null,
+        "openalex": "W579397989",
+        "year": 2010,
+        "title": "Polymer derived ceramics : from nano-structure to applications"
+      },
+      {
+        "doi": "10.1088/1468-6996/11/4/044303",
+        "openalex": "W2132087367",
+        "year": 2010,
+        "title": "Processing of polysiloxane-derived porous ceramics: a review"
+      },
+      {
+        "doi": "10.1088/1468-6996/11/6/069801",
+        "openalex": "W3021004684",
+        "year": 2010,
+        "title": "Processing of polysiloxane-derived porous ceramics: a review"
+      },
+      {
+        "doi": "10.3390/ma6030941",
+        "openalex": "W1975918072",
+        "year": 2013,
+        "title": "A Special Material or a New State of Matter: A Review and Reconsideration of the Aerogel"
+      },
+      {
+        "doi": "10.1016/j.jconrel.2013.12.033",
+        "openalex": "W2015672013",
+        "year": 2014,
+        "title": "An emerging platform for drug delivery: Aerogel based systems"
+      },
+      {
+        "doi": "10.1007/978-3-319-04681-5_45",
+        "openalex": "W786130489",
+        "year": 2014,
+        "title": "Experimental Insulation Performance Evaluation of Aerogel for Household Refrigerators"
+      },
+      {
+        "doi": "10.1007/978-3-319-04681-5",
+        "openalex": "W645405680",
+        "year": 2014,
+        "title": "Progress in Exergy, Energy, and the Environment"
+      },
+      {
+        "doi": "10.1007/978-3-319-19454-7",
+        "openalex": "W2503904495",
+        "year": 2016,
+        "title": "Handbook of Sol-Gel Science and Technology"
+      },
+      {
+        "doi": "10.1016/j.mser.2016.05.001",
+        "openalex": "W2403706270",
+        "year": 2016,
+        "title": "Porous polymer derived ceramics"
+      },
+      {
+        "doi": "10.1007/s10971-016-3968-5",
+        "openalex": "W2292035093",
+        "year": 2016,
+        "title": "Review of aerogel-based materials in biomedical applications"
+      },
+      {
+        "doi": "10.1007/978-981-10-0440-7",
+        "openalex": "W2862750096",
+        "year": 2016,
+        "title": "Silica Aerogel Composites"
+      },
+      {
+        "doi": "10.1016/j.cis.2016.05.011",
+        "openalex": "W2414545839",
+        "year": 2016,
+        "title": "Synthesis and biomedical applications of aerogels: Possibilities and challenges"
+      },
+      {
+        "doi": "10.1002/anie.201611552",
+        "openalex": "W2584731085",
+        "year": 2017,
+        "title": "Modern Inorganic Aerogels"
+      },
+      {
+        "doi": "10.22078/jpst.2018.3348.1535",
+        "openalex": "W2913427050",
+        "year": 2018,
+        "title": "A Review of Aerogel Applications in Adsorption and Catalysis"
+      },
+      {
+        "doi": "10.1007/978-3-319-32101-1_121",
+        "openalex": "W2494629557",
+        "year": 2018,
+        "title": "Aerogels from Preceramic Polymers"
+      },
+      {
+        "doi": "10.1111/jace.16934",
+        "openalex": "W2990233046",
+        "year": 2019,
+        "title": "Closed porosity ceramics and glasses"
+      },
+      {
+        "doi": "10.1016/j.apmt.2019.100482",
+        "openalex": "W2981281411",
+        "year": 2019,
+        "title": "Review: Silicon oxycarbide based materials for biomedical applications"
+      },
+      {
+        "doi": "10.1039/c9ta04811a",
+        "openalex": "W2973628026",
+        "year": 2019,
+        "title": "Silica aerogel composites with embedded fibres: a review on their preparation, properties and applications"
+      },
+      {
+        "doi": "10.1016/j.carbpol.2019.115744",
+        "openalex": "W2996409978",
+        "year": 2019,
+        "title": "Synthesis of chitosan aerogels as promising carriers for drug delivery: A review"
+      },
+      {
+        "doi": "10.1016/j.cis.2020.102101",
+        "openalex": "W2999327598",
+        "year": 2020,
+        "title": "Advances in precursor system for silica-based aerogel production toward improved mechanical properties, customized morphology, and multifunctionality: A review"
+      },
+      {
+        "doi": "10.1016/j.carbon.2020.02.073",
+        "openalex": "W3008749659",
+        "year": 2020,
+        "title": "Recent advances in preparations and applications of carbon aerogels: A review"
+      }
+    ],
+    "other_aerogels": [
+      {
+        "doi": "10.1021/ma9812027",
+        "openalex": "W2037600345",
+        "year": 1999,
+        "title": "Growth Mechanism of Poly(divinylbenzene) Microspheres in Precipitation Polymerization"
+      },
+      {
+        "doi": "10.1039/b007591o",
+        "openalex": "W2013308421",
+        "year": 2001,
+        "title": "Electrically conductive oxide aerogels: new materials in electrochemistry"
+      },
+      {
+        "doi": "10.1016/s0254-0584(02)00207-9",
+        "openalex": "W2019154117",
+        "year": 2002,
+        "title": "Effect of glycerol additive on physical properties of hydrophobic silica aerogels"
+      },
+      {
+        "doi": "10.1002/adma.201204576",
+        "openalex": "W2163392372",
+        "year": 2013,
+        "title": "Multifunctional, Ultra‐Flyweight, Synergistically Assembled Carbon Aerogels"
+      },
+      {
+        "doi": "10.1039/c4nr00005f",
+        "openalex": "W2131872746",
+        "year": 2014,
+        "title": "Synthesis of nitrogen-doped activated graphene aerogel/gold nanoparticles and its application for electrochemical detection of hydroquinone and o-dihydroxybenzene"
+      },
+      {
+        "doi": "10.1016/j.sna.2015.03.006",
+        "openalex": "W2025512122",
+        "year": 2015,
+        "title": "Monolithic pyroelectric infrared detectors using SiO2 aerogel thin films"
+      },
+      {
+        "doi": "10.1002/app.44434",
+        "openalex": "W2519221204",
+        "year": 2016,
+        "title": "Microstructural, mechanical, and thermal‐insulation properties of poly(methyl methacrylate)/silica aerogel bimodal cellular foams"
+      },
+      {
+        "doi": "10.1039/c7nr00967d",
+        "openalex": "W2605895481",
+        "year": 2017,
+        "title": "Facile and novel synthesis of palladium nanoparticles supported on a carbon aerogel for ultrasensitive electrochemical sensing of biomolecules"
+      },
+      {
+        "doi": "10.1016/j.enbuild.2017.10.024",
+        "openalex": "W2764122126",
+        "year": 2017,
+        "title": "Hygro-thermal properties of silica aerogel blankets dried using microwave heating for building thermal insulation"
+      },
+      {
+        "doi": "10.1016/j.ceramint.2017.04.043",
+        "openalex": "W2604343377",
+        "year": 2017,
+        "title": "Novel whisker-reinforced Al 2 O 3 –SiO 2 aerogel composites with ultra-low thermal conductivity"
+      },
+      {
+        "doi": null,
+        "openalex": "W2746557599",
+        "year": 2017,
+        "title": "ポリ(メタクリル酸メチル)/シリカ・エーロゲル二峰セル発泡体のミクロ組織,機械および断熱特性【Powered by NICT】"
+      },
+      {
+        "doi": "10.1039/c7ee03031b",
+        "openalex": "W2782168734",
+        "year": 2018,
+        "title": "Graphene aerogels for efficient energy storage and conversion"
+      },
+      {
+        "doi": "10.1016/j.apsusc.2018.09.233",
+        "openalex": "W2894213069",
+        "year": 2018,
+        "title": "Trimethylamine detection of 3D rGO/mesoporous In2O3 nanocomposites at room temperature"
+      },
+      {
+        "doi": "10.1002/aoc.5073",
+        "openalex": "W2950771149",
+        "year": 2019,
+        "title": "3D hierarchical MnO2 aerogels with superhydrophobicity for selective oil–water separation"
+      },
+      {
+        "doi": "10.1039/c9ta00596j",
+        "openalex": "W2923042546",
+        "year": 2019,
+        "title": "A carbon aerogel with super mechanical and sensing performances for wearable piezoresistive sensors"
+      },
+      {
+        "doi": "10.1016/j.memsci.2019.117632",
+        "openalex": "W2989518619",
+        "year": 2019,
+        "title": "A polyvinylidene fluoride (PVDF)–silica aerogel (SiAG) insulating membrane for improvement of thermal efficiency during membrane distillation"
+      },
+      {
+        "doi": "10.1002/cplu.201900554",
+        "openalex": "W2988448988",
+        "year": 2019,
+        "title": "Calixarene‐Functionalized Porous Carbon Aerogels for Polysulfide Capture: Cathodes for High Performance Lithium‐Sulfur Batteries"
+      },
+      {
+        "doi": "10.1002/mp.13426",
+        "openalex": "W2914284440",
+        "year": 2019,
+        "title": "Density effects of silica aerogel insulation on the performance of a graphite probe calorimeter"
+      },
+      {
+        "doi": "10.1002/masy.201800242",
+        "openalex": "W2968948059",
+        "year": 2019,
+        "title": "Engineering of MoS2 Quantum Dots/PANI Aerogel for High Performance Supercapaciator"
+      },
+      {
+        "doi": "10.1002/er.4752",
+        "openalex": "W2966068255",
+        "year": 2019,
+        "title": "Fabrication of ultrafine Gd2O3nanoparticles/carbon aerogel composite as immobilization host for cathode for lithium‐sulfur batteries"
+      },
+      {
+        "doi": "10.1016/j.jallcom.2019.07.156",
+        "openalex": "W2958609340",
+        "year": 2019,
+        "title": "Fabrication of yttria-stabilized zirconia aerogel for high-performance thermal barrier coating"
+      },
+      {
+        "doi": "10.1002/cssc.201902970",
+        "openalex": "W2994642806",
+        "year": 2019,
+        "title": "Gel–Emulsion‐Templated Polymeric Aerogels for Water Treatment by Organic Liquid Removal and Solar Vapor Generation"
+      },
+      {
+        "doi": "10.1021/acsami.9b14688",
+        "openalex": "W2980548960",
+        "year": 2019,
+        "title": "Highly Compressible and Robust Polyimide/Carbon Nanotube Composite Aerogel for High-Performance Wearable Pressure Sensor"
+      },
+      {
+        "doi": "10.1002/slct.201902096",
+        "openalex": "W2981145267",
+        "year": 2019,
+        "title": "Hollow α‐Fe 2 O 3 Nanotubes Embedded in Graphene Aerogel as High‐Performance Anode Material for Lithium‐Ion Batteries"
+      },
+      {
+        "doi": "10.1002/wer.1162",
+        "openalex": "W2950749666",
+        "year": 2019,
+        "title": "Hybrid silica aerogel nanocomposite adsorbents designed for Cd(II) removal from aqueous solution"
+      },
+      {
+        "doi": "10.1002/ente.201901057",
+        "openalex": "W2990463813",
+        "year": 2019,
+        "title": "Improved Performance and Immobilizing Mechanism of N‐doping Carbon Aerogel with Net Channel via Long‐Chain Directing for Lithium–Sulfur Battery"
+      },
+      {
+        "doi": "10.1016/j.compscitech.2019.01.025",
+        "openalex": "W2911605369",
+        "year": 2019,
+        "title": "Lightweight, strong, and super-thermal insulating polyimide composite aerogels under high temperature"
+      },
+      {
+        "doi": "10.1002/aelm.201900537",
+        "openalex": "W2967506265",
+        "year": 2019,
+        "title": "MXene‐Reduced Graphene Oxide Aerogel for Aqueous Zinc‐Ion Hybrid Supercapacitor with Ultralong Cycle Life"
+      },
+      {
+        "doi": "10.1016/j.compositesb.2019.107624",
+        "openalex": "W2989610873",
+        "year": 2019,
+        "title": "Mechanically strong and thermally insulating polyimide aerogels by homogeneity reinforcement of electrospun nanofibers"
+      },
+      {
+        "doi": "10.1016/j.buildenv.2019.01.019",
+        "openalex": "W2911055195",
+        "year": 2019,
+        "title": "Multi-field and multi-scale characterization of novel super insulating panels/systems based on silica aerogels: Thermal, hydric, mechanical, acoustic, and fire performance"
+      },
+      {
+        "doi": "10.1002/er.4598",
+        "openalex": "W2945345531",
+        "year": 2019,
+        "title": "Niobium carbide/reduced graphene oxide hybrid porous aerogel as high capacity and long‐life anode material for Li‐ion batteries"
+      },
+      {
+        "doi": "10.1002/celc.201901951",
+        "openalex": "W2992450390",
+        "year": 2019,
+        "title": "Nitrogen‐Containing Carbon Aerogels with High Specific Surface Area for Supercapacitors"
+      },
+      {
+        "doi": "10.1002/pssr.201900534",
+        "openalex": "W2982277667",
+        "year": 2019,
+        "title": "Nitrogen‐Doped Porous Graphene‐Based Aerogels toward Efficient Heavy Metal Ion Adsorption and Supercapacitor Applications"
+      },
+      {
+        "doi": "10.1039/c9cc09092d",
+        "openalex": "W2991092829",
+        "year": 2019,
+        "title": "On-chip assembly of 3D graphene-based aerogels for chemiresistive gas sensing"
+      },
+      {
+        "doi": "10.1016/j.matlet.2019.126890",
+        "openalex": "W2982644790",
+        "year": 2019,
+        "title": "Polyvinylidene fluoride aerogel with high thermal stability and low thermal conductivity"
+      },
+      {
+        "doi": "10.1002/celc.201901549",
+        "openalex": "W2986657721",
+        "year": 2019,
+        "title": "Pseudocapacitance‐Enhanced Anode of CoP@C Particles Embedded in Graphene Aerogel toward Ultralong Cycling Stability Sodium‐Ion Batteries"
+      },
+      {
+        "doi": "10.1016/j.jnoncrysol.2019.02.004",
+        "openalex": "W2916957024",
+        "year": 2019,
+        "title": "Surface modified sodium silicate based superhydrophobic silica aerogels prepared via ambient pressure drying process"
+      },
+      {
+        "doi": "10.1016/j.applthermaleng.2019.114547",
+        "openalex": "W2980916947",
+        "year": 2019,
+        "title": "Thermal performance evaluation of glass window combining silica aerogels and phase change materials for cold climate of China"
+      },
+      {
+        "doi": "10.1002/admi.201900314",
+        "openalex": "W2947693537",
+        "year": 2019,
+        "title": "Ultralight and Flexible Monolithic Polymer Aerogel with Extraordinary Thermal Insulation by A Facile Ambient Process"
+      },
+      {
+        "doi": "10.1002/adfm.201904785",
+        "openalex": "W2964643219",
+        "year": 2019,
+        "title": "Ultra‐High Surface Area Nitrogen‐Doped Carbon Aerogels Derived From a Schiff‐Base Porous Organic Polymer Aerogel for CO2 Storage and Supercapacitors"
+      },
+      {
+        "doi": "10.1016/j.conbuildmat.2020.118709",
+        "openalex": "W3011570338",
+        "year": 2020,
+        "title": "A silica aerogel synthesized from olivine and its application as a photocatalytic support"
+      },
+      {
+        "doi": "10.1002/adma.201907932",
+        "openalex": "W3004585203",
+        "year": 2020,
+        "title": "Amyloid Fibrils Aerogel for Sustainable Removal of Organic Contaminants from Water"
+      },
+      {
+        "doi": "10.1002/mame.201900777",
+        "openalex": "W3007409735",
+        "year": 2020,
+        "title": "Double Dianhydride Backbone Polyimide Aerogels with Enhanced Thermal Insulation for High‐Temperature Applications"
+      },
+      {
+        "doi": "10.1007/s10924-020-01702-1",
+        "openalex": "W3012244083",
+        "year": 2020,
+        "title": "Efficient Removal of Dyes from Aqueous Solution by a Porous Sodium Alginate/gelatin/graphene Oxide Triple-network Composite Aerogel"
+      },
+      {
+        "doi": "10.1002/slct.201904375",
+        "openalex": "W3010063134",
+        "year": 2020,
+        "title": "Graphene Aerogel Modified Carbon Paper as Anode for Lithium‐Ion Batteries"
+      },
+      {
+        "doi": "10.1002/celc.201901999",
+        "openalex": "W2999157506",
+        "year": 2020,
+        "title": "Plasma‐Enabled Ternary SnO 2 @Sn/Nitrogen‐Doped Graphene Aerogel Anode for Sodium‐Ion Batteries"
+      }
+    ],
+    "not_pdc_route": [
+      {
+        "doi": "10.1088/2053-1591/aafaef",
+        "openalex": "W2905828864",
+        "year": 2018,
+        "title": "A novel SiC nanowire aerogel consisted of ultra long SiC nanowires"
+      },
+      {
+        "doi": "10.1126/science.aav7304",
+        "openalex": "W2912198485",
+        "year": 2019,
+        "title": "Double-negative-index ceramic aerogels for thermal superinsulation"
+      },
+      {
+        "doi": "10.1021/acsami.9b16811",
+        "openalex": "W2986139974",
+        "year": 2019,
+        "title": "Scalable Fabrication of Resilient SiC Nanowires Aerogels with Exceptional High-Temperature Stability"
+      }
+    ],
+    "method_or_theory": [
+      {
+        "doi": "10.1016/s0896-8446(03)00029-9",
+        "openalex": "W1980405524",
+        "year": 2003,
+        "title": "Supercritical and near-critical CO2 in green chemical synthesis and processing"
+      },
+      {
+        "doi": "10.1016/j.ijheatmasstransfer.2013.04.053",
+        "openalex": "W2017992402",
+        "year": 2013,
+        "title": "Effective thermal conductivity of the solid backbone of aerogel"
+      },
+      {
+        "doi": "10.1039/d0cp05520d",
+        "openalex": "W3135456222",
+        "year": 2021,
+        "title": "Differential hysteresis scanning of non-templated monomodal amorphous aerogels"
+      }
+    ]
+  }
+}
