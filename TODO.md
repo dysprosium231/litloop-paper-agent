@@ -19,9 +19,11 @@
   - **SiBCN 7 篇**：文章分属几个子问题，只用来观察，不用来验收。
   - 以后再加：金属/陶瓷互穿复合材料综述（10.1016/j.ceramint.2021.09.232），作为宽课题测试集。
 - [x] Zotero「LitLoop 测试 / 深度检索 · SiBCN」（种子 2、目标 5），以及 `tests/acceptance/sibcn_deep_search.json`（2026-10-15）。
-- [ ] 主测试集：写一句问题、挑 3 篇种子 → 用户确认 → `tests/acceptance/sic_al_infiltration.json`，并在 Zotero「LitLoop 测试」下建对应分类。
+- [x] 主测试集（2026-10-15，用户确认问题和种子）：`tests/acceptance/sic_al_infiltration.json`，Zotero「LitLoop 测试 / 深度检索 · SiC/Al」（种子 3、目标 19）。
+  - 种子按年代和预制体类型错开：2000 年颗粒预制体浸渗机理、2006 年三维网络预制体、2025 年粘结剂喷射打印预制体。
+  - 稻壳灰双层预制体那篇（2015）一度存疑，看摘要确认是一步无压浸渗，保留为目标。
 - [ ] 辅助测试集：取综述的参考文献 → 筛选 → 用户抽查 → JSON。
-- [ ] SiBCN 测试集的 JSON 标注为“跨子方向，仅观察”。
+- [x] SiBCN 测试集的 JSON 标注为“跨子方向，仅观察”（2026-10-15）。
 
 ## 接下来
 

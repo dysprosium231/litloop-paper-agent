@@ -1,0 +1,144 @@
+{
+  "name": "SiC/Al 无压浸渗",
+  "role": "main",
+  "purpose": "Stage 2 (deep search) main acceptance set: starting from the seeds and the question, find every target. Relevance was judged by the user, who collected these papers.",
+  "question": "无压浸渗法制备 SiC/Al 复合材料：铝合金自发浸渗 SiC 预制体（颗粒堆积、三维网络或互穿结构、增材制造预制体），涉及润湿以及 Si、Mg 的作用、界面反应（Al4C3）的控制、工艺条件，以及导热和力学等性能。",
+  "zotero_collection": "LitLoop 测试/深度检索 · SiC/Al",
+  "source": "User Zotero collection 1 陶瓷-金属复合材料/SiC/Al (2026-10-15); excluded: Nobel prize 2026 popular science background (off-topic).",
+  "seeds": [
+    {
+      "doi": "10.1023/a:1004758305801",
+      "zotero_key": "LQ52QUY6",
+      "year": 2000,
+      "title": "The role of silicon in wetting and pressureless infiltration of SiCp preforms by aluminum alloys"
+    },
+    {
+      "doi": "10.1016/j.matlet.2006.01.027",
+      "zotero_key": "U93A2IAG",
+      "year": 2006,
+      "title": "Fabrication of 3D-SiC network reinforced aluminum–matrix composites by pressureless infiltration"
+    },
+    {
+      "doi": "10.3390/jcs9030111",
+      "zotero_key": "UFQWHACZ",
+      "year": 2025,
+      "title": "Fabrication of SiC–aluminum composites via binder jetting 3D printing and infiltration: a feasibility study"
+    }
+  ],
+  "targets": [
+    {
+      "doi": "10.1007/bf00576541",
+      "zotero_key": "97YXV9C3",
+      "year": 1991,
+      "title": "The fabrication of metal matrix composites by a pressureless infiltration technique"
+    },
+    {
+      "doi": "10.1111/j.1151-2916.1996.tb07886.x",
+      "zotero_key": "2FFHIR4G",
+      "year": 1996,
+      "title": "Spontaneous infiltration of aluminum-silicon alloy into silicon carbide preforms in air"
+    },
+    {
+      "doi": "10.1023/a:1009421727757",
+      "zotero_key": "7D3I53F2",
+      "year": 2000,
+      "title": "Processing of Al–SiCp metal matrix composites by pressureless infiltration of SiCp preforms"
+    },
+    {
+      "doi": "10.1016/s0924-0136(00)00664-6",
+      "zotero_key": "F8K92ILX",
+      "year": 2000,
+      "title": "Optimum conditions for pressureless infiltration of SiCp preforms by aluminum alloys"
+    },
+    {
+      "doi": "10.1023/a:1014395730170",
+      "zotero_key": "5HH2A2DJ",
+      "year": 2002,
+      "title": "The production of Al-Mg alloy/SiC metal matrix composites by pressureless infiltration"
+    },
+    {
+      "doi": "10.1109/tepm.2005.862627",
+      "zotero_key": "DTIQAFZG",
+      "year": 2006,
+      "title": "Al/SiC carriers for microwave integrated circuits by a new technique of pressureless infiltration"
+    },
+    {
+      "doi": "10.1016/j.compscitech.2005.07.025",
+      "zotero_key": "GMFF2M2W",
+      "year": 2006,
+      "title": "Limiting the development of Al4C3 to prevent degradation of Al/SiCp composites processed by pressureless infiltration"
+    },
+    {
+      "doi": "10.1016/j.jmatprotec.2006.10.029",
+      "zotero_key": "B3TBAUUC",
+      "year": 2007,
+      "title": "Microstructure and impact behavior of Al/SiCp composites fabricated by pressureless infiltration with different types of SiCp"
+    },
+    {
+      "doi": "10.1016/j.jallcom.2007.01.127",
+      "zotero_key": "NTVSSDMU",
+      "year": 2008,
+      "title": "Effect of controlled interfacial reaction on the microstructure and properties of the SiCp/Al composites prepared by pressureless infiltration"
+    },
+    {
+      "doi": "10.1016/j.jallcom.2007.10.055",
+      "zotero_key": "DQE6368V",
+      "year": 2008,
+      "title": "Pressureless infiltration of liquid aluminum alloy into SiC preforms to form near-net-shape SiC/Al composites"
+    },
+    {
+      "doi": "10.3724/sp.j.1077.2012.00353",
+      "zotero_key": "NQ2CCSCJ",
+      "year": 2012,
+      "title": "Fabrication of oxidized SiC particles reinforced aluminum matrix composite by pressureless infiltration technique"
+    },
+    {
+      "doi": "10.1007/s10854-012-1037-6",
+      "zotero_key": "LBG7LXCA",
+      "year": 2013,
+      "title": "Microstructure and thermo-mechanical properties of SiCp/Al composites prepared by pressureless infiltration"
+    },
+    {
+      "doi": "10.1016/j.msea.2015.02.012",
+      "zotero_key": "XJ74M7AS",
+      "year": 2015,
+      "title": "Lamellar-interpenetrated Al–Si–Mg/SiC composites fabricated by freeze casting and pressureless infiltration"
+    },
+    {
+      "doi": "10.1016/j.jallcom.2015.04.194",
+      "zotero_key": "83XZXDVV",
+      "year": 2015,
+      "title": "Effect of rice-husk ash on properties of laminated and functionally graded Al/SiC composites by one-step pressureless infiltration"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2016.10.104",
+      "zotero_key": "YTT6V7L8",
+      "year": 2017,
+      "title": "Enhanced thermal conductive 3D-SiC/Al-Si-Mg interpenetrating composites fabricated by pressureless infiltration"
+    },
+    {
+      "doi": "10.1088/2053-1591/aa93b5",
+      "zotero_key": "M95EPWIA",
+      "year": 2017,
+      "title": "The influence of nickel coating on the interface of pressureless infiltrated with vibration Al–SiC composites"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2018.03.016",
+      "zotero_key": "2RNGM6CC",
+      "year": 2018,
+      "title": "Interface design in 3D-SiC/Al-Si-Mg interpenetrating composite fabricated by pressureless infiltration"
+    },
+    {
+      "doi": "10.1016/j.pnsc.2019.02.004",
+      "zotero_key": "U3GU8TXX",
+      "year": 2019,
+      "title": "Preparation and anisotropic thermophysical properties of SiC honeycomb/Al-Mg-Si composite via spontaneous infiltration"
+    },
+    {
+      "doi": "10.1016/j.ceramint.2021.05.147",
+      "zotero_key": "VDEAPXAJ",
+      "year": 2021,
+      "title": "Fabrication of 3D-SiC/aluminum alloy interpenetrating composites by DIW and pressureless infiltration"
+    }
+  ]
+}
