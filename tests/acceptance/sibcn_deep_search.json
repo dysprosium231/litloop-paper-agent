@@ -2,7 +2,7 @@
   "name": "深度检索 · SiBCN",
   "role": "observe",
   "note": "Targets span several sub-questions (aerogels, dense bulk, thermal-protection structures); used to observe behaviour, not to pass or fail stage 2.",
-  "purpose": "Stage 2 (deep search) acceptance: starting from the seeds, every target must be found.",
+  "purpose": "Stage 2 (deep search) observation set: how far each method gets from these seeds toward targets in neighbouring sub-questions.",
   "topic": "先驱体陶瓷（PDCs），尤其 SiBCN 的制备与应用：隔热/防热、吸波、成型",
   "zotero_collection": "LitLoop 测试/深度检索 · SiBCN",
   "seeds": [
