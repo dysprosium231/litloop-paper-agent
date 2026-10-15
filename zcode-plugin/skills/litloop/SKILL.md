@@ -73,6 +73,15 @@ litloop search "关键词" --limit 10 --sort cited_by_count   # 13源引擎,失�
 5. **呈现**：中文表格，列为 序号、相关度、文章、年份、期刊/分区、理由。**序号和顺序一律用 save 返回的 `numbering`**（保存时会按相关度重排），不要用自己发送时的顺序。`retracted` 标“⚠已撤稿”，`concern` 标“⚠关注声明”，`journal_warning` 标“⚠预警期刊”。不相关的文章也列出（可折叠在最后），**不替用户删除任何文章**。附上会话的 Markdown 文件路径。
 6. **用户选择**：用户说“要 1、3、5”后调用 `litloop_screening(action="decide", session=..., selected=[...], rejected=[...], out_file=...)` 记录。每次 decide 记录的是**完整选择**，会覆盖上一次；用户追加或改选时传入全部选中项。把返回的 `chosen` 列表（序号 + 标题）念给用户核对，再按需要下载（`litloop_batch_download`）或推送 Zotero。
 
+### 深度检索（要把一个课题查全时）
+
+1. 标准确认后，请用户给 1–3 篇确定相关的种子文章（DOI）；没有时先用 `litloop_search` 找几篇请用户认。
+2. `litloop_deep_search(action="start", question=..., queries=[4–8 组英文检索词], seeds=[DOI], core_terms=[1–3 个核心词], criteria=[...])`，返回第一批（默认 30 篇）和 `session`。用户给了必找文章时传 `must_find=[DOI]`，结果的 `coverage` 会报告每篇的状态。
+3. 逐篇判断后用 `litloop_screening(action="save", session=..., mode="deep", items=[...])` 保存，**这一批每篇都要评**，没评的下一批会再出现。
+4. `litloop_deep_search(action="next", session=...)` 取下一批。评为“高”的文章会自动成为新种子；从第二批起排序由模型根据全部评分学习（`ranked_by="model"`），所以“低 / 不相关”也要如实评。
+5. 返回 `stop_suggested=true` 时，把 `stop_reason` 告诉用户并建议停止；用户要继续就接着 `next`。随时可以用 `action="status"` 看已筛篇数和各相关度数量。
+6. 筛完后按上面第 5、6 步呈现和让用户选择。跨了多批之后编号会变，**decide 时优先传 DOI**。
+
 ## 场景 → 工具链(常见意图直接对号入座)
 
 | 用户说 | 动作 |

@@ -379,6 +379,7 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
 
 def next_batch(session: str) -> dict[str, Any]:
     """Fold the agent's latest ratings back in (高 papers become seeds) and serve the next batch."""
+    t0 = time.time()
     state = _load(session)
     rated = _ratings(state)
     new_seeds = [k for k, rel in rated.items() if rel == "高" and k in state["pool"] and k not in state["seeds"]]
@@ -386,10 +387,15 @@ def next_batch(session: str) -> dict[str, Any]:
     if new_seeds:
         added = _expand(state, new_seeds)
         _score(state)
-    state["rounds"].append({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "event": "next",
-                            "new_seeds": len(new_seeds), "pool_added": added})
+    t1 = time.time()
+    rnd = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "event": "next", "new_seeds": len(new_seeds),
+           "pool_added": added, "expand_seconds": round(t1 - t0, 1)}
+    state["rounds"].append(rnd)
     _save(state)
-    return _next_batch(state, rated)
+    out = _next_batch(state, rated)
+    rnd["rank_seconds"] = round(time.time() - t1, 1)  # abstracts, model, journal ranks
+    _save(state)
+    return out
 
 
 def status(session: str) -> dict[str, Any]:
