@@ -49,6 +49,7 @@ ABSTRACT_CHARS = 1500
 PREFILL = 150          # fetch missing abstracts for this many top candidates before ranking
 MIN_LABELS = (3, 5)    # positives (高 + seeds), negatives (中/低/不相关) before the model takes over
 PSEUDO_NEGATIVES = 100
+TITLE_WEIGHT = 0.3     # extra weight of each title word in the ranking model
 KNEE_RATIO = 6         # stop when 高 per batch falls below 1/6 of the best batch
 WORKERS = 4            # parallel OpenAlex requests (each chunk of 50 ids is independent)
 
@@ -282,6 +283,9 @@ def _features(state: dict[str, Any]) -> dict[str, dict[str, float]]:
         norm = math.sqrt(sum(x * x for x in v.values())) or 1.0
         v = {w: x / norm for w, x in v.items()}
         r = pool[k]
+        # Title words again, on their own: a title says what the paper is about
+        # better than the abstract, and is all there is when the abstract is missing.
+        v.update({"t:" + w: TITLE_WEIGHT for w in _tokens({"title": r.get("title")})})
         v["_coupling"] = math.log1p(r.get("anchored", 0)) / 3
         v["_queries"] = r.get("query_hits", 0) / nq
         v["_no_abstract"] = 0.0 if r.get("abstract") else 1.0
