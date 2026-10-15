@@ -1,8 +1,9 @@
 name: Publisher canaries
 
+# Manual only (2026-10-15): GitHub's US runners cannot test the institutional
+# channels LitLoop mostly uses, and they see a different network than users in
+# China. Run it from the Actions tab, or locally: python scripts/canary.py
 on:
-  schedule:
-    - cron: "0 4 * * 1,4" # Mondays & Thursdays 04:00 UTC
   workflow_dispatch:
 
 jobs:

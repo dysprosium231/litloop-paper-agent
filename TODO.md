@@ -11,7 +11,6 @@
 
 1. 用测试集验收阶段 2：主测试集 SiC/Al 必须达标；辅助测试集 PDC 气凝胶只测召回率；SiBCN 只观察。
 2. 评估 easyseek 调 OpenAlex 用 `search=`（会匹配正文全文）与 `title_and_abstract.search` 的取舍：前者噪音多，后者可能漏掉只在正文提到的文章。
-3. 快速检索提速：扩大候选池后单组 5–30 秒。
 
 ## 待办池
 
@@ -19,6 +18,7 @@
 - [ ] 阶段 3：系统综述支持（PRISMA 式统计、纳入排除理由，中断后可续跑）。
 - [ ] 阶段 4：定期追踪（保存检索式，只推送新文章）。
 - [ ] 中文文献（知网、万方）。
+- [ ] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。
 
 ### 分析归纳
 - [ ] 从全文抽取要点、做对比表、起草综述。
@@ -28,7 +28,7 @@
 - [ ] **新版本提醒**：每周后台检查 LitLoop、scansci-find（easyseek）、zotero-mcp 是否有新版本，有则在检索/下载结果里提示“运行 scripts/deploy.py 更新”。只提醒，不自动安装。
 - [x] ZCode 插件的技能文档补上“检索与筛选”流程和 Zotero 本地推送（2026-10-15）。
 - [ ] 三份技能文档已经分叉，需要合成一份来源、生成其余副本：`skills/litloop/SKILL.md`（简短入口）、`skill/SKILL.md`（完整参考，还写着 17 个工具）、`zcode-plugin/skills/litloop/SKILL.md`（中文操作手册）。`litloop-sort` 也有两份不同的。
-- [ ] 出版商巡检工作流（canary.yml）是否改为只手动触发：待用户决定。
+- [x] 出版商巡检工作流（canary.yml）改为只手动触发（2026-10-15，用户同意）：GitHub 的美国服务器测不了机构渠道，网络环境也和国内不同；需要时在 Actions 页面手动运行，或在本机运行 `python scripts/canary.py`。
 
 ### 期刊分区插件
 见 [litloop-journal-rank 的 TODO](https://github.com/dysprosium231/litloop-journal-rank/blob/main/TODO.md)（机构数据、公开发布前移除分区数据等）。
