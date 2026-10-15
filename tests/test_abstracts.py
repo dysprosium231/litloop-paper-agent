@@ -111,3 +111,26 @@ def test_semantic_scholar_batches_are_chunked_and_odd_replies_ignored(monkeypatc
     got = a._semantic_scholar(dois, 5)
     assert sizes == [500, 500]          # second reply was not a list: stop asking
     assert got == {"10.1/0": "text"}
+
+
+def test_scopus_retries_when_throttled_and_stops_only_when_the_quota_is_spent(monkeypatch):
+    replies = []
+
+    class R:
+        def __init__(self, code, remaining=None, text=""):
+            self.status_code, self.headers, self.text = code, ({"X-RateLimit-Remaining": remaining} if remaining else {}), text
+
+        def json(self):
+            return {"abstracts-retrieval-response": {"coredata": {"dc:description": self.text}}}
+
+    class S:
+        def get(self, *a, **k):
+            return replies.pop(0)
+
+    monkeypatch.setattr(a, "_session", lambda: S())
+    monkeypatch.setattr(a.time, "sleep", lambda s: None)
+    scopus = a._Scopus("k")
+    replies[:] = [R(429), R(200, text="found")]          # throttled once, then fine
+    assert scopus.get("10.1016/x", 5) == "found" and not scopus.exhausted
+    replies[:] = [R(429, remaining="0")]                  # weekly quota spent
+    assert scopus.get("10.1016/y", 5) == "" and scopus.exhausted

@@ -20,6 +20,7 @@ from __future__ import annotations
 import html
 import os
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeout
@@ -104,30 +105,42 @@ def _semantic_scholar(dois: list[str], timeout: float) -> dict[str, str]:
 
 
 class _Scopus:
+    """Scopus abstract lookups. At most CONCURRENCY at a time: more trips the
+    per-second throttle, which answers 429 like a spent weekly quota does."""
+
+    CONCURRENCY = 5
+
     def __init__(self, key: str):
         self.key = key
-        self.exhausted = False  # quota hit: stop asking this run
+        self.exhausted = False  # weekly quota spent: stop asking this run
+        self._slots = threading.Semaphore(self.CONCURRENCY)
 
     def get(self, doi: str, timeout: float) -> str:
-        if self.exhausted:
-            return ""
-        try:
-            r = _session().get(f"https://api.elsevier.com/content/abstract/doi/{doi}",
-                               headers={"X-ELS-APIKey": self.key, "Accept": "application/json"},
-                               timeout=timeout)
-        except requests.RequestException:
-            return ""
-        if r.status_code == 429:
-            self.exhausted = True
-            log.warning("abstracts: Scopus quota exhausted")
-            return ""
-        if r.status_code != 200:
-            return ""
-        try:
-            core = (r.json().get("abstracts-retrieval-response") or {}).get("coredata") or {}
-        except ValueError:
-            return ""
-        return str(core.get("dc:description") or "")
+        for attempt in range(3):
+            if self.exhausted:
+                return ""
+            with self._slots:
+                try:
+                    r = _session().get(f"https://api.elsevier.com/content/abstract/doi/{doi}",
+                                       headers={"X-ELS-APIKey": self.key, "Accept": "application/json"},
+                                       timeout=timeout)
+                except requests.RequestException:
+                    return ""
+            if r.status_code == 429:
+                if r.headers.get("X-RateLimit-Remaining") == "0":
+                    self.exhausted = True
+                    log.warning("abstracts: Scopus weekly quota exhausted")
+                    return ""
+                time.sleep(1.0 + attempt)  # throttled: slow down and retry
+                continue
+            if r.status_code != 200:
+                return ""
+            try:
+                core = (r.json().get("abstracts-retrieval-response") or {}).get("coredata") or {}
+            except ValueError:
+                return ""
+            return str(core.get("dc:description") or "")
+        return ""
 
 
 def _crossref(doi: str, timeout: float) -> str:
@@ -136,6 +149,9 @@ def _crossref(doi: str, timeout: float) -> str:
         return str(r.json().get("message", {}).get("abstract") or "") if r.status_code == 200 else ""
     except (requests.RequestException, ValueError):
         return ""
+
+
+ELSEVIER_PREFIX = "10.1016/"
 
 
 def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None = None,
@@ -167,13 +183,17 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
         # All sources at once, first answer wins: asking them in turn made one
         # slow source (Semantic Scholar without a key often takes 10 s or more)
         # hold up abstracts another source returns in a second.
-        pool = ThreadPoolExecutor(max_workers=8)
+        # Scopus jobs are queued before Crossref ones, and Elsevier DOIs skip
+        # Crossref (Elsevier does not deposit abstracts there): with 150
+        # papers to fill, Crossref calls queued alongside used to crowd the
+        # Scopus ones out of the budget.
+        pool = ThreadPoolExecutor(max_workers=12)
         try:
             jobs = [pool.submit(lambda: ("semantic_scholar", _semantic_scholar(list(missing), min(8.0, left()))))]
-            for doi in missing:
-                if scopus:
-                    jobs.append(pool.submit(ask, "scopus", doi))
-                jobs.append(pool.submit(ask, "crossref", doi))
+            if scopus:
+                jobs += [pool.submit(ask, "scopus", doi) for doi in missing]
+            jobs += [pool.submit(ask, "crossref", doi) for doi in missing
+                     if not (scopus and doi.startswith(ELSEVIER_PREFIX))]
             for job in as_completed(jobs, timeout=max(0.1, deadline - time.monotonic())):
                 res = job.result()
                 if res[0] == "semantic_scholar":
