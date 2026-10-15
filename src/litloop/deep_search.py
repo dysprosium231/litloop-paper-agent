@@ -9,12 +9,15 @@ routes and hands it to the agent in ranked batches for screening:
   core term in title/abstract, plus the seeds' own references and citing works.
 
 On the acceptance sets neither route alone found most targets, together they
-did (TODO.md, 2026-10-15). Candidates are ranked by
+did (TODO.md, 2026-10-15). The first batch is ranked by
 
-    score = shared references with the seeds + 2 x queries the record fully matches
+    score = shared references with the seeds (anchored to the user's seeds)
+            + 2 x queries the record fully matches
 
-Papers the agent rates 高 join the seeds, so later batches follow what the
-user actually wants (snowballing). A batch with almost nothing relevant, or
+From then on a small model trained on every rating so far ranks the rest
+(continuous active learning, see ``_rerank``), and missing abstracts of the
+top candidates are fetched before ranking. Papers the agent rates 高 join the
+seeds, so later batches follow what the user actually wants (snowballing). A batch with almost nothing relevant, or
 the screening cap, ends the search with a stated reason.
 
 Ratings live in the screening session (``litloop_screening``); this module
@@ -24,7 +27,11 @@ keeps the pool next to it as ``<session>.pool.json``.
 from __future__ import annotations
 
 import json
+import math
+import random
+import re
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -39,6 +46,9 @@ _FIELDS = ("id,doi,title,publication_year,cited_by_count,referenced_works,"
            "abstract_inverted_index,primary_location,authorships")
 QUERY_WEIGHT = 2
 ABSTRACT_CHARS = 1500
+PREFILL = 150          # fetch missing abstracts for this many top candidates before ranking
+MIN_LABELS = (3, 5)    # positives (高 + seeds), negatives (中/低/不相关) before the model takes over
+PSEUDO_NEGATIVES = 100
 
 
 # --------------------------------------------------------------------------- OpenAlex
@@ -162,18 +172,126 @@ def _add(pool: dict[str, dict], rec: dict[str, Any], via: str) -> None:
         have["via"].append(via)
 
 
-def _score(pool: dict[str, dict], seed_refs: set[str], queries: list[str]) -> None:
+def _score(state: dict[str, Any]) -> None:
+    """Formula score: anchored coupling + QUERY_WEIGHT x fully matched queries.
+
+    References of the user's own seeds count fully; references that only
+    snowballed seeds cite count by how many seeds share them (1/3 each, at most
+    1), so a seed set drifting toward a neighbouring topic cannot outvote the
+    original intent.
+    """
     from .search import _match_tier
+    pool = state["pool"]
+    seed_refs = set(state["seed_refs"])
+    orig_refs = {r for s in _orig_seeds(state) for r in (pool.get(s, {}).get("refs") or [])}
+    seed_df = Counter(r for s in state["seeds"] for r in set(pool.get(s, {}).get("refs") or []))
     hits = {k: 0 for k in pool}
-    for q in queries:
+    for q in state["queries"]:
         rows = [{"title": r["title"], "abstract": r.get("abstract") or "", "_k": k} for k, r in pool.items()]
         for row in _match_tier(rows, q):
             if row["_tier"] == 0:
                 hits[row["_k"]] += 1
     for k, r in pool.items():
-        r["coupling"] = sum(1 for ref in (r.get("refs") or []) if ref in seed_refs)
+        shared = [ref for ref in (r.get("refs") or []) if ref in seed_refs]
+        r["coupling"] = len(shared)
+        r["anchored"] = round(sum(1.0 if ref in orig_refs else min(1.0, seed_df[ref] / 3) for ref in shared), 2)
         r["query_hits"] = hits[k]
-        r["score"] = r["coupling"] + QUERY_WEIGHT * r["query_hits"]
+        r["score"] = r["anchored"] + QUERY_WEIGHT * r["query_hits"]
+        r["rank"] = r["score"]
+
+
+def _orig_seeds(state: dict[str, Any]) -> list[str]:
+    return state.get("orig_seeds") or state["seeds"][:3]
+
+
+# --------------------------------------------------------------------------- ranking model
+#
+# Continuous active learning, the usual way screening tools for systematic
+# reviews rank: after every batch, train a small logistic regression on all
+# ratings so far (高 and the seeds against 中/低/不相关, plus a random sample of
+# unscreened papers standing in as negatives) and rank the rest by it.
+# Negative ratings pull the ranking back when snowballing drifts. On the
+# SiC/Al set, after the first 90 ratings, the 6 targets still unscreened
+# ranked [18, 39, 68, 70, 98, 1196] by the old formula and [9, 19, 30, 38, 52,
+# 56] by the model (TODO.md, 2026-10-15).
+
+_WORD = re.compile(r"[a-z][a-z0-9]+")
+_STOP = set("the and of in for with by on to a an is are was were from as at this that these be or its "
+            "their which we our into than also".split())
+
+
+def _tokens(rec: dict[str, Any]) -> Counter:
+    text = (rec.get("title") or "") + " " + (rec.get("abstract") or "")
+    return Counter(w[:7] for w in _WORD.findall(text.lower()) if w not in _STOP)
+
+
+def _features(state: dict[str, Any]) -> dict[str, dict[str, float]]:
+    pool = state["pool"]
+    docs = {k: _tokens(r) for k, r in pool.items()}
+    df = Counter(w for c in docs.values() for w in c)
+    n, nq = len(pool), max(1, len(state["queries"]))
+    out = {}
+    for k, c in docs.items():
+        v = {w: (1 + math.log(m)) * math.log(n / df[w]) for w, m in c.items() if df[w] >= 2}
+        norm = math.sqrt(sum(x * x for x in v.values())) or 1.0
+        v = {w: x / norm for w, x in v.items()}
+        r = pool[k]
+        v["_coupling"] = math.log1p(r.get("anchored", 0)) / 3
+        v["_queries"] = r.get("query_hits", 0) / nq
+        v["_no_abstract"] = 0.0 if r.get("abstract") else 1.0
+        out[k] = v
+    return out
+
+
+def _train(examples: list[tuple[dict[str, float], int]], epochs: int = 60, lr: float = 0.5,
+           l2: float = 1e-3) -> Counter:
+    w: Counter = Counter()
+    for _ in range(epochs):
+        for v, y in examples:
+            z = sum(w[f] * x for f, x in v.items()) + w["_bias"]
+            g = 1 / (1 + math.exp(-max(-30.0, min(30.0, z)))) - y
+            for f, x in v.items():
+                w[f] -= lr * (g * x + l2 * w[f])
+            w["_bias"] -= lr * g
+    return w
+
+
+def _rerank(state: dict[str, Any], rated: dict[str, str]) -> str:
+    """Set every record's ``rank``; returns "model" or "formula"."""
+    pool, seeds = state["pool"], set(state["seeds"])
+    pos = {k for k, r in rated.items() if r == "高" and k in pool} | {k for k in seeds if k in pool}
+    neg = [k for k, r in rated.items() if r != "高" and k in pool]
+    if len(pos) < MIN_LABELS[0] or len(neg) < MIN_LABELS[1]:
+        for r in pool.values():
+            r["rank"] = r.get("score", 0)
+        return "formula"
+    rng = random.Random(len(rated))  # same ratings, same ranking
+    unscreened = sorted(k for k in pool if k not in rated and k not in seeds)
+    pseudo = rng.sample(unscreened, min(PSEUDO_NEGATIVES, len(unscreened)))
+    feats = _features(state)
+    examples = [(feats[k], 1) for k in sorted(pos)] + [(feats[k], 0) for k in neg + pseudo]
+    rng.shuffle(examples)
+    w = _train(examples)
+    for k, r in pool.items():
+        r["rank"] = round(sum(w[f] * x for f, x in feats[k].items()) + w["_bias"], 4)
+    return "model"
+
+
+def _prefill_abstracts(state: dict[str, Any], rated: dict[str, str]) -> int:
+    """Fetch abstracts for the top unscreened candidates that lack one, once each.
+
+    Ranking reads abstracts, so a paper without one used to sink and never
+    reach a batch, which is where its abstract would have been fetched.
+    """
+    from .abstracts import fill_abstracts
+    top = [state["pool"][k] for k in _ranked(state) if k not in rated][:PREFILL]
+    todo = [r for r in top if not r.get("abstract") and not r.get("abstract_tried") and r.get("doi")]
+    if not todo:
+        return 0
+    fill_abstracts(todo, load_config(), budget_s=30.0)
+    for r in todo:
+        r["abstract_tried"] = True
+    return sum(1 for r in todo if r.get("abstract"))
 
 
 def _pool_path(session: str):
@@ -247,11 +365,12 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
     for rec in _by_filter("doi", missing):
         _add(pool, rec, "metadata")
     state = {"session": session, "question": question, "queries": queries, "core_terms": core_terms,
+             "orig_seeds": [_key(r) for r in seed_recs],
              "year_from": year_from, "year_to": year_to, "batch_size": batch_size, "cap": cap,
              "must_find": [d.lower() for d in (must_find or [])], "seeds": [], "seed_refs": [],
              "queried_refs": [], "served": [], "rounds": [], "pool": pool}
     _expand(state, [_key(r) for r in seed_recs])
-    _score(pool, set(state["seed_refs"]), queries)
+    _score(state)
     state["rounds"].append({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "event": "start",
                             "pool": len(pool), "seconds": round(time.time() - t0, 1)})
     _save(state)
@@ -266,7 +385,7 @@ def next_batch(session: str) -> dict[str, Any]:
     added = 0
     if new_seeds:
         added = _expand(state, new_seeds)
-        _score(state["pool"], set(state["seed_refs"]), state["queries"])
+        _score(state)
     state["rounds"].append({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "event": "next",
                             "new_seeds": len(new_seeds), "pool_added": added})
     _save(state)
@@ -298,8 +417,9 @@ def _ratings(state: dict[str, Any]) -> dict[str, str]:
 
 def _ranked(state: dict[str, Any]) -> list[str]:
     seeds = set(state["seeds"])
-    return sorted((k for k in state["pool"] if k not in seeds),
-                  key=lambda k: (-state["pool"][k].get("score", 0), -(state["pool"][k].get("cited_by_count") or 0)))
+    pool = state["pool"]
+    return sorted((k for k in pool if k not in seeds),
+                  key=lambda k: (-pool[k].get("rank", pool[k].get("score", 0)), -(pool[k].get("cited_by_count") or 0)))
 
 
 def _stop(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any]:
@@ -335,6 +455,10 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
     from .search import _add_journal_rank, _flag_retractions
     rated = rated if rated is not None else _ratings(state)
     stop = _stop(state, rated)
+    if not stop["stop_suggested"]:
+        if _prefill_abstracts(state, rated):
+            _score(state)
+        state["ranked_by"] = _rerank(state, rated)
     served_before = {k for b in state["served"] for k in b}
     order = [k for k in _ranked(state) if k not in rated]
     fresh = [k for k in order if k not in served_before]
@@ -362,7 +486,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
         state["served"].append([k for k in picked if k not in served_before])
         _save(state)
     return {"session": state["session"], "pool": len(state["pool"]), "screened": len(rated),
-            "remaining": len(order) - len(picked), "batch": batch,
+            "remaining": len(order) - len(picked), "ranked_by": state.get("ranked_by", "formula"), "batch": batch,
             "coverage": _coverage(state, rated, _ranked(state)), **stop,
             "next_step": ("rate every paper in batch, save with litloop_screening(action='save', "
                           "session=..., mode='deep'), then call action='next'") if batch else

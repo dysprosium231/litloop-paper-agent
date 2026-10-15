@@ -121,3 +121,53 @@ def test_rated_paper_without_doi_is_not_served_again(net, monkeypatch):
     nxt = deep_search.next_batch(out["session"])
     assert nxt["screened"] == len(out["batch"])
     assert not [b for b in nxt["batch"] if b["doi"] is None]
+
+
+def _state(pool, seeds, orig, queries=("pressureless infiltration SiC aluminum",)):
+    return {"pool": pool, "seeds": list(seeds), "orig_seeds": list(orig), "queries": list(queries),
+            "seed_refs": sorted({r for s in seeds for r in pool[s]["refs"]})}
+
+
+def test_references_only_snowballed_seeds_cite_count_less():
+    pool = {k: rec(k, t, refs=r) for k, t, r in [
+        ("10.1/o", "orig seed", ["A", "B"]), ("10.1/s", "snowballed seed", ["C", "D"]),
+        ("10.1/on", "on topic", ["A", "B"]), ("10.1/drift", "neighbouring topic", ["C", "D"])]}
+    st = _state(pool, ["10.1/o", "10.1/s"], ["10.1/o"])
+    deep_search._score(st)
+    assert pool["10.1/on"]["coupling"] == pool["10.1/drift"]["coupling"] == 2
+    assert pool["10.1/on"]["anchored"] == 2 and pool["10.1/drift"]["anchored"] < 1
+
+
+def test_model_learns_from_negative_ratings():
+    on = "pressureless infiltration of SiC preforms by molten aluminium alloys wetting magnesium"
+    off = "supergravity infiltration of copper into tungsten skeletons under centrifugal force"
+    pool = {}
+    for i in range(8):
+        pool[f"10.1/on{i}"] = rec(f"10.1/on{i}", f"paper {i}", abstract=on)
+        pool[f"10.1/off{i}"] = rec(f"10.1/off{i}", f"paper {i}", abstract=off)
+    pool["10.1/new_on"] = rec("10.1/new_on", "x", abstract=on)
+    pool["10.1/new_off"] = rec("10.1/new_off", "y", abstract=off)
+    st = _state(pool, ["10.1/on0"], ["10.1/on0"])
+    deep_search._score(st)
+    few = {"10.1/on1": "高"}
+    assert deep_search._rerank(st, few) == "formula"
+    rated = {f"10.1/on{i}": "高" for i in range(1, 6)} | {f"10.1/off{i}": "低" for i in range(6)}
+    assert deep_search._rerank(st, rated) == "model"
+    assert pool["10.1/new_on"]["rank"] > pool["10.1/new_off"]["rank"]
+
+
+def test_missing_abstracts_of_top_candidates_are_fetched_once(monkeypatch):
+    import litloop.abstracts as ab
+    calls = []
+
+    def fill(items, cfg=None, **kw):
+        calls.append([it["doi"] for it in items])
+        for it in items:
+            it["abstract"] = "fetched" if it["doi"] == "10.1/a" else ""
+
+    monkeypatch.setattr(ab, "fill_abstracts", fill)
+    pool = {"10.1/a": rec("10.1/a", "A"), "10.1/b": rec("10.1/b", "B"), "10.1/c": rec("10.1/c", "C", abstract="has")}
+    st = _state(pool, [], [])
+    assert deep_search._prefill_abstracts(st, {}) == 1
+    assert sorted(calls[0]) == ["10.1/a", "10.1/b"]
+    assert deep_search._prefill_abstracts(st, {}) == 0 and len(calls) == 1   # not asked again
