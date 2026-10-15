@@ -1,0 +1,24 @@
+{
+  "name": "深度检索 · SiBCN",
+  "purpose": "Stage 2 (deep search) acceptance: starting from the seeds, every target must be found.",
+  "topic": "先驱体陶瓷（PDCs），尤其 SiBCN 的制备与应用：隔热/防热、吸波、成型",
+  "zotero_collection": "LitLoop 测试/深度检索 · SiBCN",
+  "seeds": [
+    {"doi": "10.1016/j.ceramint.2024.08.002", "zotero_key": "LS2QENPA",
+     "title": "Microwave absorption and thermal insulation integrated polymer-derived SiBCN/SiBCNnf ceramic aerogel with enhanced mechanical property"},
+    {"doi": "10.1016/j.jeurceramsoc.2018.06.046", "zotero_key": "32ARS28E",
+     "title": "The fabrication of SiBCN ceramic components from preceramic polymers by digital light processing (DLP) 3D printing technology"}
+  ],
+  "targets": [
+    {"doi": "10.1111/jace.19480", "zotero_key": "876UMPRC",
+     "title": "Polysilazane hybrid phenolic resin ceramic aerogels with excellent electromagnetic wave absorption performance"},
+    {"doi": "10.1016/j.ceramint.2024.11.211", "zotero_key": "B5UNQZKT",
+     "title": "Lightweight and resilient SiBCNa/mullite/SiCnw composite for thermal insulation and electromagnetic wave absorption"},
+    {"doi": "10.1016/j.cej.2024.156158", "zotero_key": "QQ5QIGND",
+     "title": "Construction of ZrC@SiC shell-core structure in SiBCN aerogel for enhanced thermal stability and thermal insulation"},
+    {"doi": "10.1016/j.ceramint.2020.01.037", "zotero_key": "CND3MJKU",
+     "title": "A pyrolysis heating rate based pressureless method for preparing dense and crack-free polymer-derived silicon oxycarbide bulk ceramics"},
+    {"doi": "10.1016/j.jeurceramsoc.2024.05.052", "zotero_key": "G5D8TSKY",
+     "title": "Graphite-assisted structural design of hierarchically porous SiC(rGO) PDCs with excellent capacity in thermal protection/insulation and load bearing for hypersonic vehicles"}
+  ]
+}
