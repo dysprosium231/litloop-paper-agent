@@ -49,6 +49,7 @@ ABSTRACT_CHARS = 1500
 PREFILL = 150          # fetch missing abstracts for this many top candidates before ranking
 MIN_LABELS = (3, 5)    # positives (高 + seeds), negatives (中/低/不相关) before the model takes over
 PSEUDO_NEGATIVES = 100
+WORKERS = 4            # parallel OpenAlex requests (each chunk of 50 ids is independent)
 
 
 # --------------------------------------------------------------------------- OpenAlex
@@ -101,13 +102,24 @@ def _year_filter(year_from: int | None, year_to: int | None) -> list[str]:
     return out
 
 
+def _parallel(fn, args: list) -> list:
+    """``[fn(a) for a in args]`` with WORKERS threads, results in order and concatenated."""
+    if len(args) <= 1:
+        return [x for a in args for x in fn(a)]
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        return [x for part in ex.map(fn, args) for x in part]
+
+
+def _chunks(values: list[str], n: int = 50) -> list[list[str]]:
+    return [values[i:i + n] for i in range(0, len(values), n)]
+
+
 def _by_filter(field: str, values: list[str], extra: list[str] | None = None) -> list[dict[str, Any]]:
     """Fetch works whose ``field`` is any of ``values`` (50 per request)."""
-    out = []
-    for i in range(0, len(values), 50):
-        flt = ",".join([f"{field}:" + "|".join(values[i:i + 50])] + (extra or []))
-        out += _get({"filter": flt, "per-page": 50, "select": _FIELDS}).get("results") or []
-    return [_record(w) for w in out]
+    def one(chunk: list[str]) -> list[dict[str, Any]]:
+        flt = ",".join([f"{field}:" + "|".join(chunk)] + (extra or []))
+        return _get({"filter": flt, "per-page": 50, "select": _FIELDS}).get("results") or []
+    return [_record(w) for w in _parallel(one, _chunks(values))]
 
 
 def _pages(flt: str, max_records: int) -> list[dict[str, Any]]:
@@ -120,10 +132,8 @@ def _pages(flt: str, max_records: int) -> list[dict[str, Any]]:
 
 
 def _citing(work_ids: list[str], years: list[str], max_records: int = 400) -> list[dict[str, Any]]:
-    out = []
-    for i in range(0, len(work_ids), 50):
-        out += _pages(",".join(["cites:" + "|".join(work_ids[i:i + 50])] + years), max_records)
-    return out
+    return _parallel(lambda chunk: _pages(",".join(["cites:" + "|".join(chunk)] + years), max_records),
+                     _chunks(work_ids))
 
 
 def _topic_search(term: str) -> str:
@@ -142,11 +152,13 @@ def _topic_search(term: str) -> str:
 def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[str],
                          max_records: int = 1000) -> list[dict[str, Any]]:
     """Works citing any of ``ref_ids`` whose title/abstract mentions a core term."""
-    out = []
-    for term in core_terms or [""]:
+    jobs = [(term, chunk) for term in (core_terms or [""]) for chunk in _chunks(ref_ids)]
+
+    def one(job: tuple[str, list[str]]) -> list[dict[str, Any]]:
+        term, chunk = job
         topic = [f"title_and_abstract.search:{_topic_search(term)}"] if term else []
-        for i in range(0, len(ref_ids), 50):
-            out += _pages(",".join(["cites:" + "|".join(ref_ids[i:i + 50])] + topic + years), max_records)
+        return _pages(",".join(["cites:" + "|".join(chunk)] + topic + years), max_records)
+    out = _parallel(one, jobs)
     return out
 
 
@@ -297,8 +309,11 @@ def _prefill_abstracts(state: dict[str, Any], rated: dict[str, str]) -> int:
     reach a batch, which is where its abstract would have been fetched.
     """
     from .abstracts import fill_abstracts
-    top = [state["pool"][k] for k in _ranked(state) if k not in rated][:PREFILL]
-    todo = [r for r in top if not r.get("abstract") and not r.get("abstract_tried") and r.get("doi")]
+    # Pick among the papers that lack one: they rank low for that very reason, so
+    # taking the overall top PREFILL would reach almost none of them.
+    todo = [r for k in _ranked(state) if k not in rated
+            for r in [state["pool"][k]] if not r.get("abstract") and not r.get("abstract_tried") and r.get("doi")]
+    todo = todo[:PREFILL]
     if not todo:
         return 0
     fill_abstracts(todo, load_config(), budget_s=30.0)

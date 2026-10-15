@@ -173,6 +173,28 @@ def test_missing_abstracts_of_top_candidates_are_fetched_once(monkeypatch):
     assert deep_search._prefill_abstracts(st, {}) == 0 and len(calls) == 1   # not asked again
 
 
+def test_prefill_abstracts_picks_among_records_lacking_abstract(monkeypatch):
+    import litloop.abstracts as ab
+    monkeypatch.setattr(deep_search, "PREFILL", 2)
+    calls = []
+
+    def fill(items, cfg=None, **kw):
+        calls.append([it["doi"] for it in items])
+
+    monkeypatch.setattr(ab, "fill_abstracts", fill)
+    pool = {
+        "10.1/top1": dict(rec("10.1/top1", "Top 1", abstract="has"), rank=5.0),
+        "10.1/top2": dict(rec("10.1/top2", "Top 2", abstract="has"), rank=4.0),
+        "10.1/top3": dict(rec("10.1/top3", "Top 3", abstract="has"), rank=3.0),
+        "10.1/low1": dict(rec("10.1/low1", "Low 1", abstract=""), rank=2.0),
+        "10.1/low2": dict(rec("10.1/low2", "Low 2", abstract=""), rank=1.0),
+    }
+    st = _state(pool, [], [])
+    deep_search._prefill_abstracts(st, {})
+    assert len(calls) == 1
+    assert calls[0] == ["10.1/low1", "10.1/low2"]
+
+
 def test_topic_search_expands_alternatives_and_handles_punctuation():
     assert deep_search._topic_search("aluminum SiC") == "aluminum SiC"
     assert deep_search._topic_search("Al|aluminum|aluminium SiC") == "(Al OR aluminum OR aluminium) AND SiC"
