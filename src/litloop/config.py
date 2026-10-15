@@ -107,6 +107,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     #   browser_auto_upgrade: True 时自动探测本机 Chrome/Edge（版本 > 146 优先于内置 stealth Chromium）
     "browser_executable": "",
     "browser_auto_upgrade": True,
+    # browser_executable 指向本机 Chrome 的副本时，启动前若系统 Chrome 已升级就同步更新副本
+    "browser_copy_follow_system": True,
     "is_campus_network": False,
     "tor_proxy": os.environ.get("TOR_PROXY", ""),
     "tor_use_bridges": False,

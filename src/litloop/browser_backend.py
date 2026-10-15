@@ -241,6 +241,10 @@ def _patchright_browser_kwargs(config: dict[str, Any] | None) -> dict[str, Any]:
             # litloop-chrome.exe name; the system Chrome shares its name with the
             # user's own browser and cannot be singled out anyway.
             dedicated = "program files" not in explicit.lower()
+            if dedicated and cfg.get("browser_copy_follow_system", True):
+                # A copy of the installed Chrome falls behind when Chrome updates.
+                from .chrome_copy import refresh_chrome_copy
+                refresh_chrome_copy(explicit)
             return {"executable_path": stable_browser_alias(explicit) if dedicated else explicit}
         logger.warning("browser_backend: browser_executable '%s' not found, using channel=chrome", explicit)
     return {"channel": "chrome"}
