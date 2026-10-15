@@ -29,7 +29,8 @@
 ### 维护
 - [ ] **真 Chrome 副本自动跟随**：启动浏览器前比较系统 Chrome 与 `~/.litloop/chrome-real` 的版本号，不一致就重新复制（含 `litloop-chrome.exe` 硬链接）。版本落后会让出版商更容易识别为机器人。
 - [ ] **新版本提醒**：每周后台检查 LitLoop、scansci-find（easyseek）、zotero-mcp 是否有新版本，有则在检索/下载结果里提示“运行 scripts/deploy.py 更新”。只提醒，不自动安装。
-- [ ] ZCode 插件里的技能文档落后于主版本，缺少筛选流程。
+- [x] ZCode 插件的技能文档补上“检索与筛选”流程和 Zotero 本地推送（2026-10-15）。
+- [ ] 三份技能文档已经分叉，需要合成一份来源、生成其余副本：`skills/litloop/SKILL.md`（简短入口）、`skill/SKILL.md`（完整参考，还写着 17 个工具）、`zcode-plugin/skills/litloop/SKILL.md`（中文操作手册）。`litloop-sort` 也有两份不同的。
 - [ ] 出版商巡检工作流（canary.yml）是否改为只手动触发：待用户决定。
 
 ### 期刊分区插件

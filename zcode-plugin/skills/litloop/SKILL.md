@@ -60,6 +60,19 @@ litloop search "关键词" --limit 10 --sort cited_by_count   # 13源引擎,失�
 
 搜作者优先用 `--author "Dabo Guan"` 或 OpenAlex `--author-id`,别把人名放 query(全文匹配会混入同名/被引提及)。引文格式(citation: bibtex/ris/endnote)仅 MCP 支持。发现层:CLI `plan → estimate → find --out <dir>`,再 `build-queue <dir> --out queue.txt` 接 batch。OpenAlex 配额按 IP 每日计(429 就降级 Unpaywall 单点并发);Unpaywall 批量端点常 500,自写单点并发脚本更稳。
 
+## 检索与筛选（AI 给理由，用户决定）
+
+用户要找文献时按这个流程，不要直接甩一个列表：
+
+1. **定标准**：把问题拆成 2–5 条纳入标准（研究对象、关注性质或现象、方法、文章类型、年份）。
+   - 快速查找：直接写在结果上方，不等确认。
+   - 课题调研、综述等深度检索：先列出标准请用户确认或修改，再检索。
+2. **检索**：`litloop_search` 用英文关键词；中文问题先译成英文检索词，必要时换 2–3 组同义词分别检索。用户在意期刊质量时用 `max_cas_zone` / `max_cas_sub_zone` / `max_jcr_quartile` / `exclude_warning`，不要擅自加过滤。
+3. **逐篇判断**：读每篇的标题和 `abstract`，按标准给相关度 **高 / 中 / 低 / 不相关**，写一句中文理由，说明它对应哪条标准、缺了什么。`abstract_missing` 的文章在理由里注明“仅凭标题”。不要编造摘要里没有的内容。
+4. **保存**：`litloop_screening(action="save", question=..., criteria=[...], query=..., mode="quick"|"deep", items=[{doi, title, year, journal, journal_rank, cited_by_count, abstract_missing, retracted, concern, relevance, reason}, ...])`。同一课题的后续检索传 `session=` 合并进同一会话。
+5. **呈现**：中文表格，列为 序号、相关度、文章、年份、期刊/分区、理由。**序号和顺序一律用 save 返回的 `numbering`**（保存时会按相关度重排），不要用自己发送时的顺序。`retracted` 标“⚠已撤稿”，`concern` 标“⚠关注声明”，`journal_warning` 标“⚠预警期刊”。不相关的文章也列出（可折叠在最后），**不替用户删除任何文章**。附上会话的 Markdown 文件路径。
+6. **用户选择**：用户说“要 1、3、5”后调用 `litloop_screening(action="decide", session=..., selected=[...], rejected=[...], out_file=...)` 记录。每次 decide 记录的是**完整选择**，会覆盖上一次；用户追加或改选时传入全部选中项。把返回的 `chosen` 列表（序号 + 标题）念给用户核对，再按需要下载（`litloop_batch_download`）或推送 Zotero。
+
 ## 场景 → 工具链(常见意图直接对号入座)
 
 | 用户说 | 动作 |
@@ -71,6 +84,8 @@ litloop search "关键词" --limit 10 --sort cited_by_count   # 13源引擎,失�
 | "上次有失败的,补齐" | `batch --retry <output>/batch_results.json`(自动读失败清单重跑) |
 | "模糊引用('Wang 2023 CRISPR 那篇')" | 先 `search "Wang 2023 CRISPR"` 拿候选让用户确认,别硬猜 DOI |
 | 系统性文献发现(PRSIMA/引文追链/高召回多源检索) | 装了 `scansci-find` skill/CLI → 用它;没装 → 本地降级链 `search → verify → resolve-oa → build-queue → batch --lanes`(Find 系 MCP 工具需要可选的 scansci-find CLI) |
+| "帮我找某课题的文献/筛一筛" | 按上面“检索与筛选”流程：定标准 → `litloop_search` → 逐篇给相关度和理由 → `litloop_screening` 保存，用户挑选后 `decide` |
+| "放进 Zotero" | `litloop_zotero_push`（经 zotero-mcp；授权本地写入后直接写进本机 Zotero，同步交给 Zotero） |
 | "只要合法来源" | `legal_only` 策略或 `--scihub` 反选 |
 
 队列文件格式(机器可读,人也能手编):`identifier<TAB>channel<TAB>oa_url`,channel ∈ oa/elsevier/grey/institution/auto;`search --out` 与 csv/xlsx 解析自动打标(10.1016→elsevier)。`batch --lanes` 按车道调度:Elsevier API/OA 快车道并行 HTTP → 灰色源竞速 → 机构级联串行,失败逐级溢流。
