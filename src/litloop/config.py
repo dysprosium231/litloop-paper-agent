@@ -147,6 +147,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 
+ENV_KEYS = {"openalex_api_key": "OPENALEX_API_KEY", "elsevier_api_key": "ELSEVIER_API_KEY"}
+
+
 def load_config() -> dict[str, Any]:
     config = DEFAULT_CONFIG.copy()
     if CONFIG_FILE.exists():
@@ -159,10 +162,15 @@ def load_config() -> dict[str, Any]:
             pass
     for key, value in DEFAULT_CONFIG.items():
         config.setdefault(key, value)
+    for key, env in ENV_KEYS.items():  # the config file wins; the environment fills the gap
+        if not config.get(key) and os.environ.get(env):
+            config[key] = os.environ[env]
     return config
 
 
 def save_config(config: dict[str, Any]) -> None:
+    # Keys that came from the environment stay there: never write them to disk.
+    config = {k: ("" if k in ENV_KEYS and v and v == os.environ.get(ENV_KEYS[k]) else v) for k, v in config.items()}
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with CONFIG_FILE.open("w", encoding="utf-8") as fh:
         json.dump(config, fh, indent=2, ensure_ascii=False)
