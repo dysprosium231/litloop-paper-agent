@@ -157,15 +157,30 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
     """Works citing any of ``ref_ids`` whose title/abstract mentions a core term."""
     jobs = [(term, chunk) for term in (core_terms or [""]) for chunk in _chunks(ref_ids)]
 
-    def one(job: tuple[str, list[str]]) -> list[dict[str, Any]]:
-        term, chunk = job
+    def flt(term: str, chunk: list[str]) -> str:
         topic = [f"title_and_abstract.search:{_topic_search(term)}"] if term else []
-        got = _pages(",".join(["cites:" + "|".join(chunk)] + topic + years), max_records)
-        if len(got) >= max_records and len(chunk) > 1:  # hit the cap: split rather than lose the rest
-            half = len(chunk) // 2
-            return one((term, chunk[:half])) + one((term, chunk[half:]))
-        return got
-    return _parallel(one, jobs)
+        return ",".join(["cites:" + "|".join(chunk)] + topic + years)
+
+    def one(job: tuple[str, list[str]]) -> list[tuple[bool, list[dict[str, Any]]]]:
+        term, chunk = job
+        if len(chunk) > 1:  # ask for the count first: fetching 1000 records only to split is slow
+            count = (_get({"filter": flt(term, chunk), "per-page": 1, "select": "id"}).get("meta") or {}).get("count", 0)
+            if count > max_records:
+                return [(True, [])]
+        return [(False, _pages(flt(term, chunk), max_records))]
+
+    out: list[dict[str, Any]] = []
+    while jobs:  # a query over the cap is split in halves and asked again, all in parallel
+        results = _parallel(one, jobs)
+        again = []
+        for (term, chunk), (split, got) in zip(jobs, results):
+            if split:
+                half = len(chunk) // 2
+                again += [(term, chunk[:half]), (term, chunk[half:])]
+            else:
+                out += got
+        jobs = again
+    return out
 
 
 # --------------------------------------------------------------------------- pool

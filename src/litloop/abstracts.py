@@ -21,7 +21,8 @@ import html
 import os
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeout
 from typing import Any
 
 import requests
@@ -157,25 +158,35 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
                 missing[doi]["abstract"] = text
                 missing[doi]["abstract_source"] = source
 
-        with ThreadPoolExecutor(max_workers=6) as pool:
-            # With a Scopus key, Elsevier DOIs go straight to Scopus (the free
-            # sources rarely have them) while one Semantic Scholar request
-            # covers the rest; its batch call can take 10 s, so it is capped.
-            elsevier = [d for d in missing if d.startswith("10.1016/")] if scopus else []
-            s2_dois = [d for d in missing if d not in elsevier]
-            s2_job = pool.submit(_semantic_scholar, s2_dois, min(8.0, left()))
-            for doi, text in zip(elsevier, pool.map(lambda d: scopus.get(d, min(15.0, left())), elsevier)):
-                take(doi, text, "scopus")
-            for doi, text in s2_job.result().items():
-                take(doi, text, "semantic_scholar")
-            rest = [d for d, r in missing.items() if not r["abstract"]]
-            if scopus and rest and time.monotonic() < deadline:
-                for doi, text in zip(rest, pool.map(lambda d: scopus.get(d, min(15.0, left())), rest)):
-                    take(doi, text, "scopus")
-            rest = [d for d, r in missing.items() if not r["abstract"]]
-            if rest and time.monotonic() < deadline:
-                for doi, text in zip(rest, pool.map(lambda d: _crossref(d, min(15.0, left())), rest)):
-                    take(doi, text, "crossref")
+        def ask(source: str, doi: str) -> tuple[str, str, str]:
+            if missing[doi]["abstract"] or time.monotonic() >= deadline:  # another source was faster
+                return source, doi, ""
+            fetch = scopus.get if source == "scopus" else _crossref
+            return source, doi, fetch(doi, min(15.0, left()))
+
+        # All sources at once, first answer wins: asking them in turn made one
+        # slow source (Semantic Scholar without a key often takes 10 s or more)
+        # hold up abstracts another source returns in a second.
+        pool = ThreadPoolExecutor(max_workers=8)
+        try:
+            jobs = [pool.submit(lambda: ("semantic_scholar", _semantic_scholar(list(missing), min(8.0, left()))))]
+            for doi in missing:
+                if scopus:
+                    jobs.append(pool.submit(ask, "scopus", doi))
+                jobs.append(pool.submit(ask, "crossref", doi))
+            for job in as_completed(jobs, timeout=max(0.1, deadline - time.monotonic())):
+                res = job.result()
+                if res[0] == "semantic_scholar":
+                    for doi, text in res[1].items():
+                        take(doi, text, "semantic_scholar")
+                else:
+                    take(res[1], res[2], res[0])
+                if all(r["abstract"] for r in missing.values()):
+                    break
+        except FuturesTimeout:
+            log.debug("abstracts: budget used up")
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)  # do not wait for the slow ones
     for r in results:
         if not r["abstract"]:
             r["abstract_missing"] = True  # judge from the title only

@@ -10,11 +10,12 @@
     "review_year": 2021,
     "references_listed": 148,
     "references_resolved": 141,
-    "curated": "2026-10-15; titles and abstracts read by the agent (missing abstracts fetched via Scopus); the user decided carbothermal-route aerogels are borderline, not targets"
+    "curated": "2026-10-15; titles and abstracts read by the agent (missing abstracts fetched via Scopus); the user decided carbothermal-route aerogels are borderline, not targets",
+    "rules_revised": "2026-10-15: the user decided a preceramic-polymer precursor makes it the PDC route even when the conversion is carbothermal (e.g. bridged polysilsesquioxane aerogels)"
   },
   "rules": {
-    "target": "research article on a ceramic aerogel made by the polymer-derived ceramic route, or on materials made from such an aerogel",
-    "borderline": "porous PDC that is not an aerogel, ceramic aerogels made by carbothermal reduction of hybrid gels, or route unknown; reported separately, not required",
+    "target": "research article on a ceramic aerogel made from a preceramic polymer (polysiloxane, polysilsesquioxane, polycarbosilane, polysilazane, ...) by pyrolysis or by carbothermal reduction, or on materials made from such an aerogel",
+    "borderline": "porous PDC that is not an aerogel, ceramic aerogels made by carbothermal reduction of hybrid gels without a preceramic polymer (resorcinol/novolac-formaldehyde with silica), or route unknown; reported separately, not required",
     "excluded": "reviews and books, background on dense PDC glasses, other aerogel families (silica, carbon, graphene, polymer, oxide), ceramic aerogels made by CVD, methods and theory"
   },
   "seeds": [

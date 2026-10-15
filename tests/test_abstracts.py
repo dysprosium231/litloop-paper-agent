@@ -18,10 +18,14 @@ def test_very_long_abstract_keeps_head_and_conclusion():
     assert len(out) < 4000 and out.startswith("start") and out.endswith("conclusion.")
 
 
-def test_fill_order_free_first_then_scopus_then_crossref(monkeypatch):
+def test_fill_asks_all_sources_and_keeps_the_first_answer(monkeypatch):
+    import time
     calls = []
-    monkeypatch.setattr(a, "_semantic_scholar",
-                        lambda dois, timeout: calls.append(("s2", tuple(dois))) or {"10.1111/b": "S2 text"})
+
+    def s2(dois, timeout):
+        calls.append(("s2", tuple(dois)))
+        time.sleep(0.3)  # slower than the others
+        return {"10.1111/b": "S2 text", "10.1002/c": "S2 c"}
 
     class FakeScopus:
         def __init__(self, key):
@@ -29,19 +33,32 @@ def test_fill_order_free_first_then_scopus_then_crossref(monkeypatch):
 
         def get(self, doi, timeout):
             calls.append(("scopus", doi))
-            return "Scopus text. © 2020 Elsevier Ltd." if doi == "10.1016/a" else ""
+            return {"10.1016/a": "Scopus text. © 2020 Elsevier Ltd.", "10.1111/b": "Scopus b"}.get(doi, "")
 
+    monkeypatch.setattr(a, "_semantic_scholar", s2)
     monkeypatch.setattr(a, "_Scopus", FakeScopus)
     monkeypatch.setattr(a, "_crossref", lambda doi, timeout: calls.append(("crossref", doi)) or
                         ("<jats:p>CR text</jats:p>" if doi == "10.1002/c" else ""))
     rows = [{"doi": "10.1016/A", "abstract": ""}, {"doi": "10.1111/b"}, {"doi": "10.1002/c"},
             {"doi": "10.1007/d"}, {"doi": "10.9/e", "abstract": "<p>Already here</p>", "source": "openalex"}]
     a.fill_abstracts(rows, {"elsevier_api_key": "k"})
-    assert [r.get("abstract_source") for r in rows] == ["scopus", "semantic_scholar", "crossref", None, "openalex"]
-    assert rows[0]["abstract"] == "Scopus text." and rows[4]["abstract"] == "Already here"
-    assert rows[3]["abstract_missing"] is True
-    assert ("s2", ("10.1111/b", "10.1002/c", "10.1007/d")) in calls  # Elsevier skipped S2
-    assert ("scopus", "10.1111/b") not in calls  # S2 already had it
+    # Scopus and Crossref answered before the slow Semantic Scholar call
+    assert [r.get("abstract_source") for r in rows] == ["scopus", "scopus", "crossref", None, "openalex"]
+    assert rows[0]["abstract"] == "Scopus text." and rows[2]["abstract"] == "CR text"
+    assert rows[4]["abstract"] == "Already here" and rows[3]["abstract_missing"] is True
+    assert ("s2", ("10.1016/a", "10.1111/b", "10.1002/c", "10.1007/d")) in calls
+
+
+def test_fill_does_not_wait_for_a_slow_source_once_everything_is_found(monkeypatch):
+    import time
+    monkeypatch.setattr(a, "_semantic_scholar", lambda dois, timeout: time.sleep(3) or {})
+    monkeypatch.setattr(a, "_Scopus", lambda key: (_ for _ in ()).throw(AssertionError("no key given")))
+    monkeypatch.setattr(a, "_crossref", lambda doi, timeout: "found")
+    rows = [{"doi": "10.1/x"}, {"doi": "10.1/y"}]
+    t0 = time.monotonic()
+    a.fill_abstracts(rows, {})
+    assert time.monotonic() - t0 < 1.5
+    assert [r["abstract_source"] for r in rows] == ["crossref", "crossref"]
 
 
 def test_no_elsevier_key_uses_free_sources_only(monkeypatch):

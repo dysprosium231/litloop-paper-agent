@@ -235,7 +235,12 @@ def test_citation_query_that_hits_the_cap_is_split(monkeypatch):
         seen.append(len(ids))
         return [rec(f"10.1/{i}_{n}", "t") for i in ids for n in range(2)][:max_records]
 
+    def count(params):
+        ids = params["filter"].split("cites:")[1].split(",")[0].split("|")
+        return {"meta": {"count": 2 * len(ids)}}
+
     monkeypatch.setattr(deep_search, "_pages", pages)
-    out = deep_search._cites_refs_on_topic(["A", "B", "C", "D"], ["x"], [], max_records=4)
+    monkeypatch.setattr(deep_search, "_get", count)
+    out = deep_search._cites_refs_on_topic(["A", "B", "C", "D"], ["x"], [], max_records=3)
     assert len({r["doi"] for r in out}) == 8          # nothing lost to the cap
-    assert seen[0] == 4 and 1 in seen                 # split down to single references
+    assert sorted(seen) == [1, 1, 1, 1]               # over the cap: split before fetching anything
