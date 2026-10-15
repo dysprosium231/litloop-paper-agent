@@ -49,7 +49,7 @@ _FIELDS = ("id,doi,title,publication_year,cited_by_count,referenced_works,"
 NON_PAPER = {"dataset", "paratext", "erratum", "reference-entry", "book-review", "editorial",
              "peer-review", "grant", "standard", "retraction", "supplementary-materials", "libguides"}
 QUERY_WEIGHT = 2
-ABSTRACT_CHARS = 1500
+ABSTRACT_CHARS = 1200   # per paper in a batch; a batch of 20 stays under ~30 KB for the agent
 PREFILL = 150          # fetch missing abstracts for this many top candidates before ranking
 MIN_LABELS = (3, 5)    # positives (高 + seeds), negatives (中/低/不相关) before the model takes over
 PSEUDO_NEGATIVES = 100
@@ -396,7 +396,7 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
 def start(question: str, queries: list[str], seeds: list[str], core_terms: list[str], *,
           criteria: list[str] | None = None, must_find: list[str] | None = None,
           year_from: int | None = None, year_to: int | None = None,
-          batch_size: int = 30, cap: int = 200) -> dict[str, Any]:
+          batch_size: int = 20, cap: int = 200) -> dict[str, Any]:
     """Build the pool and return the first batch to screen."""
     if not queries:
         raise ValueError("give 4-8 English queries")
@@ -454,6 +454,39 @@ def next_batch(session: str) -> dict[str, Any]:
     rnd["rank_seconds"] = round(time.time() - t1, 1)  # abstracts, model, journal ranks
     _save(state)
     return out
+
+
+def rate(session: str, ratings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Save the agent's ratings for the latest batch by number: [{"n": 3, "relevance": "高", "reason": "..."}].
+
+    Title, DOI, year and journal come from the batch, so the agent writes only
+    its judgement. Nothing is saved if any number or relevance is invalid.
+    """
+    state = _load(session)
+    batch = state.get("last_batch") or []
+    if not batch:
+        raise ValueError("no batch to rate yet; call action='start' or 'next' first")
+    items, bad = [], []
+    for r in ratings or []:
+        try:
+            n = int(r.get("n"))
+        except (TypeError, ValueError):
+            n = 0
+        rel = str(r.get("relevance") or "").strip()
+        if not 1 <= n <= len(batch) or rel not in screening.RELEVANCE:
+            bad.append(r)
+            continue
+        b = batch[n - 1]
+        items.append({**{f: b.get(f) for f in ("doi", "title", "year", "journal", "journal_rank", "retracted", "concern")},
+                      "relevance": rel, "reason": str(r.get("reason") or rel)})
+    if bad:
+        raise ValueError(f"nothing saved: invalid entries {bad[:3]}; n is 1-{len(batch)}, "
+                         f"relevance one of {'/'.join(screening.RELEVANCE)}")
+    saved = screening.save("", items, session=session, mode="deep")
+    done = {int(r["n"]) for r in ratings}
+    return {"session": session, "saved": len(items), "total": saved["total"], "by_relevance": saved["by_relevance"],
+            "not_rated": [i for i in range(1, len(batch) + 1) if i not in done],
+            "next_step": "action='next'" if len(done) == len(batch) else "rate the papers in not_rated, then action='next'"}
 
 
 def status(session: str) -> dict[str, Any]:
@@ -551,23 +584,27 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
         _add_journal_rank(items)
         _flag_retractions(items)
     batch = []
-    for k, it in zip(picked, items):
+    for n, (k, it) in enumerate(zip(picked, items), 1):
         batch.append({
-            "doi": it.get("doi"), "title": it["title"], "year": it.get("year"), "journal": it.get("journal"),
-            "journal_rank": it.get("journal_rank"), "authors": it.get("authors"),
+            "n": n, "doi": it.get("doi"), "title": it["title"], "year": it.get("year"), "journal": it.get("journal"),
+            "journal_rank": it.get("journal_rank"), "authors": (it.get("authors") or [])[:3],
             "cited_by_count": it.get("cited_by_count"),
             "abstract": clean_abstract(it.get("abstract") or "")[:ABSTRACT_CHARS],
             "abstract_missing": not it.get("abstract"),
             "retracted": it.get("retracted") or None, "concern": it.get("concern") or None,
             "why": {"shared_refs_with_seeds": it.get("coupling", 0), "queries_matched": it.get("query_hits", 0),
-                    "found_via": it.get("via", [])[:4]},
+                    "found_via": it.get("via", [])[:2]},
         })
     if picked:
         state["served"].append([k for k in picked if k not in served_before])
+        # What action="rate" needs to turn "n=3 高" back into a screening item.
+        state["last_batch"] = [{"key": k, **{f: it.get(f) for f in ("doi", "title", "year", "journal", "journal_rank",
+                                                                     "retracted", "concern")}}
+                               for k, it in zip(picked, items)]
         _save(state)
     return {"session": state["session"], "pool": len(state["pool"]), "screened": len(rated),
             "remaining": len(order) - len(picked), "ranked_by": state.get("ranked_by", "formula"), "batch": batch,
             "coverage": _coverage(state, rated, _ranked(state)), **stop,
-            "next_step": ("rate every paper in batch, save with litloop_screening(action='save', "
-                          "session=..., mode='deep'), then call action='next'") if batch else
+            "next_step": ("rate every paper: action='rate', session=..., ratings=[{n, relevance, reason}], "
+                          "then action='next'") if batch else
                          "stop: show the user the screening session and let them choose"}

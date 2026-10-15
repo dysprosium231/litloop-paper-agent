@@ -251,3 +251,16 @@ def test_non_papers_stay_out_of_the_pool():
     deep_search._add(pool, dict(rec("10.1/data", "Survey data"), type="dataset"), "cites_seed")
     deep_search._add(pool, dict(rec("10.1/chap", "A chapter"), type="book-chapter"), "cites_seed")
     assert list(pool) == ["10.1/chap"]
+
+
+def test_rate_by_number_fills_in_the_paper_and_rejects_bad_entries(net):
+    out = deep_search.start("q", ["pressureless infiltration SiC aluminum"], ["10.1/seed"], ["aluminum"], batch_size=10)
+    sid, batch = out["session"], out["batch"]
+    assert [b["n"] for b in batch] == list(range(1, len(batch) + 1))
+    with pytest.raises(ValueError):
+        deep_search.rate(sid, [{"n": 1, "relevance": "高"}, {"n": 99, "relevance": "高"}])
+    assert screening.load(sid)["items"] == []                      # nothing saved on a bad entry
+    res = deep_search.rate(sid, [{"n": 1, "relevance": "高", "reason": "on topic"}])
+    assert res["saved"] == 1 and res["not_rated"] == list(range(2, len(batch) + 1))
+    saved = screening.load(sid)["items"][0]
+    assert saved["doi"] == batch[0]["doi"] and saved["title"] == batch[0]["title"] and saved["reason"] == "on topic"

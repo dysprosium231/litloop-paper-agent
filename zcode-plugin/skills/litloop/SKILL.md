@@ -76,8 +76,8 @@ litloop search "关键词" --limit 10 --sort cited_by_count   # 13源引擎,失�
 ### 深度检索（要把一个课题查全时）
 
 1. 标准确认后，请用户给 1–3 篇确定相关的种子文章（DOI）；没有时先用 `litloop_search` 找几篇请用户认。
-2. `litloop_deep_search(action="start", question=..., queries=[4–8 组英文检索词], seeds=[DOI], core_terms=[1–3 个核心词], criteria=[...])`，返回第一批（默认 30 篇）和 `session`。**检索词和核心词要照顾缩写、全称和英式拼写**：很多文章只写 Al、SiC 这类缩写或化学式。核心词里用 `|` 表示“任意一个”，如 `Al|aluminum|aluminium SiC`；检索词里也要有一组用缩写的。用户给了必找文章时传 `must_find=[DOI]`，结果的 `coverage` 会报告每篇的状态。
-3. 逐篇判断后用 `litloop_screening(action="save", session=..., mode="deep", items=[...])` 保存，**这一批每篇都要评**，没评的下一批会再出现。
+2. `litloop_deep_search(action="start", question=..., queries=[4–8 组英文检索词], seeds=[DOI], core_terms=[1–3 个核心词], criteria=[...])`，返回第一批（默认 20 篇）和 `session`。**检索词和核心词要照顾缩写、全称和英式拼写**：很多文章只写 Al、SiC 这类缩写或化学式。核心词里用 `|` 表示“任意一个”，如 `Al|aluminum|aluminium SiC`；检索词里也要有一组用缩写的。用户给了必找文章时传 `must_find=[DOI]`，结果的 `coverage` 会报告每篇的状态。
+3. 逐篇判断后用 `litloop_deep_search(action="rate", session=..., ratings=[{"n": 1, "relevance": "高", "reason": "..."}, ...])` 按编号保存，标题和 DOI 由插件补上。**这一批每篇都要评**，返回的 `not_rated` 列出漏评的编号；没评的下一批会再出现。
 4. `litloop_deep_search(action="next", session=...)` 取下一批。评为“高”的文章会自动成为新种子；从第二批起排序由模型根据全部评分学习（`ranked_by="model"`），所以“低 / 不相关”也要如实评。
 5. 返回 `stop_suggested=true` 时，把 `stop_reason` 告诉用户并建议停止；用户要继续就接着 `next`。随时可以用 `action="status"` 看已筛篇数和各相关度数量。
 6. 筛完后按上面第 5、6 步呈现和让用户选择。跨了多批之后编号会变，**decide 时优先传 DOI**。

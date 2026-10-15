@@ -397,22 +397,26 @@ def litloop_deep_search(
     must_find: list[str] | None = None,
     year_from: int | None = None,
     year_to: int | None = None,
-    batch_size: int = 30,
+    batch_size: int = 20,
     session: str | None = None,
+    ratings: list[dict] | None = None,
 ) -> str:
-    """Deep search: start (question, 4-8 queries, seed DOIs, core_terms) / next / status. Rate each batch via litloop_screening."""
+    """Deep search: start (question, 4-8 queries, seed DOIs, core_terms), rate (ratings=[{n, relevance, reason}]), next, status."""
     from . import deep_search
     try:
         if action == "start":
             out = deep_search.start(question, queries or [], seeds or [], core_terms or [],
                                     criteria=criteria, must_find=must_find, year_from=year_from,
                                     year_to=year_to, batch_size=max(5, min(batch_size, 60)))
-        elif action in ("next", "status"):
+        elif action in ("next", "status", "rate"):
             if not session:
                 return json.dumps({"error": "session is required"})
-            out = deep_search.next_batch(session) if action == "next" else deep_search.status(session)
+            if action == "rate":
+                out = deep_search.rate(session, ratings or [])
+            else:
+                out = deep_search.next_batch(session) if action == "next" else deep_search.status(session)
         else:
-            return json.dumps({"error": f"unknown action {action!r}; use start|next|status"})
+            return json.dumps({"error": f"unknown action {action!r}; use start|rate|next|status"})
         return json.dumps(out, ensure_ascii=False)
     except (ValueError, FileNotFoundError, RuntimeError) as exc:
         return json.dumps({"error": str(exc)}, ensure_ascii=False)
