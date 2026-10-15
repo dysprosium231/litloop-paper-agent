@@ -387,30 +387,34 @@ def litloop_calibrate_search(
 
 
 @mcp_app.tool()
-def litloop_expand_citations(
-    query: str,
-    rounds: int = 1,
-    citation_source: str = "semantic",
-    limit: int = 20,
+def litloop_deep_search(
+    action: str = "start",
+    question: str = "",
+    queries: list[str] | None = None,
+    seeds: list[str] | None = None,
+    core_terms: list[str] | None = None,
+    criteria: list[str] | None = None,
+    must_find: list[str] | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    batch_size: int = 30,
+    session: str | None = None,
 ) -> str:
-    """Search plus backward/forward citation chasing (Semantic Scholar/OpenCitations): query, rounds, citation_source, limit."""
-    import tempfile as _tempfile
-    from .discovery import expand_citations
+    """Deep search: start (question, 4-8 queries, seed DOIs, core_terms) / next / status. Rate each batch via litloop_screening."""
+    from . import deep_search
     try:
-        with _tempfile.TemporaryDirectory(prefix="scansci_find_") as tmp:
-            payload = expand_citations(
-                query, tmp, rounds=min(rounds, 5),
-                citation_source=citation_source, limit=min(limit, 100),
-            )
-        candidates = payload.get("candidates") or []
-        summary = {
-            "total": payload.get("total", len(candidates)),
-            "dois": [c.get("doi") for c in candidates if c.get("doi")][:50],
-            "arxiv_ids": [c.get("arxiv_id") for c in candidates if c.get("arxiv_id")][:20],
-            "saturated": bool(payload.get("citation_report", {}).get("saturated")),
-        }
-        return json.dumps(summary, ensure_ascii=False)
-    except Exception as exc:
+        if action == "start":
+            out = deep_search.start(question, queries or [], seeds or [], core_terms or [],
+                                    criteria=criteria, must_find=must_find, year_from=year_from,
+                                    year_to=year_to, batch_size=max(5, min(batch_size, 60)))
+        elif action in ("next", "status"):
+            if not session:
+                return json.dumps({"error": "session is required"})
+            out = deep_search.next_batch(session) if action == "next" else deep_search.status(session)
+        else:
+            return json.dumps({"error": f"unknown action {action!r}; use start|next|status"})
+        return json.dumps(out, ensure_ascii=False)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
         return json.dumps({"error": str(exc)}, ensure_ascii=False)
 
 

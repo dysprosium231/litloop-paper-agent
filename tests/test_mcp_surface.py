@@ -22,7 +22,7 @@ EXPECTED = {
     "litloop_diagnostics",
     "litloop_download",
     "litloop_elsevier_setup",
-    "litloop_expand_citations",
+    "litloop_deep_search",
     "litloop_find",
     "litloop_login",
     "litloop_parse_list",

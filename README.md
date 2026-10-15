@@ -138,7 +138,7 @@ litloop check                                                     # 检查依赖
 |---|---|
 | 下载单篇（可拉附件、转 Markdown） | `litloop_download` |
 | 批量下载（列表 / xlsx·csv·bib·APA 文件） | `litloop_batch_download` |
-| 检索、作者检索、系统性发现 | `litloop_search` · `litloop_find` · `litloop_expand_citations` |
+| 检索、作者检索、深度检索（关键词 + 共同引用扩展，分批筛选） | `litloop_search` · `litloop_find` · `litloop_deep_search` |
 | 筛选记录（相关度 + 理由，记录选择，生成下载队列） | `litloop_screening` |
 | 准备队列（校验 / OA 定位 / 构建） | `litloop_prepare_queue` |
 | 机构登录与状态（WebVPN / CARSI / EZProxy / 出版商 SSO） | `litloop_login` · `litloop_channel_status` · `litloop_schools` |
