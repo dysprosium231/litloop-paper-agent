@@ -126,12 +126,25 @@ def _citing(work_ids: list[str], years: list[str], max_records: int = 400) -> li
     return out
 
 
+def _topic_search(term: str) -> str:
+    """Core term -> OpenAlex search text. Words must all appear; ``a|b`` means either.
+
+    Papers often write only the abbreviation ("Al/SiC") or the British spelling,
+    so "Al|aluminum|aluminium SiC" becomes "(Al OR aluminum OR aluminium) AND SiC".
+    """
+    words = [w for w in term.replace(",", " ").split() if w.strip("|")]
+    if not any("|" in w for w in words):
+        return " ".join(words)
+    parts = [("(" + " OR ".join(a for a in w.split("|") if a) + ")") if "|" in w else w for w in words]
+    return " AND ".join(parts)
+
+
 def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[str],
                          max_records: int = 1000) -> list[dict[str, Any]]:
     """Works citing any of ``ref_ids`` whose title/abstract mentions a core term."""
     out = []
     for term in core_terms or [""]:
-        topic = [f"title_and_abstract.search:{term.replace(',', ' ')}"] if term else []
+        topic = [f"title_and_abstract.search:{_topic_search(term)}"] if term else []
         for i in range(0, len(ref_ids), 50):
             out += _pages(",".join(["cites:" + "|".join(ref_ids[i:i + 50])] + topic + years), max_records)
     return out

@@ -171,3 +171,11 @@ def test_missing_abstracts_of_top_candidates_are_fetched_once(monkeypatch):
     assert deep_search._prefill_abstracts(st, {}) == 1
     assert sorted(calls[0]) == ["10.1/a", "10.1/b"]
     assert deep_search._prefill_abstracts(st, {}) == 0 and len(calls) == 1   # not asked again
+
+
+def test_topic_search_expands_alternatives_and_handles_punctuation():
+    assert deep_search._topic_search("aluminum SiC") == "aluminum SiC"
+    assert deep_search._topic_search("Al|aluminum|aluminium SiC") == "(Al OR aluminum OR aluminium) AND SiC"
+    assert deep_search._topic_search("aluminum, SiC") == "aluminum SiC"
+    assert deep_search._topic_search("a||b") == "(a OR b)"
+
