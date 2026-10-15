@@ -155,7 +155,7 @@ litloop check                                                     # 检查依赖
 
 ## 检索与筛选
 
-设计原则见 [docs/SEARCH_SPEC.md](docs/SEARCH_SPEC.md)。它要解决三个问题：结果杂、读不过来、不好判断质量。
+目标、原则和验收标准见 [docs/SEARCH_SPEC.md](docs/SEARCH_SPEC.md)。它要解决四个问题：结果杂、读不过来、不好判断质量、查不全。
 
 **检索结果里有什么**
 
