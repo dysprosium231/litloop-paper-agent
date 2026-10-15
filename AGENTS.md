@@ -7,7 +7,7 @@
 - 开始工作前，先读 [TODO.md](TODO.md) 的「正在做」和「接下来」，从那里接着做。
 - 每完成一步，就在 TODO.md 里打勾，或者移到「已完成」并写上日期和提交号；和对应的代码放在同一个提交里。
 - 用户做的决定、计划的变化、实验结论，也记进 TODO.md。日期写绝对日期。
-- 设计和验收标准写在 [docs/SEARCH_SPEC.md](docs/SEARCH_SPEC.md)，进度不写在那里。
+- 设计和验收标准写在 [docs/SEARCH_CHARTER.md](docs/SEARCH_CHARTER.md)，进度不写在那里。
 
 ## 提交前
 

@@ -155,7 +155,7 @@ litloop check                                                     # 检查依赖
 
 ## 检索与筛选
 
-目标、原则和验收标准见 [docs/SEARCH_SPEC.md](docs/SEARCH_SPEC.md)。它要解决四个问题：结果杂、读不过来、不好判断质量、查不全。
+目标、原则和验收标准见 [docs/SEARCH_CHARTER.md](docs/SEARCH_CHARTER.md)。它要解决四个问题：结果杂、读不过来、不好判断质量、查不全。
 
 **检索结果里有什么**
 
@@ -395,7 +395,7 @@ ACS 出现 “IP Address Blocked” 时，封禁在出版商那边，代码解�
 
 ### 待开发
 
-按计划顺序排列。详细进度和计划见 [TODO.md](TODO.md)，检索部分的设计和验收标准见 [docs/SEARCH_SPEC.md](docs/SEARCH_SPEC.md)。
+按计划顺序排列。详细进度和计划见 [TODO.md](TODO.md)，检索部分的设计和验收标准见 [docs/SEARCH_CHARTER.md](docs/SEARCH_CHARTER.md)。
 
 1. **深度检索排序改进**（第一版已完成）：改用系统综述筛选常用的持续主动学习，每批评分后用相关和不相关的文章一起重新训练排序；排序前先补摘要；共同引用按文献的常见程度加权，避免被稀释。验收标准：测试集中指定的核心文章全部找到。
 2. **系统综述支持**：记录每个数据源的检索量、去重数、纳入和排除的数量及理由，生成 PRISMA 式统计，中断后可以接着做。
