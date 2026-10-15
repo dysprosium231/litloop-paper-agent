@@ -67,3 +67,30 @@ def test_dedupe_titles_merges_preprint_and_published():
             {"title": "Short", "doi": "10.1/s"}, {"title": "Short", "doi": "10.1/t"}]
     out = _dedupe_titles(rows)
     assert len(out) == 3 and out[0]["doi"] == "10.1/x" and out[0]["cited_by_count"] == 650
+
+def test_semantic_scholar_batches_are_chunked_and_odd_replies_ignored(monkeypatch):
+    import litloop.abstracts as a
+    sizes = []
+
+    class R:
+        status_code = 200
+
+        def __init__(self, rows):
+            self.rows = rows
+
+        def json(self):
+            return self.rows
+
+    class S:
+        def post(self, url, params=None, json=None, headers=None, timeout=None):
+            ids = json["ids"]
+            sizes.append(len(ids))
+            if len(sizes) == 1:
+                return R([{"abstract": "text"} if i == 0 else None for i in range(len(ids))])
+            return R({"message": "odd"})
+
+    monkeypatch.setattr(a, "_session", lambda: S())
+    dois = [f"10.1/{i}" for i in range(1200)]
+    got = a._semantic_scholar(dois, 5)
+    assert sizes == [500, 500]          # second reply was not a list: stop asking
+    assert got == {"10.1/0": "text"}

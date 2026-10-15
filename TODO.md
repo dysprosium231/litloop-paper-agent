@@ -52,6 +52,14 @@
 - [ ] 中文文献（知网、万方）。
 - [ ] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。
 
+### 代码审查遗留（2026-10-15 外部审查意见，已逐条核实）
+- [ ] **`institutional/` 与根目录两套重复模块**（publisher_batch、publisher_profiles、fetcher 等，都继承自原项目）：根目录版有测试覆盖，但 `sources/__init__.py:1494` 的浏览器兜底下载和 `main.py` 的 publisher-batch 实际走 `institutional/`，另有 10 个测试引用它。先比对差异、确认哪套新，再统一，最后做真实下载验证。不能直接删。
+- [ ] API Key 读取统一为“配置优先，环境变量兜底”：现在 `openalex_api_key`、`elsevier_api_key` 只读配置，Semantic Scholar 的 Key 只读环境变量。
+- [ ] DOI 规范化统一成一个函数（去前缀、URL 解码、转小写），各模块共用；目前各自转小写，未发现实际出错。
+- [ ] 删除无引用的 `src/litloop/mcp_server.py`、`build_core.py`。注意：`_cli_core.py`（命令行注册在这里）和 `camofox.py`（`sources/publishers.py` 的下载兜底在用）**仍在使用**，审查意见说它们是死代码，不对。
+- [ ] 深度检索跨批次按编号选文章时，让 Agent 用 DOI 选（编号会随筛选记录重排变化；`decide` 已支持 DOI，并拒绝对不上的编号）。
+- 不做：拆分 `server.py`、`_publisher_strategies_core.py` 两个大文件（继承自原项目，风险大、收益不直接）。
+
 ### 分析归纳
 - [ ] 从全文抽取要点、做对比表、起草综述。
 
@@ -66,6 +74,11 @@
 见 [litloop-journal-rank 的 TODO](https://github.com/dysprosium231/litloop-journal-rank/blob/main/TODO.md)（机构数据、公开发布前移除分区数据等）。
 
 ## 已完成
+
+### 2026-10-15：修代码审查中两个紧急问题
+- 深度检索中没有 DOI 的文章评分后读不回来，每批都会被重新推送（SiC/Al 池里有 58/3563 篇）。改为按标题对应回池中的条目。
+- Semantic Scholar 批量补摘要按 500 篇分块（接口上限），回复不是列表时停止请求、不崩溃。为“排序前先补摘要”做准备。
+- 各加 1 个测试，确认修复前失败、修复后通过。
 
 ### 2026-10-15：CHARTER 改为纲领
 - 用户确认它是纲领：只写痛点、原则、验收标准、测试集角色和各阶段设计要点；路线进度不再写在那里，统一记在本表。

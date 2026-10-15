@@ -72,23 +72,34 @@ def _session() -> requests.Session:
     return s
 
 
+S2_BATCH = 500
+
+
 def _semantic_scholar(dois: list[str], timeout: float) -> dict[str, str]:
     if not dois:
         return {}
     headers = {}
     if os.environ.get("SEMANTIC_SCHOLAR_API_KEY"):
         headers["x-api-key"] = os.environ["SEMANTIC_SCHOLAR_API_KEY"]
-    try:
-        r = _session().post("https://api.semanticscholar.org/graph/v1/paper/batch",
-                            params={"fields": "abstract"}, json={"ids": [f"DOI:{d}" for d in dois]},
-                            headers=headers, timeout=timeout)
-        if r.status_code != 200:
-            log.debug(f"abstracts: Semantic Scholar batch HTTP {r.status_code}")
-            return {}
-        return {d: (x or {}).get("abstract") or "" for d, x in zip(dois, r.json()) if x and x.get("abstract")}
-    except (requests.RequestException, ValueError) as e:
-        log.debug(f"abstracts: Semantic Scholar batch failed: {e}")
-        return {}
+    out: dict[str, str] = {}
+    for i in range(0, len(dois), S2_BATCH):  # the batch endpoint takes at most 500 ids
+        chunk = dois[i:i + S2_BATCH]
+        try:
+            r = _session().post("https://api.semanticscholar.org/graph/v1/paper/batch",
+                                params={"fields": "abstract"}, json={"ids": [f"DOI:{d}" for d in chunk]},
+                                headers=headers, timeout=timeout)
+            if r.status_code != 200:
+                log.debug(f"abstracts: Semantic Scholar batch HTTP {r.status_code}")
+                break
+            rows = r.json()
+        except (requests.RequestException, ValueError) as e:
+            log.debug(f"abstracts: Semantic Scholar batch failed: {e}")
+            break
+        if not isinstance(rows, list):
+            log.debug("abstracts: Semantic Scholar batch returned no list")
+            break
+        out.update({d: x["abstract"] for d, x in zip(chunk, rows) if isinstance(x, dict) and x.get("abstract")})
+    return out
 
 
 class _Scopus:

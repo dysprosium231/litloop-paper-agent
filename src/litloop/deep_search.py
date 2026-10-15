@@ -261,7 +261,7 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
 def next_batch(session: str) -> dict[str, Any]:
     """Fold the agent's latest ratings back in (高 papers become seeds) and serve the next batch."""
     state = _load(session)
-    rated = _ratings(session)
+    rated = _ratings(state)
     new_seeds = [k for k, rel in rated.items() if rel == "高" and k in state["pool"] and k not in state["seeds"]]
     added = 0
     if new_seeds:
@@ -275,7 +275,7 @@ def next_batch(session: str) -> dict[str, Any]:
 
 def status(session: str) -> dict[str, Any]:
     state = _load(session)
-    rated = _ratings(session)
+    rated = _ratings(state)
     order = _ranked(state)
     return {"session": session, "pool": len(state["pool"]), "screened": len(rated),
             "by_relevance": {r: sum(1 for v in rated.values() if v == r) for r in screening.RELEVANCE},
@@ -284,9 +284,16 @@ def status(session: str) -> dict[str, Any]:
 
 # --------------------------------------------------------------------------- helpers
 
-def _ratings(session: str) -> dict[str, str]:
-    data = screening.load(session)
-    return {str(it.get("doi") or "").lower(): it["relevance"] for it in data["items"] if it.get("doi")}
+def _ratings(state: dict[str, Any]) -> dict[str, str]:
+    """Ratings keyed like the pool. Papers without a DOI are matched back by title, the way screening keys them."""
+    by_title = {screening._key({"title": r.get("title")}): k for k, r in state["pool"].items() if not r.get("doi")}
+    out = {}
+    for it in screening.load(state["session"])["items"]:
+        key = screening._key(it)
+        key = by_title.get(key) if key.startswith("title:") else key
+        if key:
+            out[key] = it["relevance"]
+    return out
 
 
 def _ranked(state: dict[str, Any]) -> list[str]:
@@ -326,7 +333,7 @@ def _coverage(state: dict[str, Any], rated: dict[str, str], order: list[str]) ->
 def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> dict[str, Any]:
     from .abstracts import clean_abstract, fill_abstracts
     from .search import _add_journal_rank, _flag_retractions
-    rated = rated if rated is not None else _ratings(state["session"])
+    rated = rated if rated is not None else _ratings(state)
     stop = _stop(state, rated)
     served_before = {k for b in state["served"] for k in b}
     order = [k for k in _ranked(state) if k not in rated]

@@ -107,3 +107,17 @@ def test_start_needs_queries_and_seeds(net):
         deep_search.start("q", [], ["10.1/seed"], ["x"])
     with pytest.raises(ValueError):
         deep_search.start("q", ["x"], [], ["x"])
+
+
+def test_rated_paper_without_doi_is_not_served_again(net, monkeypatch):
+    no_doi = dict(rec("10.1/x", "Infiltration of SiC foams by aluminium", abstract="pressureless infiltration SiC aluminum"),
+                  doi=None, openalex="WNODOI")
+    monkeypatch.setattr(deep_search, "_cites_refs_on_topic", lambda refs, terms, years, max_records=1000: [no_doi])
+    out = deep_search.start("q", ["pressureless infiltration SiC aluminum"], ["10.1/seed"], ["aluminum"], batch_size=10)
+    first = [b for b in out["batch"] if b["doi"] is None]
+    assert first
+    screening.save("q", [{"doi": b["doi"], "title": b["title"], "relevance": "低", "reason": "r"} for b in out["batch"]],
+                   session=out["session"])
+    nxt = deep_search.next_batch(out["session"])
+    assert nxt["screened"] == len(out["batch"])
+    assert not [b for b in nxt["batch"] if b["doi"] is None]
