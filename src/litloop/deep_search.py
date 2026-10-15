@@ -49,6 +49,7 @@ ABSTRACT_CHARS = 1500
 PREFILL = 150          # fetch missing abstracts for this many top candidates before ranking
 MIN_LABELS = (3, 5)    # positives (高 + seeds), negatives (中/低/不相关) before the model takes over
 PSEUDO_NEGATIVES = 100
+KNEE_RATIO = 6         # stop when 高 per batch falls below 1/6 of the best batch
 WORKERS = 4            # parallel OpenAlex requests (each chunk of 50 ids is independent)
 
 
@@ -123,9 +124,11 @@ def _by_filter(field: str, values: list[str], extra: list[str] | None = None) ->
 
 
 def _pages(flt: str, max_records: int) -> list[dict[str, Any]]:
+    """Up to ``max_records`` works matching ``flt``, most cited first, so a cut drops the least cited."""
     out, cursor = [], "*"
     while cursor and len(out) < max_records:
-        d = _get({"filter": flt, "per-page": 200, "cursor": cursor, "select": _FIELDS})
+        d = _get({"filter": flt, "per-page": 200, "cursor": cursor, "select": _FIELDS,
+                  "sort": "cited_by_count:desc"})
         out += d.get("results") or []
         cursor = (d.get("meta") or {}).get("next_cursor")
     return [_record(w) for w in out[:max_records]]
@@ -157,9 +160,12 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
     def one(job: tuple[str, list[str]]) -> list[dict[str, Any]]:
         term, chunk = job
         topic = [f"title_and_abstract.search:{_topic_search(term)}"] if term else []
-        return _pages(",".join(["cites:" + "|".join(chunk)] + topic + years), max_records)
-    out = _parallel(one, jobs)
-    return out
+        got = _pages(",".join(["cites:" + "|".join(chunk)] + topic + years), max_records)
+        if len(got) >= max_records and len(chunk) > 1:  # hit the cap: split rather than lose the rest
+            half = len(chunk) // 2
+            return one((term, chunk[:half])) + one((term, chunk[half:]))
+        return got
+    return _parallel(one, jobs)
 
 
 # --------------------------------------------------------------------------- pool
@@ -457,15 +463,31 @@ def _ranked(state: dict[str, Any]) -> list[str]:
 
 
 def _stop(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any]:
+    """Suggest stopping at the cap, or once the yield of 高 has fallen off.
+
+    Knee rule, as in screening for systematic reviews: when the share of 高 in
+    the latest batch is below 1/KNEE_RATIO of the best earlier batch, the
+    relevant papers have mostly been read. Counting 中 too never fired: the
+    neighbouring topics that come up late keep it high.
+    """
     if len(rated) >= state["cap"]:
         return {"stop_suggested": True, "stop_reason": f"已筛 {len(rated)} 篇，达到上限 {state['cap']}"}
-    last = state["served"][-1] if state["served"] else []
+    batches = [b for b in state["served"] if b]
+    last = batches[-1] if batches else []
     judged = [rated[k] for k in last if k in rated]
-    if len(state["served"]) >= 2 and judged and len(judged) >= len(last) // 2:
-        useful = sum(1 for r in judged if r in ("高", "中"))
-        if useful <= max(1, len(judged) // 15):
-            return {"stop_suggested": True,
-                    "stop_reason": f"最近一批 {len(judged)} 篇里只有 {useful} 篇高或中相关，新增已经很少"}
+    if len(batches) < 2 or not judged or len(judged) < len(last) // 2:
+        return {"stop_suggested": False, "stop_reason": ""}
+    high = sum(1 for r in judged if r == "高")
+    rates = [sum(1 for k in b if rated.get(k) == "高") / max(1, sum(1 for k in b if k in rated)) for b in batches[:-1]]
+    best = max(rates)
+    if best > 0 and high / len(judged) <= best / KNEE_RATIO:
+        return {"stop_suggested": True,
+                "stop_reason": (f"最近一批 {len(judged)} 篇里只有 {high} 篇高相关，不到此前最好一批"
+                                f"（{best:.0%}）的 1/{KNEE_RATIO}，相关文章大多已经读到")}
+    useful = sum(1 for r in judged if r in ("高", "中"))
+    if useful <= max(1, len(judged) // 15):
+        return {"stop_suggested": True,
+                "stop_reason": f"最近一批 {len(judged)} 篇里只有 {useful} 篇高或中相关，新增已经很少"}
     return {"stop_suggested": False, "stop_reason": ""}
 
 

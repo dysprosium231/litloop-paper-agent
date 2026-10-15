@@ -102,6 +102,30 @@ def test_stop_when_a_batch_brings_almost_nothing(net):
     assert deep_search._stop({"cap": 5, "served": []}, {k: "低" for k in "abcde"})["stop_suggested"] is True
 
 
+def test_stop_knee_rule(net):
+    b1 = [f"b1_{i}" for i in range(30)]
+    b2 = [f"b2_{i}" for i in range(30)]
+    b3 = [f"b3_{i}" for i in range(30)]
+    state = {"cap": 200, "served": [b1, [], b2, b3]}
+    rated = {}
+    for i, k in enumerate(b1):
+        rated[k] = "高" if i < 12 else "低"
+    for i, k in enumerate(b2):
+        rated[k] = "高" if i < 10 else "低"
+    for i, k in enumerate(b3):
+        rated[k] = "高" if i < 2 else "中"
+
+    res = deep_search._stop(state, rated)
+    assert res["stop_suggested"] is True
+    assert "1/6" in res["stop_reason"]
+
+    for i, k in enumerate(b3):
+        rated[k] = "高" if i < 4 else "中"
+
+    res2 = deep_search._stop(state, rated)
+    assert res2["stop_suggested"] is False
+
+
 def test_start_needs_queries_and_seeds(net):
     with pytest.raises(ValueError):
         deep_search.start("q", [], ["10.1/seed"], ["x"])
@@ -201,3 +225,17 @@ def test_topic_search_expands_alternatives_and_handles_punctuation():
     assert deep_search._topic_search("aluminum, SiC") == "aluminum SiC"
     assert deep_search._topic_search("a||b") == "(a OR b)"
 
+
+
+def test_citation_query_that_hits_the_cap_is_split(monkeypatch):
+    seen = []
+
+    def pages(flt, max_records):
+        ids = flt.split("cites:")[1].split(",")[0].split("|")
+        seen.append(len(ids))
+        return [rec(f"10.1/{i}_{n}", "t") for i in ids for n in range(2)][:max_records]
+
+    monkeypatch.setattr(deep_search, "_pages", pages)
+    out = deep_search._cites_refs_on_topic(["A", "B", "C", "D"], ["x"], [], max_records=4)
+    assert len({r["doi"] for r in out}) == 8          # nothing lost to the cap
+    assert seen[0] == 4 and 1 in seen                 # split down to single references
