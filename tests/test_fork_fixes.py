@@ -528,20 +528,21 @@ def test_search_sort_aliases():
     assert _normalize_sort(None) is None
 
 
-def test_search_drops_off_topic_records():
-    from litloop.search import _drop_off_topic
+def test_search_ranks_off_topic_records_last_instead_of_dropping():
+    from litloop.search import _match_tier
     rows = [
-        {"title": "High-entropy ceramics with low thermal conductivity", "abstract": ""},
         {"title": "Endoscopic mucosal resection for lesions", "abstract": ""},
+        {"title": "High-entropy ceramics with low thermal conductivity", "abstract": ""},
         {"title": "Cytotoxicity of dental alloys, metals, and ceramics", "abstract": ""},
         {"title": "Unrelated title", "abstract": "", "_matched": True},
     ]
-    kept = _drop_off_topic(rows, "high-entropy ceramics thermal conductivity")
-    assert [r["title"] for r in kept] == [
-        "High-entropy ceramics with low thermal conductivity", "Unrelated title"]
-    assert "_matched" not in kept[1]
-    # CJK queries are left alone
-    assert len(_drop_off_topic(rows[:2], "高熵陶瓷 热导率")) == 2
+    ranked = _match_tier(rows, "high-entropy ceramics thermal conductivity")
+    assert [r["title"] for r in ranked] == [
+        "High-entropy ceramics with low thermal conductivity", "Unrelated title",
+        "Endoscopic mucosal resection for lesions", "Cytotoxicity of dental alloys, metals, and ceramics"]
+    assert "_matched" not in ranked[1]
+    # CJK queries keep their order
+    assert [r["title"] for r in _match_tier(rows[:2], "高熵陶瓷 热导率")] == [r["title"] for r in rows[:2]]
 
 
 def test_discovery_results_report_real_citation_counts():

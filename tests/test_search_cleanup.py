@@ -44,15 +44,25 @@ def test_journal_abbreviation_titles_are_dropped():
     assert search._drop_junk_titles([junk, same_as_journal, real]) == [real]
 
 
-def test_hyphenated_query_term_must_appear_as_a_phrase():
+def test_hyphenated_concept_missing_ranks_below_full_matches():
     q = "polymer-derived ceramics thermal conductivity"
-    pdc = {"title": "SiOC foams", "abstract": "Polymer derived ceramics show low thermal conductivity."}
-    sibcn = {"title": "Si–B–C–N", "abstract": "Polymer–derived Si–B–C–N with low thermal conductivity."}
     polymers = {"title": "Thermal Conductivity of Nanoparticles Filled Polymers",
                 "abstract": "Polymers ... fillers derived from ceramic materials raise thermal conductivity."}
-    no_abstract = {"title": "Thermal conductivity of PDCs", "abstract": ""}
-    assert search._require_compounds([pdc, sibcn, polymers, no_abstract], q) == [pdc, sibcn, no_abstract]
-    assert search._require_compounds([polymers], "thermal conductivity") == [polymers]
+    pdc = {"title": "SiOC foams", "abstract": "Polymer derived ceramics show low thermal conductivity."}
+    sibcn = {"title": "Si–B–C–N", "abstract": "Polymer–derived Si–B–C–N with low thermal conductivity."}
+    no_abstract = {"title": "Thermal conductivity of polymer-derived ceramics", "abstract": ""}
+    ranked = search._match_tier([polymers, pdc, sibcn, no_abstract], q)
+    assert ranked == [pdc, sibcn, no_abstract, polymers]  # nothing dropped, the miss goes last
+    assert search._match_tier([polymers], "thermal conductivity ceramics") == [polymers]
+
+
+def test_chemical_systems_and_terms_with_digits_are_not_concepts():
+    assert search._query_compounds("Al-Si-Mg alloy infiltration SiC") == set()
+    assert search._query_compounds("Si-B-C-N ceramics") == set()
+    assert search._query_compounds("3D-SiC network Al-12%Si") == set()
+    assert search._query_compounds("polymer-derived SiOC lithium-ion") == {"polymerderived", "lithiumion"}
+    al_mg_si = {"title": "SiC honeycomb/Al-Mg-Si composite", "abstract": "Al-Mg-Si alloy infiltrated SiC preforms."}
+    assert search._match_tier([al_mg_si], "Al-Si-Mg alloy infiltration SiC")[0]["_tier"] == 0
 
 
 def test_venue_without_doi_is_flagged():

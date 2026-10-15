@@ -305,11 +305,15 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
                 seen.add(extra["doi"].lower())
                 extra["_matched"] = True  # OpenAlex matched it in title/abstract
                 results.append(extra)
-    results = _dedupe_titles(_require_compounds(_drop_off_topic(_drop_junk_titles(results), query), query))
+    results = _dedupe_titles(_match_tier(_drop_junk_titles(results), query))
+    # Sorting by citations or date happens within a match tier, so a famous
+    # but weakly matching paper does not jump ahead of the on-topic ones.
     if sort == "cited_by_count":
-        results.sort(key=lambda x: x.get("cited_by_count", 0), reverse=True)
+        results.sort(key=lambda x: (x.get("_tier", 0), -(x.get("cited_by_count") or 0)))
     elif sort == "publication_date":
-        results.sort(key=lambda x: x.get("year") or 0, reverse=True)
+        results.sort(key=lambda x: (x.get("_tier", 0), -(x.get("year") or 0)))
+    for r in results:
+        r.pop("_tier", None)
     return results
 
 
@@ -568,67 +572,101 @@ _STOPWORDS = frozenset(
 
 
 def _query_terms(query: str) -> list[str]:
+    """Content words of a query, normalised for a substring test.
+
+    Hyphenated concepts stay whole ("polymer derived"); chemical systems and
+    terms with digits are split into their parts, since papers write Al-Si-Mg
+    as Al-Mg-Si or AlSiMg. Long words are cut to a crude stem so
+    "infiltration" also matches "infiltrated"."""
     terms = []
-    for word in re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", query.lower()):
-        if word in _STOPWORDS or len(word) < 2:
-            continue
-        word = word.replace("-", " ")
-        # crude singular so "ceramics" matches "ceramic" (a substring test)
-        if len(word) > 4 and word.endswith("s") and not word.endswith("ss"):
-            word = word[:-1]
-        terms.append(word)
+    for word in re.findall(r"[A-Za-z0-9%]+(?:-[A-Za-z0-9%]+)*", query or ""):
+        parts = word.split("-")
+        if len(parts) > 1 and (any(ch.isdigit() for ch in word) or all(_ELEMENT.match(p) for p in parts)):
+            pieces = [p.lower() for p in parts]
+        else:
+            pieces = [word.lower()]
+        for w in pieces:
+            w = w.strip("%")
+            if w in _STOPWORDS or len(w) < 2:
+                continue
+            w = w.replace("-", " ")
+            # crude singular so "ceramics" matches "ceramic" (a substring test)
+            if len(w) > 4 and w.endswith("s") and not w.endswith("ss"):
+                w = w[:-1]
+            if " " not in w and len(w) > 7:
+                w = w[:max(6, len(w) - 3)]
+            terms.append(w)
     return list(dict.fromkeys(terms))
 
 
-def _drop_off_topic(results: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
-    """Drop records that share almost none of the query's terms.
+def _plain(text: str) -> str:
+    """Lower case, every kind of dash read as a space."""
+    return re.sub(r"[\-‐-―]", " ", text.lower())
 
-    Crossref's ranking returns highly cited papers that match one common word
-    ("oxidation", "ceramics"); sorted by citations they took the top slots.
-    A record stays when its title (plus abstract, when present) contains at
-    least 60% of the query terms. Queries in CJK scripts are left alone.
+
+def _match_tier(results: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    """Order records by how well they match the query, without dropping any.
+
+    Tier 0: the record names every hyphenated concept of the query and at
+    least 60% of its terms. Tier 1: the terms are there but a concept is
+    missing ("polymers ... derived" for "polymer-derived"), or there is no
+    real abstract and the title alone falls short. Tier 2: an abstract to
+    judge from, and fewer than 60% of the terms in it. Records keep their
+    relevance order inside a tier, so
+    weaker matches only surface when the strong ones run out.
+
+    Nothing is removed: we judge from a title and an often truncated
+    abstract, while the index matched the full record, and a deep search
+    loses more from a dropped target than from a few extra records to screen.
+    Queries in CJK scripts and records OpenAlex matched on title/abstract
+    (``_matched``) count as tier 0.
     """
-    if re.search(r"[぀-ヿ㐀-鿿가-힯]", query or ""):
-        return results
-    terms = _query_terms(query or "")
-    if len(terms) < 2:
-        return results
-    need = max(1, math.ceil(0.6 * len(terms)))
-    kept = []
-    for r in results:
-        # The abstract we hold may be truncated; trust OpenAlex's own
-        # title/abstract match for records it returned from that filter.
-        if r.pop("_matched", False):
-            kept.append(r)
-            continue
-        text = f"{r.get('title') or ''} {r.get('abstract') or ''}".lower().replace("-", " ")
-        if sum(1 for t in terms if t in text) >= need:
-            kept.append(r)
-    return kept
+    cjk = re.search(r"[぀-ヿ㐀-鿿가-힯]", query or "")
+    terms = [] if cjk else _query_terms(query or "")
+    need = max(1, math.ceil(0.6 * len(terms))) if len(terms) >= 2 else 0
+    compounds = set() if cjk else _query_compounds(query or "")
+    tiered = []
+    for pos, r in enumerate(results):
+        tier = 0
+        if not r.pop("_matched", False):
+            text = _plain(f"{r.get('title') or ''} {r.get('abstract') or ''}")
+            judged_on_title = len(r.get("abstract") or "") < 300
+            if need and sum(1 for t in terms if t in text) < need:
+                # A title alone rarely carries every term: too little to call it off-topic.
+                tier = 1 if judged_on_title else 2
+            elif compounds and r.get("abstract"):
+                squashed = _squash(f"{r.get('title') or ''} {r.get('abstract') or ''}")
+                if not all(c in squashed for c in compounds):
+                    tier = 1
+        tiered.append((tier, pos, r))
+    tiered.sort(key=lambda x: (x[0], x[1]))
+    for tier, _, r in tiered:
+        r["_tier"] = tier
+    return [r for _, _, r in tiered]
 
 
 def _squash(text: str) -> str:
-    return re.sub(r"[\s\-\u2010-\u2015/]+", "", text.lower())
+    return re.sub(r"[\s\-‐-―/]+", "", text.lower())
 
 
-def _require_compounds(results: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
-    """A hyphenated query term ("polymer-derived", "Si-B-C-N") is one concept:
-    "polymers ... derived" in an abstract is not a match. Spaces and dashes
-    are ignored, so "SiBCN" matches "Si-B-C-N". Records without an abstract
-    are kept, since a title alone may not spell the compound out."""
-    compounds = {_squash(c) for c in re.findall(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+", query or "")}
-    compounds = {c for c in compounds if len(c) >= 4}
-    if not compounds:
-        return results
-    kept = []
-    for r in results:
-        if not r.get("abstract"):
-            kept.append(r)
+_ELEMENT = re.compile(r"^[A-Z][a-z]?$")
+
+
+def _query_compounds(query: str) -> set[str]:
+    """Hyphenated query terms that name one concept ("polymer-derived").
+
+    Chemical systems (Al-Si-Mg, Si-B-C-N) are left out because papers list
+    the elements in any order or run them together, and so are terms with
+    digits (3D-SiC, Al-12%Si), which are written in too many ways."""
+    out = set()
+    for c in re.findall(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+", query or ""):
+        parts = c.split("-")
+        if any(ch.isdigit() for ch in c) or all(_ELEMENT.match(p) for p in parts):
             continue
-        text = _squash(f"{r.get('title') or ''} {r.get('abstract') or ''}")
-        if all(c in text for c in compounds):
-            kept.append(r)
-    return kept
+        squashed = _squash(c)
+        if len(squashed) >= 4:
+            out.add(squashed)
+    return out
 
 
 _SORT_ALIASES = {
