@@ -59,7 +59,8 @@
 ## 接下来
 
 1. **可视化 app**（2026-10-16 规划，用户定：独立桌面 app 用 Tauri 2；先做 app，阶段 2 剩下的穿插；用户在 app 里改的评分覆盖 Agent 的评分。设计见 CHARTER「可视化 app」）：
-   - [~] 开发环境：Node 24 已有、WebView2 系统自带；安装 Visual Studio Build Tools（C++ 桌面开发）和 Rust（rustup，MSVC 工具链）。
+   - [x] 开发环境（2026-10-16）：Node 24、WebView2 152（系统自带）；Visual Studio Build Tools 2022（C++ 桌面开发，C 盘）；Rust 1.99.1 MSVC 工具链装在 `D:\devust`（用户环境变量 `RUSTUP_HOME`、`CARGO_HOME`，已加入 PATH）。
+   - [x] 桌面版筛选页设计（2026-10-16 用户认可，质感以后再打磨）：高保真示意 https://claude.ai/artifact/Esd3rbAG6VZa494Y2WCZHe 。三栏固定布局（会话 / 本批文章 / 详情与评分），顶部五段式进度（关键词、扩展、补摘要、排序、出批，含用时和预计剩余），每批高相关小柱图，键盘评分（↑↓ 换篇、1–4 评分、空格选中），改过评分的标“你改过”并保留 Agent 原判，侧栏底部显示 OpenAlex 今日剩余；Segoe UI Variable + 微软雅黑；浅色 / 深色。
    - [~] 0 期地基：
      - [x] `store.py`（2026-10-16）：跨进程文件锁（`filelock`，新依赖）、先写临时文件再替换、格式版本号 `schema`（读到更新的版本时要求更新）；筛选记录的保存和用户选择在锁内读改写；候选池整份原子写入。两进程各写 40 次的测试不丢更新。
      - [x] 用户在 app 里改的评分存为 `user_relevance`，覆盖 Agent 的评分（排序、停止判断都用它）；Agent 重评不会抹掉它。
