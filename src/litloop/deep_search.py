@@ -222,16 +222,21 @@ def _budget_ok(credits0: int) -> bool:
 def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[str],
                          max_records: int = 1000, credits0: int | None = None,
                          ) -> tuple[list[dict[str, Any]], set[str]]:
-    """Works citing any of ``ref_ids`` whose title/abstract mentions a core term.
+    """Works citing any of ``ref_ids`` whose title/abstract mentions every core term.
 
+    Each core term is one concept the paper must mention (``a|b`` = either);
+    the terms are joined into one search, so ["lanthanide|europium",
+    "drug|doxorubicin"] means rare earth AND drug. (Until 2026-10-16 each term
+    was a separate search and a paper matching any one was kept, which let
+    27,000 drug-delivery papers without rare earths into one pool.)
     ``ref_ids`` come most important first. Returns the works and the references
     actually asked about: once the round's credit budget is spent, the rest
     are left for a later round.
     """
     from . import quota
     credits0 = quota.spent("openalex") if credits0 is None else credits0
-    terms = core_terms or [""]
-    jobs = [(term, chunk) for chunk in _chunks(ref_ids) for term in terms]
+    term = " ".join(t.strip() for t in core_terms or [] if t.strip())
+    jobs = [(term, chunk) for chunk in _chunks(ref_ids)]
 
     def flt(term: str, chunk: list[str]) -> str:
         topic = [f"title_and_abstract.search:{_topic_search(term)}"] if term else []
@@ -244,7 +249,7 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
         return [(True, [])] if got is None else [(False, got)]
 
     out: list[dict[str, Any]] = []
-    done: dict[str, int] = Counter()  # ref -> how many core terms were fully asked
+    asked: set[str] = set()
     while jobs:  # a query over the cap is split in halves; a few jobs at a time, budget permitting
         if not _budget_ok(credits0):
             break
@@ -256,10 +261,9 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
                 again += [(term, chunk[:half]), (term, chunk[half:])]
             else:
                 out += got
-                for ref in chunk:
-                    done[ref] += 1
+                asked.update(chunk)
         jobs = again + jobs  # finish the halves of important references first
-    return out, {ref for ref, n in done.items() if n == len(terms)}
+    return out, asked
 
 
 # --------------------------------------------------------------------------- pool
@@ -487,6 +491,21 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
 
 # --------------------------------------------------------------------------- public
 
+# Element symbols that are also everyday words (OpenAlex search ignores case): "La", "Ce"
+# match French, "Er" German, "Eu" the EU, "In"/"As"/"Be"/"He"/"No" English.
+AMBIGUOUS_SYMBOLS = {"as", "at", "be", "ce", "er", "es", "eu", "he", "in", "la", "no"}
+
+
+def _core_term_notes(core_terms: list[str]) -> list[str]:
+    """Warnings about core terms that would make the citation route far too broad."""
+    alts = {a.lower() for term in core_terms for w in term.replace(",", " ").split() for a in w.split("|") if a}
+    loose = sorted(alts & AMBIGUOUS_SYMBOLS)
+    if not loose:
+        return []
+    return ["core_terms contain element symbols that are also common words (" + ", ".join(loose)
+            + "; search ignores case): write the element's full name instead"]
+
+
 def start(question: str, queries: list[str], seeds: list[str], core_terms: list[str], *,
           criteria: list[str] | None = None, must_find: list[str] | None = None,
           year_from: int | None = None, year_to: int | None = None,
@@ -526,7 +545,11 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
     state["rounds"].append({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "event": "start",
                             "pool": len(pool), "seconds": round(time.time() - t0, 1)})
     _save(state)
-    return _next_batch(state)
+    out = _next_batch(state)
+    notes = _core_term_notes(core_terms)
+    if notes:
+        out["core_term_notes"] = notes
+    return out
 
 
 def next_batch(session: str) -> dict[str, Any]:

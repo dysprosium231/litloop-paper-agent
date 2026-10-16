@@ -122,11 +122,11 @@
    "cerium oxide nanoparticles drug delivery"
   ],
   "core_terms": [
-   "lanthanide|rare-earth|europium|gadolinium|cerium|terbium|lanthanum|erbium|ytterbium|Eu|Gd|Ce|Tb|La|Er|Yb|Ln",
-   "drug|doxorubicin|curcumin|ibuprofen|cisplatin"
+   "lanthanide|rare-earth|europium|gadolinium|cerium|terbium|lanthanum|erbium|ytterbium|Gd|Tb|Yb",
+   "drug|doxorubicin|curcumin|ibuprofen|cisplatin|docetaxel"
   ],
   "year_from": null,
   "year_to": null,
-  "note": "Draft parameters (2026-10-16); the first run's ratings become the judgments for scripts/eval_deep_search.py"
+  "note": "2026-10-16: the first run used these two terms when each term was a separate alternative, and symbols such as La/Ce/Er/Eu; both made the pool explode. Corrected terms; ratings of that run are in the judgments file"
  }
 }

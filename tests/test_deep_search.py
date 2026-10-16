@@ -334,3 +334,22 @@ def test_keyword_searches_are_counted_against_the_openalex_budget(monkeypatch):
     search._plain_session().get("https://api.crossref.org/works")  # other APIs are not OpenAlex's business
     assert quota.spent("openalex") - before == 10
     assert quota.summary()["openalex"]["remaining"] == 4000
+
+
+def test_core_terms_are_all_required_in_one_search(monkeypatch):
+    filters = []
+
+    def pages(flt, max_records, split_over=False):
+        filters.append(flt)
+        return []
+
+    monkeypatch.setattr(deep_search, "_pages", pages)
+    deep_search._cites_refs_on_topic(["A"], ["lanthanide|europium", "drug|doxorubicin"], [])
+    assert len(filters) == 1                           # one search, not one per term
+    assert "(lanthanide OR europium) AND (drug OR doxorubicin)" in filters[0]
+
+
+def test_element_symbols_that_are_common_words_are_flagged():
+    notes = deep_search._core_term_notes(["La|Ce|Gd drug"])
+    assert len(notes) == 1 and "ce, la" in notes[0]
+    assert deep_search._core_term_notes(["Al|aluminum SiC"]) == []

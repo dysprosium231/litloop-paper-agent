@@ -1,0 +1,406 @@
+{
+ "set": "rare_earth_drug_carriers",
+ "note": "Agent ratings from the 2026-10-16 MCP run (80 papers, rules of the set: amorphous rare-earth carrier 高, crystalline 中, rare earth only for imaging = borderline, rated 低). Used by scripts/eval_deep_search.py.",
+ "judgments": {
+  "10.1002/anie.202116983": {
+   "relevance": "高",
+   "reason": "种子(Angew)的德文版重复",
+   "title": "Tumor‐Microenvironment‐Responsive Biodegradable Nanoagents Based on Lanthanide Nucleotide Self‐Assemblies toward Precise Cancer Therapy"
+  },
+  "10.1016/j.biomaterials.2012.05.059": {
+   "relevance": "高",
+   "reason": "Eu/Gd掺杂CaP囊泡纳米球载药成像",
+   "title": "Multifunctional Eu3+/Gd3+ dual-doped calcium phosphate vesicle-like nanospheres for sustained drug release and imaging"
+  },
+  "10.1039/c4ra09902h": {
+   "relevance": "高",
+   "reason": "Tb掺杂无定形CaP载药成像",
+   "title": "Multifunctional biodegradable terbium-doped calcium phosphate nanoparticles: facile preparation, pH-sensitive drug release and in vitro bioimaging"
+  },
+  "10.1039/c4tb01193g": {
+   "relevance": "高",
+   "reason": "Eu掺杂无定形CaP介孔微球载药成像",
+   "title": "Multifunctional biodegradable mesoporous microspheres of Eu 3+ -doped amorphous calcium phosphate: microwave-assisted preparation, pH-sensitive drug release, and bioimaging application"
+  },
+  "10.1039/c5ra19065g": {
+   "relevance": "高",
+   "reason": "La掺杂ACP缓释IgY蛋白",
+   "title": "An amorphous calcium phosphate nanocomposite for storing and sustained release of IgY protein with antibacterial activity"
+  },
+  "10.1039/c0dt01390k": {
+   "relevance": "高",
+   "reason": "Eu/Tb掺杂介孔硅酸钙微球载药",
+   "title": "Preparation of luminescent and mesoporous Eu 3+ /Tb 3+ doped calcium silicate microspheres as drug carriers via a template route"
+  },
+  "10.1016/j.jcis.2011.01.109": {
+   "relevance": "高",
+   "reason": "Eu掺杂介孔硅酸钙载药",
+   "title": "Luminescent, mesoporous, and bioactive europium-doped calcium silicate (MCS: Eu3+) as a drug carrier"
+  },
+  "10.1016/j.inoche.2021.108872": {
+   "relevance": "高",
+   "reason": "Eu掺杂介孔硅酸钙载DOX",
+   "title": "Biocompatible Eu doped mesoporous calcium silicate nanospheres for pH-responsive drug release"
+  },
+  "10.1021/jp900515x": {
+   "relevance": "高",
+   "reason": "Eu掺杂介孔生物玻璃载药",
+   "title": "Luminescent and Mesoporous Europium-Doped Bioactive Glasses (MBG) as a Drug Carrier"
+  },
+  "10.1016/j.dyepig.2016.08.071": {
+   "relevance": "高",
+   "reason": "Eu掺杂介孔硅酸钙纳米球载药",
+   "title": "Uniform mesoporous CaSiO 3 :Eu 3+ nanospheres: Template-directed synthesis, luminescence and sustained drug release properties"
+  },
+  "10.1016/j.jcis.2012.08.004": {
+   "relevance": "高",
+   "reason": "Eu/Tb掺杂介孔生物玻璃纤维载药",
+   "title": "Electrospinning preparation and drug delivery properties of Eu3+/Tb3+ doped mesoporous bioactive glass nanofibers"
+  },
+  "10.1016/j.biomaterials.2011.08.032": {
+   "relevance": "中",
+   "reason": "Eu/Gd掺杂HAp纳米棒载药，晶态",
+   "title": "The photoluminescence, drug delivery and imaging properties of multifunctional Eu3+/Gd3+ dual-doped hydroxyapatite nanorods"
+  },
+  "10.1021/acsami.7b18005": {
+   "relevance": "中",
+   "reason": "镧系核苷酸配位水凝胶包封蛋白，非药物",
+   "title": "Robust Hydrogels from Lanthanide Nucleotide Coordination with Evolving Nanostructures for a Highly Stable Protein Encapsulation"
+  },
+  "10.1039/c5tb02767e": {
+   "relevance": "中",
+   "reason": "Gd/Ce/Tb共掺β-TCP载药，晶态",
+   "title": "Multifunctional Gd,Ce,Tb co-doped β-tricalcium phosphate porous nanospheres for sustained drug release and bioimaging"
+  },
+  "10.1016/j.dyepig.2017.08.043": {
+   "relevance": "中",
+   "reason": "Gd2O3:Eu/CaP空心球载药，晶态",
+   "title": "Facile one-pot synthesis of hollow mesoporous fluorescent Gd2O3:Eu/calcium phosphate nanospheres for simultaneous dual-modal imaging and pH-responsive drug delivery"
+  },
+  "10.1021/jp208908b": {
+   "relevance": "中",
+   "reason": "AMP/Eu配位聚合物包客四环素，用于发光",
+   "title": "Luminescence Nucleotide/Eu3+ Coordination Polymer Based on the Inclusion of Tetracycline"
+  },
+  "10.1016/j.biomaterials.2008.07.042": {
+   "relevance": "中",
+   "reason": "Eu掺杂介孔HAp载药，晶态",
+   "title": "Bioactive, luminescent and mesoporous europium-doped hydroxyapatite as a drug carrier"
+  },
+  "10.1002/chem.200900269": {
+   "relevance": "中",
+   "reason": "Eu掺杂HAp纤维载药，晶态",
+   "title": "Multifunctional Hydroxyapatite Nanofibers and Microbelts as Drug Carriers"
+  },
+  "10.1007/s11523-009-0118-9": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Imaging applications of nanotechnology in cancer"
+  },
+  "10.1016/j.ccr.2013.04.022": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Coordination polymer nanoparticles in medicine"
+  },
+  "10.1007/s00604-015-1504-x": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Multifunctional hydroxyapatite nanoparticles for drug delivery and multimodal molecular imaging"
+  },
+  "10.1002/cnma.201700154": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Self‐Assembly of Nucleobase, Nucleoside and Nucleotide Coordination Polymers: From Synthesis to Applications"
+  },
+  "10.1039/c3dt50143d": {
+   "relevance": "低",
+   "reason": "无定形硅酸钙，不含稀土",
+   "title": "Amorphous calcium silicate hydrate/block copolymer hybrid nanoparticles: synthesis and application as drug carriers"
+  },
+  "10.1039/c2sm07320j": {
+   "relevance": "低",
+   "reason": "边缘：稀土只发光，硅载药",
+   "title": "Facile preparation of coating fluorescent hollow mesoporous silica nanoparticles with pH-sensitive amphiphilic diblock copolymer for controlled drug release and cell imaging"
+  },
+  "10.1007/978-981-10-5975-9_9": {
+   "relevance": "低",
+   "reason": "综述/书章",
+   "title": "Nanodimensional and Nanocrystalline Calcium Orthophosphates"
+  },
+  "10.1002/jbm.b.31746": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Nanosized hydroxyapatite and other calcium phosphates: Chemistry of formation and application as drug and gene delivery agents"
+  },
+  "10.1016/j.polymer.2020.122901": {
+   "relevance": "低",
+   "reason": "聚合物载体，无稀土",
+   "title": "Biodegradable diblock copolymeric PEG-PCL nanoparticles: Synthesis, characterization and applications as anticancer drug delivery agents"
+  },
+  "10.5101/nbe.v4i1.p41-49": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Nanostructured Calcium Phosphates: Preparation and Their Application in Biomedicine"
+  },
+  "10.31635/ccschem.020.202000188": {
+   "relevance": "低",
+   "reason": "Mn金属药物，无稀土",
+   "title": "Manganese–Fluorouracil Metallodrug Nanotheranostic for MRI-Correlated Drug Release and Enhanced Chemoradiotherapy"
+  },
+  "10.1002/adma.201101586": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Bioceramics: From Bone Regeneration to Cancer Nanomedicine"
+  },
+  "10.3390/ma2041975": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Nanodimensional and Nanocrystalline Apatites and Other Calcium Orthophosphates in Biomedical Engineering, Biology and Medicine"
+  },
+  "10.1002/admi.202000819": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Biodegradable Inorganic Nanostructured Biomaterials for Drug Delivery"
+  },
+  "10.1016/j.ccr.2021.213977": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Antitumour activity of coordination polymer nanoparticles"
+  },
+  "10.1039/c5tb01340b": {
+   "relevance": "低",
+   "reason": "ACP载药，无稀土",
+   "title": "Vesicle-like nanospheres of amorphous calcium phosphate: sonochemical synthesis using the adenosine 5′-triphosphate disodium salt and their application in pH-responsive drug delivery"
+  },
+  "10.1002/chem.201202829": {
+   "relevance": "低",
+   "reason": "ACP载药，无稀土",
+   "title": "Highly Stable Amorphous Calcium Phosphate Porous Nanospheres: Microwave‐Assisted Rapid Synthesis Using ATP as Phosphorus Source and Stabilizer, and Their Application in Anticancer Drug Delivery"
+  },
+  "10.1016/j.colsurfb.2014.09.021": {
+   "relevance": "低",
+   "reason": "ACP涂层支架，无稀土",
+   "title": "Amorphous calcium phosphate nanospheres/polylactide composite coated tantalum scaffold: Facile preparation, fast biomineralization and subchondral bone defect repair application"
+  },
+  "10.1039/b917441a": {
+   "relevance": "低",
+   "reason": "CaP基因载体，无稀土",
+   "title": "Calcium phosphate/PLGA-mPEG hybrid porous nanospheres: A promising vector with ultrahigh gene loading and transfection efficiency"
+  },
+  "10.1002/asia.201300083": {
+   "relevance": "低",
+   "reason": "CaP载药，无稀土",
+   "title": "Calcium Phosphate Hybrid Nanoparticles: Self‐Assembly Formation, Characterization, and Application as an Anticancer Drug Nanocarrier"
+  },
+  "10.3109/17435390.2014.911381": {
+   "relevance": "低",
+   "reason": "CaP纳米球，无稀土",
+   "title": "Preparation and properties of biocompatible PS-PEG/calcium phosphate nanospheres"
+  },
+  "10.1002/adfm.201908865": {
+   "relevance": "低",
+   "reason": "Fe配位聚合物，无稀土",
+   "title": "Biodegradable Nanoscale Coordination Polymers for Targeted Tumor Combination Therapy with Oxidative Stress Amplification"
+  },
+  "10.1007/s11671-010-9558-5": {
+   "relevance": "低",
+   "reason": "ACP载药，无稀土",
+   "title": "Preparation and Sustained-Release Property of Triblock Copolymer/Calcium Phosphate Nanocomposite as Nanocarrier for Hydrophobic Drug"
+  },
+  "10.1016/j.matlet.2010.07.060": {
+   "relevance": "低",
+   "reason": "ACP载药，无稀土",
+   "title": "Calcium phosphate/block copolymer hybrid porous nanospheres: Preparation and application in drug delivery"
+  },
+  "10.1039/c5tb00534e": {
+   "relevance": "低",
+   "reason": "CaP/碳管，无稀土",
+   "title": "Calcium phosphate nanocapsule crowned multiwalled carbon nanotubes for pH triggered intracellular anticancer drug release"
+  },
+  "10.1016/j.jcis.2014.12.004": {
+   "relevance": "低",
+   "reason": "ACP载药，无稀土",
+   "title": "Porous microspheres of amorphous calcium phosphate: Block copolymer templated microwave-assisted hydrothermal synthesis and application in drug delivery"
+  },
+  "10.1039/c6cc04538c": {
+   "relevance": "低",
+   "reason": "硅/钙盐，无稀土",
+   "title": "Hollow silica nanospheres coated with insoluble calcium salts for pH-responsive sustained release of anticancer drugs"
+  },
+  "10.2147/ijn.s114224": {
+   "relevance": "低",
+   "reason": "ACP纤维，无稀土",
+   "title": "Electrospinning of calcium phosphate-poly(D,L-lactic acid) nanofibers for sustained release of water-soluble drug and fast mineralization"
+  },
+  "10.1016/j.jlumin.2017.08.033": {
+   "relevance": "低",
+   "reason": "稀土CaP仅成像，无载药",
+   "title": "Sol-gel synthesis of biocompatible Eu3+/Gd3+ co-doped calcium phosphate nanocrystals for cell bioimaging"
+  },
+  "10.3390/nano10010020": {
+   "relevance": "低",
+   "reason": "ACP载药，无稀土",
+   "title": "Highly Porous Amorphous Calcium Phosphate for Drug Delivery and Bio-Medical Applications"
+  },
+  "10.2174/1573413711666150730204449": {
+   "relevance": "低",
+   "reason": "ACP载药，无稀土",
+   "title": "Porous Microspheres of Casein/Amorphous Calcium Phosphate Nanocomposite: Room Temperature Synthesis and Application in Drug Delivery"
+  },
+  "10.1016/j.jnoncrysol.2018.08.015": {
+   "relevance": "低",
+   "reason": "ACP载药，无稀土",
+   "title": "Preparation, characterization, release and antioxidant activity of curcumin-loaded amorphous calcium phosphate nanoparticles"
+  },
+  "10.2147/ijn.s3938": {
+   "relevance": "低",
+   "reason": "PLGA蛋白载体，无稀土",
+   "title": "Preparation, characterization and in-vitro evaluation of sustained release protein-loaded nanoparticles based on biodegradable polymers"
+  },
+  "10.1016/j.dental.2014.05.025": {
+   "relevance": "低",
+   "reason": "牙科粘接剂ACP，无稀土",
+   "title": "Antibacterial activity and ion release of bonding agent containing amorphous calcium phosphate nanoparticles"
+  },
+  "10.1016/j.micromeso.2013.06.020": {
+   "relevance": "低",
+   "reason": "Zn掺杂ACP，无稀土",
+   "title": "Microwave-assisted hydrothermal preparation using adenosine 5′-triphosphate disodium salt as a phosphate source and characterization of zinc-doped amorphous calcium phosphate mesoporous microspheres"
+  },
+  "10.1016/j.cjche.2021.08.025": {
+   "relevance": "低",
+   "reason": "ACP载药，无稀土",
+   "title": "Preparation and functional study of pH-sensitive amorphous calcium phosphate nanocarriers"
+  },
+  "10.3390/inorganics10120232": {
+   "relevance": "低",
+   "reason": "非晶Eu配合物热敏膜，无载药",
+   "title": "Composites Based on Polylactide Doped with Amorphous Europium(III) Complex as Perspective Thermosensitive Luminescent Materials"
+  },
+  "10.1039/c5dt03357h": {
+   "relevance": "低",
+   "reason": "HAp蛋白缓释，无稀土",
+   "title": "DNA-templated microwave-hydrothermal synthesis of nanostructured hydroxyapatite for storing and sustained release of an antibacterial protein"
+  },
+  "10.1039/b708258d": {
+   "relevance": "低",
+   "reason": "镧系掺杂CaP仅荧光探针",
+   "title": "Lanthanide-doped calcium phosphate nanoparticles with high internal crystallinity and with a shell of DNA as fluorescent probes in cell experiments"
+  },
+  "10.1002/adfm.201703832": {
+   "relevance": "低",
+   "reason": "Hf配位聚合物，非稀土",
+   "title": "pH‐Sensitive Dissociable Nanoscale Coordination Polymers with Drug Loading for Synergistically Enhanced Chemoradiotherapy"
+  },
+  "10.1021/acs.molpharmaceut.6b00466": {
+   "relevance": "低",
+   "reason": "Pt配位聚合物，无稀土",
+   "title": "Nanoscale Coordination Polymers Codeliver Carboplatin and Gemcitabine for Highly Effective Treatment of Platinum-Resistant Ovarian Cancer"
+  },
+  "10.1039/d0cp00797h": {
+   "relevance": "低",
+   "reason": "ACP/ATP载药表征，无稀土",
+   "title": "Tracking the interaction of drug molecules with individual mesoporous amorphous calcium phosphate/ATP nanocomposites – an X-ray spectromicroscopy study"
+  },
+  "10.1002/adma.202312488": {
+   "relevance": "低",
+   "reason": "Pt自组装，无稀土",
+   "title": "A Nanoscale Trans‐Platinum(II)‐Based Supramolecular Coordination Self‐Assembly with a Distinct Anticancer Mechanism"
+  },
+  "10.1016/j.msec.2017.03.259": {
+   "relevance": "低",
+   "reason": "印迹聚合物，无稀土",
+   "title": "The controlled drug release by pH-sensitive molecularly imprinted nanospheres for enhanced antibacterial activity"
+  },
+  "10.1111/jace.14884": {
+   "relevance": "低",
+   "reason": "Eu掺杂CaP陶瓷，无载药",
+   "title": "Luminescent calcium phosphate bioceramics doped with europium derived from fish industry byproducts"
+  },
+  "10.1021/am4060645": {
+   "relevance": "低",
+   "reason": "ACC/ACP蛋白吸附，无稀土",
+   "title": "Microwave Hydrothermal Transformation of Amorphous Calcium Carbonate Nanospheres and Application in Protein Adsorption"
+  },
+  "10.1039/c9an01325c": {
+   "relevance": "低",
+   "reason": "镧系配位聚合物电化学传感",
+   "title": "Responsive methylene blue release from lanthanide coordination polymer for label-free, immobilization-free and sensitive electrochemical alkaline phosphatase activity assay"
+  },
+  "10.1039/c1dt10162e": {
+   "relevance": "低",
+   "reason": "边缘：Gd2O3:Eu核只发光，硅壳载药",
+   "title": "A luminescent and mesoporous core-shell structured Gd2O3 : Eu3+@nSiO2@mSiO2 nanocomposite as a drug carrier"
+  },
+  "10.1002/jbm.b.30813": {
+   "relevance": "低",
+   "reason": "无定形硅酸钙，无稀土",
+   "title": "A template route to the preparation of mesoporous amorphous calcium silicate with high in vitro bone‐forming bioactivity"
+  },
+  "10.1016/j.micromeso.2007.04.013": {
+   "relevance": "低",
+   "reason": "无定形硅酸钙相变，无稀土",
+   "title": "Preparation and the phase transformation behavior of amorphous mesoporous calcium silicate"
+  },
+  "10.1039/c0nr00695e": {
+   "relevance": "低",
+   "reason": "边缘：Gd2O3:Er核只发光，硅壳载药",
+   "title": "Facile synthesis of an up-conversion luminescent and mesoporous Gd 2 O 3 : Er 3+ @nSiO 2 @mSiO 2 nanocomposite as a drug carrier"
+  },
+  "10.1016/j.biomaterials.2009.05.038": {
+   "relevance": "低",
+   "reason": "边缘：YVO4:Eu只发光",
+   "title": "A magnetic, luminescent and mesoporous core–shell structured composite material as drug carrier"
+  },
+  "10.1021/jp203039t": {
+   "relevance": "低",
+   "reason": "边缘：上转换核只发光，硅壳载药",
+   "title": "Core–Shell Structured Up-Conversion Luminescent and Mesoporous NaYF4:Yb3+/Er3+@nSiO2@mSiO2 Nanospheres as Carriers for Drug Delivery"
+  },
+  "10.15541/jim20150662": {
+   "relevance": "低",
+   "reason": "Eu掺杂HAp，无载药",
+   "title": "Luminescent and Cytotoxic Characteristics of an Ellipsoidal and Microsized Europium (Eu)-doped Hydroxyapatite"
+  },
+  "10.1016/j.jeurceramsoc.2022.10.048": {
+   "relevance": "低",
+   "reason": "Eu掺杂硅酸钙涂层，无载药",
+   "title": "Synthesis, characterization and in-vitro biocompatibility of electrophoretic deposited europium-doped calcium silicate on titanium substrate"
+  },
+  "10.1021/acsanm.3c01547": {
+   "relevance": "低",
+   "reason": "荧光粉，无生物应用",
+   "title": "Europium-Doped Calcium Silicate Nanoparticles as High-Quantum-Yield Red-Emitting Phosphors"
+  },
+  "10.1002/chem.201000900": {
+   "relevance": "低",
+   "reason": "硅纤维，无稀土",
+   "title": "Luminescent Porous Silica Fibers as Drug Carriers"
+  },
+  "10.1039/c6ra28457d": {
+   "relevance": "低",
+   "reason": "Tb掺杂硅/CaP发光，无载药",
+   "title": "Hybrid preparation of terbium( iii )-doped mesoporous silica particles with calcium phosphates"
+  },
+  "10.1111/ijac.12869": {
+   "relevance": "低",
+   "reason": "硅酸钙涂层载药，无稀土",
+   "title": "Preparation and characterization of mesoporous calcium‐doped silica‐coated TiO 2 scaffolds and their drug releasing behavior"
+  },
+  "10.1016/j.jlumin.2015.07.024": {
+   "relevance": "低",
+   "reason": "长余辉CaP成像，无载药",
+   "title": "Persistent luminescence of Eu, Mn, Dy doped calcium phosphates for in-vivo optical imaging"
+  },
+  "10.1016/j.biomaterials.2007.10.019": {
+   "relevance": "低",
+   "reason": "边缘：YVO4:Eu只发光，硅载药",
+   "title": "Luminescence functionalization of mesoporous silica with different morphologies and applications as drug delivery systems"
+  },
+  "10.1016/j.actbio.2009.01.012": {
+   "relevance": "低",
+   "reason": "硅酸钙蛋白缓释，无稀土",
+   "title": "Mesoporous calcium silicate for controlled release of bovine serum albumin protein"
+  }
+ }
+}
