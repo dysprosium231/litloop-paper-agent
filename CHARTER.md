@@ -120,7 +120,7 @@
 - **形态**：先做 LitLoop 起的本地网页（浏览器打开，跨平台，不增加安装负担），以后需要再包成桌面 app。
 - **界面库**（2026-10-15 确定）：React + shadcn/ui（Tailwind），图表用 Recharts；前端预先编译成静态文件随 Python 包分发，由 LitLoop 用已有的 Starlette/uvicorn 起本地服务，用户不需要装 Node。主题色用图标的北航蓝和琥珀色，支持深色模式。风格以 2026-10-15 的筛选页示意为准：浅底、细边框、圆角卡片，每页只有一个强调色按钮，相关度用绿/琥珀/灰标签，撤稿用红色。
 - **初次使用引导与设置**（2026-10-16 确定）：凡是因人而异、或要用户自己申请和登录的配置，都在首次打开 app 时逐步引导，每步可跳过、带“测试”按钮当场验证，设置页按同样分组随时可改：
-  1. 数据源：OpenAlex Key、Elsevier Key、联系邮箱（只发给 Crossref 和 OpenAlex）、Semantic Scholar Key（可选）；测试时显示剩余额度。
+  1. 数据源：OpenAlex Key、Elsevier Key、Springer Nature Meta API Key（提示用 Meta API 那个，并说明摘要仅限个人非商业使用）、联系邮箱（配置项 `email`，只发给 Crossref、OpenAlex、Unpaywall）、Semantic Scholar Key（可选）；测试时显示剩余额度。
   2. 学校认证：从学校列表选学校，自动带出 WebVPN / CARSI / EZProxy；引导登录一次，测试能否下载一篇订阅论文。
   3. 网络：是否开着代理软件；机构通道绕开代理、指定出版商走代理。
   4. 下载：保存位置、命名方式；是否允许 Sci-Hub、LibGen 等来源（合规问题，必须用户明确选择）。

@@ -25,8 +25,10 @@ from typing import Any
 
 from . import config as _config
 
-# Limits from the providers' documentation (checked 2026-10-16), kept a little
-# below the published figures:
+# Official limits (checked 2026-10-16; full list with sources in docs/API_LIMITS.md).
+# PER_SECOND stays a little below each published per-second figure. CONCURRENCY
+# is official only for Crossref (1 public / 3 polite); the providers below that
+# publish no concurrency limit get LitLoop's own conservative choice.
 # * OpenAlex: 30 requests/s with a key, but 5/s for searches with more than five
 #   boolean operators; budget 10,000 credits/day with a free key (list 1 credit,
 #   keyword search 10), reset at midnight UTC.
@@ -38,12 +40,14 @@ from . import config as _config
 #   https://crossref.org/blog/announcing-changes-to-rest-api-rate-limits/
 # * Semantic Scholar: keyless requests share one pool and are often throttled;
 #   a key gives 1 request/s. https://www.semanticscholar.org/product/api
+# * Springer Nature Meta API, free plan: 500 requests/day, 100/min.
+#   https://dev.springernature.com/subscription/
 # Lanes: "openalex" assumes a key (30/s); without one OpenAlex allows 10/s and
 # 1/s for boolean-heavy searches, and only $0.10 (1,000 credits) a day.
 CONCURRENCY = {"openalex": 4, "openalex_boolean": 2, "openalex_nokey": 2, "openalex_boolean_nokey": 1,
-               "scopus": 5, "semantic_scholar": 1, "crossref": 1, "crossref_polite": 3}
+               "scopus": 5, "semantic_scholar": 1, "crossref": 1, "crossref_polite": 3, "springer": 2}
 PER_SECOND = {"openalex": 25.0, "openalex_boolean": 4.0, "openalex_nokey": 8.0, "openalex_boolean_nokey": 0.9,
-              "scopus": 8.0, "semantic_scholar": 1.0, "crossref": 4.0, "crossref_polite": 8.0}
+              "scopus": 8.0, "semantic_scholar": 1.0, "crossref": 4.0, "crossref_polite": 8.0, "springer": 1.5}
 WARN_FRACTION = 0.1  # warn when less than this share of the budget is left
 
 _lock = threading.Lock()

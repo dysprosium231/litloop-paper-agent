@@ -151,3 +151,20 @@ def test_fill_marks_a_paper_decided_only_when_every_source_answered(monkeypatch)
     rows = [{"doi": "10.1016/none"}, {"doi": "10.1016/timeout"}]
     a.fill_abstracts(rows, {"elsevier_api_key": "k"})
     assert [r["abstract_decided"] for r in rows] == [True, False]
+
+
+def test_springer_is_asked_only_for_springer_nature_dois(monkeypatch):
+    asked = []
+    monkeypatch.setattr(a, "_semantic_scholar", lambda dois, timeout: {})
+    monkeypatch.setattr(a, "_crossref", lambda doi, timeout, email="": "")
+    monkeypatch.setattr(a, "_springer", lambda doi, timeout, key, limit: asked.append(doi) or "Springer text")
+    rows = [{"doi": "10.1007/s1"}, {"doi": "10.1038/n2"}, {"doi": "10.1016/e3"}, {"doi": "10.1021/acs4"}]
+    a.fill_abstracts(rows, {"springer_meta_api_key": "k"})
+    assert sorted(asked) == ["10.1007/s1", "10.1038/n2"]
+    assert [r.get("abstract_source") for r in rows] == ["springer", "springer", None, None]
+
+
+def test_springer_stops_at_the_daily_limit(monkeypatch):
+    monkeypatch.setattr(a.quota, "summary", lambda: {"springer": {"requests_today": 500}})
+    monkeypatch.setattr(a, "_session", lambda: (_ for _ in ()).throw(AssertionError("no request expected")))
+    assert a._springer("10.1007/x", 5, "k", 500) is None

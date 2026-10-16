@@ -112,9 +112,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "browser_copy_follow_system": True,
     "is_campus_network": False,
     "tor_proxy": os.environ.get("TOR_PROXY", ""),
-    # Optional. Sent to Crossref and OpenAlex only, so they can reach you if a request misbehaves;
-    # with it Crossref allows 3 parallel requests instead of 1.
-    "contact_email": "",
+    # Optional Springer Nature Meta API key (not the TDM key above): abstracts of Springer Nature papers,
+    # free plan 500 requests/day. See docs/API_LIMITS.md.
+    "springer_meta_api_key": "",
+    "springer_meta_daily_limit": 500,
     "tor_use_bridges": False,
     "use_tor_for_scihub": True,
     "google_scholar_limit": 5,
@@ -151,7 +152,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 
-ENV_KEYS = {"openalex_api_key": "OPENALEX_API_KEY", "elsevier_api_key": "ELSEVIER_API_KEY"}
+ENV_KEYS = {"openalex_api_key": "OPENALEX_API_KEY", "elsevier_api_key": "ELSEVIER_API_KEY",
+            "springer_meta_api_key": "SPRINGER_META_API_KEY"}
 
 
 def load_config() -> dict[str, Any]:

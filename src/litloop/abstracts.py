@@ -166,6 +166,31 @@ def _crossref(doi: str, timeout: float, email: str = "") -> str | None:
 
 
 ELSEVIER_PREFIX = "10.1016/"
+# DOI prefixes of Springer Nature (Springer, Nature, BMC, Kluwer, Palgrave, EPJ).
+SPRINGER_PREFIXES = ("10.1007/", "10.1038/", "10.1186/", "10.1023/", "10.1057/", "10.1140/")
+
+
+def _springer(doi: str, timeout: float, key: str, daily_limit: int) -> str | None:
+    """Abstract from the Springer Nature Meta API (subscription articles too).
+    Abstracts are licensed for personal, non-commercial use only."""
+    if quota.summary().get("springer", {}).get("requests_today", 0) >= daily_limit:
+        return None  # the plan's daily allowance is used up
+    try:
+        with quota.slot("springer"):
+            r = _session().get("https://api.springernature.com/meta/v2/json",
+                               params={"q": f"doi:{doi}", "api_key": key}, timeout=timeout)
+        quota.record("springer", r)
+        if r.status_code != 200:
+            return None
+        records = r.json().get("records") or []
+    except (requests.RequestException, ValueError):
+        return None
+    if not records:
+        return ""
+    ab = records[0].get("abstract") or ""
+    if isinstance(ab, dict):  # {"h1": "Abstract", "p": [...]}
+        ab = ab.get("p") or ""
+    return " ".join(ab) if isinstance(ab, list) else str(ab)
 
 
 def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None = None,
@@ -180,7 +205,11 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
         deadline = time.monotonic() + budget_s
         left = lambda: max(2.0, deadline - time.monotonic())  # noqa: E731
         key = str((config or {}).get("elsevier_api_key") or "").strip()
-        email = str((config or {}).get("contact_email") or "").strip()
+        # The contact email (Crossref polite pool); the shipped placeholder does not count.
+        email = str((config or {}).get("email") or "").strip()
+        email = "" if email.endswith(".invalid") else email
+        springer_key = str((config or {}).get("springer_meta_api_key") or "").strip()
+        springer_limit = int((config or {}).get("springer_meta_daily_limit") or 500)
         scopus = _Scopus(key) if key else None
 
         def take(doi: str, text: str, source: str) -> None:
@@ -194,6 +223,8 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
                 return source, doi, None
             if source == "scopus":
                 return source, doi, scopus.get(doi, min(15.0, left()))
+            if source == "springer":
+                return source, doi, _springer(doi, min(15.0, left()), springer_key, springer_limit)
             return source, doi, _crossref(doi, min(15.0, left()), email)
 
         # All sources at once, first answer wins: asking them in turn made one
@@ -211,7 +242,9 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
             if scopus:
                 jobs += [pool.submit(ask, "scopus", doi) for doi in missing]
             asked = {doi: (["scopus"] if scopus else []) +
+                     (["springer"] if springer_key and doi.startswith(SPRINGER_PREFIXES) else []) +
                      ([] if scopus and doi.startswith(ELSEVIER_PREFIX) else ["crossref"]) for doi in missing}
+            jobs += [pool.submit(ask, "springer", doi) for doi in missing if "springer" in asked[doi]]
             jobs += [pool.submit(ask, "crossref", doi) for doi in missing if "crossref" in asked[doi]]
             for job in as_completed(jobs, timeout=max(0.1, deadline - time.monotonic())):
                 res = job.result()

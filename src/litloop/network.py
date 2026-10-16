@@ -306,6 +306,15 @@ def polite_delay(config: dict[str, Any]) -> None:
 _domain_locks: dict[str, threading.Lock] = {}
 _domain_last_request: dict[str, float] = {}
 _DOMAIN_RATE_LIMIT = 0.5  # seconds between requests to same domain
+# Longer gaps where the provider's terms ask for them (docs/API_LIMITS.md):
+# arXiv API "no more than one request every three seconds"; CORE "five single
+# requests per 10 seconds".
+_DOMAIN_MIN_INTERVAL = {"export.arxiv.org": 3.0, "arxiv.org": 3.0, "api.core.ac.uk": 2.0}
+# Hourly allowances: OpenAIRE allows 60 requests/hour without a token. Once
+# used up the host is skipped (an OA probe, other sources cover it) instead of
+# stalling downloads for up to an hour.
+_DOMAIN_HOURLY_CAP = {"api.openaire.eu": 55}
+_domain_hour_log: dict[str, list[float]] = {}
 
 
 def _extract_domain(url: str) -> str:
@@ -324,17 +333,26 @@ def domain_rate_limit(url: str) -> None:
     if domain not in _domain_locks:
         _domain_locks[domain] = threading.Lock()
     with _domain_locks[domain]:
+        cap = _DOMAIN_HOURLY_CAP.get(domain)
+        if cap:
+            recent = [s for s in _domain_hour_log.get(domain, []) if time.time() - s < 3600]
+            if len(recent) >= cap:
+                raise requests.ConnectionError(f"{domain}: hourly allowance of {cap} requests used; skipped")
+            _domain_hour_log[domain] = recent + [time.time()]
+        gap = _DOMAIN_MIN_INTERVAL.get(domain, _DOMAIN_RATE_LIMIT)
         now = time.time()
         last = _domain_last_request.get(domain, 0)
         elapsed = now - last
-        if elapsed < _DOMAIN_RATE_LIMIT:
-            time.sleep(_DOMAIN_RATE_LIMIT - elapsed)
+        if elapsed < gap:
+            time.sleep(gap - elapsed)
         _domain_last_request[domain] = time.time()
 
 
 # ============================================================
 # Per-host concurrency control (scimesh-style)
 # ============================================================
+# Inherited from the original project; not published by the providers, except
+# arXiv (single connection) and CORE (see _DOMAIN_MIN_INTERVAL). docs/API_LIMITS.md.
 _DEFAULT_HOST_CONCURRENCY: dict[str, int] = {
     "unpaywall.org": 3,
     "api.openalex.org": 5,
@@ -343,11 +361,11 @@ _DEFAULT_HOST_CONCURRENCY: dict[str, int] = {
     "api.openaire.eu": 3,
     "doaj.org": 3,
     "api.semanticscholar.org": 3,
-    "api.core.ac.uk": 3,
+    "api.core.ac.uk": 1,     # CORE: five single requests per 10 seconds
     "europepmc.org": 3,
     "www.ebi.ac.uk": 3,
-    "arxiv.org": 2,
-    "export.arxiv.org": 2,
+    "arxiv.org": 1,          # arXiv terms: a single connection at a time
+    "export.arxiv.org": 1,
 }
 
 _host_semaphores: dict[str, threading.Semaphore] = {}

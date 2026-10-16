@@ -104,14 +104,15 @@ docker compose up -d                                              # MCP 服务�
 
 ## 依赖与 Key
 
-装好就能用；下面几样配上以后效果明显更好。各接口今天用了多少、还剩多少，可以用 `litloop_diagnostics(check="quota")` 查看；深度检索在额度不足或频繁被限流时会在返回里提醒。Key 都可以用 `litloop_config` 写进配置，也可以设成环境变量（配置文件优先，来自环境变量的 Key 不会被写进文件）。
+装好就能用；下面几样配上以后效果明显更好。所有外部接口的限额、配置项和 LitLoop 的应对方式集中在 [docs/API_LIMITS.md](docs/API_LIMITS.md)。各接口今天用了多少、还剩多少，可以用 `litloop_diagnostics(check="quota")` 查看；深度检索在额度不足或频繁被限流时会在返回里提醒。Key 都可以用 `litloop_config` 写进配置，也可以设成环境变量（配置文件优先，来自环境变量的 Key 不会被写进文件）。
 
 | 组件 | 必需吗 | 用来做什么 | 没有时 | 怎么获取 |
 |---|---|---|---|---|
 | Python 3.11+、Git | 必需 | 运行和更新 LitLoop | 装不上 | Windows：`winget install Python.Python.3.12 Git.Git` |
 | OpenAlex API Key | **强烈推荐** | 快速检索和深度检索的主要数据源（目前唯一） | 每天只有约 0.1 美元（1000 积分）、每秒 10 次，一次深度检索就可能用完；也不能用游标翻页（LitLoop 会自动改用页码翻页） | 在 [openalex.org](https://openalex.org) 注册后免费获取；`openalex_api_key` 或环境变量 `OPENALEX_API_KEY`。有 Key 时每天 1 美元 = 10000 积分（UTC 零点重置），每秒 30 次。普通过滤每次 1 积分，**带关键词检索每次 10 积分**；深度检索的引用路线每页都是检索请求。[官方说明](https://help.openalex.org/how-to-use-the-api/rate-limits-and-authentication) |
 | Elsevier API Key | **强烈推荐** | ScienceDirect 全文下载（需校园网出口）；从 Scopus 补摘要 | Elsevier 期刊多的领域大量文章缺摘要，深度检索只能凭标题排序。PDC 测试集上，26 篇目标里 16 篇的摘要靠它补 | [dev.elsevier.com](https://dev.elsevier.com) 免费申请；`litloop_elsevier_setup`，或 `elsevier_api_key` / 环境变量 `ELSEVIER_API_KEY`。Scopus 摘要每周 10000 次、每秒 9 次；全文下载每周 50000 次、每秒 10 次（[官方额度表](https://dev.elsevier.com/api_key_settings.html)）。一次深度检索补摘要约用几百次 |
-| 联系邮箱 | 推荐 | 随请求发给 Crossref 和 OpenAlex，出问题时它们能联系你 | Crossref 按公共池限速：同时只能 1 个请求，补摘要慢一些 | `litloop_config(key="contact_email", value="你的邮箱")`。有邮箱时 Crossref 允许每秒 10 次、同时 3 个（[官方说明](https://crossref.org/blog/announcing-changes-to-rest-api-rate-limits/)） |
+| Springer Nature Meta API Key | 推荐 | 补 Springer、Nature、BMC 等文章的摘要（订阅文章也有） | 这些文章的摘要只能靠 Scopus 和 Crossref，缺得多一些 | 在 [dev.springernature.com](https://dev.springernature.com) 免费注册，用 **Meta API** 那个 Key（Open Access API 只覆盖开放获取文章）；`springer_meta_api_key` 或环境变量 `SPRINGER_META_API_KEY`。免费档每天 500 次、每分钟 100 次（[官方说明](https://dev.springernature.com/subscription/)），LitLoop 只用它查 Springer Nature 自家的 DOI。条款规定摘要仅限个人、非商业使用 |
+| 联系邮箱 | 推荐 | 随请求发给 Crossref、OpenAlex、Unpaywall，出问题时它们能联系你 | Crossref 按公共池限速：同时只能 1 个请求，补摘要慢一些 | `litloop_config(key="email", value="你的邮箱")`（同一个邮箱也用于 OpenAlex、Unpaywall）。有邮箱时 Crossref 允许每秒 10 次、同时 3 个（[官方说明](https://crossref.org/blog/announcing-changes-to-rest-api-rate-limits/)） |
 | scansci-find（发现引擎） | 推荐 | 快速检索和深度检索的关键词路线 | 自动退回内置的三源检索，较慢 | 安装时加 `--with-find` |
 | Zotero 桌面版 + zotero-mcp | 可选 | 把文献和 PDF 直接写进本机 Zotero | 只能下载到本地文件夹 | 见下文 [Zotero](#zotero) |
 | 本机 Chrome | 可选 | 需要浏览器的出版商和机构通道 | 这些通道不可用，开放获取和 API 照常 | 正常安装 Chrome 即可，LitLoop 会自动复制一份私有副本 |
