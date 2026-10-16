@@ -1,0 +1,132 @@
+{
+ "name": "深度检索 · 稀土药物载体",
+ "role": "main",
+ "purpose": "Stage 2 (deep search) acceptance set in a field far from ceramics (biomedical nanocarriers): starting from the seeds and the question, find every target. The user collected these papers.",
+ "question": "含稀土（镧系）元素、以非晶/无定形为主的纳米材料作为药物递送载体：稀土配位聚合物与核苷酸自组装、稀土掺杂的无定形磷酸钙、生物活性玻璃和磷酸盐玻璃、稀土氢氧化物/碳酸盐/氧化物空心或多孔载体、稀土功能化的纳米载体；载药与刺激响应释放（pH、肿瘤微环境、光、磁热），以及荧光、MRI、CT 成像与治疗一体化。",
+ "zotero_collection": "LitLoop 测试/深度检索 · 稀土药物载体",
+ "source": "User Zotero collection 非晶稀土材料-药物递送载体 (13 items, 2026-10-16); DOIs and years checked against OpenAlex.",
+ "rules": {
+  "target": "research article on a nanocarrier whose own material contains rare-earth (lanthanide) elements — coordination polymers, nucleotide self-assemblies, rare-earth-doped amorphous calcium phosphate or glasses, rare-earth hydroxide/carbonate/oxide carriers, rare-earth-functionalized nanoparticles — used to load and release a drug; amorphous carriers are rated 高, crystalline ones 中",
+  "borderline": "rare earths used only for luminescence or contrast while another material carries the drug (e.g. upconversion NaYF4 cores with a mesoporous silica shell), or rare-earth nanomaterials for therapy without drug loading",
+  "excluded": "reviews and books, rare-earth materials without a biomedical use, drug carriers without rare earths",
+  "decided": "2026-10-16: the user chose 'rare earth as the carrier itself, amorphous preferred'; all 12 indexed papers of the collection are seeds or targets"
+ },
+ "seeds": [
+  {
+   "doi": "10.1021/ja803383k",
+   "openalex": "W1968377063",
+   "zotero_key": "28DSU6ZE",
+   "year": 2008,
+   "title": "Nanoscale coordination polymers for platinum-based anticancer drug delivery"
+  },
+  {
+   "doi": "10.1186/1556-276x-6-67",
+   "openalex": "W2126578150",
+   "zotero_key": "5YI9CUFI",
+   "year": 2011,
+   "title": "Europium-doped amorphous calcium phosphate porous nanospheres: preparation and application as luminescent drug carriers"
+  },
+  {
+   "doi": "10.1002/anie.202116983",
+   "openalex": "W4210587988",
+   "zotero_key": "W9RXJ6CG",
+   "year": 2022,
+   "title": "Tumor-microenvironment-responsive biodegradable nanoagents based on lanthanide nucleotide self-assemblies toward precise cancer therapy"
+  }
+ ],
+ "targets": [
+  {
+   "doi": "10.1039/c4ra09902h",
+   "openalex": "W2095144038",
+   "zotero_key": "9H3TEGMK",
+   "year": 2014,
+   "title": "Multifunctional biodegradable terbium-doped calcium phosphate nanoparticles: facile preparation, pH-sensitive drug release and in vitro bioimaging"
+  },
+  {
+   "doi": "10.1039/c7nr01784g",
+   "openalex": "W2618151931",
+   "zotero_key": "3GWFBCST",
+   "year": 2017,
+   "title": "Microemulsion-made gadolinium carbonate hollow nanospheres showing magnetothermal heating and drug release"
+  },
+  {
+   "doi": "10.1016/j.jnoncrysol.2017.08.034",
+   "openalex": "W2750692643",
+   "zotero_key": "S9GHH73P",
+   "year": 2017,
+   "title": "Evaluation of solubility and cytotoxicity of lanthanum-doped phosphate glasses nanoparticles for drug delivery applications"
+  },
+  {
+   "doi": "10.1016/j.diamond.2018.11.015",
+   "openalex": "W2900847916",
+   "zotero_key": "JG7MHVDH",
+   "year": 2018,
+   "title": "Rare earth-functionalized nanodiamonds for dual-modal imaging and drug delivery"
+  },
+  {
+   "doi": "10.1186/s12951-021-00811-w",
+   "openalex": "W3134925280",
+   "zotero_key": "3HJKP638",
+   "year": 2021,
+   "title": "NIR-laser-triggered gadolinium-doped carbon dots for magnetic resonance imaging, drug delivery and combined photothermal chemotherapy for triple negative breast cancer"
+  },
+  {
+   "doi": "10.1016/j.jnoncrysol.2023.122578",
+   "openalex": "W4386262371",
+   "zotero_key": "EP56HB7W",
+   "year": 2023,
+   "title": "Cerium doped dendritic mesoporous bioactive glass nanoparticles with bioactivity and drug delivery capability"
+  },
+  {
+   "doi": "10.2147/ijn.s434873",
+   "openalex": "W4388736025",
+   "zotero_key": "8JRKLR82",
+   "year": 2023,
+   "title": "Functionalized cerium dioxide nanoparticles with antioxidative neuroprotection for alzheimer's disease"
+  },
+  {
+   "doi": "10.1080/17435889.2024.2350357",
+   "openalex": "W4399944196",
+   "zotero_key": "HPM76N2S",
+   "year": 2024,
+   "title": "Integrin receptor-targeted, doxorubicin-loaded cerium oxide nanoparticles delivery to combat glioblastoma"
+  },
+  {
+   "doi": "10.1016/j.inoche.2026.117182",
+   "openalex": "W7167831458",
+   "zotero_key": "FC6YTQ5H",
+   "year": 2026,
+   "title": "Hollow spherical erbium and ytterbium hydroxide nano-capsules for curcumin loading, pH responsive release, and multimodal imaging with therapeutic potential"
+  }
+ ],
+ "not_indexed": [
+  {
+   "zotero_key": "9GTRXS4U",
+   "doi": null,
+   "year": null,
+   "title": "Development of a gadolinium-based nanotheranostics platform for irradiation activatable MRI-radiosensitization and doxorubicin release in cancer therapy",
+   "why": "thesis (Zhipeng Yuan), no DOI, not found in OpenAlex; deep search cannot reach it"
+  }
+ ],
+ "deep_search": {
+  "question": "含稀土（镧系）元素、以非晶/无定形为主的纳米材料作为药物递送载体：稀土配位聚合物与核苷酸自组装、稀土掺杂的无定形磷酸钙、生物活性玻璃和磷酸盐玻璃、稀土氢氧化物/碳酸盐/氧化物空心或多孔载体、稀土功能化的纳米载体；载药与刺激响应释放（pH、肿瘤微环境、光、磁热），以及荧光、MRI、CT 成像与治疗一体化。",
+  "queries": [
+   "lanthanide coordination polymer nanoparticles drug delivery",
+   "lanthanide nucleotide self-assembly nanoparticles doxorubicin",
+   "europium doped amorphous calcium phosphate drug carrier",
+   "terbium doped calcium phosphate drug release bioimaging",
+   "rare earth doped bioactive glass nanoparticles drug delivery",
+   "lanthanum phosphate glass nanoparticles drug release",
+   "gadolinium hollow nanospheres drug release",
+   "lanthanide hydroxide hollow nanoparticles drug loading imaging",
+   "cerium oxide nanoparticles drug delivery"
+  ],
+  "core_terms": [
+   "lanthanide|rare-earth|europium|gadolinium|cerium|terbium|lanthanum|erbium|ytterbium|Eu|Gd|Ce|Tb|La|Er|Yb|Ln",
+   "drug|doxorubicin|curcumin|ibuprofen|cisplatin"
+  ],
+  "year_from": null,
+  "year_to": null,
+  "note": "Draft parameters (2026-10-16); the first run's ratings become the judgments for scripts/eval_deep_search.py"
+ }
+}
