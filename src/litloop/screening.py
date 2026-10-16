@@ -10,13 +10,13 @@ topic can be searched in several rounds and later continued.
 
 from __future__ import annotations
 
-import json
 import re
 import time
 from pathlib import Path
 from typing import Any
 
 from . import config as _config
+from . import store
 from .identifiers import canonical_doi
 
 RELEVANCE = ("高", "中", "低", "不相关")
@@ -56,14 +56,19 @@ def _path(session: str) -> Path:
 
 
 def load(session: str) -> dict[str, Any]:
-    return json.loads(_path(session).read_text(encoding="utf-8"))
+    return store.read_json(_path(session))
+
+
+def _rating(item: dict[str, Any]) -> str:
+    """The rating that counts: the user's, set in the app, overrides the agent's."""
+    return item.get("user_relevance") or item["relevance"]
 
 
 def _write(data: dict[str, Any]) -> dict[str, str]:
     data["updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
     base = screening_dir() / data["id"]
-    base.with_suffix(".json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    base.with_suffix(".md").write_text(render_markdown(data), encoding="utf-8")
+    store.write_json(base.with_suffix(".json"), data, indent=2)
+    store.write_text(base.with_suffix(".md"), render_markdown(data))
     return {"json": str(base.with_suffix(".json")), "markdown": str(base.with_suffix(".md"))}
 
 
@@ -71,12 +76,18 @@ def save(question: str, items: list[dict[str, Any]], criteria: list[str] | str |
          query: str = "", mode: str = "quick", session: str | None = None,
          search_params: dict[str, Any] | None = None) -> dict[str, Any]:
     """Create a session, or merge ITEMS into SESSION. Returns id, paths, counts."""
-    if session:
-        data = load(session)
+    sid = session or time.strftime("%Y%m%d-%H%M%S") + "-" + _slug(question or query)
+    with store.lock(screening_dir() / f"{sid}.json"):  # the app may be writing the user's picks
+        return _save(sid, bool(session), question, items, criteria, query, mode, search_params)
+
+
+def _save(sid: str, existing: bool, question: str, items: list[dict[str, Any]], criteria: Any,
+          query: str, mode: str, search_params: dict[str, Any] | None) -> dict[str, Any]:
+    if existing:
+        data = load(sid)
     else:
-        sid = time.strftime("%Y%m%d-%H%M%S") + "-" + _slug(question or query)
-        data = {"id": sid, "created": time.strftime("%Y-%m-%d %H:%M:%S"), "question": question,
-                "mode": mode, "criteria": [], "searches": [], "items": []}
+        data = {"schema": store.SCHEMA, "id": sid, "created": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "question": question, "mode": mode, "criteria": [], "searches": [], "items": []}
     if criteria:
         data["criteria"] = [criteria] if isinstance(criteria, str) else list(criteria)
     if query:
@@ -120,6 +131,12 @@ def decide(session: str, selected: list[int | str], rejected: list[int | str] | 
     """Record the user's whole choice by item number or DOI, replacing any
     earlier decision (a corrected pick must not leave the wrong one behind);
     optionally write a download queue."""
+    with store.lock(_path(session)):
+        return _decide(session, selected, rejected, out_file)
+
+
+def _decide(session: str, selected: list[int | str], rejected: list[int | str] | None,
+            out_file: str | None) -> dict[str, Any]:
     data = load(session)
     index: dict[str, dict[str, Any]] = {}
     for it in data["items"]:
@@ -152,10 +169,14 @@ def decide(session: str, selected: list[int | str], rejected: list[int | str] | 
 
 def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
     out = []
-    for p in sorted(screening_dir().glob("*.json"), reverse=True)[:limit]:
+    # Only the records: a deep search's pool, summary and progress files sit
+    # next to them (the pool can be 100+ MB and has no "id").
+    records = [p for p in screening_dir().glob("*.json") if p.name.count(".") == 1]
+    for p in sorted(records, reverse=True)[:limit]:
         try:
-            d = json.loads(p.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            d = store.read_json(p)
+            d["id"]
+        except (OSError, ValueError, KeyError, TypeError):
             continue
         out.append({"session": d["id"], "question": d.get("question", ""), "updated": d.get("updated", ""),
                     "items": len(d.get("items", [])),

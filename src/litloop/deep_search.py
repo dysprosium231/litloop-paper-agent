@@ -30,17 +30,31 @@ import json
 import math
 import random
 import re
+import threading
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from . import screening
+from . import screening, store
 from .config import load_config
 from .identifiers import canonical_doi
 from .log import get_logger
 
 logger = get_logger()
+_run = threading.local()  # the round being worked on in this thread, for progress reports
+
+
+def _phase(name: str, total: int | None = None) -> None:
+    p = getattr(_run, "progress", None)
+    if p:
+        p.phase(name, total)
+
+
+def _step(done: int, total: int | None = None) -> None:
+    p = getattr(_run, "progress", None)
+    if p:
+        p.step(done, total)
 
 OPENALEX = "https://api.openalex.org/works"
 _FIELDS = ("id,doi,title,publication_year,cited_by_count,referenced_works,"
@@ -250,6 +264,7 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
 
     out: list[dict[str, Any]] = []
     asked: set[str] = set()
+    _step(0, len(ref_ids))
     while jobs:  # a query over the cap is split in halves; a few jobs at a time, budget permitting
         if not _budget_ok(credits0):
             break
@@ -262,6 +277,7 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
             else:
                 out += got
                 asked.update(chunk)
+        _step(len(asked))
         jobs = again + jobs  # finish the halves of important references first
     return out, asked
 
@@ -427,6 +443,7 @@ def _prefill_abstracts(state: dict[str, Any], rated: dict[str, str]) -> int:
     todo = todo[:PREFILL]
     if not todo:
         return 0
+    _phase("abstracts", len(todo))
     # Scopus answers about 3 papers a second at its allowed pace: budget for that.
     fill_abstracts(todo, load_config(), budget_s=min(90.0, max(30.0, len(todo) / 3)))
     for r in todo:
@@ -443,11 +460,11 @@ def _load(session: str) -> dict[str, Any]:
     p = _pool_path(session)
     if not p.exists():
         raise FileNotFoundError(f"no deep search for session {session!r}")
-    return json.loads(p.read_text(encoding="utf-8"))
+    return store.read_json(p)
 
 
 def _save(state: dict[str, Any]) -> None:
-    _pool_path(state["session"]).write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+    store.write_json(_pool_path(state["session"]), state)  # whole file at once: a crash keeps the old one
 
 
 def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
@@ -467,6 +484,7 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
                       key=lambda r: (-weight[r], r))
     before = len(pool)
     asked: set[str] = set()
+    _phase("expand", len(new_refs))
     if new_refs:
         for rec in _by_filter("openalex", new_refs, years):
             _add(pool, rec, "seed_reference")
@@ -519,6 +537,21 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
     session = screening.save(question, [], criteria=criteria, query=" | ".join(queries), mode="deep",
                              search_params={"core_terms": core_terms, "seeds": seeds,
                                             "year_from": year_from, "year_to": year_to})["session"]
+    _run.progress = store.Progress(session, "start")
+    try:
+        return _start(session, t0, question, queries, seeds, core_terms, must_find, year_from, year_to,
+                      batch_size, cap)
+    except BaseException:
+        _run.progress.finish("failed")
+        raise
+    finally:
+        _run.progress = None
+
+
+def _start(session: str, t0: float, question: str, queries: list[str], seeds: list[str],
+           core_terms: list[str], must_find: list[str] | None, year_from: int | None, year_to: int | None,
+           batch_size: int, cap: int) -> dict[str, Any]:
+    _phase("keywords", len(queries))
     years = _year_filter(year_from, year_to)
     pool: dict[str, dict] = {}
     seed_recs = _by_filter("doi", [canonical_doi(s) for s in seeds])
@@ -549,11 +582,25 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
     notes = _core_term_notes(core_terms)
     if notes:
         out["core_term_notes"] = notes
+    _run.progress.finish()
     return out
 
 
 def next_batch(session: str) -> dict[str, Any]:
     """Fold the agent's latest ratings back in (高 papers become seeds) and serve the next batch."""
+    _run.progress = store.Progress(session, "next")
+    try:
+        out = _next_round(session)
+    except BaseException:
+        _run.progress.finish("failed")
+        raise
+    finally:
+        p, _run.progress = _run.progress, None
+    p.finish()
+    return out
+
+
+def _next_round(session: str) -> dict[str, Any]:
     from . import quota
     t0 = time.time()
     credits0 = quota.spent("openalex")
@@ -630,7 +677,7 @@ def _ratings(state: dict[str, Any]) -> dict[str, str]:
         key = screening._key(it)
         key = by_title.get(key) if key.startswith("title:") else key
         if key:
-            out[key] = it["relevance"]
+            out[key] = screening._rating(it)  # the user's own rating (from the app) wins
     return out
 
 
@@ -685,6 +732,29 @@ def _coverage(state: dict[str, Any], rated: dict[str, str], order: list[str]) ->
     return out
 
 
+def _write_summary(state: dict[str, Any], rated: dict[str, str], stop: dict[str, Any],
+                   coverage: list[dict[str, Any]], notes: list[str], remaining: int) -> None:
+    """A small overview of the session for the app, which never reads the (huge) pool."""
+    batches = []
+    for i, keys in enumerate(b for b in state["served"] if b):
+        counts = {r: sum(1 for k in keys if rated.get(k) == r) for r in screening.RELEVANCE}
+        batches.append({"batch": i + 1, "size": len(keys), "rated": sum(counts.values()), **counts})
+    rounds = [{f: r.get(f) for f in ("time", "event", "new_seeds", "pool_added", "expand_seconds",
+                                     "rank_seconds", "openalex_credits", "seconds") if r.get(f) is not None}
+              for r in state["rounds"]]
+    summary = {"session": state["session"], "question": state["question"], "mode": "deep",
+               "updated": time.strftime("%Y-%m-%d %H:%M:%S"), "pool": len(state["pool"]),
+               "screened": len(rated), "remaining": remaining, "ranked_by": state.get("ranked_by", "formula"),
+               "seeds": len(state["seeds"]), "batches": batches, "rounds": rounds,
+               "stop_suggested": stop.get("stop_suggested", False), "stop_reason": stop.get("stop_reason", ""),
+               "coverage": coverage, "api_warnings": notes, "core_terms": state.get("core_terms", []),
+               "queries": state.get("queries", [])}
+    try:
+        store.write_json(store.summary_path(state["session"]), summary)
+    except OSError as exc:
+        logger.warning("deep search: could not write the session summary (%s)", exc)
+
+
 def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> dict[str, Any]:
     from .abstracts import clean_abstract, fill_abstracts
     from .search import _add_journal_rank, _flag_retractions
@@ -693,6 +763,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
     if not stop["stop_suggested"]:
         if _prefill_abstracts(state, rated):
             _score(state)
+        _phase("rank")
         state["ranked_by"] = _rerank(state, rated)
     served_before = {k for b in state["served"] for k in b}
     order = [k for k in _ranked(state) if k not in rated]
@@ -702,6 +773,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
     picked = (pending + fresh)[: state["batch_size"]] if not stop["stop_suggested"] else []
     items = [dict(state["pool"][k]) for k in picked]
     if items:
+        _phase("batch", len(items))
         fill_abstracts([it for it in items if not it.get("abstract")], load_config())
         for k, it in zip(picked, items):  # keep what was found, so ranking can use it too
             if it.get("abstract") and not state["pool"][k].get("abstract"):
@@ -736,10 +808,12 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
     if state.get("deferred_refs"):
         notes.append(f"openalex: this round's credit budget was used; {state['deferred_refs']} seed references "
                      "were not followed yet and are tried again in later rounds")
+    coverage = _coverage(state, rated, _ranked(state))
+    _write_summary(state, rated, stop, coverage, notes, remaining=len(order) - len(picked))
     return {"session": state["session"], "pool": len(state["pool"]), "screened": len(rated),
             "api_warnings": notes,
             "remaining": len(order) - len(picked), "ranked_by": state.get("ranked_by", "formula"), "batch": batch,
-            "coverage": _coverage(state, rated, _ranked(state)), **stop,
+            "coverage": coverage, **stop,
             "next_step": ("rate every paper: action='rate', session=..., ratings=[{n, relevance, reason}], "
                           "then action='next'") if batch else
                          "stop: show the user the screening session and let them choose"}

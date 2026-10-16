@@ -353,3 +353,14 @@ def test_element_symbols_that_are_common_words_are_flagged():
     notes = deep_search._core_term_notes(["La|Ce|Gd drug"])
     assert len(notes) == 1 and "ce, la" in notes[0]
     assert deep_search._core_term_notes(["Al|aluminum SiC"]) == []
+
+
+def test_a_round_leaves_a_summary_and_progress_for_the_app(net):
+    from litloop import store
+    out = deep_search.start("SiC/Al 无压浸渗", ["pressureless infiltration SiC aluminum"], ["10.1/SEED"],
+                            ["aluminum"], batch_size=10)
+    summary = store.read_json(store.summary_path(out["session"]))
+    assert summary["pool"] == out["pool"] and summary["batches"][0]["size"] == len(out["batch"])
+    progress = store.read_progress(out["session"])
+    assert progress["state"] == "idle" and progress["event"] == "start"
+    assert {"keywords", "expand"} <= {p["name"] for p in progress["phases"]}
