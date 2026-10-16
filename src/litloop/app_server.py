@@ -43,6 +43,11 @@ class Rating(BaseModel):
     relevance: str | None = None  # None clears the user's rating: the agent's counts again
 
 
+class Setting(BaseModel):
+    key: str
+    value: Any = None
+
+
 class Decision(BaseModel):
     doi: str | None = None
     title: str | None = None
@@ -129,6 +134,34 @@ def create_app(token: str) -> FastAPI:
     def quota_summary() -> dict[str, Any]:
         from . import quota
         return quota.summary()
+
+    @app.get("/api/quota/openalex")
+    def quota_openalex() -> dict[str, Any] | None:
+        from . import quota
+        return quota.openalex_live()  # OpenAlex's own count; costs no credits
+
+    @app.get("/api/settings")
+    def settings_list() -> list[dict[str, Any]]:
+        from . import app_settings
+        return app_settings.settings()
+
+    @app.post("/api/settings")
+    def settings_update(body: Setting) -> dict[str, Any]:
+        from . import app_settings
+        try:
+            return app_settings.update(body.key, body.value)
+        except KeyError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/settings/test/{group}")
+    def settings_test(group: str) -> dict[str, Any]:
+        from . import app_settings
+        try:
+            return app_settings.run_test(group)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
 
     return app
 

@@ -145,3 +145,12 @@
   user-select: none !important;
   transition: none !important;
 }
+
+/* The sidebar hides scrollbars (no-scrollbar); lists that scroll get a thin, quiet one back. */
+.scrollable {
+  scrollbar-width: thin !important;
+  scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent !important;
+}
+.scrollable::-webkit-scrollbar {
+  display: block !important;
+}

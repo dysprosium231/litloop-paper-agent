@@ -123,3 +123,52 @@ export const rating = (it: Item) => it.user_relevance ?? it.relevance
 /** The same key the backend uses to find a paper: DOI, or the title's letters and digits. */
 export const paperKey = (p: { doi?: string; title?: string }) =>
   p.doi ? p.doi.toLowerCase() : "title:" + (p.title ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "")
+
+// ------------------------------------------------------------------ settings
+
+export interface SettingField {
+  key: string
+  label: string
+  type: "secret" | "text" | "email" | "path" | "bool" | "select"
+  value: string | boolean | null
+  set: boolean
+  source: "file" | "env" | "default"
+  env?: string
+  help?: string
+  placeholder?: string
+  link?: string
+  warn?: boolean
+  options?: [string, string][]
+}
+
+export interface SettingGroup {
+  id: string
+  title: string
+  test?: string
+  fields: SettingField[]
+}
+
+export interface TestResult {
+  name: string
+  ok: boolean | null // null: not configured, nothing to test
+  detail: string
+  cost?: string
+}
+
+export interface ProviderUsage {
+  requests_today: number
+  credits_today: number
+  throttled_today: number
+  remaining: number | null
+  limit: number | null
+  resets_at: string | null
+  checked_at: string | null
+}
+
+export const settingsApi = {
+  list: () => call<SettingGroup[]>("/api/settings"),
+  save: (key: string, value: unknown) => call<SettingField>("/api/settings", { key, value }),
+  test: (group: string) => call<{ results: TestResult[]; seconds: number }>(`/api/settings/test/${group}`, {}),
+  quota: () => call<Record<string, ProviderUsage>>("/api/quota"),
+  openalex: () => call<{ credits_used?: number; credits_remaining?: number; credits_limit?: number; resets_at?: string; has_key?: boolean; error?: string } | null>("/api/quota/openalex"),
+}

@@ -1,7 +1,9 @@
 import * as React from "react"
 import { ChevronDownIcon } from "lucide-react"
 
-import { AppSidebar, type PaperRow } from "@/components/app-sidebar"
+import { AppSidebar, type Section } from "@/components/app-sidebar"
+import { PaperList, type PaperRow } from "@/components/paper-list"
+import { SettingsNav, SettingsPane } from "@/components/settings-view"
 import { DetailPane, type Paper } from "@/components/detail-pane"
 import { ProgressStrip } from "@/components/progress-strip"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
@@ -23,6 +25,8 @@ import {
   type SessionListEntry,
   type SessionRecord,
   type Summary,
+  settingsApi,
+  type SettingGroup,
 } from "@/lib/api"
 
 const short = (q: string) => (q.length > 28 ? q.slice(0, 28) + "…" : q)
@@ -99,7 +103,7 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (w: number) 
           onWidth(width + (e.key === "ArrowRight" ? 20 : -20))
         }
       }}
-      className="absolute inset-y-0 left-0 z-20 hidden w-1.5 -translate-x-1/2 cursor-col-resize transition-colors hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none md:block"
+      className="absolute inset-y-0 left-0 z-20 hidden w-2 -translate-x-1/2 cursor-col-resize focus-visible:outline-none md:block after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent hover:after:bg-foreground/15 focus-visible:after:bg-foreground/25"
     />
   )
 }
@@ -114,6 +118,12 @@ export default function App() {
   const [onlyBatch, setOnlyBatch] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [listWidth, setListWidth] = useStoredWidth()
+  const [section, setSection] = React.useState<Section>("screen")
+  const [groups, setGroups] = React.useState<SettingGroup[]>([])
+  const [settingsGroup, setSettingsGroup] = React.useState("sources")
+  React.useEffect(() => {
+    if (section === "settings") settingsApi.list().then(setGroups).catch((e) => setError(String(e)))
+  }, [section])
 
   React.useEffect(() => {
     api.sessions().then((s) => {
@@ -188,6 +198,7 @@ export default function App() {
   // Keyboard: ↑↓ move, 1-4 rate, space select. Not while typing in a field.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (section !== "screen") return
       const t = e.target as HTMLElement
       if (t.closest("input, textarea, [contenteditable=true]")) return
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -202,7 +213,7 @@ export default function App() {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [papers, idx, rate, toggleSelect])
+  }, [papers, idx, rate, toggleSelect, section])
 
   const heading = summary && onlyBatch && summary.current_batch?.length
     ? `第 ${summary.batches.length} 批 · ${summary.current_batch.length} 篇`
@@ -211,10 +222,22 @@ export default function App() {
   return (
     <TooltipProvider>
       <SidebarProvider style={{ "--sidebar-width": `${listWidth}px` } as React.CSSProperties}>
-        <AppSidebar rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
-          onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
+        <AppSidebar section={section} onSection={setSection}>
+          {section === "settings" ? (
+            <SettingsNav groups={groups} current={settingsGroup} onPick={setSettingsGroup} />
+          ) : section === "screen" ? (
+            <PaperList rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
+              onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
+          ) : (
+            <p className="p-4 text-sm text-muted-foreground">{section === "download" ? "下载队列" : "Zotero"}还在做。</p>
+          )}
+        </AppSidebar>
         <SidebarInset className="relative min-h-0">
           <ResizeHandle width={listWidth} onWidth={setListWidth} />
+          {section === "settings" ? (
+            <SettingsPane groups={groups} current={settingsGroup}
+              onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
+          ) : (<>
           <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-background px-4 py-3">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
@@ -248,6 +271,7 @@ export default function App() {
           {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           <ProgressStrip progress={progress} summary={summary} />
           <DetailPane paper={paper} edited={edited} onRate={rate} onSelect={toggleSelect} onExclude={exclude} />
+          </>)}
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
