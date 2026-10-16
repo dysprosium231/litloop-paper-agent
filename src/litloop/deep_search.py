@@ -389,9 +389,11 @@ def _prefill_abstracts(state: dict[str, Any], rated: dict[str, str]) -> int:
     todo = todo[:PREFILL]
     if not todo:
         return 0
-    fill_abstracts(todo, load_config(), budget_s=30.0)
+    # Scopus answers about 3 papers a second at its allowed pace: budget for that.
+    fill_abstracts(todo, load_config(), budget_s=min(90.0, max(30.0, len(todo) / 3)))
     for r in todo:
-        r["abstract_tried"] = True
+        if r.get("abstract") or r.pop("abstract_decided", False):
+            r["abstract_tried"] = True  # undecided ones (timeout, throttled) are asked again next round
     return sum(1 for r in todo if r.get("abstract"))
 
 
@@ -629,6 +631,10 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
     items = [dict(state["pool"][k]) for k in picked]
     if items:
         fill_abstracts([it for it in items if not it.get("abstract")], load_config())
+        for k, it in zip(picked, items):  # keep what was found, so ranking can use it too
+            if it.get("abstract") and not state["pool"][k].get("abstract"):
+                state["pool"][k]["abstract"] = it["abstract"]
+                state["pool"][k]["abstract_source"] = it.get("abstract_source")
         _add_journal_rank(items)
         _flag_retractions(items)
     batch = []

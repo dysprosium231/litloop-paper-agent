@@ -134,4 +134,20 @@ def test_scopus_retries_when_throttled_and_stops_only_when_the_quota_is_spent(mo
     replies[:] = [R(429), R(200, text="found")]          # throttled once, then fine
     assert scopus.get("10.1016/x", 5) == "found" and not scopus.exhausted
     replies[:] = [R(429, spent=True)]                    # weekly quota spent (Elsevier's signal)
-    assert scopus.get("10.1016/y", 5) == "" and scopus.exhausted
+    assert scopus.get("10.1016/y", 5) is None and scopus.exhausted   # could not ask: not a definite "none"
+
+
+def test_fill_marks_a_paper_decided_only_when_every_source_answered(monkeypatch):
+    class FakeScopus:
+        def __init__(self, key):
+            pass
+
+        def get(self, doi, timeout):
+            return {"10.1016/none": "", "10.1016/timeout": None}.get(doi, "")
+
+    monkeypatch.setattr(a, "_semantic_scholar", lambda dois, timeout: {})
+    monkeypatch.setattr(a, "_Scopus", FakeScopus)
+    monkeypatch.setattr(a, "_crossref", lambda doi, timeout, email="": "")
+    rows = [{"doi": "10.1016/none"}, {"doi": "10.1016/timeout"}]
+    a.fill_abstracts(rows, {"elsevier_api_key": "k"})
+    assert [r["abstract_decided"] for r in rows] == [True, False]

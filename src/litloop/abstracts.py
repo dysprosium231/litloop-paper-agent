@@ -117,36 +117,39 @@ class _Scopus:
         self.key = key
         self.exhausted = False  # weekly quota spent: stop asking this run
 
-    def get(self, doi: str, timeout: float) -> str:
+    def get(self, doi: str, timeout: float) -> str | None:
+        """The abstract, "" if Scopus has none, None if it could not be asked."""
         for attempt in range(3):
             if self.exhausted:
-                return ""
+                return None
             try:
                 with quota.slot("scopus"):
                     r = _session().get(f"https://api.elsevier.com/content/abstract/doi/{doi}",
                                        headers={"X-ELS-APIKey": self.key, "Accept": "application/json"},
                                        timeout=timeout)
             except requests.RequestException:
-                return ""
+                return None
             quota.record("scopus", r)
             if r.status_code == 429:
                 if "QUOTA_EXCEEDED" in str(r.headers.get("X-ELS-Status") or ""):
                     self.exhausted = True
                     log.warning("abstracts: Scopus weekly quota exhausted")
-                    return ""
+                    return None
                 time.sleep(1.0 + attempt)  # throttled: slow down and retry
                 continue
+            if r.status_code in (400, 404):
+                return ""  # not in Scopus
             if r.status_code != 200:
-                return ""
+                return None
             try:
                 core = (r.json().get("abstracts-retrieval-response") or {}).get("coredata") or {}
             except ValueError:
-                return ""
+                return None
             return str(core.get("dc:description") or "")
-        return ""
+        return None  # still throttled
 
 
-def _crossref(doi: str, timeout: float, email: str = "") -> str:
+def _crossref(doi: str, timeout: float, email: str = "") -> str | None:
     """One Crossref record. With a contact email the request joins the polite
     pool (3 parallel requests instead of 1)."""
     provider = "crossref_polite" if email else "crossref"
@@ -155,9 +158,11 @@ def _crossref(doi: str, timeout: float, email: str = "") -> str:
             r = _session().get(f"https://api.crossref.org/works/{doi}",
                                params={"mailto": email} if email else None, timeout=timeout)
         quota.record("crossref", r)
-        return str(r.json().get("message", {}).get("abstract") or "") if r.status_code == 200 else ""
+        if r.status_code == 404:
+            return ""
+        return str(r.json().get("message", {}).get("abstract") or "") if r.status_code == 200 else None
     except (requests.RequestException, ValueError):
-        return ""
+        return None
 
 
 ELSEVIER_PREFIX = "10.1016/"
@@ -184,9 +189,9 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
                 missing[doi]["abstract"] = text
                 missing[doi]["abstract_source"] = source
 
-        def ask(source: str, doi: str) -> tuple[str, str, str]:
+        def ask(source: str, doi: str) -> tuple[str, str, str | None]:
             if missing[doi]["abstract"] or time.monotonic() >= deadline:  # another source was faster
-                return source, doi, ""
+                return source, doi, None
             if source == "scopus":
                 return source, doi, scopus.get(doi, min(15.0, left()))
             return source, doi, _crossref(doi, min(15.0, left()), email)
@@ -198,26 +203,35 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
         # Crossref (Elsevier does not deposit abstracts there): with 150
         # papers to fill, Crossref calls queued alongside used to crowd the
         # Scopus ones out of the budget.
+        answered: dict[str, set[str]] = {}  # sources that gave a definite reply, per DOI
+        asked: dict[str, list[str]] = {}
         pool = ThreadPoolExecutor(max_workers=12)
         try:
             jobs = [pool.submit(lambda: ("semantic_scholar", _semantic_scholar(list(missing), min(8.0, left()))))]
             if scopus:
                 jobs += [pool.submit(ask, "scopus", doi) for doi in missing]
-            jobs += [pool.submit(ask, "crossref", doi) for doi in missing
-                     if not (scopus and doi.startswith(ELSEVIER_PREFIX))]
+            asked = {doi: (["scopus"] if scopus else []) +
+                     ([] if scopus and doi.startswith(ELSEVIER_PREFIX) else ["crossref"]) for doi in missing}
+            jobs += [pool.submit(ask, "crossref", doi) for doi in missing if "crossref" in asked[doi]]
             for job in as_completed(jobs, timeout=max(0.1, deadline - time.monotonic())):
                 res = job.result()
                 if res[0] == "semantic_scholar":
                     for doi, text in res[1].items():
                         take(doi, text, "semantic_scholar")
                 else:
-                    take(res[1], res[2], res[0])
+                    if res[2] is not None:
+                        answered.setdefault(res[1], set()).add(res[0])
+                        take(res[1], res[2], res[0])
                 if all(r["abstract"] for r in missing.values()):
                     break
         except FuturesTimeout:
             log.debug("abstracts: budget used up")
         finally:
             pool.shutdown(wait=False, cancel_futures=True)  # do not wait for the slow ones
+        # Decided: found, or every source asked gave a definite "none". Papers left
+        # undecided (timeout, throttling, budget) are worth asking again later.
+        for doi, r in missing.items():
+            r["abstract_decided"] = bool(r["abstract"]) or set(asked.get(doi, [])) <= answered.get(doi, set()) != set()
     for r in results:
         if not r["abstract"]:
             r["abstract_missing"] = True  # judge from the title only

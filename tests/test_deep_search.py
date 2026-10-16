@@ -185,16 +185,19 @@ def test_missing_abstracts_of_top_candidates_are_fetched_once(monkeypatch):
     calls = []
 
     def fill(items, cfg=None, **kw):
-        calls.append([it["doi"] for it in items])
+        calls.append(sorted(it["doi"] for it in items))
         for it in items:
             it["abstract"] = "fetched" if it["doi"] == "10.1/a" else ""
+            it["abstract_decided"] = it["doi"] != "10.1/d"     # d: the source timed out
 
     monkeypatch.setattr(ab, "fill_abstracts", fill)
-    pool = {"10.1/a": rec("10.1/a", "A"), "10.1/b": rec("10.1/b", "B"), "10.1/c": rec("10.1/c", "C", abstract="has")}
+    pool = {"10.1/a": rec("10.1/a", "A"), "10.1/b": rec("10.1/b", "B"), "10.1/c": rec("10.1/c", "C", abstract="has"),
+            "10.1/d": rec("10.1/d", "D")}
     st = _state(pool, [], [])
     assert deep_search._prefill_abstracts(st, {}) == 1
-    assert sorted(calls[0]) == ["10.1/a", "10.1/b"]
-    assert deep_search._prefill_abstracts(st, {}) == 0 and len(calls) == 1   # not asked again
+    assert calls[0] == ["10.1/a", "10.1/b", "10.1/d"]
+    deep_search._prefill_abstracts(st, {})
+    assert calls[1] == ["10.1/d"]          # b had a definite "none"; d was not answered, so it is asked again
 
 
 def test_prefill_abstracts_picks_among_records_lacking_abstract(monkeypatch):
