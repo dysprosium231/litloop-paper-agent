@@ -138,7 +138,8 @@ def update(key: str, value: Any) -> dict[str, Any]:
 def _result(name: str, ok: bool | None, detail: str, cost: str = "", **extra: Any) -> dict[str, Any]:
     """ok: True passed, False failed, None not configured (nothing to test).
 
-    extra: ``steps`` (what to do, in order) and ``copy`` (lines to paste).
+    extra: ``guides``, each with a ``title``, numbered ``steps``, ``copy`` blocks
+    ({label, lines}) to paste, and an optional ``note``.
     """
     return {"name": name, "ok": ok, "detail": detail, **({"cost": cost} if cost else {}), **extra}
 
@@ -256,24 +257,35 @@ def test_network() -> list[dict[str, Any]]:
     names, paths = found["direct_processes"], proxy_check.litloop_paths()
     programs = "、".join(found["programs"]) or "代理软件"
     if found["mode"] == "unknown":
-        out.append(_result("代理软件", None, "无法检测（目前只支持 Windows）"))
+        out.append(_result("代理软件", None, "暂不支持在此系统上检测。"))
     elif found["mode"] == "none":
-        out.append(_result("代理软件", True, "未检测到"))
+        out.append(_result("代理软件", True, "未检测到代理软件。"))
     elif found["mode"] == "system":
-        out.append(_result("代理软件", True, f"{programs}（系统代理模式）：LitLoop 已自动绕开，无需设置"))
+        out.append(_result("代理软件", True, f"{programs} 以系统代理模式运行，LitLoop 会自动直连，无需设置。"))
     else:
-        steps, copy = [], []
+        guides = []
         if any(p in ("v2rayN", "sing-box", "Xray") for p in found["programs"]) or not found["programs"]:
-            steps += ["v2rayN：路由设置 → 新建规则，“进程名”填下面的进程名，出口选 direct；每个进程一条规则，移到最前面",
-                      "v2rayN 官方文档没写进程名的格式；不生效时改填完整路径"]
-            copy += names
+            # v2rayN's wiki names the 进程名 field and the direct outbound but not the
+            # value's format; full paths are offered for when the name does not match.
+            guides.append({
+                "title": "在 v2rayN 中设置直连",
+                "steps": ["打开「路由设置」，新建一条规则。",
+                          "在「进程名」中填写下方的一个程序名，出站选择「direct」。每个程序单独建一条规则。",
+                          "将这些规则移到列表最上方并保存。规则按顺序生效。"],
+                "copy": [{"label": "程序名", "lines": names},
+                         {"label": "完整路径（填程序名不生效时使用）", "lines": paths}],
+            })
         if any("Clash" in p or p == "mihomo" for p in found["programs"]):
-            steps += ["Clash Verge：右键订阅 → 编辑规则 → 前置规则，添加下面的规则",
-                      "不生效时在扩展配置里加 find-process-mode: always"]
-            copy += [f"PROCESS-NAME,{n},DIRECT" for n in names]
+            guides.append({
+                "title": "在 Clash Verge 中设置直连",
+                "steps": ["右键当前订阅，选择「编辑规则」。",
+                          "在「前置规则」中添加下方的规则并保存。"],
+                "copy": [{"label": "规则", "lines": [f"PROCESS-NAME,{n},DIRECT" for n in names]}],
+                "note": "若规则未生效，在「扩展配置」中加入 find-process-mode: always。",
+            })
         out.append(_result("代理软件", False,
-                           f"{programs} 开着 TUN 模式（{'、'.join(found['tun'])}）：机构下载会走代理出口，学校权限失效",
-                           steps=steps, copy=list(dict.fromkeys(copy + paths))))
+                           f"{programs} 正以 TUN 模式运行。学校通道的流量会经由代理出口，无法通过学校的身份认证。",
+                           guides=guides))
     return out
 
 

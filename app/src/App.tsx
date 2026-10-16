@@ -232,7 +232,7 @@ export default function App() {
             <p className="p-4 text-sm text-muted-foreground">{section === "download" ? "下载队列" : "Zotero"}还在做。</p>
           )}
         </AppSidebar>
-        <SidebarInset className="relative min-h-0">
+        <SidebarInset className="relative min-h-0 min-w-0">
           <ResizeHandle width={listWidth} onWidth={setListWidth} />
           {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           {section === "settings" ? (

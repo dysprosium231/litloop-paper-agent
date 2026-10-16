@@ -42,7 +42,9 @@ def test_network_check_gives_direct_rules_for_tun_mode(monkeypatch, tmp_path):
     monkeypatch.setattr(proxy_check, "litloop_paths", lambda: ["C:/Python/python.exe"])
     (r,) = app_settings.test_network()
     assert r["ok"] is False and "TUN" in r["detail"]
-    assert "PROCESS-NAME,litloop-chrome.exe,DIRECT" in r["copy"] and "C:/Python/python.exe" in r["copy"]
+    (guide,) = r["guides"]
+    assert guide["title"].endswith("Clash Verge 中设置直连")
+    assert "PROCESS-NAME,litloop-chrome.exe,DIRECT" in guide["copy"][0]["lines"]
 
 
 def test_network_check_system_proxy_is_fine(monkeypatch, tmp_path):
@@ -52,4 +54,4 @@ def test_network_check_system_proxy_is_fine(monkeypatch, tmp_path):
         "mode": "system", "programs": ["v2rayN"], "tun": [], "system_proxy": "127.0.0.1:10808",
         "direct_processes": ["python.exe"]})
     (r,) = app_settings.test_network()
-    assert r["ok"] is True and "steps" not in r
+    assert r["ok"] is True and "guides" not in r

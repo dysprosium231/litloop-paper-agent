@@ -74,12 +74,12 @@ const SOURCE: Record<SettingField["source"], string> = { file: "", env: "来自�
 /** A settings row: name (and a short note) on the left, the control on the right. */
 function Row({ title, note, children, wide }: { title: React.ReactNode; note?: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className={cn("flex gap-6 border-b py-4 last:border-b-0", wide ? "flex-col gap-3" : "items-center")}>
-      <div className="min-w-0 flex-1 space-y-1">
+    <div className={cn("flex flex-wrap gap-x-6 gap-y-3 border-b py-4 last:border-b-0", wide ? "flex-col" : "items-center")}>
+      <div className="min-w-48 flex-1 space-y-1">
         <div className="text-[15px]">{title}</div>
         {note && <div className="text-sm text-muted-foreground">{note}</div>}
       </div>
-      <div className={cn("shrink-0", wide && "w-full")}>{children}</div>
+      <div className={cn("max-w-full min-w-0", wide && "w-full")}>{children}</div>
     </div>
   )
 }
@@ -129,7 +129,7 @@ function Field({ field, onSaved }: { field: SettingField; onSaved: (f: SettingFi
   } else {
     wide = field.type === "path"
     control = (
-      <form className={cn("flex gap-2", wide ? "w-full" : "w-80")} onSubmit={(e) => { e.preventDefault(); save(draft) }}>
+      <form className={cn("flex gap-2", wide ? "w-full" : "w-80 max-w-full")} onSubmit={(e) => { e.preventDefault(); save(draft) }}>
         <Input id={id} aria-label={field.label} type={field.type === "secret" ? "password" : field.type === "email" ? "email" : "text"}
           autoComplete="off" spellCheck={false} value={draft} onChange={(e) => setDraft(e.target.value)}
           placeholder={field.placeholder ?? (field.type === "secret" ? "粘贴新的 Key" : field.type === "email" ? "name@example.edu" : "")}
@@ -215,12 +215,21 @@ function GroupPane({ group, onSaved }: { group: SettingGroup; onSaved: (f: Setti
                 <span className="w-32 shrink-0">{r.name}</span>
                 <span className="text-muted-foreground">{r.detail}{r.cost && <span className="ml-1 text-xs">（{r.cost}）</span>}</span>
               </div>
-              {r.steps && (
-                <ol className="ml-6 list-decimal space-y-1 pl-4 text-sm">
-                  {r.steps.map((s) => <li key={s}>{s}</li>)}
-                </ol>
-              )}
-              {r.copy && <div className="ml-6 space-y-1">{r.copy.map((c) => <CopyLine key={c} text={c} />)}</div>}
+              {r.guides?.map((g) => (
+                <section key={g.title} className="ml-6 min-w-0 space-y-3 rounded-lg border bg-background p-4">
+                  <h3 className="text-sm font-medium">{g.title}</h3>
+                  <ol className="list-decimal space-y-1.5 pl-5 text-sm text-foreground/90">
+                    {g.steps.map((s) => <li key={s}>{s}</li>)}
+                  </ol>
+                  {g.copy?.filter((c) => c.lines.length).map((c) => (
+                    <div key={c.label} className="space-y-1.5">
+                      <div className="text-xs text-muted-foreground">{c.label}</div>
+                      {c.lines.map((line) => <CopyLine key={line} text={line} />)}
+                    </div>
+                  ))}
+                  {g.note && <p className="text-xs text-muted-foreground">{g.note}</p>}
+                </section>
+              ))}
             </div>
           ))}
         </div>
@@ -270,8 +279,8 @@ function QuotaPane() {
 
 /** Main area on the settings section. */
 export function SettingsPane({ groups, current, onSaved }: { groups: SettingGroup[]; current: string; onSaved: (f: SettingField) => void }) {
-  if (current === QUOTA) return <div className="min-h-0 flex-1 overflow-auto scrollable"><QuotaPane /></div>
+  if (current === QUOTA) return <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto scrollable"><QuotaPane /></div>
   const group = groups.find((g) => g.id === current)
   if (!group) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">正在读取设置…</div>
-  return <div className="min-h-0 flex-1 overflow-auto scrollable"><GroupPane group={group} onSaved={onSaved} /></div>
+  return <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto scrollable"><GroupPane group={group} onSaved={onSaved} /></div>
 }
