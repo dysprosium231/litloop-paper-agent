@@ -46,7 +46,7 @@ GROUPS: list[dict[str, Any]] = [
         ],
     },
     {
-        "id": "network", "title": "网络",
+        "id": "network", "title": "网络", "test": "network",
         "fields": [
             # network_proxy is the campus egress (auth.py skips the school login when it is set),
             # not a personal VPN: filling in Clash's port breaks institutional downloads.
@@ -135,9 +135,12 @@ def update(key: str, value: Any) -> dict[str, Any]:
 
 # --------------------------------------------------------------------------- tests
 
-def _result(name: str, ok: bool | None, detail: str, cost: str = "") -> dict[str, Any]:
-    """ok: True passed, False failed, None not configured (nothing to test)."""
-    return {"name": name, "ok": ok, "detail": detail, **({"cost": cost} if cost else {})}
+def _result(name: str, ok: bool | None, detail: str, cost: str = "", **extra: Any) -> dict[str, Any]:
+    """ok: True passed, False failed, None not configured (nothing to test).
+
+    extra: ``steps`` (what to do, in order) and ``copy`` (lines to paste).
+    """
+    return {"name": name, "ok": ok, "detail": detail, **({"cost": cost} if cost else {}), **extra}
 
 
 def _get(url: str, **kw: Any):
@@ -236,7 +239,45 @@ def test_zotero() -> list[dict[str, Any]]:
         return [_result("Zotero", False, "未运行")]
 
 
-TESTS = {"sources": test_sources, "downloads": test_downloads, "zotero": test_zotero}
+def test_network() -> list[dict[str, Any]]:
+    """Proxy programs: system-proxy mode is bypassed by itself; TUN mode needs direct rules.
+
+    The steps follow the programs' own docs (checked 2026-10-16):
+    v2rayN https://github.com/2dust/v2rayN/wiki/Description-of-some-ui ,
+    Clash Verge Rev https://www.clashverge.dev/guide/rules.html ,
+    mihomo find-process-mode https://wiki.metacubex.one/config/general/ .
+    """
+    from . import proxy_check
+    out = []
+    cfg = _config.load_config()
+    if str(cfg.get("network_proxy") or "").strip():
+        out.append(_result("校园出口代理", None, "已填写：LitLoop 会跳过学校登录。只有学校提供的校园隧道才该填在这里。"))
+    found = proxy_check.detect()
+    names, paths = found["direct_processes"], proxy_check.litloop_paths()
+    programs = "、".join(found["programs"]) or "代理软件"
+    if found["mode"] == "unknown":
+        out.append(_result("代理软件", None, "无法检测（目前只支持 Windows）"))
+    elif found["mode"] == "none":
+        out.append(_result("代理软件", True, "未检测到"))
+    elif found["mode"] == "system":
+        out.append(_result("代理软件", True, f"{programs}（系统代理模式）：LitLoop 已自动绕开，无需设置"))
+    else:
+        steps, copy = [], []
+        if any(p in ("v2rayN", "sing-box", "Xray") for p in found["programs"]) or not found["programs"]:
+            steps += ["v2rayN：路由设置 → 新建规则，“进程名”填下面的进程名，出口选 direct；每个进程一条规则，移到最前面",
+                      "v2rayN 官方文档没写进程名的格式；不生效时改填完整路径"]
+            copy += names
+        if any("Clash" in p or p == "mihomo" for p in found["programs"]):
+            steps += ["Clash Verge：右键订阅 → 编辑规则 → 前置规则，添加下面的规则",
+                      "不生效时在扩展配置里加 find-process-mode: always"]
+            copy += [f"PROCESS-NAME,{n},DIRECT" for n in names]
+        out.append(_result("代理软件", False,
+                           f"{programs} 开着 TUN 模式（{'、'.join(found['tun'])}）：机构下载会走代理出口，学校权限失效",
+                           steps=steps, copy=list(dict.fromkeys(copy + paths))))
+    return out
+
+
+TESTS = {"sources": test_sources, "downloads": test_downloads, "network": test_network, "zotero": test_zotero}
 
 
 def run_test(group: str) -> dict[str, Any]:

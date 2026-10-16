@@ -153,6 +153,8 @@ export interface TestResult {
   ok: boolean | null // null: not configured, nothing to test
   detail: string
   cost?: string
+  steps?: string[]
+  copy?: string[]
 }
 
 export interface ProviderUsage {

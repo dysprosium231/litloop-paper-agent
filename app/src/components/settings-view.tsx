@@ -158,6 +158,21 @@ function Field({ field, onSaved }: { field: SettingField; onSaved: (f: SettingFi
   return <Row title={title} note={note} wide={wide}>{control}</Row>
 }
 
+/** One line to paste into another program, with a copy button. */
+function CopyLine({ text }: { text: string }) {
+  const [done, setDone] = React.useState(false)
+  const copy = () => navigator.clipboard.writeText(text).then(() => {
+    setDone(true)
+    setTimeout(() => setDone(false), 1200)
+  })
+  return (
+    <div className="flex items-center gap-2 rounded-md border bg-background px-2 py-1">
+      <code className="min-w-0 flex-1 truncate font-mono text-xs">{text}</code>
+      <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={copy}>{done ? "已复制" : "复制"}</Button>
+    </div>
+  )
+}
+
 function Page({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-3xl px-8 py-8">
@@ -194,10 +209,18 @@ function GroupPane({ group, onSaved }: { group: SettingGroup; onSaved: (f: Setti
       {results && (
         <div className="my-3 space-y-2 rounded-xl bg-muted/50 p-4">
           {results.map((r) => (
-            <div key={r.name} className="flex items-start gap-2 text-sm">
-              <ResultIcon ok={r.ok} />
-              <span className="w-32 shrink-0">{r.name}</span>
-              <span className="text-muted-foreground">{r.detail}{r.cost && <span className="ml-1 text-xs">（{r.cost}）</span>}</span>
+            <div key={r.name} className="space-y-2">
+              <div className="flex items-start gap-2 text-sm">
+                <ResultIcon ok={r.ok} />
+                <span className="w-32 shrink-0">{r.name}</span>
+                <span className="text-muted-foreground">{r.detail}{r.cost && <span className="ml-1 text-xs">（{r.cost}）</span>}</span>
+              </div>
+              {r.steps && (
+                <ol className="ml-6 list-decimal space-y-1 pl-4 text-sm">
+                  {r.steps.map((s) => <li key={s}>{s}</li>)}
+                </ol>
+              )}
+              {r.copy && <div className="ml-6 space-y-1">{r.copy.map((c) => <CopyLine key={c} text={c} />)}</div>}
             </div>
           ))}
         </div>

@@ -274,11 +274,13 @@ litloop_login(kind="ezproxy")
 <details>
 <summary><strong>如果你开着代理软件</strong></summary>
 
-机构通道靠校园网出口 IP 识别身份，流量经过代理（尤其是境外出口）后，学校权限就会失效。LitLoop 有意忽略 `HTTP_PROXY` 和 `HTTPS_PROXY` 环境变量，只认 `network_proxy` 配置项，或 `LITLOOP_PROXY` 环境变量。
+1. 机构通道靠校园网出口 IP 识别身份，LitLoop 自己的流量必须直连。
+2. 代理软件只开“系统代理”模式时不用管：LitLoop 不读系统代理和 HTTP_PROXY/HTTPS_PROXY（requests 用 trust_env=False），它启动的浏览器带 `--no-proxy-server`。
+3. 开了 TUN 模式（如 v2rayN 的 TUN、Clash 的虚拟网卡）时，要在代理软件里给 LitLoop 的进程设直连：运行 LitLoop 的 `python.exe`，以及 LitLoop 启动的浏览器 `litloop-chrome.exe`。桌面 app 的“设置 → 网络 → 检测”会自动识别模式并给出步骤。
+4. **v2rayN**：路由设置里新建规则，“进程名”一栏填进程名，出口选 direct，把规则移到最前面（规则按顺序匹配，前面的先生效）；每条规则只填域名、IP、进程名中的一项。官方文档没有写进程名的值格式，不生效时改填完整路径。来源：[v2rayN UI 说明](https://github.com/2dust/v2rayN/wiki/Description-of-some-ui)
+5. **Clash Verge Rev**：右键订阅 →“编辑规则”→ 前置规则，添加 `PROCESS-NAME,python.exe,DIRECT` 和 `PROCESS-NAME,litloop-chrome.exe,DIRECT`；若不生效，在“扩展配置”里加 `find-process-mode: always`。来源：[规则配置](https://www.clashverge.dev/guide/rules.html)、[General 配置](https://wiki.metacubex.one/config/general/)
 
-如果你用的是 TUN 或全局模式的代理软件，请按进程名给下面两个程序设置直连：
-- 运行 LitLoop 的 `python.exe`；
-- LitLoop 启动的浏览器 `litloop-chrome.exe`。
+`network_proxy` 只填学校提供的校园隧道；个人代理不要填（填了会跳过学校登录，机构下载会失败）。
 
 个别出版商只在直连时很慢，这种情况可以用 `host_proxy_url` 让指定域名单独走代理。
 
