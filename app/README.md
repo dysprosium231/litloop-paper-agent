@@ -25,6 +25,6 @@ npm run dev
 
 - `src/App.tsx`：筛选页（会话切换、进度、详情与评分、键盘操作）。
 - `src/components/app-sidebar.tsx`：左侧图标栏和本批文章列表，改自 shadcn 区块 sidebar-09。
-- `src/components/ui/`：shadcn 组件，按官方方式添加（`npx shadcn add …`），不要手改样式，主题在 `src/index.css`。
+- `src/components/ui/`：shadcn 组件，按官方方式添加（`npx shadcn add …`）；颜色主题在 `src/index.css`。改过的组件：`switch.tsx`（40×22，关闭为中灰轨道、白色圆钮）。
 - `src/lib/api.ts`：调用后台的接口。
 - `src-tauri/src/lib.rs`：启动后台、把端口和令牌交给界面、退出时结束后台。
