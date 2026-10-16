@@ -146,13 +146,26 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
 - **官方限额**（[API 使用条款](https://info.arxiv.org/help/api/tou.html)，针对 API、OAI-PMH 和 RSS）：每 3 秒不超过 1 次，同时只用 1 个连接，按你控制的所有机器合计。
 - **LitLoop 怎么控制**：`export.arxiv.org` 和 `arxiv.org` 都按同时 1 个、间隔 3 秒。
 
-### Europe PMC、NCBI（PubMed Central）、DOAJ
+### NCBI / PubMed Central
+
+- **用途**：用 PMC ID 转换接口把 DOI 换成 PMCID，再取 PMC 的 PDF。LitLoop 不调用 E-utilities。
+- **配置**：`email`（选填；填了真实邮箱就随请求带上，另带 `tool=litloop`）。
+- **官方说明**（2026-10-16 核对）：
+  - [PMC ID Converter API](https://pmc.ncbi.nlm.nih.gov/tools/id-converter-api/)（页面最后修改 2025-06-10）：
+    - 新地址 `https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/`，旧地址 `/pmc/utils/idconv/v1.0/` 301 跳转到这里；
+    - 每次最多 200 个 ID，同一次请求的 ID 必须同一类型；
+    - 请求方应带上 `tool` 和 `email`（“Requested”，不是必填）；
+    - **页面没有写每秒请求上限。**
+  - [PMC For Developers](https://pmc.ncbi.nlm.nih.gov/tools/developers/)（页面最后修改 2026-08-20）：自动获取 PMC 内容只能用 PMC Cloud Service、OAI-PMH、E-utilities 和 BioC API，通过其他自动方式系统性（批量）获取文章是禁止的。
+  - [E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25497/)（页面最后更新 2022-11-17，用户代为读取）：无 API Key 每秒不超过 3 次，有 Key 默认每秒 10 次；大任务放在周末或美东时间工作日 21:00–5:00；违规可能封 IP。**这条只适用于 `eutils.ncbi.nlm.nih.gov`，LitLoop 目前不用。**
+- **LitLoop 怎么控制**：NCBI 没有并发上限，同一域名间隔至少 0.5 秒（自定）。
+- **待决定**：LitLoop 直接从 `www.ncbi.nlm.nih.gov/pmc/articles/<PMCID>/pdf/` 下载 PDF，不属于上面列出的四种允许的自动获取方式；批量下载时可能违反 PMC 的规定。见 TODO。
+
+### Europe PMC、DOAJ
 
 - **用途**：查生物医学文献和开放获取期刊。
-- **官方限额**：**未核对**。
-  - NCBI 文档页（[E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25497/)）需要人机验证，没有读取；
-  - Europe PMC、DOAJ 尚未查阅。
-- **LitLoop 怎么控制**：Europe PMC（`europepmc.org`、`www.ebi.ac.uk`）和 DOAJ 并发 3 个（继承，**非官方**）；NCBI 没有并发上限；三者同一域名间隔都至少 0.5 秒。
+- **官方限额**：**未核对**，尚未查阅。
+- **LitLoop 怎么控制**：Europe PMC（`europepmc.org`、`www.ebi.ac.uk`）和 DOAJ 并发 3 个（继承，**非官方**）；同一域名间隔至少 0.5 秒。
 
 ## 二、出版商网站与机构通道
 

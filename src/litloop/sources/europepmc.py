@@ -51,7 +51,14 @@ def try_europepmc(doi: str, output_path: Path, config: dict[str, Any]) -> dict[s
 
 def try_pmc(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str, Any] | None:
     """Try PubMed Central for free full-text PDF."""
-    search_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?ids={doi}&format=json"
+    # PMC ID Converter API (https://pmc.ncbi.nlm.nih.gov/tools/id-converter-api/):
+    # the old /pmc/utils/idconv/v1.0/ address now redirects here; NCBI asks
+    # callers to identify themselves with tool and email.
+    params = {"ids": doi, "idtype": "doi", "format": "json", "tool": "litloop"}
+    email = str(config.get("email") or "").strip()
+    if email and not email.endswith(".invalid"):
+        params["email"] = email
+    search_url = "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/?" + urllib.parse.urlencode(params)
     try:
         resp_data = fetch_json(search_url, config)
         if not resp_data:
