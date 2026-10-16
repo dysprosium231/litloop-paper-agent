@@ -52,7 +52,7 @@ class TestPreprintFallbacks:
             output_dir=tmp_path, scihub_enabled=True, use_tor=False, use_vpnsci=True,
         )
 
-        assert calls == [("2401.00001", {"scihub_enabled": True, "use_tor": False, "use_vpnsci": False, "_institutional": False})]
+        assert calls == [("2401.00001", {"scihub_enabled": True, "use_tor": False, "use_vpnsci": False, "_institutional": False, "_batch": True})]
         assert results["10.1000/x"]["success"] is True
         assert results["10.1000/x"]["preprint_fallback"] == "2401.00001"
         assert progress_saved["10.1000/x"]["preprint_fallback"] == "2401.00001"
