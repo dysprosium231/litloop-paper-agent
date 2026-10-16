@@ -48,8 +48,12 @@ GROUPS: list[dict[str, Any]] = [
     {
         "id": "network", "title": "网络",
         "fields": [
-            {"key": "network_proxy", "label": "代理", "type": "text", "placeholder": "http://127.0.0.1:7890"},
-            {"key": "is_campus_network", "label": "在校园网内", "type": "bool"},
+            # network_proxy is the campus egress (auth.py skips the school login when it is set),
+            # not a personal VPN: filling in Clash's port breaks institutional downloads.
+            {"key": "network_proxy", "label": "校园出口代理", "type": "text",
+             "help": "学校提供的校园隧道地址；个人翻墙代理不要填，否则机构下载会失败"},
+            {"key": "is_campus_network", "label": "电脑连在校园网上", "type": "bool",
+             "help": "打开后直接按学校 IP 下载，不再登录 WebVPN / CARSI"},
         ],
     },
     {
