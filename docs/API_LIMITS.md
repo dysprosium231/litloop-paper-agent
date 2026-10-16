@@ -159,7 +159,7 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
   - [PMC For Developers](https://pmc.ncbi.nlm.nih.gov/tools/developers/)（页面最后修改 2026-08-20）：自动获取 PMC 内容只能用 PMC Cloud Service、OAI-PMH、E-utilities 和 BioC API，通过其他自动方式系统性（批量）获取文章是禁止的。
   - [E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25497/)（页面最后更新 2022-11-17，用户代为读取）：无 API Key 每秒不超过 3 次，有 Key 默认每秒 10 次；大任务放在周末或美东时间工作日 21:00–5:00；违规可能封 IP。**这条只适用于 `eutils.ncbi.nlm.nih.gov`，LitLoop 目前不用。**
 - **LitLoop 怎么控制**：NCBI 没有并发上限，同一域名间隔至少 0.5 秒（自定）。
-- **待决定**：LitLoop 直接从 `www.ncbi.nlm.nih.gov/pmc/articles/<PMCID>/pdf/` 下载 PDF，不属于上面列出的四种允许的自动获取方式；批量下载时可能违反 PMC 的规定。见 TODO。
+- **PMC 的 PDF**：直接从 `www.ncbi.nlm.nih.gov/pmc/articles/<PMCID>/pdf/` 下载不属于上面四种允许的自动获取方式，所以只在单篇下载时用；批量下载（含分道调度、批量的机构回退和预印本回退）不走 PMC，开放获取的生物医学论文由 Europe PMC 等来源覆盖。（2026-10-16 用户决定）
 
 ### Europe PMC、DOAJ
 

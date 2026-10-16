@@ -372,7 +372,9 @@ def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str
 
     legal_sources = publisher_fast + extra_fast
     legal_sources += [(try_doaj, "DOAJ"), (try_crossref_page_scrape, "CrossrefPage")]
-    legal_sources += [(try_europepmc, "EuropePMC"), (try_core, "CORE"), (try_pmc, "PMC")]
+    legal_sources += [(try_europepmc, "EuropePMC"), (try_core, "CORE")]
+    if not config.get("_batch"):
+        legal_sources.append((try_pmc, "PMC"))
 
     if config.get("openalex_api_key"):
         legal_sources.append((try_openalex_content_api, "OpenAlexContent"))
@@ -1013,6 +1015,7 @@ def download(
     rename: bool = True,
     _institutional: bool = True,
     strategy: str | None = None,
+    _batch: bool = False,
 ) -> dict[str, Any]:
     key = identifier.strip()
     if not is_arxiv_identifier(key):
@@ -1044,6 +1047,7 @@ def download(
             rename=rename,
             _institutional=_institutional,
             strategy=strategy,
+            _batch=_batch,
         )
         if _cancelled() and not result.get("success"):
             return fail(key, "cancelled by user", error_type="cancelled", action="none")
@@ -1079,6 +1083,7 @@ def _download_impl(
     rename: bool = True,
     _institutional: bool = True,
     strategy: str | None = None,
+    _batch: bool = False,
 ) -> dict[str, Any]:
     race_failures: list[dict[str, str]] = []
     config = load_config()
@@ -1089,6 +1094,11 @@ def _download_impl(
 
     if strategy is not None:
         config["download_strategy"] = strategy
+
+    # PMC allows automated retrieval only through its Cloud / OAI-PMH /
+    # E-utilities / BioC services (https://pmc.ncbi.nlm.nih.gov/tools/developers/),
+    # so its PDF pages are used for single downloads only, never in a batch.
+    config["_batch"] = _batch
 
     target_dir = Path(output_dir) if output_dir else Path(config["output_dir"])
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -1605,7 +1615,7 @@ def _batch_institutional_phase(
             _save_progress(batch_id, doi, result)
             continue
         log.info(f"   [Batch] Phase 2 fallback: {doi}")
-        result = download(doi, output_dir, scihub_enabled=config.get("scihub_enabled", True), use_vpnsci=True, _institutional=True)
+        result = download(doi, output_dir, scihub_enabled=config.get("scihub_enabled", True), use_vpnsci=True, _institutional=True, _batch=True)
         results_map[doi] = result
         _save_progress(batch_id, doi, result)
 
@@ -1665,7 +1675,7 @@ def _apply_preprint_fallbacks(
             log.info(f"   [Fallback] {ident} -> preprint {fallback_id}")
             fb_result = download(
                 fallback_id, output_dir,
-                scihub_enabled=scihub_enabled, use_tor=use_tor, use_vpnsci=False, _institutional=False,
+                scihub_enabled=scihub_enabled, use_tor=use_tor, use_vpnsci=False, _institutional=False, _batch=True,
             )
             if fb_result and fb_result.get("success"):
                 fb_result["identifier"] = ident
@@ -1807,7 +1817,7 @@ def batch_download(
             if elapsed < delay_between:
                 time.sleep(delay_between - elapsed)
             last_download_time[0] = time.time()
-        return download(ident, output_dir, scihub_enabled=scihub_enabled, use_tor=use_tor, use_vpnsci=use_vpnsci, _institutional=False)
+        return download(ident, output_dir, scihub_enabled=scihub_enabled, use_tor=use_tor, use_vpnsci=use_vpnsci, _institutional=False, _batch=True)
 
     results: list[dict[str, Any] | None] = [None] * total
     total_budget = float(config.get("batch_total_timeout", 600))
