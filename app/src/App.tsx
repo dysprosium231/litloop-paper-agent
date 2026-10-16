@@ -234,6 +234,7 @@ export default function App() {
         </AppSidebar>
         <SidebarInset className="relative min-h-0">
           <ResizeHandle width={listWidth} onWidth={setListWidth} />
+          {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           {section === "settings" ? (
             <SettingsPane groups={groups} current={settingsGroup}
               onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
@@ -268,7 +269,6 @@ export default function App() {
               </BreadcrumbList>
             </Breadcrumb>
           </header>
-          {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           <ProgressStrip progress={progress} summary={summary} />
           <DetailPane paper={paper} edited={edited} onRate={rate} onSelect={toggleSelect} onExclude={exclude} />
           </>)}
