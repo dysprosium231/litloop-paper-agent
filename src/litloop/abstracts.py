@@ -28,6 +28,7 @@ from typing import Any
 
 import requests
 
+from . import quota
 from .log import get_logger
 
 log = get_logger()
@@ -87,9 +88,11 @@ def _semantic_scholar(dois: list[str], timeout: float) -> dict[str, str]:
     for i in range(0, len(dois), S2_BATCH):  # the batch endpoint takes at most 500 ids
         chunk = dois[i:i + S2_BATCH]
         try:
-            r = _session().post("https://api.semanticscholar.org/graph/v1/paper/batch",
-                                params={"fields": "abstract"}, json={"ids": [f"DOI:{d}" for d in chunk]},
-                                headers=headers, timeout=timeout)
+            with quota.slot("semantic_scholar"):
+                r = _session().post("https://api.semanticscholar.org/graph/v1/paper/batch",
+                                    params={"fields": "abstract"}, json={"ids": [f"DOI:{d}" for d in chunk]},
+                                    headers=headers, timeout=timeout)
+            quota.record("semantic_scholar", r)
             if r.status_code != 200:
                 log.debug(f"abstracts: Semantic Scholar batch HTTP {r.status_code}")
                 break
@@ -105,29 +108,29 @@ def _semantic_scholar(dois: list[str], timeout: float) -> dict[str, str]:
 
 
 class _Scopus:
-    """Scopus abstract lookups. At most CONCURRENCY at a time: more trips the
-    per-second throttle, which answers 429 like a spent weekly quota does."""
-
-    CONCURRENCY = 5
+    """Scopus Abstract Retrieval: 9 requests/s and 10,000 per week per key
+    (dev.elsevier.com/api_key_settings.html). Parallelism and pacing come from
+    ``quota``; a 429 carrying ``X-ELS-Status: QUOTA_EXCEEDED`` means the weekly
+    quota is spent, any other 429 is the per-second throttle."""
 
     def __init__(self, key: str):
         self.key = key
         self.exhausted = False  # weekly quota spent: stop asking this run
-        self._slots = threading.Semaphore(self.CONCURRENCY)
 
     def get(self, doi: str, timeout: float) -> str:
         for attempt in range(3):
             if self.exhausted:
                 return ""
-            with self._slots:
-                try:
+            try:
+                with quota.slot("scopus"):
                     r = _session().get(f"https://api.elsevier.com/content/abstract/doi/{doi}",
                                        headers={"X-ELS-APIKey": self.key, "Accept": "application/json"},
                                        timeout=timeout)
-                except requests.RequestException:
-                    return ""
+            except requests.RequestException:
+                return ""
+            quota.record("scopus", r)
             if r.status_code == 429:
-                if r.headers.get("X-RateLimit-Remaining") == "0":
+                if "QUOTA_EXCEEDED" in str(r.headers.get("X-ELS-Status") or ""):
                     self.exhausted = True
                     log.warning("abstracts: Scopus weekly quota exhausted")
                     return ""
@@ -143,9 +146,15 @@ class _Scopus:
         return ""
 
 
-def _crossref(doi: str, timeout: float) -> str:
+def _crossref(doi: str, timeout: float, email: str = "") -> str:
+    """One Crossref record. With a contact email the request joins the polite
+    pool (3 parallel requests instead of 1)."""
+    provider = "crossref_polite" if email else "crossref"
     try:
-        r = _session().get(f"https://api.crossref.org/works/{doi}", timeout=timeout)
+        with quota.slot(provider):
+            r = _session().get(f"https://api.crossref.org/works/{doi}",
+                               params={"mailto": email} if email else None, timeout=timeout)
+        quota.record("crossref", r)
         return str(r.json().get("message", {}).get("abstract") or "") if r.status_code == 200 else ""
     except (requests.RequestException, ValueError):
         return ""
@@ -166,6 +175,7 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
         deadline = time.monotonic() + budget_s
         left = lambda: max(2.0, deadline - time.monotonic())  # noqa: E731
         key = str((config or {}).get("elsevier_api_key") or "").strip()
+        email = str((config or {}).get("contact_email") or "").strip()
         scopus = _Scopus(key) if key else None
 
         def take(doi: str, text: str, source: str) -> None:
@@ -177,8 +187,9 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
         def ask(source: str, doi: str) -> tuple[str, str, str]:
             if missing[doi]["abstract"] or time.monotonic() >= deadline:  # another source was faster
                 return source, doi, ""
-            fetch = scopus.get if source == "scopus" else _crossref
-            return source, doi, fetch(doi, min(15.0, left()))
+            if source == "scopus":
+                return source, doi, scopus.get(doi, min(15.0, left()))
+            return source, doi, _crossref(doi, min(15.0, left()), email)
 
         # All sources at once, first answer wins: asking them in turn made one
         # slow source (Semantic Scholar without a key often takes 10 s or more)

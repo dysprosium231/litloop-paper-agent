@@ -111,6 +111,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "browser_copy_follow_system": True,
     "is_campus_network": False,
     "tor_proxy": os.environ.get("TOR_PROXY", ""),
+    # Optional. Sent to Crossref and OpenAlex only, so they can reach you if a request misbehaves;
+    # with it Crossref allows 3 parallel requests instead of 1.
+    "contact_email": "",
     "tor_use_bridges": False,
     "use_tor_for_scihub": True,
     "google_scholar_limit": 5,

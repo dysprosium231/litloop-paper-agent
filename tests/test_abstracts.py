@@ -37,7 +37,7 @@ def test_fill_asks_all_sources_and_keeps_the_first_answer(monkeypatch):
 
     monkeypatch.setattr(a, "_semantic_scholar", s2)
     monkeypatch.setattr(a, "_Scopus", FakeScopus)
-    monkeypatch.setattr(a, "_crossref", lambda doi, timeout: calls.append(("crossref", doi)) or
+    monkeypatch.setattr(a, "_crossref", lambda doi, timeout, email="": calls.append(("crossref", doi)) or
                         ("<jats:p>CR text</jats:p>" if doi == "10.1002/c" else ""))
     rows = [{"doi": "10.1016/A", "abstract": ""}, {"doi": "10.1111/b"}, {"doi": "10.1002/c"},
             {"doi": "10.1007/d"}, {"doi": "10.9/e", "abstract": "<p>Already here</p>", "source": "openalex"}]
@@ -53,7 +53,7 @@ def test_fill_does_not_wait_for_a_slow_source_once_everything_is_found(monkeypat
     import time
     monkeypatch.setattr(a, "_semantic_scholar", lambda dois, timeout: time.sleep(3) or {})
     monkeypatch.setattr(a, "_Scopus", lambda key: (_ for _ in ()).throw(AssertionError("no key given")))
-    monkeypatch.setattr(a, "_crossref", lambda doi, timeout: "found")
+    monkeypatch.setattr(a, "_crossref", lambda doi, timeout, email="": "found")
     rows = [{"doi": "10.1/x"}, {"doi": "10.1/y"}]
     t0 = time.monotonic()
     a.fill_abstracts(rows, {})
@@ -64,7 +64,7 @@ def test_fill_does_not_wait_for_a_slow_source_once_everything_is_found(monkeypat
 def test_no_elsevier_key_uses_free_sources_only(monkeypatch):
     monkeypatch.setattr(a, "_semantic_scholar", lambda dois, timeout: {})
     monkeypatch.setattr(a, "_Scopus", lambda key: (_ for _ in ()).throw(AssertionError("scopus used")))
-    monkeypatch.setattr(a, "_crossref", lambda doi, timeout: "")
+    monkeypatch.setattr(a, "_crossref", lambda doi, timeout, email="": "")
     rows = [{"doi": "10.1016/a"}]
     a.fill_abstracts(rows, {})
     assert rows[0]["abstract_missing"] is True
@@ -117,8 +117,9 @@ def test_scopus_retries_when_throttled_and_stops_only_when_the_quota_is_spent(mo
     replies = []
 
     class R:
-        def __init__(self, code, remaining=None, text=""):
-            self.status_code, self.headers, self.text = code, ({"X-RateLimit-Remaining": remaining} if remaining else {}), text
+        def __init__(self, code, spent=False, text=""):
+            self.status_code, self.text = code, text
+            self.headers = {"X-ELS-Status": "QUOTA_EXCEEDED - Quota Exceeded"} if spent else {}
 
         def json(self):
             return {"abstracts-retrieval-response": {"coredata": {"dc:description": self.text}}}
@@ -132,5 +133,5 @@ def test_scopus_retries_when_throttled_and_stops_only_when_the_quota_is_spent(mo
     scopus = a._Scopus("k")
     replies[:] = [R(429), R(200, text="found")]          # throttled once, then fine
     assert scopus.get("10.1016/x", 5) == "found" and not scopus.exhausted
-    replies[:] = [R(429, remaining="0")]                  # weekly quota spent
+    replies[:] = [R(429, spent=True)]                    # weekly quota spent (Elsevier's signal)
     assert scopus.get("10.1016/y", 5) == "" and scopus.exhausted

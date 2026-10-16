@@ -37,6 +37,7 @@ from typing import Any
 
 from . import screening
 from .config import load_config
+from .identifiers import canonical_doi
 from .log import get_logger
 
 logger = get_logger()
@@ -60,21 +61,43 @@ WORKERS = 4            # parallel OpenAlex requests (each chunk of 50 ids is ind
 
 # --------------------------------------------------------------------------- OpenAlex
 
-def _get(params: dict[str, Any], *, tries: int = 3) -> dict[str, Any]:
+def _boolean_heavy(params: dict[str, Any]) -> bool:
+    """OpenAlex allows only 5 requests/s for searches with more than five boolean operators."""
+    text = " ".join(str(v) for v in params.values())
+    return len(re.findall(r"(?:OR|AND|NOT)", text)) > 5
+
+
+def _get(params: dict[str, Any], *, tries: int = 6) -> dict[str, Any]:
+    """One OpenAlex request, paced and counted by ``quota``. A 429 is retried with
+    growing waits; a spent daily budget (remaining 0) is reported plainly."""
+    from . import quota
     from .search import _plain_session
     key = str(load_config().get("openalex_api_key") or "").strip()
     if key:
         params = {**params, "api_key": key}
+    lane = ("openalex_boolean" if _boolean_heavy(params) else "openalex") + ("" if key else "_nokey")
     last: Exception | None = None
     for attempt in range(tries):
+        wait = min(30.0, 1.5 * 2 ** attempt)
         try:
-            r = _plain_session().get(OPENALEX, params=params, timeout=60)
+            with quota.slot(lane):
+                r = _plain_session().get(OPENALEX, params=params, timeout=60)
+            quota.record("openalex", r)
+            remaining = r.headers.get("X-RateLimit-Remaining")
             if r.status_code == 200:
                 return r.json()
+            if r.status_code == 429 and remaining == "0":
+                hours = round(int(r.headers.get("X-RateLimit-Reset") or 0) / 3600, 1)
+                raise RuntimeError(f"OpenAlex daily budget used up ({r.headers.get('X-RateLimit-Limit')} "
+                                   f"credits); it resets in about {hours} h (midnight UTC)")
+            if r.status_code == 429:
+                wait = max(wait, float(r.headers.get("Retry-After") or 0))
             last = RuntimeError(f"OpenAlex HTTP {r.status_code}")
+        except RuntimeError:
+            raise
         except Exception as exc:  # network hiccup: retry
             last = exc
-        time.sleep(1.5 * (attempt + 1))
+        time.sleep(wait)
     raise RuntimeError(f"OpenAlex request failed: {last}")
 
 
@@ -87,7 +110,7 @@ def _record(w: dict[str, Any]) -> dict[str, Any]:
     src = ((w.get("primary_location") or {}).get("source") or {})
     return {
         "openalex": _short(w.get("id")),
-        "doi": (str(w.get("doi") or "").replace("https://doi.org/", "").lower() or None),
+        "doi": canonical_doi(w.get("doi")) or None,
         "title": w.get("title") or "",
         "year": w.get("publication_year"),
         "journal": src.get("display_name") or "",
@@ -129,14 +152,31 @@ def _by_filter(field: str, values: list[str], extra: list[str] | None = None) ->
     return [_record(w) for w in _parallel(one, _chunks(values))]
 
 
-def _pages(flt: str, max_records: int) -> list[dict[str, Any]]:
-    """Up to ``max_records`` works matching ``flt``, most cited first, so a cut drops the least cited."""
-    out, cursor = [], "*"
-    while cursor and len(out) < max_records:
-        d = _get({"filter": flt, "per-page": 200, "cursor": cursor, "select": _FIELDS,
-                  "sort": "cited_by_count:desc"})
-        out += d.get("results") or []
-        cursor = (d.get("meta") or {}).get("next_cursor")
+def _pages(flt: str, max_records: int, *, split_over: bool = False) -> list[dict[str, Any]] | None:
+    """Up to ``max_records`` works matching ``flt``, most cited first, so a cut drops the least cited.
+
+    With ``split_over``, return None as soon as the first page shows more than
+    ``max_records`` matches, so the caller can split the query instead; the
+    first page already carries the count, so no separate count request is
+    needed (each topic-search request costs 10 OpenAlex credits).
+    """
+    # Cursor paging past the first page needs an API key; without one, page numbers
+    # (allowed up to 10,000 results) do the same job.
+    keyed = bool(str(load_config().get("openalex_api_key") or "").strip())
+    out, cursor, page = [], "*", 1
+    while len(out) < max_records:
+        params = {"filter": flt, "per-page": 200, "select": _FIELDS, "sort": "cited_by_count:desc"}
+        params.update({"cursor": cursor} if keyed else {"page": page})
+        d = _get(params)
+        meta = d.get("meta") or {}
+        if split_over and page == 1 and (meta.get("count") or 0) > max_records:
+            return None
+        rows = d.get("results") or []
+        out += rows
+        page += 1
+        cursor = meta.get("next_cursor")
+        if not rows or (keyed and not cursor) or len(out) >= (meta.get("count") or 0):
+            break
     return [_record(w) for w in out[:max_records]]
 
 
@@ -174,11 +214,8 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
 
     def one(job: tuple[str, list[str]]) -> list[tuple[bool, list[dict[str, Any]]]]:
         term, chunk = job
-        if len(chunk) > 1:  # ask for the count first: fetching 1000 records only to split is slow
-            count = (_get({"filter": flt(term, chunk), "per-page": 1, "select": "id"}).get("meta") or {}).get("count", 0)
-            if count > max_records:
-                return [(True, [])]
-        return [(False, _pages(flt(term, chunk), max_records))]
+        got = _pages(flt(term, chunk), max_records, split_over=len(chunk) > 1)
+        return [(True, [])] if got is None else [(False, got)]
 
     out: list[dict[str, Any]] = []
     while jobs:  # a query over the cap is split in halves and asked again, all in parallel
@@ -414,12 +451,12 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
                                             "year_from": year_from, "year_to": year_to})["session"]
     years = _year_filter(year_from, year_to)
     pool: dict[str, dict] = {}
-    seed_recs = _by_filter("doi", [s.lower() for s in seeds])
+    seed_recs = _by_filter("doi", [canonical_doi(s) for s in seeds])
     for rec in seed_recs:
         _add(pool, rec, "seed")
     for q, rows in _keyword_candidates(queries, year_from, year_to).items():
         for r in rows:
-            _add(pool, {"openalex": None, "doi": str(r.get("doi") or "").lower() or None,
+            _add(pool, {"openalex": None, "doi": canonical_doi(r.get("doi")) or None,
                         "title": r.get("title") or "", "year": r.get("year"), "journal": r.get("journal") or "",
                         "issn": r.get("issn") or [], "authors": r.get("authors") or [],
                         "cited_by_count": r.get("cited_by_count") or 0, "abstract": r.get("abstract") or "",
@@ -431,7 +468,7 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
     state = {"session": session, "question": question, "queries": queries, "core_terms": core_terms,
              "orig_seeds": [_key(r) for r in seed_recs],
              "year_from": year_from, "year_to": year_to, "batch_size": batch_size, "cap": cap,
-             "must_find": [d.lower() for d in (must_find or [])], "seeds": [], "seed_refs": [],
+             "must_find": [canonical_doi(d) for d in (must_find or [])], "seeds": [], "seed_refs": [],
              "queried_refs": [], "served": [], "rounds": [], "pool": pool}
     _expand(state, [_key(r) for r in seed_recs])
     _score(state)
@@ -443,7 +480,9 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
 
 def next_batch(session: str) -> dict[str, Any]:
     """Fold the agent's latest ratings back in (高 papers become seeds) and serve the next batch."""
+    from . import quota
     t0 = time.time()
+    credits0 = quota.spent("openalex")
     state = _load(session)
     rated = _ratings(state)
     new_seeds = [k for k, rel in rated.items() if rel == "高" and k in state["pool"] and k not in state["seeds"]]
@@ -458,6 +497,9 @@ def next_batch(session: str) -> dict[str, Any]:
     _save(state)
     out = _next_batch(state, rated)
     rnd["rank_seconds"] = round(time.time() - t1, 1)  # abstracts, model, journal ranks
+    rnd["openalex_credits"] = quota.spent("openalex") - credits0
+    rnd["api_budget"] = {k: {f: v.get(f) for f in ("remaining", "limit", "resets_at")}
+                         for k, v in quota.summary().items()}
     _save(state)
     return out
 
@@ -608,7 +650,13 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
                                                                      "retracted", "concern")}}
                                for k, it in zip(picked, items)]
         _save(state)
+    from . import quota
+    notes = quota.warnings()
+    if not str(load_config().get("openalex_api_key") or "").strip():
+        notes.insert(0, "no OpenAlex API key: the free daily budget without one is about 1,000 credits, "
+                        "which one deep search can use up; add a free key (openalex_api_key)")
     return {"session": state["session"], "pool": len(state["pool"]), "screened": len(rated),
+            "api_warnings": notes,
             "remaining": len(order) - len(picked), "ranked_by": state.get("ranked_by", "formula"), "batch": batch,
             "coverage": _coverage(state, rated, _ranked(state)), **stop,
             "next_step": ("rate every paper: action='rate', session=..., ratings=[{n, relevance, reason}], "

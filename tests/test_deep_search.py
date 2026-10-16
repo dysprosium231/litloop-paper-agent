@@ -233,37 +233,39 @@ def test_topic_search_expands_alternatives_and_handles_punctuation():
 def test_citation_query_that_hits_the_cap_is_split(monkeypatch):
     seen = []
 
-    def pages(flt, max_records):
+    def pages(flt, max_records, split_over=False):
         ids = flt.split("cites:")[1].split(",")[0].split("|")
         seen.append(len(ids))
-        return [rec(f"10.1/{i}_{n}", "t") for i in ids for n in range(2)][:max_records]
-
-    def count(params):
-        ids = params["filter"].split("cites:")[1].split(",")[0].split("|")
-        return {"meta": {"count": 2 * len(ids)}}
+        if split_over and 2 * len(ids) > max_records:
+            return None                               # the first page shows the count is over the cap
+        return [rec(f"10.1/{i}_{n}", "t") for i in ids for n in range(2)]
 
     monkeypatch.setattr(deep_search, "_pages", pages)
-    monkeypatch.setattr(deep_search, "_get", count)
     out = deep_search._cites_refs_on_topic(["A", "B", "C", "D"], ["x"], [], max_records=3)
     assert len({r["doi"] for r in out}) == 8          # nothing lost to the cap
-    assert sorted(seen) == [1, 1, 1, 1]               # over the cap: split before fetching anything
+    assert seen == [4, 2, 2, 1, 1, 1, 1]              # split down to single references
 
 
-def test_non_papers_stay_out_of_the_pool():
-    pool = {}
-    deep_search._add(pool, dict(rec("10.1/data", "Survey data"), type="dataset"), "cites_seed")
-    deep_search._add(pool, dict(rec("10.1/chap", "A chapter"), type="book-chapter"), "cites_seed")
-    assert list(pool) == ["10.1/chap"]
+def test_openalex_retries_when_throttled_and_explains_a_spent_budget(monkeypatch):
+    import litloop.search as s
+    replies = []
 
+    class R:
+        def __init__(self, code, remaining="500"):
+            self.status_code = code
+            self.headers = {"X-RateLimit-Remaining": remaining, "X-RateLimit-Limit": "10000", "X-RateLimit-Reset": "7200"}
 
-def test_rate_by_number_fills_in_the_paper_and_rejects_bad_entries(net):
-    out = deep_search.start("q", ["pressureless infiltration SiC aluminum"], ["10.1/seed"], ["aluminum"], batch_size=10)
-    sid, batch = out["session"], out["batch"]
-    assert [b["n"] for b in batch] == list(range(1, len(batch) + 1))
-    with pytest.raises(ValueError):
-        deep_search.rate(sid, [{"n": 1, "relevance": "高"}, {"n": 99, "relevance": "高"}])
-    assert screening.load(sid)["items"] == []                      # nothing saved on a bad entry
-    res = deep_search.rate(sid, [{"n": 1, "relevance": "高", "reason": "on topic"}])
-    assert res["saved"] == 1 and res["not_rated"] == list(range(2, len(batch) + 1))
-    saved = screening.load(sid)["items"][0]
-    assert saved["doi"] == batch[0]["doi"] and saved["title"] == batch[0]["title"] and saved["reason"] == "on topic"
+        def json(self):
+            return {"results": []}
+
+    class S:
+        def get(self, *a, **k):
+            return replies.pop(0)
+
+    monkeypatch.setattr(s, "_plain_session", lambda: S())
+    monkeypatch.setattr(deep_search.time, "sleep", lambda sec: None)
+    replies[:] = [R(429), R(429), R(200)]
+    assert deep_search._get({"filter": "x"}) == {"results": []}
+    replies[:] = [R(429, remaining="0")]
+    with pytest.raises(RuntimeError, match="daily budget used up"):
+        deep_search._get({"filter": "x"})

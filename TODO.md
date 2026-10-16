@@ -30,6 +30,7 @@
   3. [ ] **宽泛缩写的噪音**：如“Al”让 SiC/Al 候选池多出约 3000 篇。可试：引用路线进来的文章需命中至少一组检索词，或宽泛缩写只在标题里匹配；先离线确认不误伤目标。
   4. [ ] **用 Zotero 里已有的文献当种子和正例**：读用户指定分类，冷启动更快、少一步手动给 DOI。
   5. [ ] **停止时估计还剩多少相关文章**：按模型分数估计剩余数量，给出“估计已找到约几成”。
+  - [x] 接口用量监控（2026-10-16，用户要求以官方文档为准）：新增 `quota.py`，按 OpenAlex、Elsevier、Crossref、Semantic Scholar 官方文档设置各自的并发和每秒请求数（OpenAlex 有/无 Key、布尔运算符超过 5 个的检索、Crossref 有/无联系邮箱各一套），记录每天的请求数、OpenAlex 实际扣的积分、被限流次数和剩余额度，存 `~/.litloop/api_usage.json`；`litloop_diagnostics(check="quota")` 查看；深度检索每轮记录花费的积分，返回 `api_warnings`。按文档修正：Scopus 额度用完以 `X-ELS-Status: QUOTA_EXCEEDED` 判断；OpenAlex 带关键词检索每次 10 积分（实测），去掉“先问总数”的多余请求；没有 OpenAlex Key 时改用页码翻页（实测与游标结果一致）并提醒；新增配置 `contact_email`（用户已填），Crossref 带上即进入礼貌池。README 依赖表换成官方数字，技能文档加“首次使用”引导。
   - [x] OpenAlex 限流与每日额度（2026-10-16 重跑时两个会话并行触发 429，整轮扩展失败）：Key 每天 10000 次请求；被限流时按 Retry-After 或逐次加长等待、最多 6 次；额度用完时直接说明多久后重置；每轮记录剩余额度（`openalex_remaining`）。README 写明额度。
   6. [ ] **速度**：扩展与补摘要并行；OpenAlex 查询按参考文献缓存，重跑和续跑不重复请求；给出进度。
   7. [ ] **深度检索之后的流程**：在深度检索会话上走通选择 → 批量下载 → 按分类推送 Zotero（可随 app 筛选页一起做）。
@@ -55,7 +56,7 @@
 - [ ] **`institutional/` 与根目录两套重复模块**（publisher_batch、publisher_profiles、fetcher 等，都继承自原项目）：根目录版有测试覆盖，但 `sources/__init__.py:1494` 的浏览器兜底下载、`main.py`（fetch、publisher-batch、浏览器配置检查）和 `pipeline.py:582` 实际走 `institutional/`，另有 10 个测试引用它。先比对差异、确认哪套新，再统一，最后做真实下载验证。不能直接删。
   - 初步比对（2026-10-15）：`fetcher.py`、`profile_health.py` 是转发到根目录的薄壳；`http_utils.py`、`publisher_pdf_router.py`、`session_store.py` 两边相同；`carsi_client.py`、`config_adapter.py`、`instsci_bridge.py` 只在 `institutional/`。真正分叉的是 `publisher_batch.py`（根目录 136K 多了页面池、代理槽、Wiley 登录入口等；`institutional/` 107K 却独有 `_is_school_login_host`、`_user_waiting`，可能是学校登录的修复）和 `publisher_profiles.py`（`institutional/` 版多一段机构配方说明），以及 `models.py`、`publisher_access.py`、`session_broker.py`、`flaresolverr.py`、`cloakbrowser_compat.py` 的小差异。统一时要把两边独有的修复合并，不能简单二选一。
 - [x] API Key 读取改为“配置优先，环境变量兜底”（`OPENALEX_API_KEY`、`ELSEVIER_API_KEY`），保存配置时不会把环境变量里的 Key 写进文件（2026-10-15，Antigravity 实现，补了写盘保护）。
-- [ ] DOI 规范化统一成一个函数（去前缀、URL 解码、转小写），各模块共用；目前各自转小写，未发现实际出错。
+- [x] DOI 规范化统一成一个函数（2026-10-16，Antigravity 实现、已审：`identifiers.canonical_doi`，用于筛选记录和深度检索）（去前缀、URL 解码、转小写），各模块共用；目前各自转小写，未发现实际出错。
 - [x] 删除无引用的 `src/litloop/mcp_server.py`、`build_core.py`（2026-10-15）。`_cli_core.py`（命令行注册在这里）和 `camofox.py`（`sources/publishers.py` 的下载兜底在用）**仍在使用**，不能删。
 - [x] 深度检索跨批次按编号选文章时，让 Agent 用 DOI 选（技能文档已写明 decide 优先传 DOI；评分改为批内编号的 `rate`，不受重排影响）（编号会随筛选记录重排变化；`decide` 已支持 DOI，并拒绝对不上的编号）。
 - 不做：拆分 `server.py`、`_publisher_strategies_core.py` 两个大文件（继承自原项目，风险大、收益不直接）。

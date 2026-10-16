@@ -1580,7 +1580,10 @@ def litloop_schools(action: str = "search", query: str = "", school: str = "") -
 
 @mcp_app.tool()
 def litloop_diagnostics(check: str = "health", detailed: bool = False) -> str:
-    """Diagnostics: check=health|network|sources|setup|auto_setup (detailed for health)."""
+    """Diagnostics: check=health|network|sources|setup|auto_setup|quota (API usage and limits)."""
+    if check == "quota":
+        from . import quota
+        return json.dumps({"providers": quota.summary(), "warnings": quota.warnings()}, ensure_ascii=False)
     if check == "network":
         return litloop_network_diagnose()
     if check == "sources":
