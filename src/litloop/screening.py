@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from . import config as _config
+from .identifiers import canonical_doi
 
 RELEVANCE = ("高", "中", "低", "不相关")
 _RANK = {r: i for i, r in enumerate(RELEVANCE)}
@@ -35,7 +36,7 @@ def _slug(text: str) -> str:
 
 
 def _key(item: dict[str, Any]) -> str:
-    doi = str(item.get("doi") or "").strip().lower()
+    doi = canonical_doi(item.get("doi"))
     return doi or "title:" + re.sub(r"[^a-z0-9]+", "", str(item.get("title") or "").lower())
 
 

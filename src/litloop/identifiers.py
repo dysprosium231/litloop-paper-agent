@@ -10,6 +10,17 @@ ARXIV_DOI_RE = re.compile(r"10\.48550/arxiv\.(?P<id>\d{4}\.\d{4,5})(?:v\d+)?", r
 OLD_ARXIV_RE = re.compile(r"^(?:arxiv:)?(?P<id>[a-z-]+(?:\.[A-Z]{2})?/\d{7})(?:v\d+)?$", re.I)
 
 
+def canonical_doi(value: str | None) -> str:
+    """Canonicalize a DOI: strip, URL-decode, strip prefixes, and lower-case."""
+    if not value:
+        return ""
+    v = urllib.parse.unquote(str(value).strip())
+    v = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", v, flags=re.I)
+    v = re.sub(r"^doi\.org/", "", v, flags=re.I)
+    v = re.sub(r"^doi:\s*", "", v, flags=re.I)
+    return v.strip().lower()
+
+
 def normalize_doi(value: str) -> str:
     value = value.strip()
     value = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", value, flags=re.I)
