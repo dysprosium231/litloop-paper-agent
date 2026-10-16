@@ -1,0 +1,756 @@
+{
+ "set": "sibcn_deep_search",
+ "note": "Agent ratings collected during the 2026-10-15/16 deep-search runs; later runs override earlier ones. Used by scripts/eval_deep_search.py to replay a run without re-rating.",
+ "judgments": {
+  "10.1002/adem.201701168": {
+   "relevance": "高",
+   "reason": "含铁SiBCN吸波",
+   "title": "Excellent Electromagnetic Wave Absorption of Iron‐Containing SiBCN Ceramics at 1158 K High‐Temperature"
+  },
+  "10.1002/adem.201800360": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Polymer Derived Si–B–C–N Ceramics: 30 Years of Research"
+  },
+  "10.1002/adem.201801295": {
+   "relevance": "高",
+   "reason": "聚硼硅氮烷SiBCNO",
+   "title": "Polyborosilazane‐Derived High Temperature Resistant SiBCNO"
+  },
+  "10.1002/chem.201700623": {
+   "relevance": "高",
+   "reason": "硼改性聚硅氮烷",
+   "title": "Molecular Chemistry and Engineering of Boron‐Modified Polyorganosilazanes as New Processable and Functional SiBCN Precursors"
+  },
+  "10.1002/smll.202308145": {
+   "relevance": "低",
+   "reason": "C/SiOC气凝胶",
+   "title": "Multifunctional Carbon Fiber Reinforced C/SiOC Aerogel Composites for Efficient Electromagnetic Wave Absorption, Thermal Insulation, and Flame Retardancy"
+  },
+  "10.1007/978-981-13-0110-0_87": {
+   "relevance": "高",
+   "reason": "无摘要，聚硼硅氮烷硼含量",
+   "title": "Effect of Boron Content on Structure and High Thermal Stability of Polyborosilazane Precursor"
+  },
+  "10.1007/s10853-018-2452-8": {
+   "relevance": "高",
+   "reason": "无摘要，硼嗪液态前驱体",
+   "title": "Synthesis, characterization, and ceramic conversion of a liquid polymeric precursor to SiBCN ceramic via borazine-modified polymethylsilane"
+  },
+  "10.1007/s10853-022-08027-5": {
+   "relevance": "高",
+   "reason": "无摘要，SiBCN热稳定",
+   "title": "Improved thermal stability of SiBCN ceramics by lowering nitrogen content"
+  },
+  "10.1007/s40145-018-0278-0": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN PIP",
+   "title": "3D Cf/SiBCN composites prepared by an improved polymer infiltration and pyrolysis"
+  },
+  "10.1007/s40145-021-0468-z": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Photopolymerization-based additive manufacturing of ceramics: A systematic review"
+  },
+  "10.1007/s40145-021-0510-1": {
+   "relevance": "低",
+   "reason": "SiCNO气凝胶",
+   "title": "Microwave induced in-situ formation of SiC nanowires on SiCNO ceramic aerogels with excellent electromagnetic wave absorption performance"
+  },
+  "10.1007/s40145-021-0562-2": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Si-based polymer-derived ceramics for energy conversion and storage"
+  },
+  "10.1007/s40820-022-00865-x": {
+   "relevance": "中",
+   "reason": "PDC DLP超材料",
+   "title": "Digital Light Processing 3D-Printed Ceramic Metamaterials for Electromagnetic Wave Absorption"
+  },
+  "10.1007/s42114-018-0044-3": {
+   "relevance": "高",
+   "reason": "SiBCN自愈合",
+   "title": "High temperature self-healing SiBCN ceramics derived from hyperbranched polyborosilazanes"
+  },
+  "10.1016/j.addma.2024.104239": {
+   "relevance": "高",
+   "reason": "光固化3D打印SiBCN超材料",
+   "title": "Vat photopolymerization 3D printing SiBCN ceramic metamaterials with strong electromagnetic wave absorption"
+  },
+  "10.1016/j.carbon.2021.03.057": {
+   "relevance": "高",
+   "reason": "SiBCN-rGO吸波",
+   "title": "SiBCN-reduced graphene oxide (rGO) ceramic composites derived from single-source-precursor with enhanced and tunable microwave absorption performance"
+  },
+  "10.1016/j.carbon.2021.11.051": {
+   "relevance": "高",
+   "reason": "SiBNC单源前驱体",
+   "title": "SiBNCx ceramics derived from single source polymeric precursor with controllable carbon structures for highly efficient electromagnetic wave absorption at high temperature"
+  },
+  "10.1016/j.carbon.2023.118189": {
+   "relevance": "高",
+   "reason": "超支化聚硼硅氮烷SiBCN吸波",
+   "title": "High temperature stable, amorphous SiBCN microwave absorption ceramics with tunable carbon structures derived from divinylbenzene crosslinked hyperbranched polyborosilazane"
+  },
+  "10.1016/j.ccr.2020.213486": {
+   "relevance": "中",
+   "reason": "PDC 3D打印通论",
+   "title": "Molecule editable 3D printed polymer-derived ceramics"
+  },
+  "10.1016/j.cej.2021.133743": {
+   "relevance": "高",
+   "reason": "CNFs-SiBCN超材料",
+   "title": "Additive manufacturing of nanocellulose/polyborosilazane derived CNFs-SiBCN ceramic metamaterials for ultra-broadband electromagnetic absorption"
+  },
+  "10.1016/j.cej.2024.148878": {
+   "relevance": "高",
+   "reason": "SiBCN/SiCnw气凝胶",
+   "title": "Lightweight and thermally insulating polymer-derived SiBCN/SiCnw ceramic aerogel with enhanced electromagnetic wave absorbing performance"
+  },
+  "10.1016/j.cej.2024.154485": {
+   "relevance": "高",
+   "reason": "SiBCN纤维纸",
+   "title": "Novel fire-resistant SiBCN fiber paper with efficient electromagnetic interference shielding and Joule-heating performance"
+  },
+  "10.1016/j.cej.2024.155392": {
+   "relevance": "高",
+   "reason": "SiBCN多相吸波",
+   "title": "Multiphase ceramic SiBCN-ZrO2/ZrC/ZrB2/SiC with ultra-wide bandwidth electromagnetic absorption"
+  },
+  "10.1016/j.cej.2024.156158": {
+   "relevance": "高",
+   "reason": "SiBCN气凝胶ZrC@SiC",
+   "title": "Construction of ZrC@SiC shell-core structure in SiBCN aerogel for enhanced thermal stability and thermal insulation"
+  },
+  "10.1016/j.cej.2024.157656": {
+   "relevance": "高",
+   "reason": "SiBCN/Al2O3气凝胶",
+   "title": "Lightweight, thermally insulating SiBCN/Al2O3 ceramic aerogel with enhanced high-temperature resistance and electromagnetic wave absorption performance"
+  },
+  "10.1016/j.cej.2025.163274": {
+   "relevance": "低",
+   "reason": "SiOC气凝胶",
+   "title": "High-attenuation and broadband microwave absorption of robust and thermally stable SiOC ceramic aerogels derived from interpenetrating silicone double network structure"
+  },
+  "10.1016/j.cej.2025.165426": {
+   "relevance": "高",
+   "reason": "SiBCN-ZrO2气凝胶改性防热",
+   "title": "SiBCN–ZrO2 aerogel-modified carbon-bonded carbon fiber composite with enhancement of in-plane thermal conductivity for thermal protection applications"
+  },
+  "10.1016/j.cej.2026.177810": {
+   "relevance": "高",
+   "reason": "SiBCN气凝胶纤维",
+   "title": "UV-assisted confined spinning of SiBCN aerogel fibers with enhanced thermal insulation and high-temperature stability"
+  },
+  "10.1016/j.ceramint.2012.02.045": {
+   "relevance": "高",
+   "reason": "聚硼硅氮烷合成与转化",
+   "title": "Synthesis and ceramic conversion of a novel processible polyboronsilazane precursor to SiBCN ceramic"
+  },
+  "10.1016/j.ceramint.2012.05.001": {
+   "relevance": "高",
+   "reason": "无摘要，聚硼硅氮烷纤维",
+   "title": "A novel polyborosilazane for high-temperature amorphous Si–B–N–C ceramic fibres"
+  },
+  "10.1016/j.ceramint.2015.04.114": {
+   "relevance": "高",
+   "reason": "UV固化硼嗪型前驱体",
+   "title": "Synthesis of borosilazane as UV-curable borazine-type single source precursor for SiBCN ceramic materials"
+  },
+  "10.1016/j.ceramint.2016.01.028": {
+   "relevance": "高",
+   "reason": "先驱体SiBCN环境损伤",
+   "title": "Stress induced environmental damage in precursor derived SiBCN ceramics"
+  },
+  "10.1016/j.ceramint.2018.01.155": {
+   "relevance": "高",
+   "reason": "聚硅氧烷-BN前驱体SiBCN",
+   "title": "Cured polysiloxane-boron nitride composite as novel precursor for SiBCN nanostructures"
+  },
+  "10.1016/j.ceramint.2018.02.045": {
+   "relevance": "高",
+   "reason": "SiBCN前驱体胶黏剂",
+   "title": "An air stable high temperature adhesive from modified SiBCN precursor synthesized via polymer-derived-ceramic route"
+  },
+  "10.1016/j.ceramint.2018.09.074": {
+   "relevance": "中",
+   "reason": "CVD沉积SiBCN，非先驱体路线",
+   "title": "Three-dimensional graphene/SiBCN composites for high-performance electromagnetic interference shielding"
+  },
+  "10.1016/j.ceramint.2018.09.098": {
+   "relevance": "高",
+   "reason": "SiBCN-ZrO2气凝胶",
+   "title": "SiBCN-ZrO2 hybrid ceramic aerogels through the polymer-derived ceramics (PDCs) route"
+  },
+  "10.1016/j.ceramint.2019.03.192": {
+   "relevance": "高",
+   "reason": "C/SiBCN氧化",
+   "title": "High-temperature oxidation behavior and oxidation mechanism of C/SiBCN composites in static air"
+  },
+  "10.1016/j.ceramint.2019.10.267": {
+   "relevance": "高",
+   "reason": "SiBCN气凝胶/石墨烯",
+   "title": "SiBCN ceramic aerogel/graphene composites prepared via sol-gel infiltration process and polymer-derived ceramics (PDCs) route"
+  },
+  "10.1016/j.ceramint.2019.12.001": {
+   "relevance": "高",
+   "reason": "无摘要，SiBCN吸波界面",
+   "title": "Construction of multiple heterogeneous interface and its effect on microwave absorption of SiBCN ceramics"
+  },
+  "10.1016/j.ceramint.2020.04.282": {
+   "relevance": "中",
+   "reason": "SiCN DLP",
+   "title": "Carbon nanotubes as light absorbers in digital light processing three-dimensional printing of SiCN ceramics from preceramic polysilazane"
+  },
+  "10.1016/j.ceramint.2020.07.061": {
+   "relevance": "中",
+   "reason": "SiCN DLP",
+   "title": "Three-dimensional printing of SiCN ceramic matrix composites from preceramic polysilazane by digital light processing"
+  },
+  "10.1016/j.ceramint.2021.04.303": {
+   "relevance": "高",
+   "reason": "新前驱体SiBCN用于电池",
+   "title": "BCl3 modified tris(dichloromethylsilylethyl)borane as a precursor for SiBCN ceramics applied in lithium-ion battery anodes"
+  },
+  "10.1016/j.ceramint.2021.12.246": {
+   "relevance": "高",
+   "reason": "SiBCN(O)元素可调",
+   "title": "Polymer derived SiBCN(O) ceramics with tunable element content"
+  },
+  "10.1016/j.ceramint.2022.07.100": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN(O)自愈合",
+   "title": "Preparation of self-healing Cf/SiBCN(O) composite using a novel polyborosilazane"
+  },
+  "10.1016/j.ceramint.2022.12.004": {
+   "relevance": "高",
+   "reason": "聚硼硅氮烷光固化成型",
+   "title": "UV curing behavior of a liquid polyborosilazane and stereolithography to SiBCN ceramic components"
+  },
+  "10.1016/j.ceramint.2023.03.307": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN防热监测",
+   "title": "Integration of thermal protection and structural health monitoring for carbon fiber reinforced SiBCN composites with SiC coating enhanced interfacial performance"
+  },
+  "10.1016/j.ceramint.2023.10.159": {
+   "relevance": "高",
+   "reason": "DLP打印聚硼硅氮烷吸波",
+   "title": "DLP–printable hyperbranched polyborosilazane for microwave absorbing SiBCN(O) ceramic metastructure"
+  },
+  "10.1016/j.ceramint.2024.05.202": {
+   "relevance": "低",
+   "reason": "CVD C/SiC",
+   "title": "Thermal insulated C/SiC nanofiber aerogel with high thermal stability and superior electromagnetic wave absorption performance"
+  },
+  "10.1016/j.ceramint.2024.06.165": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN-ZrB2",
+   "title": "Microstructure evolution and failure mechanism of 2D Cf/SiBCN–ZrB2 composite at elevated temperatures"
+  },
+  "10.1016/j.ceramint.2024.06.321": {
+   "relevance": "高",
+   "reason": "莫来石纤维增强SiBCN气凝胶",
+   "title": "Multifunctional mullite fiber reinforced SiBCN ceramic aerogel with excellent microwave absorption and thermal insulation performance"
+  },
+  "10.1016/j.ceramint.2024.07.191": {
+   "relevance": "高",
+   "reason": "SiBCN气凝胶改性莫来石纤维毡",
+   "title": "Flexible and resilient mullite fiber felts modified by SiBCN ceramic aerogel with enhanced thermal insulation performance"
+  },
+  "10.1016/j.ceramint.2024.07.379": {
+   "relevance": "高",
+   "reason": "SiBCN纤维吸波",
+   "title": "Microstructure evolution and excellent electromagnetic wave absorption performance of SiBCN fibers"
+  },
+  "10.1016/j.ceramint.2024.10.286": {
+   "relevance": "高",
+   "reason": "SiBCN复合气凝胶",
+   "title": "Thermally insulated C/SiC/SiBCN composite ceramic aerogel with enhanced electromagnetic wave absorption performance"
+  },
+  "10.1016/j.ceramint.2024.11.211": {
+   "relevance": "高",
+   "reason": "SiBCN气凝胶复合隔热吸波",
+   "title": "Lightweight and resilient SiBCNa/mullite/SiCnw composite for thermal insulation and electromagnetic wave absorption"
+  },
+  "10.1016/j.ceramint.2025.01.517": {
+   "relevance": "高",
+   "reason": "SiBCN纤维膜隔热",
+   "title": "Robust, fire-resistant, and thermal-stable HSMSS@SiBCN ceramic fiber membranes with blocked axial and radial heat transfer for high-temperature thermal superinsulation"
+  },
+  "10.1016/j.ceramint.2025.07.394": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN电弧风洞烧蚀",
+   "title": "Ablation resistance evaluation of carbon fiber reinforced SiBCN composites under arc jet wind tunnel testing"
+  },
+  "10.1016/j.ceramint.2025.12.025": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN梯度防热",
+   "title": "Ablation resistance and heat insulation performance of integrated Cf/SiBCN ceramic-polymer gradient composites in arc wind tunnel"
+  },
+  "10.1016/j.ceramint.2026.06.064": {
+   "relevance": "高",
+   "reason": "SiBCN气凝胶隔热隐身",
+   "title": "High-performance SiBCN ceramic aerogels with integrated thermal insulation and electromagnetic stealth enabled by divinylbenzene-regulated carbon structure"
+  },
+  "10.1016/j.ceramint.2026.08.045": {
+   "relevance": "高",
+   "reason": "SiBCN气凝胶静电纺",
+   "title": "Wrinkled SiBCN ceramic aerogels fabricated by microfluidic electrospinning for shrinkage resistance and thermal insulation"
+  },
+  "10.1016/j.ceramint.2026.08.217": {
+   "relevance": "高",
+   "reason": "GNS/SiBCN气凝胶",
+   "title": "Study on thermal insulation and electromagnetic shielding properties of multifunctional GNS/SiBCN aerogel"
+  },
+  "10.1016/j.ceramint.2026.09.541": {
+   "relevance": "高",
+   "reason": "无摘要，SiBCN硼硅比",
+   "title": "Role of boron-to-silicon ratio in tailoring local atomic configuration and crystallization behavior of amorphous SiBCN ceramics"
+  },
+  "10.1016/j.cja.2020.06.028": {
+   "relevance": "高",
+   "reason": "MOF/SiBCN吸波",
+   "title": "Excellent electromagnetic wave absorption of MOF/SiBCN nanomaterials at high temperature"
+  },
+  "10.1016/j.coco.2024.102052": {
+   "relevance": "低",
+   "reason": "碳纤维/石墨",
+   "title": "Lightweight and thermally insulating carbon-bonded carbon fiber/graphite composite with enhanced in-plane heat-leading functionality for efficient thermal protection materials"
+  },
+  "10.1016/j.colsurfa.2023.132605": {
+   "relevance": "高",
+   "reason": "SiBCN(Fe)纳米纤维",
+   "title": "Novel and efficient electromagnetic wave absorption of SiBCN(Fe) nanofibers"
+  },
+  "10.1016/j.colsurfa.2024.134234": {
+   "relevance": "高",
+   "reason": "SiBCN/Ni纤维",
+   "title": "Heterogeneous interface engineering of SiBCN/Ni fibers extends enhanced electromagnetic wave absorption properties"
+  },
+  "10.1016/j.compositesa.2025.109268": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN吸波",
+   "title": "Carbon fiber reinforced SiBCN composite with broadband and tunable microwave absorption performance"
+  },
+  "10.1016/j.compscitech.2024.110629": {
+   "relevance": "高",
+   "reason": "SiBCN陶瓷/树脂双层防热",
+   "title": "Preparation of integrated carbon fiber stitched fabric reinforced (SiBCN) ceramic/resin double-layered composites for ablation resistance, thermal insulation and compression resistance performance"
+  },
+  "10.1016/j.corsci.2015.07.006": {
+   "relevance": "高",
+   "reason": "无摘要，石墨烯/SiBCN烧蚀",
+   "title": "Ablation behavior of graphene reinforced SiBCN ceramics in an oxyacetylene combustion flame"
+  },
+  "10.1016/j.corsci.2016.10.002": {
+   "relevance": "高",
+   "reason": "无摘要，SiCf/SiBCN烧蚀",
+   "title": "Effects of in situ amorphous graphite coating on ablation resistance of SiC fiber reinforced SiBCN ceramics in an oxyacetylene flame"
+  },
+  "10.1016/j.corsci.2019.06.001": {
+   "relevance": "高",
+   "reason": "富硼SiBCN块体氧化",
+   "title": "High-temperature oxidation resistance of dense amorphous boron-rich SiBCN monoliths"
+  },
+  "10.1016/j.corsci.2023.111723": {
+   "relevance": "高",
+   "reason": "SiBCN氧化",
+   "title": "Heterogeneous oxidation of different atomic clusters in amorphous SiBCN ceramic associated with phase separation"
+  },
+  "10.1016/j.jallcom.2022.165190": {
+   "relevance": "高",
+   "reason": "SiBCN复合纤维吸波",
+   "title": "Novel SiBCN composite fibers with broadband and strong electromagnetic wave absorption performance"
+  },
+  "10.1016/j.jallcom.2025.181702": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN梯度防热",
+   "title": "Research on shear ablation and thermal insulation performance of the Cf/SiBCN polymer-amorphous ceramic gradient thermal protection composites"
+  },
+  "10.1016/j.jallcom.2025.181759": {
+   "relevance": "中",
+   "reason": "硅改性BN气凝胶",
+   "title": "Silicon-modified boron nitride aerogels with enhanced thermal stability for thermal insulation applications in high-temperature"
+  },
+  "10.1016/j.jallcom.2026.191126": {
+   "relevance": "高",
+   "reason": "ZrC增强SiBCN纤维",
+   "title": "In situ ZrC-reinforced SiBCN nanofibers with superior electromagnetic wave absorption performance"
+  },
+  "10.1016/j.jcis.2020.02.045": {
+   "relevance": "低",
+   "reason": "SiOC复合",
+   "title": "Precursor infiltration and pyrolysis cycle-dependent microwave absorption and mechanical properties of lightweight and antioxidant carbon fiber felts reinforced silicon oxycarbide composites"
+  },
+  "10.1016/j.jcis.2020.08.030": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN吸波",
+   "title": "Strong and thermostable hydrothermal carbon coated 3D needled carbon fiber reinforced silicon-boron carbonitride composites with broadband and tunable high-performance microwave absorption"
+  },
+  "10.1016/j.jeurceramsoc.2004.08.015": {
+   "relevance": "高",
+   "reason": "单源聚硼硅氮烷SiBCN纤维",
+   "title": "Preparation of high-temperature stable SiBCN fibers from tailored single source polyborosilazanes"
+  },
+  "10.1016/j.jeurceramsoc.2014.05.039": {
+   "relevance": "高",
+   "reason": "二甲氨基硼烷改性聚硅氮烷",
+   "title": "Dimethylaminoborane-modified copolysilazane as a novel precursor for high-temperature resistant SiBCN ceramics"
+  },
+  "10.1016/j.jeurceramsoc.2016.11.009": {
+   "relevance": "高",
+   "reason": "液态SiBCN前驱体",
+   "title": "Synthesis, pyrolysis of a novel liquid SiBCN ceramic precursor and its application in ceramic matrix composites"
+  },
+  "10.1016/j.jeurceramsoc.2017.07.033": {
+   "relevance": "中",
+   "reason": "聚硅氧烷DLP",
+   "title": "Digital light processing of ceramic components from polysiloxanes"
+  },
+  "10.1016/j.jeurceramsoc.2018.04.061": {
+   "relevance": "中",
+   "reason": "机械球磨粉体烧结块体",
+   "title": "Effects of high pressure on the low-temperature sintering of dense amorphous SiBCN monoliths"
+  },
+  "10.1016/j.jeurceramsoc.2019.06.025": {
+   "relevance": "高",
+   "reason": "C/SiBCN PIP",
+   "title": "High-temperature properties and interface evolution of C/SiBCN composites prepared by precursor infiltration and pyrolysis"
+  },
+  "10.1016/j.jeurceramsoc.2021.12.003": {
+   "relevance": "中",
+   "reason": "SiCN蜂窝3D打印",
+   "title": "High strength and microwave-absorbing polymer-derived SiCN honeycomb ceramic prepared by 3D printing"
+  },
+  "10.1016/j.jeurceramsoc.2022.06.056": {
+   "relevance": "中",
+   "reason": "SiCN DLP成型",
+   "title": "3D-printing of polymer‐derived SiCN ceramic matrix composites by digital light processing"
+  },
+  "10.1016/j.jeurceramsoc.2023.02.065": {
+   "relevance": "高",
+   "reason": "SiBCN超材料吸波",
+   "title": "High performance X-band electromagnetic wave absorption of SiBCN metamaterials fabricated by direct pyrolysis"
+  },
+  "10.1016/j.jeurceramsoc.2023.08.009": {
+   "relevance": "高",
+   "reason": "无摘要，SiBCN温度传感器",
+   "title": "Fabrication of polymer-derived SiBCN ceramic temperature sensor with excellent sensing performance"
+  },
+  "10.1016/j.jeurceramsoc.2024.116691": {
+   "relevance": "中",
+   "reason": "PDC增材制造通论",
+   "title": "On Enhancing the Manufacturability and Conversion of Additively Manufactured Polymer-Derived Ceramics"
+  },
+  "10.1016/j.jeurceramsoc.2024.117180": {
+   "relevance": "高",
+   "reason": "GNS/SiBCN屏蔽",
+   "title": "Tailoring of carbon structure in lightweight GNS/SiBCN nanocomposites for enhanced electromagnetic interference shielding performance"
+  },
+  "10.1016/j.jeurceramsoc.2025.117725": {
+   "relevance": "高",
+   "reason": "SiBCN压阻",
+   "title": "Study on preparation and piezoresistive characteristics of TVS-modified polymer-derived SiBCN ceramics"
+  },
+  "10.1016/j.jeurceramsoc.2025.118019": {
+   "relevance": "高",
+   "reason": "SiBCN温度传感器",
+   "title": "Study on service performance of SiBCN ceramic temperature sensor under heat flux shock"
+  },
+  "10.1016/j.jeurceramsoc.2026.118576": {
+   "relevance": "中",
+   "reason": "无摘要，钛合金涂层",
+   "title": "Multifunctional TiO2-SiO2/SiBCN/ZrO2 coating on titanium alloy: Enhanced high-temperature oxidation resistance and thermal radiation performance"
+  },
+  "10.1016/j.jmst.2022.03.015": {
+   "relevance": "高",
+   "reason": "SiBCNHf吸波",
+   "title": "Single source precursor derived SiBCNHf ceramic with enhanced high‐temperature microwave absorption and antioxidation"
+  },
+  "10.1016/j.jmst.2023.09.014": {
+   "relevance": "高",
+   "reason": "rGO增强SiBCN气凝胶",
+   "title": "Lightweight and large-scale rGO reinforced SiBCN aerogels with hierarchical cellular structures exposed to high-temperature environments"
+  },
+  "10.1016/j.jmst.2024.02.008": {
+   "relevance": "高",
+   "reason": "SiBCN透波",
+   "title": "Hyperbranched polyborosilazanes derived SiBCN ceramic for high-temperature wave-transparent performance"
+  },
+  "10.1016/j.materresbull.2024.112718": {
+   "relevance": "高",
+   "reason": "单源前驱体SiBCN吸波",
+   "title": "High temperature stable amorphous SiBCN microwave absorption ceramics derived from one-pot synthesis of single-source precursors"
+  },
+  "10.1016/j.matlet.2017.06.016": {
+   "relevance": "高",
+   "reason": "SiBCN前驱体光聚合涂层",
+   "title": "Coating formed by SiBCN single source precursor via UV-photopolymerization"
+  },
+  "10.1016/j.mattod.2025.09.024": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "The key role of boron as a ‘Magical Element’ in polymer-derived boron-containing ceramics"
+  },
+  "10.1016/j.mseb.2025.119118": {
+   "relevance": "中",
+   "reason": "机械合金化SiBCN-Ti，非先驱体路线",
+   "title": "Enhanced thermal shock resistance of SiBCN-Ti ceramics: The influnce of Ti content and source"
+  },
+  "10.1016/j.mtnano.2025.100571": {
+   "relevance": "高",
+   "reason": "GNS/PyC@SiBCN气凝胶",
+   "title": "Facile preparation of GNS/PyC@SiBCN aerogels with heterogeneous interfaces for broadband and tunable electromagnetic wave absorption"
+  },
+  "10.1016/j.pmatsci.2019.100623": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "The fate and role of in situ formed carbon in polymer-derived ceramics"
+  },
+  "10.1016/j.pmatsci.2022.100969": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Additive manufacturing of polymer-derived ceramics: Materials, technologies, properties and potential applications"
+  },
+  "10.1016/j.surfcoat.2018.06.091": {
+   "relevance": "高",
+   "reason": "SiBCN前驱体抗氧化涂层",
+   "title": "SiBCN-precursor-derived gradient oxidation protective ceramic coating for C/C composites"
+  },
+  "10.1016/j.surfcoat.2024.131098": {
+   "relevance": "中",
+   "reason": "SiCf/SiC腐蚀，未明确SiBCN",
+   "title": "A novel strategy to improve the corrosion resistance of SiCf/SiC composites in high-temperature combustion environments by cooperation of self-healing SiBCN and high-stability Yb2Si2O7"
+  },
+  "10.1021/acs.inorgchem.3c01390": {
+   "relevance": "高",
+   "reason": "硼含量可调聚硼硅氮烷",
+   "title": "Polyborosilazane with Broadly Tunable Boron Content for SiBCN Ceramics"
+  },
+  "10.1021/acs.jpcc.6b03995": {
+   "relevance": "低",
+   "reason": "其他PDC体系",
+   "title": "Microwave-Absorbing Polymer-Derived Ceramics from Cobalt-Coordinated Poly(dimethylsilylene)diacetylenes"
+  },
+  "10.1021/acsami.1c07912": {
+   "relevance": "高",
+   "reason": "SiBCN纳米纤维吸波",
+   "title": "Polymer-Derived Lightweight SiBCN Ceramic Nanofibers with High Microwave Absorption Performance"
+  },
+  "10.1021/acsami.1c16909": {
+   "relevance": "高",
+   "reason": "Y2O3掺杂SiBCN",
+   "title": "Enhanced Electromagnetic Wave Absorption for Y 2 O 3 -Doped SiBCN Ceramics"
+  },
+  "10.1021/acsami.2c20397": {
+   "relevance": "高",
+   "reason": "SiBCN相变纳米颗粒",
+   "title": "Phase-Transformation Nanoparticles Synchronously Boosting Mechanical and Electromagnetic Performance of SiBCN Ceramics"
+  },
+  "10.1021/acsami.2c22601": {
+   "relevance": "高",
+   "reason": "SiBCN气凝胶高温稳定",
+   "title": "In Situ Formation of the TiCN Phase in SiBCN Ceramic Aerogels Enabling Superior Thermal and Structural Stability up to 1800 °C"
+  },
+  "10.1021/acsami.6c04605": {
+   "relevance": "低",
+   "reason": "TiO2",
+   "title": "Integration of Thermal Insulation and X-Band Microwave Absorption in the Flexible and Resilient Hydrogenated TiO 2 Ceramic Nanofibrous Sponges"
+  },
+  "10.1021/acsami.6c14990": {
+   "relevance": "高",
+   "reason": "SiBCN增强BN气凝胶",
+   "title": "Lightweight and Super-Hydrophobic SiBCN-Reinforced BN Nanoribbon Aerogel for High-Temperature Thermal Insulation"
+  },
+  "10.1021/acsami.8b04497": {
+   "relevance": "高",
+   "reason": "SiBCN纤维高温腐蚀",
+   "title": "High-Temperature Corrosion Behavior of SiBCN Fibers for Aerospace Applications"
+  },
+  "10.1021/acsami.8b07879": {
+   "relevance": "高",
+   "reason": "富碳聚硼硅氮烷SiBCN吸波",
+   "title": "High-Temperature Stable and Metal-Free Electromagnetic Wave-Absorbing SiBCN Ceramics Derived from Carbon-Rich Hyperbranched Polyborosilazanes"
+  },
+  "10.1021/acsami.8b15365": {
+   "relevance": "高",
+   "reason": "石墨烯/SiBCN吸波",
+   "title": "Graphene Shield by SiBCN Ceramic: A Promising High-Temperature Electromagnetic Wave-Absorbing Material with Oxidation Resistance"
+  },
+  "10.1021/acsapm.2c02141": {
+   "relevance": "高",
+   "reason": "UV固化聚硼硅氮烷涂层",
+   "title": "UV-Curable Polyborosilazane Precursors for SiBCN Coatings under Harsh Environments"
+  },
+  "10.1021/am509129a": {
+   "relevance": "高",
+   "reason": "超支化聚硼硅氮烷",
+   "title": "Soluble and Meltable Hyperbranched Polyborosilazanes toward High-Temperature Stable SiBCN Ceramics"
+  },
+  "10.1021/jp203287h": {
+   "relevance": "高",
+   "reason": "SiBCN高温结构演变",
+   "title": "Structural Evolution of Polymer-Derived Amorphous SiBCN Ceramics at High Temperature"
+  },
+  "10.1039/b408295h": {
+   "relevance": "高",
+   "reason": "硼改性聚硅氮烷纤维",
+   "title": "Boron-modified polysilazane as a novel single-source precursor for SiBCN ceramic fibers: synthesis, melt-spinning, curing and ceramic conversion"
+  },
+  "10.1039/c3tc32088j": {
+   "relevance": "低",
+   "reason": "SiC/C/Fe",
+   "title": "Single-source-precursor synthesis of high temperature stable SiC/C/Fe nanocomposites from a processable hyperbranched polyferrocenylcarbosilane with high ceramic yield"
+  },
+  "10.1039/c9ra09598e": {
+   "relevance": "高",
+   "reason": "DLP打印SiBCN复合",
+   "title": "Additive manufacturing of SiBCN/Si 3 N 4 w composites from preceramic polymers by digital light processing"
+  },
+  "10.1063/5.0151661": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Additive manufacturing of polymer derived ceramics: Materials, methods, and applications"
+  },
+  "10.1080/15394450701310228": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Recent Developments in Polymer‐Derived Ceramic Fibers (PDCFs): Preparation, Properties and Applications – A Review"
+  },
+  "10.1080/17452759.2021.1922121": {
+   "relevance": "中",
+   "reason": "无颗粒DLP",
+   "title": "Particle-free compositions for printing dense 3D ceramic structures by digital light processing"
+  },
+  "10.1088/2053-1591/ab08fd": {
+   "relevance": "高",
+   "reason": "新型前驱体C/SiBCN PIP",
+   "title": "Preparation of C/SiBCN composites by precursor infiltration and pyrolysis using a novel precursor"
+  },
+  "10.1111/jace.16389": {
+   "relevance": "中",
+   "reason": "Si3N4 DLP",
+   "title": "Polymer‐derived silicon nitride ceramics by digital light processing based additive manufacturing"
+  },
+  "10.1111/jace.16802": {
+   "relevance": "高",
+   "reason": "Cf/SiBCN烧蚀",
+   "title": "Ablation behavior and mechanism of C f /SiBCN composites in plasma ablation flame"
+  },
+  "10.1111/jace.17596": {
+   "relevance": "高",
+   "reason": "TiC/SiBCN吸波",
+   "title": "MXene‐derived TiC/SiBCN ceramics with excellent electromagnetic absorption and high‐temperature resistance"
+  },
+  "10.1111/jace.17879": {
+   "relevance": "高",
+   "reason": "含铁SiBCN",
+   "title": "Adjustable iron‐containing SiBCN ceramics with high‐temperature microwave absorption and anti‐oxidation properties"
+  },
+  "10.1111/jace.20536": {
+   "relevance": "高",
+   "reason": "碳泡沫增强SiBCN气凝胶",
+   "title": "Carbon foam reinforced SiBCN ceramic aerogel with multifunctional performances"
+  },
+  "10.1111/jace.20586": {
+   "relevance": "高",
+   "reason": "聚硼硅氮烷吸波陶瓷",
+   "title": "Microwave absorption ceramics pyrolyzed from poly(dimethylsilylene)diacetylene‐modified hyperbranched polyborosilazane"
+  },
+  "10.1111/jace.70125": {
+   "relevance": "高",
+   "reason": "SiBCN粉体结晶",
+   "title": "Microstructure and crystallization behavior of SiBCN ceramic powder: High energy ball milling effect on polyborosilazane"
+  },
+  "10.2109/jcersj.114.524": {
+   "relevance": "高",
+   "reason": "SiBCN高温膜",
+   "title": "Polymer-Derived SiBCN Ceramic and their Potential Application for High Temperature Membranes Dedicated to Prof. Dr.-Ing. Dr.h.c. Hartmut Fuess on the occasion of his 65th birthday"
+  },
+  "10.2109/jcersj2.121.520": {
+   "relevance": "中",
+   "reason": "聚硼硅氮烷作ZrB2烧结助剂",
+   "title": "Structure and oxidation behavior of high temperature ZrB2–SiBCN ceramics with polyborosilazane as a sintering additive"
+  },
+  "10.2109/jcersj2.16124": {
+   "relevance": "中",
+   "reason": "SiCN/SiBCN纤维路线，偏综述",
+   "title": "Polymer-derived ceramics route toward SiCN and SiBCN fibers: from chemistry of polycarbosilazanes to the design and characterization of ceramic fibers"
+  },
+  "10.2109/jcersj2.17215": {
+   "relevance": "高",
+   "reason": "SiCf/LaPO4/SiBCN",
+   "title": "A lanthanum monazite coated silicon carbide fiber reinforced SiBCN composite with improved mechanical properties for high temperature applications"
+  },
+  "10.2109/jcersj2.17236": {
+   "relevance": "高",
+   "reason": "硼嗪型单源前驱体",
+   "title": "Borazine-type single source precursor with vinyl to SiBCN ceramic"
+  },
+  "10.21203/rs.3.rs-3927099/v1": {
+   "relevance": "低",
+   "reason": "SiCN气凝胶改性莫来石",
+   "title": "Simultaneous microwave absorption and thermal insulation properties of porous rigid mullite by loading SiCN aerogel"
+  },
+  "10.2139/ssrn.4014086": {
+   "relevance": "高",
+   "reason": "无摘要，SiBCN纤维吸波",
+   "title": "Novel Sibcn Fibers with Broad Band and Strong Electromagnetic Microwave Absorption Performance"
+  },
+  "10.2139/ssrn.4533364": {
+   "relevance": "高",
+   "reason": "无摘要，SiBCN涂层",
+   "title": "Low-Cost Sibcn Coatings with Excellent Hardness, Smoothness, and High-Temperature Inertness Coated on Defective Graphite Surfaces"
+  },
+  "10.2139/ssrn.4576718": {
+   "relevance": "中",
+   "reason": "无摘要，梯度防热复合，未见SiBCN",
+   "title": "Double-Layered Carbon Fiber Stitched Fabric Reinforced Ceramic / Polymer Integrated Gradient Composites for Ablation Resistance, Thermal Insulation and Load-Bearing Performance"
+  },
+  "10.26599/jac.2024.9220929": {
+   "relevance": "高",
+   "reason": "致密SiBCN块体",
+   "title": "Fabrication of dense SiBCN monolith at a lower temperature and its high-temperature performance"
+  },
+  "10.26599/jac.2024.9221019": {
+   "relevance": "高",
+   "reason": "多孔SiBCN高熵碳化物",
+   "title": "In situ formation of high-entropy carbide phase in porous SiBCN ceramic for enhanced high-temperature stability"
+  },
+  "10.26599/jac.2025.9221068": {
+   "relevance": "高",
+   "reason": "Cf/HC-SiBCN复合",
+   "title": "Lightweight C f/HC–SiBCN composite for multifunctional applications"
+  },
+  "10.26599/jac.2025.9221113": {
+   "relevance": "高",
+   "reason": "SiBCN改性碳纤维复合防热",
+   "title": "Lightweight SiBCN-modified carbon-bonded carbon fiber composites with directional heat-leading function for efficient thermal protection"
+  },
+  "10.26599/jac.2026.9221256": {
+   "relevance": "高",
+   "reason": "SiBCN/SiOC气凝胶",
+   "title": "Robust and thermally insulating SiBCN/SiOC ceramic aerogel with superior electromagnetic wave absorption performance and high-temperature stability up to 1600 °C"
+  },
+  "10.3390/app10061924": {
+   "relevance": "低",
+   "reason": "SiOC复合",
+   "title": "Strong and Thermostable Boron-Containing Phenolic Resin-Derived Carbon Modified Three-Dimensional Needled Carbon Fiber Reinforced Silicon Oxycarbide Composites with Tunable High-Performance Microwave Absorption Properties"
+  },
+  "10.3390/ma15020471": {
+   "relevance": "中",
+   "reason": "间接3D打印硅基非氧化物，未明确SiBCN",
+   "title": "Design and Manufacturing of Si-Based Non-Oxide Cellular Ceramic Structures through Indirect 3D Printing"
+  },
+  "10.3390/pr9060955": {
+   "relevance": "中",
+   "reason": "SiBCN粉改性酚醛",
+   "title": "Improved Performances of SiBCN Powders Modified Phenolic Resins-Carbon Fiber Composites"
+  },
+  "10.70675/e311d1cfzaa90z463eza875z215780dca87a": {
+   "relevance": "中",
+   "reason": "学位论文，先驱体3D打印",
+   "title": "Élaboration et caractérisation de céramiques 3D en couplant la chimie des précurseurs avec l'impression 3D"
+  }
+ }
+}

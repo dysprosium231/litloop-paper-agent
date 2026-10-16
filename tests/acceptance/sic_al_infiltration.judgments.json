@@ -1,0 +1,1206 @@
+{
+ "set": "sic_al_infiltration",
+ "note": "Agent ratings collected during the 2026-10-15/16 deep-search runs; later runs override earlier ones. Used by scripts/eval_deep_search.py to replay a run without re-rating.",
+ "judgments": {
+  "10.1002/9781119320104.ch18": {
+   "relevance": "低",
+   "reason": "Al2O3书章",
+   "title": "Pressurless Infiltration of Al 2 O 3 Preform Containing Aligned Two‐Dimensional Channels with Al‐Mg‐Si Alloy"
+  },
+  "10.1002/maco.200704067": {
+   "relevance": "中",
+   "reason": "反应浸渗复合材料降解",
+   "title": "Degradation processes in Al/SiCp/MgAl2O4 composites prepared from recycled aluminum with fly ash and rice hull ash"
+  },
+  "10.1002/maco.200805164": {
+   "relevance": "中",
+   "reason": "腐蚀，涉及Al4C3抑制",
+   "title": "Corrosion characteristics of Al‐Si‐Mg/SiCp composites with varying Si/Mg molar ratio in neutral chloride solutions"
+  },
+  "10.1002/sia.1064": {
+   "relevance": "中",
+   "reason": "氧化SiC界面演变",
+   "title": "Interfacial microstructure evolution in aluminium matrix composites reinforced with unoxidized and oxidized SiC particles"
+  },
+  "10.1007/978-981-96-2944-2_32": {
+   "relevance": "高",
+   "reason": "非压力浸渗预制体",
+   "title": "Preparation and Performance Analysis of SiCp/Al Composite Materials by Non pressure Infiltration Method"
+  },
+  "10.1007/bf00576541": {
+   "relevance": "高",
+   "reason": "无压浸渗工艺经典",
+   "title": "The fabrication of metal matrix composites by a pressureless infiltration technique"
+  },
+  "10.1007/bf01139158": {
+   "relevance": "高",
+   "reason": "晶须预制体无压浸渗",
+   "title": "Aluminium-matrix silicon carbide whisker composites fabricated by pressureless infiltration"
+  },
+  "10.1007/bf02649095": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "Factors affecting pressure infiltration of packed SiC particulates by liquid aluminum"
+  },
+  "10.1007/bf02669421": {
+   "relevance": "中",
+   "reason": "搅拌铸造界面反应",
+   "title": "Interfacial Reactions in Al-Mg (5083)/SiCp Composites during Fabrication and Remelting"
+  },
+  "10.1007/bf02670686": {
+   "relevance": "高",
+   "reason": "无压浸渗机理",
+   "title": "Pressureless infiltration of aluminum metal-matrix composites"
+  },
+  "10.1007/s00339-008-4438-x": {
+   "relevance": "低",
+   "reason": "Si3N4基底",
+   "title": "Wetting behavior of Al–Si–Mg alloys on Si3N4/Si substrates: optimization of processing parameters"
+  },
+  "10.1007/s10008-009-0853-y": {
+   "relevance": "低",
+   "reason": "Al-Si-Mg合金电化学，无复合材料",
+   "title": "Electrochemical behavior of passive films on Al–17Si–14Mg (wt.%) alloy in near-neutral solutions"
+  },
+  "10.1007/s10853-005-1988-6": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "Pressure infiltration of Al and Al-12 wt% Si alloy into compacts of SiC and oxidized SiC particles"
+  },
+  "10.1007/s10853-007-1591-0": {
+   "relevance": "低",
+   "reason": "Si3N4",
+   "title": "Microstructure and infiltration kinetics of Si3N4/Al–Mg composites fabricated by pressureless infiltration"
+  },
+  "10.1007/s10853-009-3655-9": {
+   "relevance": "高",
+   "reason": "无压浸渗双峰导热",
+   "title": "Experimental and modeling study of the thermal conductivity of SiCp/Al composites with bimodal size distribution"
+  },
+  "10.1007/s10853-009-3798-8": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "Preparation and characterization of composite materials obtained by pressure infiltration of aluminum in sintered SiC/kaolin preforms"
+  },
+  "10.1007/s10854-012-1037-6": {
+   "relevance": "高",
+   "reason": "无压浸渗组织与热机械性能",
+   "title": "Microstructure and thermo-mechanical properties of SiCp/Al composites prepared by pressureless infiltration"
+  },
+  "10.1007/s10854-013-1474-x": {
+   "relevance": "中",
+   "reason": "电子封装SiC/Al，工艺未明",
+   "title": "Microstructure and thermo-physical properties of a SiC/pure-Al composite for electronic packaging"
+  },
+  "10.1007/s10854-022-07932-4": {
+   "relevance": "低",
+   "reason": "热压",
+   "title": "Microstructure and properties of Al-Si/Al-SiCp bilayer composite for electronic packaging"
+  },
+  "10.1007/s11029-006-0038-z": {
+   "relevance": "高",
+   "reason": "无压浸渗与SiO2",
+   "title": "Influence of SiO2 in SiCp on the microstructure and impact strength of Al/SiCp composites fabricated by pressureless infiltration"
+  },
+  "10.1007/s11661-000-0291-z": {
+   "relevance": "高",
+   "reason": "Mg/Si对润湿的影响",
+   "title": "Optimum parameters for wetting silicon carbide by aluminum alloys"
+  },
+  "10.1007/s11661-001-0241-4": {
+   "relevance": "中",
+   "reason": "抑制Al4C3的界面设计",
+   "title": "Methodology to design the interfaces in SiC/Al composites"
+  },
+  "10.1007/s11661-001-0358-5": {
+   "relevance": "低",
+   "reason": "BN颗粒",
+   "title": "Characteristics of AA6061/BN composite fabricated by pressureless infiltration technique"
+  },
+  "10.1007/s11661-002-0106-5": {
+   "relevance": "高",
+   "reason": "AA7075无压浸渗",
+   "title": "Strength of Al-Zn-Mg-Cu matrix composite reinforced with SiC particles"
+  },
+  "10.1007/s11661-004-0381-4": {
+   "relevance": "低",
+   "reason": "镁基",
+   "title": "Mg AZ80/SiC composite bars fabricated by infiltration of porous ceramic preforms"
+  },
+  "10.1007/s11661-005-0125-0": {
+   "relevance": "低",
+   "reason": "TiC",
+   "title": "Reaction products of Al/TiC composites fabricated by the pressureless infiltration technique"
+  },
+  "10.1007/s11661-011-0817-6": {
+   "relevance": "低",
+   "reason": "B4C",
+   "title": "Interfacial Microstructure in a B4C/Al Composite Fabricated by Pressureless Infiltration"
+  },
+  "10.1007/s11661-998-0216-9": {
+   "relevance": "中",
+   "reason": "Al2O3与SiC混合",
+   "title": "Fabrication of Al-3 Wt pct Mg matrix composites reinforced with Al2O3 and SiC particulates by the pressureless infiltration technique"
+  },
+  "10.1007/s11661-999-0137-2": {
+   "relevance": "低",
+   "reason": "Si3N4颗粒",
+   "title": "Fabrication and characteristics of AA6061/Si3N4p composite by the pressureless infiltration technique"
+  },
+  "10.1007/s11663-007-9111-9": {
+   "relevance": "低",
+   "reason": "氧化铝预制体",
+   "title": "Kinetics of Pressureless Infiltration of Al-Mg Melts into Porous Alumina Preforms"
+  },
+  "10.1007/s11663-016-0751-5": {
+   "relevance": "中",
+   "reason": "浸渗工艺综述",
+   "title": "Liquid Metal Infiltration Processing of Metallic Composites: A Critical Review"
+  },
+  "10.1007/s11665-007-9073-8": {
+   "relevance": "低",
+   "reason": "镁基",
+   "title": "Preparation and Characterization of Binder Less Mg/Mg Alloy Infiltrated SiCp Reinforced Composites"
+  },
+  "10.1007/s11837-013-0779-9": {
+   "relevance": "低",
+   "reason": "压力辅助浸渗",
+   "title": "Optimization of Mechanical Properties of Hybrid Al2O3/SiCp Reinforced Composites Produced by Pressure-Assisted Aluminum Infiltration"
+  },
+  "10.1007/s12517-020-05463-y": {
+   "relevance": "中",
+   "reason": "多孔SiC化学镀镍",
+   "title": "Nickel coating performance of porous SiC structures by electroless coating"
+  },
+  "10.1007/s12540-011-6009-5": {
+   "relevance": "高",
+   "reason": "无辅助浸渗原位尖晶石",
+   "title": "Co-reinforcing Al/SiC composites with MgAl2O4 formed in situ during the processing by non-assisted infiltration"
+  },
+  "10.1007/s12613-011-0426-9": {
+   "relevance": "高",
+   "reason": "氧化预制体Al-8Mg无压浸渗界面",
+   "title": "Microstructure characterization of a pressureless infiltrating oxidized SiCp preform by Al-8Mg"
+  },
+  "10.1007/s12613-011-0500-3": {
+   "relevance": "高",
+   "reason": "Mg/Si对浸渗动力学",
+   "title": "Effect of Mg and Si on infiltration behavior of Al alloys pressureless infiltration into porous SiCp preforms"
+  },
+  "10.1007/s13369-014-1064-0": {
+   "relevance": "低",
+   "reason": "ZrO2",
+   "title": "Application of Pressureless Infiltration Technique for Processing and Characterizing Properties of 3-3 Al(Mg)/ZrO2 Composites"
+  },
+  "10.1007/s40195-014-0157-9": {
+   "relevance": "低",
+   "reason": "Al2O3",
+   "title": "Preparation of High-Strength Al–Mg–Si/Al2O3 Composites with Lamellar Structures Using Freeze Casting and Pressureless Infiltration Techniques"
+  },
+  "10.1016/b0-08-042993-9/00019-x": {
+   "relevance": "中",
+   "reason": "熔体浸渗综述，无摘要",
+   "title": "Melt Infiltration of Metal Matrix Composites"
+  },
+  "10.1016/j.actamat.2005.08.022": {
+   "relevance": "高",
+   "reason": "预氧化SiC界面晶体学",
+   "title": "Crystallography of SiC/MgAlO/Al interfaces in a pre-oxidized SiC reinforced SiC/Al composite"
+  },
+  "10.1016/j.apsusc.2015.09.137": {
+   "relevance": "中",
+   "reason": "SiO2/RHA基底润湿",
+   "title": "Wetting and reaction characteristics of crystalline and amorphous SiO2 derived rice-husk ash and SiO2/SiC substrates with Al–Si–Mg alloys"
+  },
+  "10.1016/j.apsusc.2019.144265": {
+   "relevance": "中",
+   "reason": "已撤稿，合金元素与界面反应",
+   "title": "RETRACTED: The effect and mechanism of alloying elements on Al/SiC interfacial reaction in Al melt"
+  },
+  "10.1016/j.ceramint.2008.10.024": {
+   "relevance": "高",
+   "reason": "无压熔体浸渗与冲击性能",
+   "title": "Processing and impact behavior of Al/SiCp composites fabricated by the pressureless melt infiltration method"
+  },
+  "10.1016/j.ceramint.2011.04.028": {
+   "relevance": "中",
+   "reason": "Al4C3导致的潮湿降解",
+   "title": "Development of aluminum hydroxides in Al–Mg–Si/SiCp in infiltrated composites exposed to moist air"
+  },
+  "10.1016/j.ceramint.2011.04.130": {
+   "relevance": "高",
+   "reason": "无压熔体浸渗工艺条件",
+   "title": "The effect of processing conditions on the microstructure and impact behavior of melt infiltrated Al/SiCp composites"
+  },
+  "10.1016/j.ceramint.2012.11.082": {
+   "relevance": "高",
+   "reason": "预氧化界面产物",
+   "title": "Interfacial microstructure of SiCp/Al composite produced by the pressureless infiltration technique"
+  },
+  "10.1016/j.ceramint.2013.12.105": {
+   "relevance": "中",
+   "reason": "3D网络但气压浸渗",
+   "title": "Thermophysical properties of SiC/Al composites with three dimensional interpenetrating network structure"
+  },
+  "10.1016/j.ceramint.2016.03.052": {
+   "relevance": "高",
+   "reason": "冷冻铸造无压浸渗",
+   "title": "Effects of oxide addition on the microstructure and mechanical properties of lamellar SiC scaffolds and Al–Si–Mg/SiC composites prepared by freeze casting and pressureless infiltration"
+  },
+  "10.1016/j.ceramint.2016.10.104": {
+   "relevance": "高",
+   "reason": "3D-SiC互穿高导热",
+   "title": "Enhanced thermal conductive 3D-SiC/Al-Si-Mg interpenetrating composites fabricated by pressureless infiltration"
+  },
+  "10.1016/j.ceramint.2016.11.162": {
+   "relevance": "低",
+   "reason": "Al2O3-ZrO2",
+   "title": "Lamellar-interpenetrated Al−Si−Mg/Al2O3−ZrO2 composites prepared by freeze casting and pressureless infiltration"
+  },
+  "10.1016/j.ceramint.2018.03.016": {
+   "relevance": "高",
+   "reason": "3D-SiC互穿结构无压浸渗",
+   "title": "Interface design in 3D-SiC/Al-Si-Mg interpenetrating composite fabricated by pressureless infiltration"
+  },
+  "10.1016/j.ceramint.2018.07.245": {
+   "relevance": "高",
+   "reason": "3D-SiC互穿多峰颗粒",
+   "title": "Multimodal particle distribution in 3D-SiC/Al-Si-Mg interpenetrating composite fabricated by pressureless infiltration"
+  },
+  "10.1016/j.ceramint.2018.10.233": {
+   "relevance": "高",
+   "reason": "无压浸渗SiC/Al低温力学",
+   "title": "Enhanced mechanical properties of SiC/Al composites at cryogenic temperatures"
+  },
+  "10.1016/j.ceramint.2019.07.358": {
+   "relevance": "高",
+   "reason": "无压浸渗界面热阻",
+   "title": "Influence of interface thermal resistance on thermal conductivity of SiC/Al composites"
+  },
+  "10.1016/j.ceramint.2019.09.040": {
+   "relevance": "高",
+   "reason": "La/Ce无压浸渗",
+   "title": "Effects of La and Ce on microstructure and properties of SiC/Al composites"
+  },
+  "10.1016/j.ceramint.2019.10.216": {
+   "relevance": "高",
+   "reason": "TiO2助剂自发浸渗",
+   "title": "Influence of TiO2 dopant on spontaneous infiltration to fabricate high volume fraction SiCp/Al cermets"
+  },
+  "10.1016/j.ceramint.2020.01.108": {
+   "relevance": "高",
+   "reason": "蜂窝SiC自发浸渗Si含量",
+   "title": "Effect of Si alloying content on the microstructure and thermophysical properties of SiC honeycomb/Al–Mg–Si composites prepared by spontaneous infiltration"
+  },
+  "10.1016/j.ceramint.2020.05.310": {
+   "relevance": "低",
+   "reason": "直接熔体氧化氧化铝基",
+   "title": "Effect of Zn and Mg additives on the fabrication of SiCp/Al2O3+Al composite by Directed Metal Oxidation (DIMOX) of aluminum"
+  },
+  "10.1016/j.ceramint.2020.09.083": {
+   "relevance": "低",
+   "reason": "压力辅助浸渗",
+   "title": "Compressive strength and wear properties of SiC/Al6061 composites reinforced with high contents of SiC fabricated by pressure-assisted infiltration"
+  },
+  "10.1016/j.ceramint.2021.03.001": {
+   "relevance": "低",
+   "reason": "TiB2压力浸渗",
+   "title": "Microstructures and mechanical properties of high-performance nacre-inspired Al-Si/TiB2 composites prepared by freeze casting and pressure infiltration"
+  },
+  "10.1016/j.ceramint.2021.05.147": {
+   "relevance": "高",
+   "reason": "直写3D-SiC无压浸渗",
+   "title": "Fabrication of 3D-SiC/aluminum alloy interpenetrating composites by DIW and pressureless infiltration"
+  },
+  "10.1016/j.ceramint.2021.09.232": {
+   "relevance": "中",
+   "reason": "互穿复合材料综述",
+   "title": "Review on development of metal/ceramic interpenetrating phase composites and critical analysis of their properties"
+  },
+  "10.1016/j.ceramint.2021.12.242": {
+   "relevance": "中",
+   "reason": "3D网络但真空压力浸渗",
+   "title": "Construction of novel plate-shaped 4H–SiC network skeleton for enhancing 3D-interpenetrated network structure SiC/Al composites"
+  },
+  "10.1016/j.ceramint.2024.05.100": {
+   "relevance": "低",
+   "reason": "超重力浸渗",
+   "title": "Preparation of SiC/Al composite material by supergravity infiltration method and its properties"
+  },
+  "10.1016/j.ceramint.2024.10.283": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "Tribological performance and mechanism of the titanium fiber-SiC whisker hybrid reinforced aluminum matrix composites prepared by pressure infiltration"
+  },
+  "10.1016/j.ceramint.2026.06.153": {
+   "relevance": "低",
+   "reason": "气压浸渗",
+   "title": "Microstructural and mechanical characterization of SiC/Al interpenetrating phase composites fabricated by pressure-assisted infiltration"
+  },
+  "10.1016/j.ceramint.2026.06.274": {
+   "relevance": "高",
+   "reason": "粘结剂喷射SiC预制体+Al-Mg浸渗",
+   "title": "Fabrication of SiC-aluminum composites via binder jetting 3D printing and infiltration: Effects of air-assisted oxidation bonding conditions"
+  },
+  "10.1016/j.coco.2022.101176": {
+   "relevance": "高",
+   "reason": "空气中无压铝熔体浸渗",
+   "title": "Fabrication of SiC matrix composite material by pressureless aluminum melt infiltration in air atmosphere"
+  },
+  "10.1016/j.compositesb.2024.111525": {
+   "relevance": "中",
+   "reason": "增材制造加PIP的高体分SiC/Al",
+   "title": "Effect of polymer infiltration and pyrolysis (PIP) on microstructure and properties of high volume fraction SiC/Al composites prepared by a novel hybrid additive manufacturing"
+  },
+  "10.1016/j.compositesb.2025.112526": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "Design and fabrication of bionic Bouligand-structured SiC/2024Al composites via binder jetting additive manufacturing and pressure infiltration"
+  },
+  "10.1016/j.compscitech.2004.02.015": {
+   "relevance": "低",
+   "reason": "气压浸渗",
+   "title": "Effect of gas pressure infiltration on microstructure and bending strength of porous Al2O3/SiC-reinforced aluminium matrix composites"
+  },
+  "10.1016/j.compscitech.2005.07.025": {
+   "relevance": "高",
+   "reason": "抑制Al4C3",
+   "title": "Limiting the development of Al4C3 to prevent degradation of Al/SiCp composites processed by pressureless infiltration"
+  },
+  "10.1016/j.compscitech.2006.11.006": {
+   "relevance": "高",
+   "reason": "Mg/Si对热机械性能",
+   "title": "Effect of Mg and Si in the aluminum on the thermo-mechanical properties of pressureless infiltrated SiCp/Al composites"
+  },
+  "10.1016/j.compscitech.2008.05.018": {
+   "relevance": "低",
+   "reason": "SiC/Cu",
+   "title": "Microstructure and thermo-mechanical properties of pressureless infiltrated SiCp/Cu composites"
+  },
+  "10.1016/j.compscitech.2012.02.018": {
+   "relevance": "中",
+   "reason": "氧化物泡沫无压浸渗，非SiC",
+   "title": "Interfacial reactions and wetting in Al–Mg/oxide ceramic interpenetrating composites made by a pressureless infiltration technique"
+  },
+  "10.1016/j.corsci.2009.03.025": {
+   "relevance": "低",
+   "reason": "压力浸渗腐蚀",
+   "title": "An investigation on corrosion behaviour of pressure infiltrated Al–Mg alloy/SiCp composites"
+  },
+  "10.1016/j.hybadv.2025.100454": {
+   "relevance": "低",
+   "reason": "SiC/碳管混杂复合材料综述",
+   "title": "A state-of-the-art review on SiC and MWCNTs reinforced hybrid metal matrix composites: Processing, properties, and applications"
+  },
+  "10.1016/j.jallcom.2007.01.127": {
+   "relevance": "高",
+   "reason": "界面反应控制",
+   "title": "Effect of controlled interfacial reaction on the microstructure and properties of the SiCp/Al composites prepared by pressureless infiltration"
+  },
+  "10.1016/j.jallcom.2007.07.032": {
+   "relevance": "低",
+   "reason": "石英",
+   "title": "A study on the formation of MgAl2O4 and MgO crystals in Al–Mg/quartz composite by differential thermal analysis"
+  },
+  "10.1016/j.jallcom.2007.10.055": {
+   "relevance": "高",
+   "reason": "近净成形无压浸渗",
+   "title": "Pressureless infiltration of liquid aluminum alloy into SiC preforms to form near-net-shape SiC/Al composites"
+  },
+  "10.1016/j.jallcom.2008.01.022": {
+   "relevance": "高",
+   "reason": "预制体强化方法",
+   "title": "Study on methods to strengthen SiC preforms for SiCp/Al composites by pressureless infiltration"
+  },
+  "10.1016/j.jallcom.2009.04.074": {
+   "relevance": "高",
+   "reason": "注射成形预制体无压浸渗",
+   "title": "Net-shape forming and properties of high volume fraction SiCp/Al composites"
+  },
+  "10.1016/j.jallcom.2011.04.136": {
+   "relevance": "低",
+   "reason": "镁基复合材料",
+   "title": "Fabrication of SiC particulate reinforced AZ91D composite by vacuum-assisted pressure infiltration technology"
+  },
+  "10.1016/j.jallcom.2015.03.166": {
+   "relevance": "低",
+   "reason": "哈氏合金",
+   "title": "Processing and microstructure characterization of SiCp/Hastelloy(Ni–Mo–Cr) composites prepared by pressureless infiltration"
+  },
+  "10.1016/j.jallcom.2015.04.194": {
+   "relevance": "高",
+   "reason": "稻壳灰梯度无压浸渗",
+   "title": "Effect of rice-husk ash on properties of laminated and functionally graded Al/SiC composites by one-step pressureless infiltration"
+  },
+  "10.1016/j.jallcom.2016.04.127": {
+   "relevance": "高",
+   "reason": "无压浸渗复合材料时效",
+   "title": "Aging behavior of high volume fraction SiCp/Al composites fabricated by pressureless infiltration"
+  },
+  "10.1016/j.jallcom.2016.09.284": {
+   "relevance": "低",
+   "reason": "B4C",
+   "title": "Tailoring microstructure and properties of bilayer-graded Al/B4C/MgAl2O4 composites by single-stage pressureless infiltration"
+  },
+  "10.1016/j.jallcom.2016.12.051": {
+   "relevance": "低",
+   "reason": "Si3N4稻壳灰",
+   "title": "Electrical and thermomechanical properties of CVI- Si3N4 porous rice husk ash infiltrated by Al-Mg-Si alloys"
+  },
+  "10.1016/j.jallcom.2018.07.355": {
+   "relevance": "低",
+   "reason": "放电等离子烧结，无浸渗",
+   "title": "Effect of oxidation of SiC particles on mechanical properties and wear behavior of SiCp/Al6061 composites"
+  },
+  "10.1016/j.jallcom.2023.169895": {
+   "relevance": "低",
+   "reason": "放电等离子烧结",
+   "title": "The interface reaction of SiC/Al composites by spark plasma sintering"
+  },
+  "10.1016/j.jallcom.2024.174775": {
+   "relevance": "低",
+   "reason": "超重力浸渗",
+   "title": "Influence of reinforcement with multimodal distribution on thermophysical properties and fracture behavior in Al-Si/SiC composites infiltrated under super-gravity field"
+  },
+  "10.1016/j.jallcom.2025.183797": {
+   "relevance": "低",
+   "reason": "粉末冶金",
+   "title": "Influence of processing routes and SiC volume percentage on microstructure, thermophysical, and mechanical properties of SiCp/Al-6061 composites"
+  },
+  "10.1016/j.jeurceramsoc.2008.06.007": {
+   "relevance": "中",
+   "reason": "SiC-B4C-Al浸渗，避免Al4C3",
+   "title": "Processing of silicon carbide–boron carbide–aluminium composites"
+  },
+  "10.1016/j.jmat.2023.07.012": {
+   "relevance": "中",
+   "reason": "3D网络SiC/Al，浸渗方式未说明",
+   "title": "Fabrication and evaluation of high-performance 3D interpenetrated network structures SiC/Al composites with high-purity plate-like α-SiC framework"
+  },
+  "10.1016/j.jmatprotec.2006.10.029": {
+   "relevance": "高",
+   "reason": "无压浸渗SiC类型",
+   "title": "Microstructure and impact behavior of Al/SiCp composites fabricated by pressureless infiltration with different types of SiCp"
+  },
+  "10.1016/j.jmrt.2023.04.246": {
+   "relevance": "中",
+   "reason": "真空压力浸渗预氧化界面",
+   "title": "Pre-oxidization of SiC on interfacial structure and mechanical properties of SiCp/Al composites prepared by vacuum-pressure infiltration"
+  },
+  "10.1016/j.jmrt.2023.05.118": {
+   "relevance": "中",
+   "reason": "3D互穿但压力浸渗",
+   "title": "The influence of particle surface oxidation treatment on microstructure and mechanical behavior of 3D-SiCp/A356 interpenetrating composites fabricated by pressure infiltration technique"
+  },
+  "10.1016/j.jmrt.2023.07.121": {
+   "relevance": "低",
+   "reason": "MgAl2O4在铝基复合材料中的作用综述",
+   "title": "Appearance of reinforcement, interfacial product, heterogeneous nucleant and grain refiner of MgAl2O4 in aluminium metal matrix composites"
+  },
+  "10.1016/j.jmrt.2023.11.107": {
+   "relevance": "中",
+   "reason": "超重力浸渗界面调控",
+   "title": "Interfacial regulation and fracture mechanism of Al–Si/SiC composites infiltrated under super-gravity field"
+  },
+  "10.1016/j.jmrt.2024.12.019": {
+   "relevance": "中",
+   "reason": "SiC/MoSi2基底润湿",
+   "title": "Effect of MoSi2 on the wettability of SiCp/MoSi2(p) substrates for prospective Al-based composites via pressureless infiltration"
+  },
+  "10.1016/j.matchar.2006.09.012": {
+   "relevance": "低",
+   "reason": "粉煤灰复合材料腐蚀",
+   "title": "Corrosion characteristics of hybrid Al/SiCp/MgAl2O4 composites fabricated with fly ash and recycled aluminum"
+  },
+  "10.1016/j.matchar.2024.114599": {
+   "relevance": "高",
+   "reason": "Al-Mg-Si在SiC上的润湿与界面反应",
+   "title": "Wettability and interfacial reactions in Al–Mg–Si/SiC and Al–Mg–Si/SiO2 systems"
+  },
+  "10.1016/j.matchemphys.2013.02.032": {
+   "relevance": "低",
+   "reason": "Si/Al气压浸渗",
+   "title": "Silicon dissolution and interfacial characteristics in Si/Al composites fabricated by gas pressure infiltration"
+  },
+  "10.1016/j.matdes.2009.03.009": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "The thermal conductivity of pressure infiltrated SiCp/Al composites with various size distributions: Experimental study and modeling"
+  },
+  "10.1016/j.matdes.2012.11.055": {
+   "relevance": "低",
+   "reason": "低压浸渗连接",
+   "title": "In situ joining of titanium to SiC/Al composites by low pressure infiltration"
+  },
+  "10.1016/j.matdes.2013.06.056": {
+   "relevance": "中",
+   "reason": "控制界面反应提升导热，浸渗方式未说明",
+   "title": "Enhanced thermal transfer and bending strength of SiC/Al composite with controlled interfacial reaction"
+  },
+  "10.1016/j.matdes.2015.09.149": {
+   "relevance": "低",
+   "reason": "B4C",
+   "title": "Surface chemistry modification for elimination of hydrophilic Al4C3 in B4C/Al composites"
+  },
+  "10.1016/j.matdes.2023.112495": {
+   "relevance": "中",
+   "reason": "激光增材预制体+真空压力浸渗",
+   "title": "Fabrication and characterization of SiC/Al composites prepared by laser powder bed fusion (LPBF) combined with vacuum pressure infiltration"
+  },
+  "10.1016/j.matlet.2005.10.106": {
+   "relevance": "低",
+   "reason": "压力容器浸渗",
+   "title": "Effect of alloying additions on the porosity of SiCp preforms infiltrated by aluminium"
+  },
+  "10.1016/j.matlet.2020.128068": {
+   "relevance": "低",
+   "reason": "ZrO2",
+   "title": "Interfacial research on interpenetrating network structure ZrO2/Al-Mg composites prepared by Extrusion Freeform Fabrication 3DP and pressureless infiltration"
+  },
+  "10.1016/j.mfglet.2026.07.099": {
+   "relevance": "高",
+   "reason": "3D打印SiC密度与浸渗",
+   "title": "Fabrication of SiC-Al composites using binder jetting 3D printing and infiltration: effects of printed sample density on infiltration"
+  },
+  "10.1016/j.msea.2004.12.051": {
+   "relevance": "低",
+   "reason": "等离子喷涂",
+   "title": "Effect of rolling on the thermo-physical properties of SiCp/Al composites fabricated by plasma spraying"
+  },
+  "10.1016/j.msea.2006.04.054": {
+   "relevance": "低",
+   "reason": "挤压态",
+   "title": "Thermal expansion anisotropy in extruded SiC particle reinforced 2080 aluminum alloy matrix composites"
+  },
+  "10.1016/j.msea.2006.08.056": {
+   "relevance": "高",
+   "reason": "预制体煅烧与无压浸渗",
+   "title": "Effect of calcination process on the properties and microstructure of SiC preform and corresponding SiCp/Al composites synthesis by pressureless infiltration"
+  },
+  "10.1016/j.msea.2007.12.028": {
+   "relevance": "低",
+   "reason": "SiC/Cu",
+   "title": "Thermo-physical and mechanical properties of high volume fraction SiCp/Cu composites prepared by pressureless infiltration"
+  },
+  "10.1016/j.msea.2008.02.025": {
+   "relevance": "低",
+   "reason": "Si3N4基底",
+   "title": "Reactive wetting and spreading of Al–Si–Mg alloys on Si3N4/Si substrates"
+  },
+  "10.1016/j.msea.2015.02.012": {
+   "relevance": "高",
+   "reason": "冷冻铸造层状预制体无压浸渗",
+   "title": "Lamellar-interpenetrated Al–Si–Mg/SiC composites fabricated by freeze casting and pressureless infiltration"
+  },
+  "10.1016/j.msea.2024.146811": {
+   "relevance": "中",
+   "reason": "3D-(SiC-Si3N4)/Al共连续，浸渗方式未说明",
+   "title": "Strong and tough 3D-(SiC–Si3N4)/Al co-continuous composite with enhanced interfaces"
+  },
+  "10.1016/j.mseb.2007.01.023": {
+   "relevance": "高",
+   "reason": "Si对界面反应与热物性",
+   "title": "Effect of Si addition to Al–8Mg alloy on the microstructure and thermo-physical properties of SiCp/Al composites prepared by pressureless infiltration"
+  },
+  "10.1016/j.mtcomm.2024.111313": {
+   "relevance": "中",
+   "reason": "SiCp/Al-Si-Mg，工艺未明",
+   "title": "Effects of SiC oxide morphology on bearing capacity of SiC and mechanical properties of SiCp/Al-Si-Mg composites"
+  },
+  "10.1016/j.pmatsci.2020.100684": {
+   "relevance": "低",
+   "reason": "已撤回的综述",
+   "title": "WITHDRAWN: Binder jet 3D printing – Process parameters, materials, properties, and challenges"
+  },
+  "10.1016/j.pmatsci.2020.100707": {
+   "relevance": "低",
+   "reason": "粘结剂喷射综述，未涉及浸渗",
+   "title": "Binder jet 3D printing—Process parameters, materials, properties, modeling, and challenges"
+  },
+  "10.1016/j.pnsc.2019.02.004": {
+   "relevance": "高",
+   "reason": "蜂窝SiC自发浸渗",
+   "title": "Preparation and anisotropic thermophysical properties of SiC honeycomb/Al-Mg-Si composite via spontaneous infiltration"
+  },
+  "10.1016/j.powtec.2007.02.008": {
+   "relevance": "高",
+   "reason": "双峰三峰颗粒无压浸渗",
+   "title": "Effect of bi- and trimodal size distribution on the superficial hardness of Al/SiCp composites prepared by pressureless infiltration"
+  },
+  "10.1016/j.powtec.2009.06.009": {
+   "relevance": "中",
+   "reason": "反应浸渗点蚀",
+   "title": "Effect of SiCp multimodal distribution on pitting behavior of Al/SiCp composites prepared by reactive infiltration"
+  },
+  "10.1016/j.scriptamat.2005.07.038": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "Effects of temperature on pressure infiltration of liquid Al and Al–12wt.%Si alloy into packed SiC particles"
+  },
+  "10.1016/j.wasman.2006.12.005": {
+   "relevance": "中",
+   "reason": "稻壳灰Al/SiCp降解",
+   "title": "Degradation of Al/SiCp composites produced with rice-hull ash and aluminum cans"
+  },
+  "10.1016/s0167-577x(02)00528-1": {
+   "relevance": "高",
+   "reason": "双层梯度无压浸渗",
+   "title": "Effect of processing parameters on the production of bilayer-graded Al/SiCp composites by pressureless infiltration"
+  },
+  "10.1016/s0167-577x(02)01142-4": {
+   "relevance": "高",
+   "reason": "Mg损失与浸渗动力学",
+   "title": "Effect of Mg loss on the kinetics of pressureless infiltration in the processing of Al–Si–Mg/SiCp composites"
+  },
+  "10.1016/s0167-577x(03)00323-9": {
+   "relevance": "高",
+   "reason": "工艺参数与浸渗程度",
+   "title": "Effect of processing parameters on the degree of infiltration of SiCp preforms by Al?Si?Mg alloys"
+  },
+  "10.1016/s0921-5093(00)01831-1": {
+   "relevance": "低",
+   "reason": "B4C",
+   "title": "Reaction products of Al–Mg/B4C composite fabricated by pressureless infiltration technique"
+  },
+  "10.1016/s0924-0136(00)00664-6": {
+   "relevance": "高",
+   "reason": "无压浸渗最优参数",
+   "title": "Optimum conditions for pressureless infiltration of SiCp preforms by aluminum alloys"
+  },
+  "10.1016/s1002-0071(12)60029-x": {
+   "relevance": "中",
+   "reason": "高导热金属基复合材料综述",
+   "title": "Review of metal matrix composites with high thermal conductivity for thermal management applications"
+  },
+  "10.1016/s1003-6326(11)61374-5": {
+   "relevance": "低",
+   "reason": "气压浸渗",
+   "title": "Microstructure and properties of Al/Si/SiC composites for electronic packaging"
+  },
+  "10.1016/s1003-6326(16)64382-0": {
+   "relevance": "低",
+   "reason": "再结晶",
+   "title": "Effect of Mg on nucleation process of recrystallization in Al–Mg–Si/SiCp composite"
+  },
+  "10.1016/s1003-6326(20)65310-9": {
+   "relevance": "中",
+   "reason": "真空压力浸渗",
+   "title": "Near-net shaped Al/SiCP composites via vacuum-pressure infiltration combined with gelcasting"
+  },
+  "10.1016/s1359-6454(01)00348-2": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "Pressure infiltration of liquid aluminium into packed SiC particulate with a bimodal size distribution"
+  },
+  "10.1016/s1359-6454(97)00265-6": {
+   "relevance": "中",
+   "reason": "抑制Al4C3的Si含量",
+   "title": "Prediction of Si contents to suppress the formation of Al4C3 in the SiCp/Al composite"
+  },
+  "10.1016/s1359-6454(97)00465-5": {
+   "relevance": "中",
+   "reason": "Si抑制界面反应",
+   "title": "Prediction of Si contents to suppress the interfacial reaction in the SiCp/2014 Al composite"
+  },
+  "10.1016/s1359-6454(97)84851-3": {
+   "relevance": "低",
+   "reason": "非浸渗工艺",
+   "title": "Effect of various processing methods on the interfacial reactions in SiCp/2024 Al composites"
+  },
+  "10.1016/s1359-6454(99)00318-3": {
+   "relevance": "低",
+   "reason": "压力浸渗综述",
+   "title": "Pressure infiltration of packed ceramic particulates by liquid metals"
+  },
+  "10.1016/s1359-6462(01)01148-4": {
+   "relevance": "高",
+   "reason": "界面TEM",
+   "title": "A TEM study of the microstructure of SiCp/Al composite prepared by pressureless infiltration method"
+  },
+  "10.1016/s1359-6462(96)00506-4": {
+   "relevance": "高",
+   "reason": "无摘要，标题为无压浸渗界面反应",
+   "title": "Interfacial reactions in SiCp/Al composite fabricated by pressureless infiltration"
+  },
+  "10.1016/s1359-835x(03)00142-8": {
+   "relevance": "中",
+   "reason": "真空浸渗",
+   "title": "Production and properties of SiCp-reinforced aluminium alloy composites"
+  },
+  "10.1016/s1875-5372(14)60154-5": {
+   "relevance": "高",
+   "reason": "无摘要，标题为β-SiCp/Al无压浸渗",
+   "title": "Process and Performance of β-SiCp/Al Prepared by Bottom-Vacuum Pressureless Infiltration"
+  },
+  "10.1016/s1875-5372(15)30066-7": {
+   "relevance": "高",
+   "reason": "无摘要，标题为无压浸渗SiCp/Al-7Si-5Mg热物性与反应",
+   "title": "Thermo-physical Properties and Reaction Process of SiCp/Al-7Si-5Mg Aluminum Matrix Composites Fabricated by Pressureless Infiltration"
+  },
+  "10.1023/a:1009421727757": {
+   "relevance": "高",
+   "reason": "无压浸渗工艺与润湿",
+   "title": "Processing of Al–SiCp Metal Matrix Composites by Pressureless Infiltration of SiCp Preforms"
+  },
+  "10.1023/a:1014395730170": {
+   "relevance": "高",
+   "reason": "Al-Mg无压浸渗与润湿",
+   "title": "The production of Al-Mg alloy/SiC metal matrix composites by pressureless infiltration"
+  },
+  "10.1023/a:1017978117837": {
+   "relevance": "高",
+   "reason": "AA6061无压浸渗",
+   "title": "Fabrication and characteristics of AA6061/SiCp composites by pressureless infiltration technique"
+  },
+  "10.1023/b:jmsc.0000012936.48243.3a": {
+   "relevance": "高",
+   "reason": "双层梯度无压浸渗Mg与SiC类型",
+   "title": "Effect of Mg and SiC type on the processing of two-layer Al/SiCp composites by pressureless infiltration"
+  },
+  "10.1038/s41598-019-56802-3": {
+   "relevance": "中",
+   "reason": "氮化诱导自发形成铝基复合材料，原理相近",
+   "title": "Aluminum Matrix Composites Manufactured using Nitridation-Induced Self-Forming Process"
+  },
+  "10.1038/s41598-024-67653-y": {
+   "relevance": "中",
+   "reason": "真空压力浸渗，界面反应控制",
+   "title": "Improving thermal conductivity of Al/SiC composites by post-oxidization of reaction-bonded silicon carbide preforms"
+  },
+  "10.1080/00150193.2019.1592539": {
+   "relevance": "低",
+   "reason": "高压烧结",
+   "title": "Microstructure of novel SiCp/Al-Si-Mg composites fabricated by high pressure sintering"
+  },
+  "10.1080/09243046.2025.2580101": {
+   "relevance": "高",
+   "reason": "CuO/NiO助剂无压浸渗",
+   "title": "Influence of CuO and NiO additives on the microstructure and properties of SiCp/Al composites fabricated by pressureless infiltration"
+  },
+  "10.1080/09276440.2018.1499326": {
+   "relevance": "低",
+   "reason": "铁基",
+   "title": "Study on the technology and performance of 3D-reticulated porous SiC/Fe composite material"
+  },
+  "10.1080/09500839.2026.2707940": {
+   "relevance": "低",
+   "reason": "搅拌铸造中的润湿",
+   "title": "Achieving intrinsic wetting of SiC in A356 Al alloy via mechanically dislocating the absorbed alumina film"
+  },
+  "10.1080/10426914.2017.1328122": {
+   "relevance": "低",
+   "reason": "压力浸渗综述",
+   "title": "Pressure infiltration processes to synthesize metal matrix composites – A review of metal matrix composites, the technology and process simulation"
+  },
+  "10.1080/10643389.2015.1077067": {
+   "relevance": "低",
+   "reason": "废弃物制备金属基复合材料综述",
+   "title": "Development of metal-matrix composites from industrial/agricultural waste materials and their derivatives"
+  },
+  "10.1080/10667857.2019.1702309": {
+   "relevance": "高",
+   "reason": "3D多孔SiC骨架自发浸渗",
+   "title": "Tailoring the thermophysical properties of porous SiC framework reinforced Al-Mg-Si composites by Si alloying content for thermal energy management"
+  },
+  "10.1080/13640461.2003.11819543": {
+   "relevance": "中",
+   "reason": "液态金属加工Al/SiCp",
+   "title": "Microstructural evolution in liquid metal processed Al-alloy/SiCp composites"
+  },
+  "10.1080/15685543.2013.763010": {
+   "relevance": "中",
+   "reason": "压力浸渗，氧化与界面",
+   "title": "The influence of SiCp oxidized on the interface layer and thermal conductivity of SiCp/Al composites"
+  },
+  "10.1081/amp-100108698": {
+   "relevance": "高",
+   "reason": "空气中无压浸渗电子封装Al-SiC",
+   "title": "Al–SiC ELECTRONIC PACKAGES WITH CONTROLLED THERMAL EXPANSION COEFFICIENT BY A NEW METHOD OF PRESSURELESS INFILTRATION"
+  },
+  "10.1081/amp-120005378": {
+   "relevance": "中",
+   "reason": "多孔陶瓷预制体反应自发浸渗，非SiC",
+   "title": "Spontaneous reactive infiltration of porous ceramic preforms with Al–Mg and Mg in the presence of both magnesium and nitrogen—new experimental evidence"
+  },
+  "10.1088/0022-3727/41/10/105403": {
+   "relevance": "高",
+   "reason": "无压浸渗高体积分数",
+   "title": "Aluminium matrix composites by pressureless infiltration: the metallurgical and physical properties"
+  },
+  "10.1088/0022-3727/42/17/175504": {
+   "relevance": "高",
+   "reason": "无压浸渗Al-Si/SiC弹性模量",
+   "title": "Elastic modulus of Al–Si/SiC metal matrix composites as a function of volume fraction"
+  },
+  "10.1088/1742-6596/3102/1/012006": {
+   "relevance": "高",
+   "reason": "无压浸渗大坯料中Ti抑制界面反应",
+   "title": "Effect of Ti addition in the matrix on the microstructure and properties of SiCp/Al composites"
+  },
+  "10.1088/1742-6596/3182/1/012005": {
+   "relevance": "高",
+   "reason": "SiC/Al无压浸渗工艺参数",
+   "title": "Study on the Effect of Process Parameters on the Pressureless Impregnation Behavior of SiC/Al Composites"
+  },
+  "10.1088/2053-1591/aa93b5": {
+   "relevance": "中",
+   "reason": "振动辅助浸渗镀镍",
+   "title": "The influence of nickel coating on the interface of pressureless infiltrated with vibration Al–SiC composites"
+  },
+  "10.1108/13565361011009487": {
+   "relevance": "高",
+   "reason": "无压浸渗Al-Si/SiC",
+   "title": "Aluminium‐silicon alloy and its composites reinforces by silicon carbide particles"
+  },
+  "10.1111/j.1151-2916.1996.tb07886.x": {
+   "relevance": "中",
+   "reason": "Al-40Si高温自发浸渗，体系偏离",
+   "title": "Spontaneous Infiltration of Aluminum‐Silicon Alloy into Silicon Carbide Preforms in Air"
+  },
+  "10.1111/j.1151-2916.2001.tb00607.x": {
+   "relevance": "不相关",
+   "reason": "TiC-Ni3Al",
+   "title": "Processing and Microstructure Development of Titanium Carbide–Nickel Aluminide Composites Prepared by Melt Infiltration/Sintering (MIS)"
+  },
+  "10.1111/j.1151-2916.2001.tb00764.x": {
+   "relevance": "中",
+   "reason": "界面反应与导热，工艺未明",
+   "title": "Effect of Interfacial Reaction on the Thermal Conductivity of Al–SiC Composites with SiC Dispersions"
+  },
+  "10.1111/j.1551-2916.2010.04157.x": {
+   "relevance": "中",
+   "reason": "Al-Mg合金在SiC上的润湿，未涉及浸渗",
+   "title": "Wettability of Aluminum–Magnesium Alloys on Silicon Carbide Substrates"
+  },
+  "10.1111/j.1551-2916.2012.05347.x": {
+   "relevance": "中",
+   "reason": "互穿用多孔SiC预制体",
+   "title": "Processing and Elastic Property Characterization of Porous SiC Preform for Interpenetrating Metal/Ceramic Composites"
+  },
+  "10.1111/j.1744-7402.2007.02177.x": {
+   "relevance": "低",
+   "reason": "Al2O3/SiC耐火材料润湿",
+   "title": "Wetting and Reaction Characteristics of Al 2 O 3 /SiC Composite Refractories by Molten Aluminum and Aluminum Alloy"
+  },
+  "10.1142/s0218625x18500890": {
+   "relevance": "中",
+   "reason": "振动辅助浸渗泡沫预制体",
+   "title": "VIBRATION EFFECTS ON THE FABRICATION AND THE INTERFACE OF Al–SiC COMPOSITE PRODUCED BY THE PRESSURELESS INFILTRATION METHOD"
+  },
+  "10.1155/2015/351780": {
+   "relevance": "高",
+   "reason": "镀镍SiCp无压浸渗导热",
+   "title": "The Microstructure and Thermal Conductivity of Pressureless Infiltrated SiCp/Al Composites Containing Electroless Nickel Platings"
+  },
+  "10.1166/193666112800851111": {
+   "relevance": "高",
+   "reason": "无摘要，SiC/Al无压浸渗",
+   "title": "Study on the SiC/Al Composite Prepared by Pressureless Infiltration"
+  },
+  "10.1177/002199803035181": {
+   "relevance": "低",
+   "reason": "搅拌铸造",
+   "title": "The Effect of Si and Mg on Age Hardening Behavior of Al-SiCp Composites"
+  },
+  "10.1177/0021998308092195": {
+   "relevance": "低",
+   "reason": "挤压铸造",
+   "title": "Squeeze Casting of Ni Coated SiC Particle Reinforced Al Based Composite"
+  },
+  "10.1177/0021998314568166": {
+   "relevance": "中",
+   "reason": "熔铝浸渗SiC预制体，工艺未明",
+   "title": "Properties of SiC p /6061-Al metal matrix composites prepared by infiltrating molten aluminum into ternary packing of SiC preforms"
+  },
+  "10.1177/0021998315571028": {
+   "relevance": "低",
+   "reason": "粉末热挤压，无浸渗",
+   "title": "The effect of a particle–matrix interface on the Young’s modulus of Al–SiC composites"
+  },
+  "10.1177/0021998318769993": {
+   "relevance": "低",
+   "reason": "B4C",
+   "title": "Bilayer graded Al/B 4 C/rice husk ash composite: Wettability behavior, thermo-mechanical, and electrical properties"
+  },
+  "10.1177/02670836241301975": {
+   "relevance": "高",
+   "reason": "MnO2助剂无压浸渗高体积分数",
+   "title": "Effect of MnO 2 addition on the microstructure and properties of high-volume fraction SiC p /Al composites fabricated by pressureless melt infiltration"
+  },
+  "10.1179/026708300101508586": {
+   "relevance": "高",
+   "reason": "Mg/Si外加掺杂无压浸渗",
+   "title": "Role of Mg and Mg+Si as external dopants in production of pure Al–SiC metal matrix composites by pressureless infiltration"
+  },
+  "10.1179/026708303225004396": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "Pressure infiltration casting process and thermophysical properties of high volume fraction SiCp/Al metal matrix composites"
+  },
+  "10.1179/1432891715z.0000000001914": {
+   "relevance": "高",
+   "reason": "SiC纯化后无压浸渗",
+   "title": "SiCp surface purification treatment for fabrication of aluminium matrix composites"
+  },
+  "10.1179/1432891715z.0000000001940": {
+   "relevance": "高",
+   "reason": "无压浸渗孔隙分析",
+   "title": "Analysis of porosity in high volume fraction SiCp/Al composites fabricated by pressureless infiltration"
+  },
+  "10.1179/174328407x168847": {
+   "relevance": "低",
+   "reason": "金刚石",
+   "title": "Microstructure and physical properties of Al/diamond composite fabricated by pressureless infiltration"
+  },
+  "10.1179/174328408x332799": {
+   "relevance": "低",
+   "reason": "爆炸压实",
+   "title": "Interfacial characterisation in Al–20 vol.-%SiCp explosively compacted composite"
+  },
+  "10.1179/1743284712y.0000000152": {
+   "relevance": "中",
+   "reason": "Cu-Al基体无压浸渗",
+   "title": "Fabrication of SiCp/Cu–Al electronic packaging material by pressureless infiltration method"
+  },
+  "10.1504/ijmpt.2002.001309": {
+   "relevance": "低",
+   "reason": "二氧化硅反应渗透",
+   "title": "Processing of co-continuous ceramic composites by reactive penetration method: influence of composition of ceramic preforms and infiltrating alloys"
+  },
+  "10.1515/rams-2022-0271": {
+   "relevance": "低",
+   "reason": "非氧化物增强体综述",
+   "title": "Analysis of the interactions between nonoxide reinforcements and Al–Si–Cu–Mg matrices"
+  },
+  "10.1515/rams-2023-0158": {
+   "relevance": "中",
+   "reason": "电子封装SiCp/Al综述",
+   "title": "Latest research progress of SiCp/Al composite for electronic packaging"
+  },
+  "10.1557/jmr.1995.2415": {
+   "relevance": "高",
+   "reason": "空气中快速无压浸渗",
+   "title": "SiC–Al–Si composites by rapid pressureless infiltration in air"
+  },
+  "10.1557/jmr.1996.0130": {
+   "relevance": "高",
+   "reason": "空气中Al-Si自发浸渗SiC机理",
+   "title": "The mechanism of spontaneous infiltration of Al–Si alloy into SiC preform in air"
+  },
+  "10.1557/jmr.2001.0060": {
+   "relevance": "中",
+   "reason": "氧化SiC反应浸渗",
+   "title": "Joining characteristics of oxidized SiC particles reinforced Al–Mg matrix composite prepared by reaction infiltration processing"
+  },
+  "10.1557/jmr.2001.0399": {
+   "relevance": "低",
+   "reason": "Al2O3预制体",
+   "title": "New technique for pressureless infiltration of Al alloys into Al 2 O 3 preforms"
+  },
+  "10.1557/jmr.2007.0282": {
+   "relevance": "中",
+   "reason": "压力浸渗中的润湿",
+   "title": "Wettability in pressure infiltration of SiC and oxidized SiC particle compacts by molten Al and Al-12wt%Si alloy"
+  },
+  "10.1557/opl.2012.316": {
+   "relevance": "高",
+   "reason": "无摘要，无辅助浸渗Al/SiCp",
+   "title": "EFFECT OF HEAT TREATMENTS ON THE MICROSTRUCTURE AND PROPERTIES OF Al/SiCp COMPOSITES PREPARED BY NON-ASSISTED INFILTRATION"
+  },
+  "10.1557/opl.2016.68": {
+   "relevance": "低",
+   "reason": "B4C",
+   "title": "Microstructure and properties of bilayer-graded Al-matrix composites by one-step pressureless infiltration of B4C/rice-husk ash preforms"
+  },
+  "10.1557/proc-702-u8.6.1": {
+   "relevance": "高",
+   "reason": "无摘要，Al-Mg无压浸渗",
+   "title": "Infiltration of Al-Mg Alloy into SiC Preform in the Production of Metal Matrix Composites by Pressureless Infiltration"
+  },
+  "10.1557/s43580-024-01066-x": {
+   "relevance": "低",
+   "reason": "镁基",
+   "title": "Fabrication of a metal matrix composite Mg-AZ91E/SiC by spontaneous infiltration"
+  },
+  "10.1590/s1517-70762010000200021": {
+   "relevance": "高",
+   "reason": "二氧化硅包覆SiC反应浸渗",
+   "title": "Young's modulus of Al/SiC P/MgAl2O4 composites with different particle size distribution of reinforcements"
+  },
+  "10.1680/jemmr.20.00196": {
+   "relevance": "高",
+   "reason": "海绵复制多孔SiC浸渗AlSi10Mg",
+   "title": "AlSi10Mg alloy infiltration into porous SiC structures manufactured by sponge replication"
+  },
+  "10.2139/ssrn.4902825": {
+   "relevance": "中",
+   "reason": "无摘要，SiCp/Al-Si-Mg界面",
+   "title": "Promotion of Sic Load Bearing Induced by Sic/Matrix Interface Strengthening in Sicp/Al-Si-Mg Composites"
+  },
+  "10.2139/ssrn.5861190": {
+   "relevance": "中",
+   "reason": "无摘要，标题为3D打印SiC+Al浸渗",
+   "title": "Fabrication of SiC-Aluminum Composites via Binder Jetting 3D Printing and Infiltration: Effects of Sintering Temperature and Time"
+  },
+  "10.2320/jinstmet.68.1047": {
+   "relevance": "低",
+   "reason": "低压浸渗纤维Al-Cu",
+   "title": "Microstructure Control of Fiber Reinforced Metal Matrix Composites Fabricated by Low Pressure Infiltration Process"
+  },
+  "10.2320/jinstmet.j2015065": {
+   "relevance": "低",
+   "reason": "碳纳米纤维",
+   "title": "Fabrication of Al-Coated CNF Reinforced Aluminum Matrix Composite by Pressureless Infiltration"
+  },
+  "10.2320/matertrans.45.1769": {
+   "relevance": "低",
+   "reason": "低压浸渗",
+   "title": "Thermal Expansion Behavior of SiCP/Aluminum Alloy Composites Fabricated by a Low-Pressure Infiltration Process"
+  },
+  "10.3139/146.111422": {
+   "relevance": "高",
+   "reason": "无压浸渗动力学",
+   "title": "Investigation into the kinetic behavior of molten aluminum pressureless infiltration into SiC preforms"
+  },
+  "10.3365/met.mat.2008.08.419": {
+   "relevance": "低",
+   "reason": "Al2O3预制体",
+   "title": "Effects of the Injection Temperature of N2 Gas on Pressureless Infiltration for Fabricating Al-Mg/Al2O3 Composites"
+  },
+  "10.3390/cryst11050515": {
+   "relevance": "中",
+   "reason": "真空压力浸渗",
+   "title": "The Preparation of High-Volume Fraction SiC/Al Composites with High Thermal Conductivity by Vacuum Pressure Infiltration"
+  },
+  "10.3390/jcs10060318": {
+   "relevance": "低",
+   "reason": "烧结无浸渗",
+   "title": "Fabrication of Silicon Carbide–Aluminum Composites Using Binder Jetting Additive Manufacturing Followed by Sintering Without Infiltration: A Preliminary Study"
+  },
+  "10.3390/jcs10090480": {
+   "relevance": "高",
+   "reason": "Mg含量与浸渗温度",
+   "title": "Fabrication of SiC/Al-Mg Composites via Binder Jetting 3D Printing and Infiltration: Effects of Mg Content and Infiltration Temperature"
+  },
+  "10.3390/ma17071608": {
+   "relevance": "高",
+   "reason": "Ti掺杂改善润湿",
+   "title": "Effect of Ti Doping on the Microstructure and Properties of SiCp/Al Composites by Pressureless Infiltration"
+  },
+  "10.3390/met11071034": {
+   "relevance": "低",
+   "reason": "金属基复合材料润湿综述",
+   "title": "Wettability in Metal Matrix Composites"
+  },
+  "10.3390/met6120311": {
+   "relevance": "低",
+   "reason": "触变成形",
+   "title": "Effect of Remelting Duration on Microstructure and Properties of SiCp/Al Composite Fabricated by Powder-Thixoforming for Electronic Packaging"
+  },
+  "10.3390/met9111195": {
+   "relevance": "中",
+   "reason": "浸渗AlSi但工艺不明",
+   "title": "Damping Capacity and Storage Modulus of SiC Matrix Composites Infiltrated by AlSi Alloy"
+  },
+  "10.3724/sp.j.1077.2012.00353": {
+   "relevance": "高",
+   "reason": "氧化SiC无压浸渗",
+   "title": "Fabrication of Oxidized SiC Particles Reinforced Aluminum Matrix Composite by Pressureless Infiltration Technique"
+  },
+  "10.4028/www.scientific.net/amm.787.553": {
+   "relevance": "中",
+   "reason": "Al-Mg-Si/SiCp加工",
+   "title": "Effect of Magnesium Addition on Processing the Al-0.8 Mg-0.7 Si/SiCp Metal Matrix Composites"
+  },
+  "10.4028/www.scientific.net/amr.239-242.1832": {
+   "relevance": "中",
+   "reason": "压力浸渗",
+   "title": "Thermo-Physical Properties of SiCAl Composites with High Volume Fraction of Reinforcement Prepared by Combining Powder Injection Molding and Pressure Infiltration"
+  },
+  "10.4028/www.scientific.net/amr.277.21": {
+   "relevance": "高",
+   "reason": "自发浸渗Al-Si/SiC",
+   "title": "Al-Si/SiC Metal Matrix Composites Produced by Spontaneous Infiltration"
+  },
+  "10.4028/www.scientific.net/amr.490-495.3816": {
+   "relevance": "高",
+   "reason": "空气中无压浸渗β-SiCp/Al",
+   "title": "The Research of β-SiCp/Al Electronic Packaging Composites Fabricated by Pressureless Infiltrating"
+  },
+  "10.4028/www.scientific.net/amr.626.948": {
+   "relevance": "高",
+   "reason": "聚苯乙烯粘结剂无压浸渗",
+   "title": "Material Characterization of Al-Si/SiCpp Composite via Pressureless Infiltration Using Polystyrene as External Binder"
+  },
+  "10.4028/www.scientific.net/kem.249.45": {
+   "relevance": "高",
+   "reason": "高体积分数无压浸渗",
+   "title": "High Volume Fraction SiCp/Al Composites Prepared by Pressureless Melt Infiltration: Processing, Properties and Applications"
+  },
+  "10.4028/www.scientific.net/kem.353-358.1318": {
+   "relevance": "高",
+   "reason": "无压浸渗组织与硬度",
+   "title": "Microstructure and Hardness Performance of a SiCp/Al Composite by Pressureless Infiltration Technique"
+  },
+  "10.4028/www.scientific.net/msf.1035.906": {
+   "relevance": "中",
+   "reason": "液相浸渗综述",
+   "title": "Research Progress on Preparation of SiC/Al for Electronic Packaging by Liquid Infiltration"
+  },
+  "10.4028/www.scientific.net/msf.475-479.913": {
+   "relevance": "低",
+   "reason": "压力浸渗",
+   "title": "Manufacture of Al/SiC Composites by Pressure Infiltration Process"
+  },
+  "10.4028/www.scientific.net/msf.546-549.1597": {
+   "relevance": "高",
+   "reason": "电子封装无压浸渗",
+   "title": "Microstructural Characterization and Properties of SiC/Al Composites for Electronic Packaging Fabricated by Pressureless Infiltration"
+  },
+  "10.4028/www.scientific.net/msf.561-565.765": {
+   "relevance": "不相关",
+   "reason": "镁基",
+   "title": "Effect of Aluminum Addition on Thermal Properties of Mg/SiCP Composites"
+  },
+  "10.4028/www.scientific.net/msf.569.189": {
+   "relevance": "高",
+   "reason": "高体积分数无压浸渗",
+   "title": "A Study on the SiC/Al Composites Fabricated by Pressureless Infiltration"
+  },
+  "10.4028/www.scientific.net/msf.610-613.546": {
+   "relevance": "高",
+   "reason": "Mg/Si对无压浸渗热物性",
+   "title": "Influence of Mg and Si in the Aluminum on the Thermo-Physical Properties of Pressureless Infiltrated SiCp/Al Composites"
+  },
+  "10.4028/www.scientific.net/msf.755.9": {
+   "relevance": "高",
+   "reason": "无压浸渗复合材料中Al4C3消除",
+   "title": "Elimination of Al4C3 Phase in Al/SiCP Composites by HYSYCVD"
+  },
+  "10.4028/www.scientific.net/msf.819.220": {
+   "relevance": "高",
+   "reason": "聚苯乙烯粘结剂无压浸渗",
+   "title": "Sic-Reinforced Aluminum-Silicon Composite via Pressureless Infiltration Using Polystyrene as External Binder for Electronic Assemblies"
+  },
+  "10.4271/940808": {
+   "relevance": "中",
+   "reason": "润湿性研究",
+   "title": "The Wettability of Silicon Carbide by Liquid Pure Aluminum and Aluminum Alloys"
+  },
+  "10.5772/intechopen.98677": {
+   "relevance": "低",
+   "reason": "综述性书章",
+   "title": "Advanced Composites with Aluminum Alloys Matrix and Their Fabrication Processes"
+  },
+  "10.6028/nist.ir.4992": {
+   "relevance": "不相关",
+   "reason": "能源材料需求评估",
+   "title": "An assessment of fossil energy materials research needs"
+  },
+  "10.82308/4902": {
+   "relevance": "低",
+   "reason": "真空浸渗涂层颗粒",
+   "title": "Infiltration processing of metal matrix composites using coated ceramic particulates"
+  }
+ }
+}

@@ -140,5 +140,25 @@
       "year": 2021,
       "title": "Fabrication of 3D-SiC/aluminum alloy interpenetrating composites by DIW and pressureless infiltration"
     }
-  ]
+  ],
+  "deep_search": {
+    "question": "无压浸渗法制备 SiC/Al 复合材料：铝合金自发浸渗 SiC 预制体（颗粒堆积、三维网络或互穿结构、增材制造预制体），涉及润湿以及 Si、Mg 的作用、界面反应（Al4C3）的控制、工艺条件，以及导热和力学等性能。",
+    "queries": [
+      "pressureless infiltration SiC aluminum",
+      "spontaneous infiltration aluminum alloy silicon carbide preform",
+      "wetting aluminum silicon carbide magnesium silicon infiltration",
+      "Al4C3 interfacial reaction SiC/Al composites",
+      "3D-SiC network aluminum interpenetrating composite",
+      "SiC preform additive manufacturing aluminum infiltration",
+      "SiCp/Al composites thermal conductivity",
+      "Al-Si-Mg alloy infiltration SiC",
+      "Al/SiC composite pressureless infiltration"
+    ],
+    "core_terms": [
+      "Al|aluminum SiC"
+    ],
+    "year_from": null,
+    "year_to": null,
+    "note": "Parameters of the 2026-10-16 runs, for scripts/eval_deep_search.py"
+  }
 }

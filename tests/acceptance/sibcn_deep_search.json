@@ -43,5 +43,28 @@
       "zotero_key": "G5D8TSKY",
       "title": "Graphite-assisted structural design of hierarchically porous SiC(rGO) PDCs with excellent capacity in thermal protection/insulation and load bearing for hypersonic vehicles"
     }
-  ]
+  ],
+  "deep_search": {
+    "question": "先驱体陶瓷（PDCs），尤其 SiBCN 的制备与应用：前驱体合成与转化、隔热/防热、吸波、成型（3D 打印、纤维、气凝胶、块体）",
+    "queries": [
+      "polymer-derived SiBCN ceramics",
+      "polyborosilazane precursor SiBCN",
+      "SiBCN aerogel thermal insulation",
+      "SiBCN electromagnetic wave absorption",
+      "SiBCN ceramic 3D printing preceramic polymer",
+      "SiBCN high temperature oxidation resistance",
+      "SiBCN fibers",
+      "SiBN SiBCN thermal protection composite"
+    ],
+    "core_terms": [
+      "SiBCN|SiBNC|silicoboron|borosilazane"
+    ],
+    "year_from": null,
+    "year_to": null,
+    "note": "Parameters of the 2026-10-16 runs, for scripts/eval_deep_search.py",
+    "seeds": [
+      "10.1016/j.ceramint.2024.08.002",
+      "10.1016/j.jeurceramsoc.2018.06.046"
+    ]
+  }
 }

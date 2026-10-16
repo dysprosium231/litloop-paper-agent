@@ -900,5 +900,25 @@
         "title": "Differential hysteresis scanning of non-templated monomodal amorphous aerogels"
       }
     ]
+  },
+  "deep_search": {
+    "question": "聚合物先驱体转化（PDC）路线制备的陶瓷气凝胶（SiOC、SiCN、SiOCN、SiBCN、SiC 等）：前驱体与凝胶化、干燥、热解与结构演变，以及隔热、吸波、储能、吸附、催化等应用。",
+    "queries": [
+      "polymer-derived ceramic aerogel",
+      "SiOC aerogel silicon oxycarbide",
+      "SiCN aerogel polysilazane",
+      "preceramic polymer aerogel pyrolysis",
+      "SiBCN aerogel",
+      "SiC aerogel polycarbosilane",
+      "polymer-derived ceramic aerogel electromagnetic wave absorption",
+      "SiOC aerogel thermal insulation"
+    ],
+    "core_terms": [
+      "aerogel SiOC|SiCN|SiOCN|SiBCN|SiC|oxycarbide|carbonitride",
+      "aerogel polymer-derived|preceramic|polysiloxane|polysilazane|polycarbosilane"
+    ],
+    "year_from": null,
+    "year_to": 2021,
+    "note": "Parameters of the 2026-10-16 runs, for scripts/eval_deep_search.py"
   }
 }

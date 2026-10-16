@@ -1,0 +1,1221 @@
+{
+ "set": "pdc_aerogel_review",
+ "note": "Agent ratings collected during the 2026-10-15/16 deep-search runs; later runs override earlier ones. Used by scripts/eval_deep_search.py to replay a run without re-rating.",
+ "judgments": {
+  "10.1002/9781119217619.ch13": {
+   "relevance": "低",
+   "reason": "纤维素气凝胶",
+   "title": "Cellulose Nanofibrils: From Hydrogels to Aerogels"
+  },
+  "10.1002/9783527680054.ch15": {
+   "relevance": "低",
+   "reason": "书章",
+   "title": "Nanoporous Carbide‐Derived Carbons as Electrode Materials in Electrochemical Double‐Layer Capacitors"
+  },
+  "10.1002/adem.201400134": {
+   "relevance": "高",
+   "reason": "聚碳硅烷热解SiC/C气凝胶",
+   "title": "Novel SiC/C Aerogels Through Pyrolysis of Polycarbosilane Precursors"
+  },
+  "10.1002/adem.201701130": {
+   "relevance": "高",
+   "reason": "SiOCN气凝胶吸附Cr",
+   "title": "Reactive Atmosphere Synthesis of Polymer‐Derived Si–O–C–N Aerogels and Their Cr Adsorption from Aqueous Solutions"
+  },
+  "10.1002/adem.201701168": {
+   "relevance": "低",
+   "reason": "致密SiBCN吸波",
+   "title": "Excellent Electromagnetic Wave Absorption of Iron‐Containing SiBCN Ceramics at 1158 K High‐Temperature"
+  },
+  "10.1002/adfm.202004348": {
+   "relevance": "低",
+   "reason": "碳化物衍生碳",
+   "title": "Toward High‐Performance Capacitive Potassium‐Ion Storage: A Superior Anode Material from Silicon Carbide‐Derived Carbon with a Well‐Developed Pore Structure"
+  },
+  "10.1002/advs.201901220": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "Silicon Oxycarbide—Tin Nanocomposite as a High‐Power‐Density Anode for Li‐Ion Batteries"
+  },
+  "10.1002/aenm.201300645": {
+   "relevance": "中",
+   "reason": "聚碳硅烷纳米浇铸碳化物衍生碳泡沫，非气凝胶",
+   "title": "Hierarchical Carbide‐Derived Carbon Foams with Advanced Mesostructure as a Versatile Electrochemical Energy‐Storage Material"
+  },
+  "10.1002/agt2.30": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Recent advances in novel aerogels through the hybrid aggregation of inorganic nanomaterials and polymeric fibers for thermal insulation"
+  },
+  "10.1002/anie.201200024": {
+   "relevance": "低",
+   "reason": "碳化物衍生碳",
+   "title": "Carbide‐Derived Carbon Monoliths with Hierarchical Pore Architectures"
+  },
+  "10.1002/batt.201800051": {
+   "relevance": "低",
+   "reason": "电化学",
+   "title": "Influence of Nitrogen‐Doping for Carbide‐Derived Carbons on the Supercapacitor Performance in an Organic Electrolyte and an Ionic Liquid"
+  },
+  "10.1002/macp.201900380": {
+   "relevance": "高",
+   "reason": "含硫交联先驱体气凝胶",
+   "title": "Novel Sulfur‐Containing Cross‐Linking Agent for Si‐Based Preceramic Polymers"
+  },
+  "10.1007/978-1-4419-7589-8_22": {
+   "relevance": "低",
+   "reason": "无摘要，气凝胶力学通论",
+   "title": "Mechanical Characterization of Aerogels"
+  },
+  "10.1007/978-3-030-12057-3_11": {
+   "relevance": "低",
+   "reason": "致密PDC热电",
+   "title": "Polymer-Derived Ceramics: A Novel Inorganic Thermoelectric Material System"
+  },
+  "10.1007/978-3-030-38144-8_14": {
+   "relevance": "低",
+   "reason": "书章",
+   "title": "Applications of Sol-Gel Processing"
+  },
+  "10.1007/978-3-319-19454-7_121-1": {
+   "relevance": "低",
+   "reason": "书章，无摘要",
+   "title": "Aerogels from Preceramic Polymers"
+  },
+  "10.1007/978-3-319-32101-1_121": {
+   "relevance": "低",
+   "reason": "书章",
+   "title": "Aerogels from Preceramic Polymers"
+  },
+  "10.1007/978-3-319-32101-1_27": {
+   "relevance": "低",
+   "reason": "书章",
+   "title": "Aerogel Processing"
+  },
+  "10.1007/978-3-662-53804-3_9": {
+   "relevance": "低",
+   "reason": "生物聚合物",
+   "title": "Porous Structures from Bio-Based Polymers via Supercritical Drying"
+  },
+  "10.1007/978-981-13-0110-0_11": {
+   "relevance": "低",
+   "reason": "无摘要，致密SiCN吸波",
+   "title": "Microwave Absorbing Performance on Polymer-Derived SiCN Ceramics Doped with Rare Earth Oxides"
+  },
+  "10.1007/bf00351300": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Effect of solvents and catalysts on monolithicity and physical properties of silica aerogels"
+  },
+  "10.1007/bfb0036965": {
+   "relevance": "低",
+   "reason": "无摘要，气凝胶通论",
+   "title": "Aerogels—Preparation, properties, applications"
+  },
+  "10.1007/s10853-010-4708-9": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Fabrication of ceramic components with hierarchical porosity"
+  },
+  "10.1007/s10853-020-05247-5": {
+   "relevance": "低",
+   "reason": "Si3N4纳米毡",
+   "title": "Si3N4 nanofelts/paraffin composites as novel thermal energy storage architecture"
+  },
+  "10.1007/s10934-010-9366-4": {
+   "relevance": "低",
+   "reason": "MTES二氧化硅气凝胶",
+   "title": "High surface area methyltriethoxysilane-derived aerogels by ambient pressure drying"
+  },
+  "10.1007/s10934-012-9660-4": {
+   "relevance": "中",
+   "reason": "RF/SiO2碳热还原",
+   "title": "Synthesis and characterization of monolithic carbon/silicon carbide composite aerogels"
+  },
+  "10.1007/s10971-013-3118-2": {
+   "relevance": "中",
+   "reason": "杂化凝胶热解硅碳气凝胶",
+   "title": "Gels dried under supercritical and ambient conditions: a comparative study and their subsequent conversion to silica–carbon composite aerogels"
+  },
+  "10.1007/s10971-014-3593-0": {
+   "relevance": "低",
+   "reason": "杂化二氧化硅气凝胶",
+   "title": "One-pot synthesis and characterization of acid-catalyzed melamine formaldehyde/SiO2 aerogel via sol–gel technology"
+  },
+  "10.1007/s10971-017-4442-8": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Silica nanowires reinforced self-hydrophobic silica aerogel derived from crosslinking of propyltriethoxysilane and tetraethoxysilane"
+  },
+  "10.1007/s10971-018-4769-9": {
+   "relevance": "低",
+   "reason": "聚脲气凝胶",
+   "title": "Freeze-drying method as a new approach to the synthesis of polyurea aerogels from isocyanate and water"
+  },
+  "10.1007/s10971-018-4851-3": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "HNTs/SiO2 dual-network aerogels with improved strength and thermal insulation"
+  },
+  "10.1007/s10971-019-04916-5": {
+   "relevance": "中",
+   "reason": "碳热还原气凝胶",
+   "title": "Multifunctional C/SiO2/SiC-based aerogels and composites for thermal insulators and electromagnetic interference shielding"
+  },
+  "10.1007/s11356-018-1367-x": {
+   "relevance": "中",
+   "reason": "多孔PDC吸附",
+   "title": "Regenerable, innovative porous silicon-based polymer-derived ceramics for removal of methylene blue and rhodamine B from textile and environmental waters"
+  },
+  "10.1007/s40145-019-0328-2": {
+   "relevance": "低",
+   "reason": "泡沫",
+   "title": "Porous SiC/melamine-derived carbon foam frameworks with excellent electromagnetic wave absorbing capacity"
+  },
+  "10.1007/s40145-019-0335-3": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Organosilicon polymer-derived ceramics: An overview"
+  },
+  "10.1007/s40145-020-0401-x": {
+   "relevance": "低",
+   "reason": "致密SiC吸波",
+   "title": "Role of in-situ formed free carbon on electromagnetic absorption properties of polymer-derived SiC ceramics"
+  },
+  "10.1007/s40145-021-0501-2": {
+   "relevance": "低",
+   "reason": "PIP致密SiCN",
+   "title": "Formation of nanocrystalline graphite in polymer-derived SiCN by polymer infiltration and pyrolysis at a low temperature"
+  },
+  "10.1007/s40145-021-0510-1": {
+   "relevance": "高",
+   "reason": "SiCNO气凝胶吸波",
+   "title": "Microwave induced in-situ formation of SiC nanowires on SiCNO ceramic aerogels with excellent electromagnetic wave absorption performance"
+  },
+  "10.1007/s40828-016-0024-6": {
+   "relevance": "低",
+   "reason": "书章",
+   "title": "Ceramic synthesis from condensed phases"
+  },
+  "10.1007/s43207-019-00002-2": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Composites of silica aerogels with organics: a review of synthesis and mechanical properties"
+  },
+  "10.1016/j.actamat.2014.03.049": {
+   "relevance": "低",
+   "reason": "致密SiCN",
+   "title": "Quantitative study on structural evolutions and associated energetics in polysilazane-derived amorphous silicon carbonitride ceramics"
+  },
+  "10.1016/j.apcatb.2011.12.036": {
+   "relevance": "中",
+   "reason": "介孔PDC复合，非气凝胶",
+   "title": "Template-free synthesis of polymer-derived mesoporous SiOC/TiO2 and SiOC/N-doped TiO2 ceramic composites for application in the removal of organic dyes from contaminated water"
+  },
+  "10.1016/j.apcatb.2018.06.061": {
+   "relevance": "低",
+   "reason": "纳米线",
+   "title": "High performance hierarchical SiCN nanowires for efficient photocatalytic - photoelectrocatalytic and supercapacitor applications"
+  },
+  "10.1016/j.apt.2020.02.028": {
+   "relevance": "低",
+   "reason": "SiBCN粉体",
+   "title": "Facile synthesis of SiBCN powders by a carbonitriding route"
+  },
+  "10.1016/j.carbon.2007.09.041": {
+   "relevance": "低",
+   "reason": "碳化物衍生碳",
+   "title": "Synthesis and characterisation of nanoporous carbide-derived carbon by chlorination of vanadium carbide"
+  },
+  "10.1016/j.carbon.2009.09.004": {
+   "relevance": "中",
+   "reason": "先驱体制多孔碳化物衍生碳",
+   "title": "Carbide-derived-carbons with hierarchical porosity from a preceramic polymer"
+  },
+  "10.1016/j.carbon.2012.12.084": {
+   "relevance": "低",
+   "reason": "碳化物衍生碳整体",
+   "title": "Carbon dioxide activated carbide-derived carbon monoliths as high performance adsorbents"
+  },
+  "10.1016/j.carbon.2016.01.063": {
+   "relevance": "低",
+   "reason": "石墨烯气凝胶",
+   "title": "Hybrid graphene aerogels/phase change material composites: Thermal conductivity, shape-stabilization and light-to-thermal energy storage"
+  },
+  "10.1016/j.carbon.2016.04.041": {
+   "relevance": "低",
+   "reason": "表征方法",
+   "title": "Nanostructure characterization of carbide-derived carbons by morphological analysis of transmission electron microscopy images combined with physisorption and Raman spectroscopy"
+  },
+  "10.1016/j.carbon.2016.11.050": {
+   "relevance": "高",
+   "reason": "由聚碳硅烷气凝胶制得的碳化物衍生碳气凝胶",
+   "title": "Carbide-derived carbon aerogels with tunable pore structure as versatile electrode material in high power supercapacitors"
+  },
+  "10.1016/j.carbon.2017.09.052": {
+   "relevance": "低",
+   "reason": "纤维",
+   "title": "One-dimensional carbon/SiC nanocomposites with tunable dielectric and broadband electromagnetic wave absorption properties"
+  },
+  "10.1016/j.carbon.2018.02.084": {
+   "relevance": "低",
+   "reason": "石墨烯气凝胶",
+   "title": "Achieving tunability of effective electromagnetic wave absorption between the whole X-band and Ku-band via adjusting PPy loading in SiC nanowires/graphene hybrid foam"
+  },
+  "10.1016/j.ccr.2016.05.009": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Synthesis and processing of silicon nitride and related materials using preceramic polymer and non-oxide sol-gel approaches"
+  },
+  "10.1016/j.cej.2019.05.076": {
+   "relevance": "中",
+   "reason": "生物质碳热还原SiC气凝胶",
+   "title": "Eggplant-derived SiC aerogels with high-performance electromagnetic wave absorption and thermal insulation properties"
+  },
+  "10.1016/j.cej.2019.122880": {
+   "relevance": "中",
+   "reason": "尿素溶胶凝胶碳热Si3N4气凝胶",
+   "title": "Synthesis and textural evolution of mesoporous Si3N4 aerogel with high specific surface area and excellent thermal insulation property via the urea assisted sol-gel technique"
+  },
+  "10.1016/j.cej.2020.127488": {
+   "relevance": "低",
+   "reason": "聚有机硅氧烷气凝胶",
+   "title": "Strong, highly hydrophobic, transparent, and super-insulative polyorganosiloxane-based aerogel"
+  },
+  "10.1016/j.cej.2021.129342": {
+   "relevance": "低",
+   "reason": "纤维气凝胶复合",
+   "title": "Thermal radiation shielded, high strength, fire resistant fiber/nanorod/aerogel composites fabricated by in-situ growth of TiO2 nanorods for thermal insulation"
+  },
+  "10.1016/j.ceramint.2009.05.022": {
+   "relevance": "中",
+   "reason": "多孔PDC泡沫，非气凝胶",
+   "title": "Highly porous macro- and micro-cellular ceramics from a polysilazane precursor"
+  },
+  "10.1016/j.ceramint.2011.11.033": {
+   "relevance": "中",
+   "reason": "多孔SiOC粉体",
+   "title": "Effect of pyrolysis temperature on the pore structure evolution of polysiloxane-derived ceramics"
+  },
+  "10.1016/j.ceramint.2014.01.025": {
+   "relevance": "中",
+   "reason": "RF/SiO2碳热还原",
+   "title": "Preparation of monolith SiC aerogel with high surface area and large pore volume and the structural evolution during the preparation"
+  },
+  "10.1016/j.ceramint.2015.05.056": {
+   "relevance": "中",
+   "reason": "溶胶凝胶大孔SiOC，非气凝胶",
+   "title": "High temperature structure evolution of macroporous SiOC ceramics prepared by a sol–gel method"
+  },
+  "10.1016/j.ceramint.2016.01.102": {
+   "relevance": "低",
+   "reason": "核壳微球",
+   "title": "A novel SiCN@TiO 2 core–shell ceramic microspheres derived from a polymeric precursor"
+  },
+  "10.1016/j.ceramint.2016.04.101": {
+   "relevance": "高",
+   "reason": "SiOC气凝胶HF刻蚀",
+   "title": "Polymer-derived SiOC aerogel with hierarchical porosity through HF etching"
+  },
+  "10.1016/j.ceramint.2016.07.213": {
+   "relevance": "高",
+   "reason": "SiC-TiO2气凝胶PDC路线",
+   "title": "Synthesis of SiC–TiO2 hybrid aerogel via supercritical drying combined PDCs route"
+  },
+  "10.1016/j.ceramint.2017.01.124": {
+   "relevance": "高",
+   "reason": "VTES/TEOS SiOC气凝胶",
+   "title": "Large size and low density SiOC aerogel monolith prepared from triethoxyvinylsilane/tetraethoxysilane"
+  },
+  "10.1016/j.ceramint.2017.04.112": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "The relationship between the silica wet-gels relative optical transmittance at 500 nm and structural features of silica aerogels"
+  },
+  "10.1016/j.ceramint.2017.04.175": {
+   "relevance": "中",
+   "reason": "邻苯二酚-甲醛/二氧化硅/勃姆石杂化气凝胶碳热，无先驱体聚合物，按规则属边缘",
+   "title": "In-situ synthesis and textural evolution of the novel carbonaceous SiC/mullite aerogel via polymer-derived ceramics route"
+  },
+  "10.1016/j.ceramint.2017.09.184": {
+   "relevance": "中",
+   "reason": "多孔微球",
+   "title": "Generation of meso- and microporous structures by pyrolysis of polysiloxane microspheres and by HF etching of SiOC microspheres"
+  },
+  "10.1016/j.ceramint.2017.09.212": {
+   "relevance": "高",
+   "reason": "SiOC气凝胶结构演变",
+   "title": "Preparation and structural evolution of SiOC preceramic aerogel during high-temperature treatment"
+  },
+  "10.1016/j.ceramint.2018.01.019": {
+   "relevance": "中",
+   "reason": "冷冻铸造多孔PDC",
+   "title": "Porous SiC ceramics with dendritic pore structures by freeze casting from chemical cross-linked polycarbosilane"
+  },
+  "10.1016/j.ceramint.2018.05.115": {
+   "relevance": "高",
+   "reason": "PSQ先驱体气凝胶制SiOC",
+   "title": "Sol-gel synthesis of preceramic polyphenylsilsesquioxane aerogels and their application toward monolithic porous SiOC ceramics"
+  },
+  "10.1016/j.ceramint.2018.05.240": {
+   "relevance": "低",
+   "reason": "致密SiCN吸波",
+   "title": "The influence of carbon materials on the absorption performance of polymer-derived SiCN ceramics in X-band"
+  },
+  "10.1016/j.ceramint.2018.07.106": {
+   "relevance": "低",
+   "reason": "致密RGO-SiBCN",
+   "title": "Microstructure and electromagnetic wave absorption properties of RGO-SiBCN composites via PDC technology"
+  },
+  "10.1016/j.ceramint.2018.08.294": {
+   "relevance": "低",
+   "reason": "相变材料气凝胶",
+   "title": "Synthesis of a novel three-dimensional Na2SO4@SiO2@Al2O3-SiO2 phase change material doped aerogel composite with high thermal resistance and latent heat"
+  },
+  "10.1016/j.ceramint.2018.09.064": {
+   "relevance": "高",
+   "reason": "PDC SiOC纤维组装气凝胶",
+   "title": "Fabrication and properties of lightweight SiOC fiber-based assembly aerogels with hierarchical pore structure"
+  },
+  "10.1016/j.ceramint.2018.09.098": {
+   "relevance": "高",
+   "reason": "SiBCN-ZrO2气凝胶",
+   "title": "SiBCN-ZrO2 hybrid ceramic aerogels through the polymer-derived ceramics (PDCs) route"
+  },
+  "10.1016/j.ceramint.2018.09.225": {
+   "relevance": "低",
+   "reason": "石墨烯/SiBCN",
+   "title": "EMW absorption properties of in-situ growth seamless SiBCN-graphene hybrid material"
+  },
+  "10.1016/j.ceramint.2019.01.169": {
+   "relevance": "中",
+   "reason": "碳气凝胶加SiCO前驱体涂层",
+   "title": "Anti-oxidation performance of carbon aerogel composites with SiCO ceramic inner coating"
+  },
+  "10.1016/j.ceramint.2019.02.216": {
+   "relevance": "中",
+   "reason": "邻苯二酚-甲醛/二氧化硅碳热还原，未称PDC路线",
+   "title": "Synthesis of monolithic SiC aerogels with high mechanical strength and low thermal conductivity"
+  },
+  "10.1016/j.ceramint.2019.05.160": {
+   "relevance": "中",
+   "reason": "碳热氮化Si3N4气凝胶",
+   "title": "Monolithic silicon nitride-based aerogels with large specific surface area and low thermal conductivity"
+  },
+  "10.1016/j.ceramint.2019.07.321": {
+   "relevance": "中",
+   "reason": "SiC纳米纤维气凝胶，路线不明",
+   "title": "Flexible and recoverable SiC nanofiber aerogels for electromagnetic wave absorption"
+  },
+  "10.1016/j.ceramint.2019.09.204": {
+   "relevance": "高",
+   "reason": "桥联聚倍半硅氧烷先驱体气凝胶碳热还原，先驱体属PDC路线",
+   "title": "SiC/C aerogels from biphenylene-bridged polysilsesquioxane/clay mineral nanocomposite aerogels"
+  },
+  "10.1016/j.ceramint.2019.10.267": {
+   "relevance": "高",
+   "reason": "SiBCN气凝胶/石墨烯",
+   "title": "SiBCN ceramic aerogel/graphene composites prepared via sol-gel infiltration process and polymer-derived ceramics (PDCs) route"
+  },
+  "10.1016/j.ceramint.2019.11.003": {
+   "relevance": "中",
+   "reason": "多孔PDC网状泡沫",
+   "title": "Processing and thermal characterization of polymer derived SiCN(O) and SiOC reticulated foams"
+  },
+  "10.1016/j.ceramint.2020.01.033": {
+   "relevance": "低",
+   "reason": "聚硅氧烷气凝胶，非陶瓷",
+   "title": "Preparation of superhydrophobic and flexible polysiloxane aerogel"
+  },
+  "10.1016/j.ceramint.2020.08.250": {
+   "relevance": "低",
+   "reason": "致密SiCN复合",
+   "title": "Microwave absorption properties of polymer-derived SiCN(CNTs) composite ceramics"
+  },
+  "10.1016/j.ceramint.2020.11.157": {
+   "relevance": "高",
+   "reason": "SiCN(O)气凝胶高温演变",
+   "title": "Synthesis and thermal evolution of polysilazane-derived SiCN(O) aerogels with variable C content stable at 1600 °C"
+  },
+  "10.1016/j.ceramint.2020.12.032": {
+   "relevance": "高",
+   "reason": "HNTs/SiBCN气凝胶",
+   "title": "Structure and mechanical properties of HNTs/SiBCN ceramic hybrid aerogels"
+  },
+  "10.1016/j.ceramint.2021.03.242": {
+   "relevance": "高",
+   "reason": "SiBNC气凝胶吸波",
+   "title": "Synthesis and electromagnetic wave absorbing properties of a polymer-derived SiBNC ceramic aerogel"
+  },
+  "10.1016/j.ceramint.2021.03.296": {
+   "relevance": "低",
+   "reason": "纤维",
+   "title": "Enhanced electromagnetic wave absorption performance of SiCN(Fe) fibers by in-situ generated Fe3Si and CNTs"
+  },
+  "10.1016/j.ceramint.2021.04.198": {
+   "relevance": "低",
+   "reason": "致密SiOC",
+   "title": "High-temperature evolution behavior of MK silicon resin derived SiOC ceramics under different environments"
+  },
+  "10.1016/j.ceramint.2021.08.035": {
+   "relevance": "高",
+   "reason": "SiCN气凝胶吸波",
+   "title": "Structure regulation and microwave absorption property of SiCN ceramic aerogels produced by catalytic pyrolysis"
+  },
+  "10.1016/j.ceramint.2021.11.091": {
+   "relevance": "高",
+   "reason": "有机硅烷气凝胶到SiOC气凝胶",
+   "title": "Preparation and textural evolution: From organosilane aerogel to SiOC aerogels"
+  },
+  "10.1016/j.ceramint.2021.12.070": {
+   "relevance": "低",
+   "reason": "致密SiC",
+   "title": "Influence of microstructure evolution on temperature-dependent dielectric and electromagnetic wave absorption properties of PDCs-SiC"
+  },
+  "10.1016/j.ceramint.2021.12.100": {
+   "relevance": "高",
+   "reason": "PDC SiC气凝胶原位纳米线",
+   "title": "Polymer-derived SiC ceramic aerogels with in-situ growth of SiC nanowires"
+  },
+  "10.1016/j.cja.2020.06.028": {
+   "relevance": "低",
+   "reason": "致密SiBCN",
+   "title": "Excellent electromagnetic wave absorption of MOF/SiBCN nanomaterials at high temperature"
+  },
+  "10.1016/j.colsurfa.2017.12.025": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Synthesis of high specific surface area silica aerogel from rice husk ash via ambient pressure drying"
+  },
+  "10.1016/j.cossms.2021.100936": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Polymer derived ceramic aerogels"
+  },
+  "10.1016/j.electacta.2013.05.064": {
+   "relevance": "低",
+   "reason": "致密负极",
+   "title": "Electrochemical performance of DVB-modified SiOC and SiCN polymer-derived negative electrodes for lithium-ion batteries"
+  },
+  "10.1016/j.electacta.2013.12.037": {
+   "relevance": "低",
+   "reason": "致密SiOC负极",
+   "title": "New Insights in to the Lithium Storage Mechanism in Polymer Derived SiOC Anode Materials"
+  },
+  "10.1016/j.electacta.2015.01.088": {
+   "relevance": "高",
+   "reason": "SiOC气凝胶负极",
+   "title": "High Rate Capability of SiOC Ceramic Aerogels with Tailored Porosity as Anode Materials for Li-ion Batteries"
+  },
+  "10.1016/j.electacta.2017.05.162": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "Effect of KOH etching on the structure and electrochemical performance of SiOC anodes for lithium-ion batteries"
+  },
+  "10.1016/j.jallcom.2018.10.214": {
+   "relevance": "低",
+   "reason": "碳气凝胶",
+   "title": "An ultralight nitrogen-doped carbon aerogel anchored by Ni-NiO nanoparticles for enhanced microwave adsorption performance"
+  },
+  "10.1016/j.jallcom.2019.152007": {
+   "relevance": "高",
+   "reason": "Co/SiCN气凝胶吸波",
+   "title": "Co decorated polymer-derived SiCN ceramic aerogel composites with ultrabroad microwave absorption performance"
+  },
+  "10.1016/j.jallcom.2021.159427": {
+   "relevance": "中",
+   "reason": "多孔SiOC衍生碳",
+   "title": "Microstructure-electrochemical behavior relationships of hierarchically micro-mesoporous silicon oxycarbide derived materials obtained by the pyrolysis of trietoxysilane/dimethyldiphenylsiloxane hybrids"
+  },
+  "10.1016/j.jallcom.2021.162592": {
+   "relevance": "高",
+   "reason": "无摘要，PDC SiOC气凝胶储热",
+   "title": "Thermochemical heat storage performances of magnesium sulphate confined in polymer-derived SiOC aerogels"
+  },
+  "10.1016/j.jcis.2016.02.050": {
+   "relevance": "低",
+   "reason": "碳管分散",
+   "title": "Rapid carbon nanotubes suspension in organic solvents using organosilicon polymers"
+  },
+  "10.1016/j.jcis.2019.04.028": {
+   "relevance": "低",
+   "reason": "杂化二氧化硅气凝胶",
+   "title": "Robust, ultra-insulative and transparent polyethylene-based hybrid silica aerogel with a novel non-particulate structure"
+  },
+  "10.1016/j.jeurceramsoc.2004.07.019": {
+   "relevance": "低",
+   "reason": "致密SiOC",
+   "title": "Synthesis and characterization of carbon-enriched silicon oxycarbides"
+  },
+  "10.1016/j.jeurceramsoc.2006.04.130": {
+   "relevance": "中",
+   "reason": "多孔SiTiOC玻璃",
+   "title": "Silicon–titanium oxycarbide glasses as bimodal porous inorganic membranes"
+  },
+  "10.1016/j.jeurceramsoc.2007.12.002": {
+   "relevance": "中",
+   "reason": "多孔PDC",
+   "title": "Engineering porosity in polymer-derived ceramics"
+  },
+  "10.1016/j.jeurceramsoc.2009.03.026": {
+   "relevance": "低",
+   "reason": "致密SiCN",
+   "title": "Carbon-rich SiCN ceramics derived from phenyl-containing poly(silylcarbodiimides)"
+  },
+  "10.1016/j.jeurceramsoc.2010.07.010": {
+   "relevance": "低",
+   "reason": "致密SiCN负极",
+   "title": "Electrochemical studies of carbon-rich polymer-derived SiCN ceramics as anode materials for lithium-ion batteries"
+  },
+  "10.1016/j.jeurceramsoc.2011.09.009": {
+   "relevance": "中",
+   "reason": "聚碳硅烷发泡SiC泡沫",
+   "title": "Silicon carbide-based foams from direct blowing of polycarbosilane"
+  },
+  "10.1016/j.jeurceramsoc.2012.11.022": {
+   "relevance": "低",
+   "reason": "致密SiOC",
+   "title": "Influence of processing conditions in TEOS/PDMS derived silicon oxycarbide materials. Part 1: Microstructure and properties"
+  },
+  "10.1016/j.jeurceramsoc.2013.08.042": {
+   "relevance": "中",
+   "reason": "多孔SiCN，非气凝胶",
+   "title": "Dielectric and microwave absorption properties of polymer derived SiCN ceramics annealed in N2 atmosphere"
+  },
+  "10.1016/j.jeurceramsoc.2015.10.038": {
+   "relevance": "高",
+   "reason": "SiCN气凝胶氧化",
+   "title": "Out-of-furnace oxidation of SiCN polymer-derived ceramic aerogel pyrolized at intermediate temperature (600–800 °C)"
+  },
+  "10.1016/j.jeurceramsoc.2016.11.034": {
+   "relevance": "低",
+   "reason": "致密SiCN介电",
+   "title": "Improved dielectric properties of PDCs-SiCN by in-situ fabricated nano-structured carbons"
+  },
+  "10.1016/j.jeurceramsoc.2017.01.003": {
+   "relevance": "低",
+   "reason": "致密SiOC",
+   "title": "Electrical and thermal response of silicon oxycarbide materials obtained by spark plasma sintering"
+  },
+  "10.1016/j.jeurceramsoc.2017.06.036": {
+   "relevance": "中",
+   "reason": "多孔SiOC",
+   "title": "Additive and pyrolysis atmosphere effects on polysiloxane-derived porous SiOC ceramics"
+  },
+  "10.1016/j.jeurceramsoc.2017.10.031": {
+   "relevance": "低",
+   "reason": "致密SiCN",
+   "title": "The dielectric and microwave absorption properties of polymer-derived SiCN ceramics"
+  },
+  "10.1016/j.jeurceramsoc.2019.06.025": {
+   "relevance": "低",
+   "reason": "C/SiBCN致密",
+   "title": "High-temperature properties and interface evolution of C/SiBCN composites prepared by precursor infiltration and pyrolysis"
+  },
+  "10.1016/j.jeurceramsoc.2019.10.056": {
+   "relevance": "中",
+   "reason": "多孔SiC-SiO2，路线不明",
+   "title": "High interfacial thermal resistance induced low thermal conductivity in porous SiC-SiO2 composites with hierarchical porosity"
+  },
+  "10.1016/j.jeurceramsoc.2021.01.051": {
+   "relevance": "低",
+   "reason": "致密SiCN微孔",
+   "title": "Influence of DVB as linker molecule on the micropore formation in polymer-derived SiCN ceramics"
+  },
+  "10.1016/j.jeurceramsoc.2021.04.056": {
+   "relevance": "高",
+   "reason": "先驱体Si3N4气凝胶储热",
+   "title": "Polymer-derived silicon nitride aerogels as shape stabilizers for low and high-temperature thermal energy storage"
+  },
+  "10.1016/j.jeurceramsoc.2021.12.002": {
+   "relevance": "低",
+   "reason": "致密SiZrBOC",
+   "title": "Molecular design for thermally stable SiZrBOC structure from single source precursor with high ceramic yield"
+  },
+  "10.1016/j.jeurceramsoc.2021.12.003": {
+   "relevance": "低",
+   "reason": "3D打印蜂窝",
+   "title": "High strength and microwave-absorbing polymer-derived SiCN honeycomb ceramic prepared by 3D printing"
+  },
+  "10.1016/j.jmatprotec.2007.10.060": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Silica aerogel; synthesis, properties and characterization"
+  },
+  "10.1016/j.jnoncrysol.2004.06.041": {
+   "relevance": "低",
+   "reason": "交联二氧化硅气凝胶",
+   "title": "Isocyanate-crosslinked silica aerogel monoliths: preparation and characterization"
+  },
+  "10.1016/j.jnoncrysol.2008.03.006": {
+   "relevance": "低",
+   "reason": "碳气凝胶",
+   "title": "High surface area carbon aerogel monoliths with hierarchical porosity"
+  },
+  "10.1016/j.jnoncrysol.2020.120302": {
+   "relevance": "中",
+   "reason": "刻蚀多孔PDC",
+   "title": "Characterization of polymer-derived ceramers subjected to wet-etching and the evolution of the carbon phase during thermal conversion"
+  },
+  "10.1016/j.jnoncrysol.2021.121048": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Spectral and structural investigation of silica aerogels properties synthesized through several techniques"
+  },
+  "10.1016/j.jpowsour.2013.02.046": {
+   "relevance": "低",
+   "reason": "致密SiCN负极",
+   "title": "Carbon-rich SiCN ceramics as high capacity/high stability anode material for lithium-ion batteries"
+  },
+  "10.1016/j.jpowsour.2017.08.051": {
+   "relevance": "中",
+   "reason": "多孔SiOC球",
+   "title": "Tailored synthesis of monodispersed nano/submicron porous silicon oxycarbide (SiOC) spheres with improved Li-storage performance as an anode material for Li-ion batteries"
+  },
+  "10.1016/j.matchemphys.2018.07.043": {
+   "relevance": "低",
+   "reason": "块体SiOC",
+   "title": "Effect of solvent in preparation of SiOC bulk ceramics"
+  },
+  "10.1016/j.matdes.2017.06.036": {
+   "relevance": "高",
+   "reason": "由SiOC气凝胶浸渍制得的气凝胶",
+   "title": "Heat-resistant, strong alumina-modified silica aerogel fabricated by impregnating silicon oxycarbide aerogel with boehmite sol"
+  },
+  "10.1016/j.matdes.2017.11.047": {
+   "relevance": "中",
+   "reason": "介孔SiOC",
+   "title": "Hierarchically porous polymer derived ceramics: A promising platform for multidrug delivery systems"
+  },
+  "10.1016/j.matdes.2019.108217": {
+   "relevance": "高",
+   "reason": "BN/SiOC气凝胶隔热",
+   "title": "New BN/SiOC aerogel composites fabricated by the sol-gel method with excellent thermal insulation performance at high temperature"
+  },
+  "10.1016/j.matlet.2013.02.047": {
+   "relevance": "中",
+   "reason": "碳热还原SiC气凝胶",
+   "title": "Synthesis of monolithic mesoporous silicon carbide from resorcinol–formaldehyde/silica composites"
+  },
+  "10.1016/j.matlet.2021.129336": {
+   "relevance": "低",
+   "reason": "致密SiCN(O)玻璃",
+   "title": "Thermal properties of dense polymer-derived SiCN(O) glasses"
+  },
+  "10.1016/j.micromeso.2006.10.027": {
+   "relevance": "中",
+   "reason": "有序介孔SiCN，非气凝胶",
+   "title": "Preparation of ordered mesoporous SiCN ceramics with large surface area and high thermal stability"
+  },
+  "10.1016/j.micromeso.2010.12.033": {
+   "relevance": "中",
+   "reason": "杂化常压干燥凝胶制多孔SiOC",
+   "title": "Porous silicon oxycarbide glasses from hybrid ambigels"
+  },
+  "10.1016/j.micromeso.2011.06.025": {
+   "relevance": "中",
+   "reason": "有序介孔SiOC",
+   "title": "Synthesis of ordered mesoporous silicon oxycarbide monoliths via preceramic polymer nanocasting"
+  },
+  "10.1016/j.micromeso.2011.10.015": {
+   "relevance": "中",
+   "reason": "介孔PDC复合，非气凝胶",
+   "title": "Polymer-derived mesoporous SiOC/ZnO nanocomposite for the purification of water contaminated with organic dyes"
+  },
+  "10.1016/j.micromeso.2013.12.022": {
+   "relevance": "中",
+   "reason": "倍半硅氧烷先驱体制SiOC衍生碳，非气凝胶",
+   "title": "Silicon oxycarbide-derived carbons from a polyphenylsilsequioxane precursor for supercapacitor applications"
+  },
+  "10.1016/j.micromeso.2016.06.025": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Design of multifunctional magnetic hybrid silica aerogels with improved properties"
+  },
+  "10.1016/j.micromeso.2018.02.034": {
+   "relevance": "中",
+   "reason": "多孔SiOC非气凝胶",
+   "title": "Effects of SiO2-forming additive on polysiloxane derived SiOC ceramics"
+  },
+  "10.1016/j.micromeso.2019.109614": {
+   "relevance": "中",
+   "reason": "多孔SiOC衍生碳",
+   "title": "Highly micro- and mesoporous oxycarbide derived materials from HF etching of silicon oxycarbide materials"
+  },
+  "10.1016/j.micromeso.2020.110164": {
+   "relevance": "中",
+   "reason": "壳聚糖/TEOS杂化凝胶热解，无先驱体聚合物",
+   "title": "Synthesis of Si/O/C/N quaternary composite aerogels with micro/mesoporous structures and their selective adsorption property for volatile carbonyl compounds in cigarette smoke"
+  },
+  "10.1016/j.micromeso.2020.110477": {
+   "relevance": "中",
+   "reason": "多孔SiOC非气凝胶",
+   "title": "Porous and ultrahigh surface area SiOC ceramics based on perhydropolysilazane and polysiloxane"
+  },
+  "10.1016/j.mser.2015.09.001": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Porous and high surface area silicon oxycarbide-based materials—A review"
+  },
+  "10.1016/j.mser.2016.05.001": {
+   "relevance": "低",
+   "reason": "多孔PDC综述",
+   "title": "Porous polymer derived ceramics"
+  },
+  "10.1016/j.oceram.2020.100001": {
+   "relevance": "低",
+   "reason": "致密纳米复合",
+   "title": "Metal-containing ceramic nanocomposites synthesized from metal acetates and polysilazane"
+  },
+  "10.1016/j.oceram.2021.100116": {
+   "relevance": "中",
+   "reason": "SiOC衍生碳多孔",
+   "title": "Porosity and nanostructure of silicon oxycarbide derived carbon"
+  },
+  "10.1016/j.pmatsci.2019.100623": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "The fate and role of in situ formed carbon in polymer-derived ceramics"
+  },
+  "10.1016/j.solidstatesciences.2017.11.012": {
+   "relevance": "低",
+   "reason": "核壳微球",
+   "title": "Synthesis of SiCN@TiO 2 core-shell ceramic microspheres via PDCs method"
+  },
+  "10.1016/j.ssi.2013.08.043": {
+   "relevance": "低",
+   "reason": "致密负极",
+   "title": "Influence of pyrolysis atmosphere on the lithium storage properties of carbon-rich polymer derived SiOC ceramic anodes"
+  },
+  "10.1016/j.ssi.2014.03.021": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "Tailoring of SiOC composition as a way to better performing anodes for Li-ion batteries"
+  },
+  "10.1016/j.ssi.2016.01.041": {
+   "relevance": "低",
+   "reason": "NMR",
+   "title": "7Li NMR studies of lithium ion dynamics in polymer-derived silicon oxycarbide ceramics"
+  },
+  "10.1016/j.ssi.2016.11.009": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "Novel 3D Si/C/SiOC nanocomposites: Toward electrochemically stable lithium storage in silicon"
+  },
+  "10.1016/j.ssi.2017.11.032": {
+   "relevance": "中",
+   "reason": "多孔SiCN",
+   "title": "The influence of pyrolysis temperature on the electrochemical behavior of porous carbon-rich SiCN polymer-derived ceramics"
+  },
+  "10.1016/j.supflu.2015.06.018": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Development of aerogel additives for the foundry industry"
+  },
+  "10.1016/j.surfcoat.2018.07.061": {
+   "relevance": "低",
+   "reason": "介孔PDC综述",
+   "title": "Polymer-Derived Ceramics with engineered mesoporosity: From design to application in catalysis"
+  },
+  "10.1016/s0022-3093(96)00560-1": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Dependence of monolithicity and physical properties of TMOS silica aerogels on gel aging and drying conditions"
+  },
+  "10.1016/s0022-3093(98)00102-1": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Hydrophobic waterglass based aerogels without solvent exchange or supercritical drying"
+  },
+  "10.1016/s0254-0584(98)00217-x": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Comparison of some physical properties of silica aerogel monoliths synthesized by different precursors"
+  },
+  "10.1021/acs.chemmater.0c04048": {
+   "relevance": "低",
+   "reason": "闪光热解",
+   "title": "Rapid Preparation and Electrochemical Energy Storage Applications of Silicon Carbide and Silicon Oxycarbide Ceramic/Carbon Nanocomposites Derived Via Flash Photothermal Pyrolysis of Organosilicon Preceramic Polymers"
+  },
+  "10.1021/acsami.0c12376": {
+   "relevance": "中",
+   "reason": "PDC与石墨烯气凝胶复合",
+   "title": "Polymer-Derived SiOC Integrated with a Graphene Aerogel As a Highly Stable Li-Ion Battery Anode"
+  },
+  "10.1021/acsami.1c02906": {
+   "relevance": "中",
+   "reason": "Si3N4/SiC气凝胶，路线不明",
+   "title": "Alternating Multilayered Si 3 N 4 /SiC Aerogels for Broadband and High-Temperature Electromagnetic Wave Absorption up to 1000 °C"
+  },
+  "10.1021/acsami.6b05032": {
+   "relevance": "低",
+   "reason": "SiOC/C纳米杂化",
+   "title": "Silicon Oxycarbide/Carbon Nanohybrids with Tiny Silicon Oxycarbide Particles Embedded in Free Carbon Matrix Based on Photoactive Dental Methacrylates"
+  },
+  "10.1021/acsami.8b15365": {
+   "relevance": "低",
+   "reason": "致密SiBCN复合",
+   "title": "Graphene Shield by SiBCN Ceramic: A Promising High-Temperature Electromagnetic Wave-Absorbing Material with Oxidation Resistance"
+  },
+  "10.1021/acsami.9b06819": {
+   "relevance": "低",
+   "reason": "纤维",
+   "title": "Continuous SiCN Fibers with Interfacial SiCxNy Phase as Structural Materials for Electromagnetic Absorbing Applications"
+  },
+  "10.1021/acsnano.7b08577": {
+   "relevance": "中",
+   "reason": "SiC纳米线气凝胶，路线不明",
+   "title": "Ultralight, Recoverable, and High-Temperature-Resistant SiC Nanowire Aerogel"
+  },
+  "10.1021/cm071203q": {
+   "relevance": "低",
+   "reason": "致密PDC玻璃",
+   "title": "New Insights on the High-Temperature Nanostructure Evolution of SiOC and B-Doped SiBOC Polymer-Derived Glasses"
+  },
+  "10.1021/cm402239e": {
+   "relevance": "低",
+   "reason": "碳气凝胶",
+   "title": "Carbon Aerogels and Monoliths: Control of Porosity and Nanoarchitecture via Sol–Gel routes"
+  },
+  "10.1021/cm903031d": {
+   "relevance": "中",
+   "reason": "有机硅凝胶热解SiOC多孔整体",
+   "title": "Sol−Gel Processing of a Glycolated Cyclic Organosilane and Its Pyrolysis to Silicon Oxycarbide Monoliths with Multiscale Porosity and Large Surface Areas"
+  },
+  "10.1038/srep07910": {
+   "relevance": "中",
+   "reason": "多孔SiCN杂化材料",
+   "title": "Hierarchically porous silicon–carbon–nitrogen hybrid materials towards highly efficient and selective adsorption of organic dyes"
+  },
+  "10.1039/c2jm00020b": {
+   "relevance": "高",
+   "reason": "聚硅氧烷/聚碳硅烷气凝胶",
+   "title": "Novel polysiloxane and polycarbosilane aerogels via hydrosilylation of preceramic polymers"
+  },
+  "10.1039/c2jm34472f": {
+   "relevance": "低",
+   "reason": "碳化物衍生碳",
+   "title": "Synthesis, characterization, and hydrogen storage capacities of hierarchical porous carbide derived carbon monolith"
+  },
+  "10.1039/c2ta00727d": {
+   "relevance": "低",
+   "reason": "致密结构",
+   "title": "Polymer-derived SiCN and SiOC ceramics – structure and energetics at the nanoscale"
+  },
+  "10.1039/c3ta14815g": {
+   "relevance": "低",
+   "reason": "模板碳",
+   "title": "Kroll-carbons based on silica and alumina templates as high-rate electrode materials in electrochemical double-layer capacitors"
+  },
+  "10.1039/c4ra01086h": {
+   "relevance": "中",
+   "reason": "多孔SiCN",
+   "title": "Preparation and electrochemical performance of a porous polymer-derived silicon carbonitride anode by hydrofluoric acid etching for lithium ion batteries"
+  },
+  "10.1039/c4ta03401e": {
+   "relevance": "高",
+   "reason": "碳化物衍生碳气凝胶",
+   "title": "Evolution of porosity in carbide-derived carbon aerogels"
+  },
+  "10.1039/c4ta04233f": {
+   "relevance": "中",
+   "reason": "微孔SiCNO",
+   "title": "NH 3 -assisted synthesis of microporous silicon oxycarbonitride ceramics from preceramic polymers: a combined N 2 and CO 2 adsorption and small angle X-ray scattering study"
+  },
+  "10.1039/c5ta03730a": {
+   "relevance": "低",
+   "reason": "碳化物衍生碳",
+   "title": "Emulsion soft templating of carbide-derived carbon nanospheres with controllable porosity for capacitive electrochemical energy storage"
+  },
+  "10.1039/c5ta06669g": {
+   "relevance": "高",
+   "reason": "透明SiOC气凝胶",
+   "title": "Synthesis and characterization of the first transparent silicon oxycarbide aerogel obtained through H 2 decarbonization"
+  },
+  "10.1039/c5tc03127c": {
+   "relevance": "低",
+   "reason": "石墨烯气凝胶",
+   "title": "Graphene aerogel composites derived from recycled cigarette filters for electromagnetic wave absorption"
+  },
+  "10.1039/c6ra05712h": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "High rate capabilities of HF-etched SiOC anode materials derived from polymer for lithium-ion batteries"
+  },
+  "10.1039/c6ra24539k": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "Silicon oxycarbide ceramics as anodes for lithium ion batteries: influence of carbon content on lithium storage capacity"
+  },
+  "10.1039/c6ta00589f": {
+   "relevance": "高",
+   "reason": "由SiCN气凝胶制得的碳气凝胶",
+   "title": "Nitrogen doped carbide derived carbon aerogels by chlorine etching of a SiCN aerogel"
+  },
+  "10.1039/c6tc01142j": {
+   "relevance": "低",
+   "reason": "致密SiOC吸波",
+   "title": "Synthesis and EMW absorbing properties of nano SiC modified PDC–SiOC"
+  },
+  "10.1039/c7ra01545c": {
+   "relevance": "低",
+   "reason": "致密SiOC复合",
+   "title": "Synthesis and electrochemical performance of a polymer-derived silicon oxycarbide/boron nitride nanotube composite"
+  },
+  "10.1039/c7ra13165h": {
+   "relevance": "低",
+   "reason": "倍半硅氧烷有机-无机气凝胶，未陶瓷化",
+   "title": "Organic–inorganic hybridization for the synthesis of robust in situ hydrophobic polypropylsilsesquioxane aerogels with fast oil absorption properties"
+  },
+  "10.1039/c7ta09236a": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "The Li-storage capacity of SiOC glasses with and without mixed silicon oxycarbide bonds"
+  },
+  "10.1039/c7tc03846a": {
+   "relevance": "中",
+   "reason": "石墨烯气凝胶嵌入PDC",
+   "title": "Anisotropic electrical conductivity in polymer derived ceramics induced by graphene aerogels"
+  },
+  "10.1039/c8tc05239e": {
+   "relevance": "低",
+   "reason": "CoNi/rGO气凝胶",
+   "title": "Ultralight CoNi/rGO aerogels toward excellent microwave absorption at ultrathin thickness"
+  },
+  "10.1039/d0cp05520d": {
+   "relevance": "高",
+   "reason": "SiOC气凝胶孔结构",
+   "title": "Differential hysteresis scanning of non-templated monomodal amorphous aerogels"
+  },
+  "10.1039/d0ma00917b": {
+   "relevance": "中",
+   "reason": "高比表面Ni/SiOCN，非气凝胶",
+   "title": "Silicon oxycarbonitride ceramic containing nickel nanoparticles: from design to catalytic application"
+  },
+  "10.1039/d0nr02930k": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "Silicon oxycarbide-antimony nanocomposites for high-performance Li-ion battery anodes"
+  },
+  "10.1063/1.4921180": {
+   "relevance": "低",
+   "reason": "聚吡咯气凝胶",
+   "title": "Self-assembled ultralight three-dimensional polypyrrole aerogel for effective electromagnetic absorption"
+  },
+  "10.1080/2374068x.2020.1728991": {
+   "relevance": "中",
+   "reason": "多孔SiOC",
+   "title": "Study on effect of structure and surface/ physical characteristics of a silicon oxycarbide by hydrofluoric acid etching"
+  },
+  "10.1088/1361-6463/aadb18": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Molecular polymer-derived ceramics for applications in electrochemical energy storage devices"
+  },
+  "10.1088/2053-1591/aafaef": {
+   "relevance": "低",
+   "reason": "CVD纳米线气凝胶",
+   "title": "A novel SiC nanowire aerogel consisted of ultra long SiC nanowires"
+  },
+  "10.1088/2053-1591/ab4318": {
+   "relevance": "低",
+   "reason": "二氧化硅气凝胶",
+   "title": "Oil spills clean-up by super hydrophobic organo-modified silica aerogel monoliths treated by different solvents in ambient condition"
+  },
+  "10.1111/ijac.12733": {
+   "relevance": "低",
+   "reason": "先驱体微球",
+   "title": "Synthesis of cross‐linked polymer microspheres and pyrolysis conversion to polymer‐derived ceramics"
+  },
+  "10.1111/ijac.13258": {
+   "relevance": "低",
+   "reason": "氧化物气凝胶",
+   "title": "Novel high‐temperature‐resistant Y 2 SiO 5 aerogel with ultralow thermal conductivity"
+  },
+  "10.1111/j.1151-2916.1996.tb09035.x": {
+   "relevance": "中",
+   "reason": "多孔SiOC凝胶与玻璃",
+   "title": "Porous Silicon Oxycarbide Glasses"
+  },
+  "10.1111/j.1551-2916.2010.03876.x": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Polymer‐Derived Ceramics: 40 Years of Research and Innovation in Advanced Ceramics"
+  },
+  "10.1111/jace.12485": {
+   "relevance": "中",
+   "reason": "介孔SiOC非气凝胶",
+   "title": "Controlled Mesoporosity in SiOC via Chemically Bonded Polymeric “Spacers”"
+  },
+  "10.1111/jace.13541": {
+   "relevance": "中",
+   "reason": "多孔SiOC块体",
+   "title": "Preparation of Micro‐/Mesoporous SiOC Bulk Ceramics"
+  },
+  "10.1111/jace.13634": {
+   "relevance": "中",
+   "reason": "多孔SiOC块体",
+   "title": "Highly Porous SiOC Bulk Ceramics with Water Vapor Assisted Pyrolysis"
+  },
+  "10.1111/jace.14323": {
+   "relevance": "高",
+   "reason": "SiOC气凝胶储锂",
+   "title": "Structural Design of Polymer‐Derived Si OC Ceramic Aerogels for High‐Rate Li Ion Storage Applications"
+  },
+  "10.1111/jace.15241": {
+   "relevance": "高",
+   "reason": "SiC/SiOC气凝胶吸附",
+   "title": "Polymer‐derived ceramic aerogels as sorbent materials for the removal of organic dyes from aqueous solutions"
+  },
+  "10.1111/jace.15423": {
+   "relevance": "中",
+   "reason": "多孔PDC吸附，非气凝胶",
+   "title": "Polymer‐derived ceramic adsorbent for pollutant removal from water"
+  },
+  "10.1111/jace.15932": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Silicon oxycarbide glasses and glass‐ceramics: “All‐Rounder” materials for advanced structural and functional applications"
+  },
+  "10.1111/jace.16100": {
+   "relevance": "高",
+   "reason": "SiOCN气凝胶冷冻干燥",
+   "title": "Facile preparation of ultralight polymer‐derived Si OCN ceramic aerogels with hierarchical pore structure"
+  },
+  "10.1111/jace.16263": {
+   "relevance": "中",
+   "reason": "相分离多孔SiC整体",
+   "title": "Monolithic silicon carbide with interconnected and hierarchical pores fabricated by reaction‐induced phase separation"
+  },
+  "10.1111/jace.16549": {
+   "relevance": "低",
+   "reason": "葡萄糖SiOC非气凝胶",
+   "title": "Electromagnetic wave absorbing properties of glucose‐derived carbon‐rich SiOC ceramics annealed at different temperatures"
+  },
+  "10.1111/jace.16848": {
+   "relevance": "低",
+   "reason": "致密Fe-SiOC",
+   "title": "Enhanced electromagnetic wave absorption of Fe‐doped silicon oxycarbide nanocomposites"
+  },
+  "10.1111/jace.17392": {
+   "relevance": "低",
+   "reason": "致密PDC力学",
+   "title": "Effect of the pyrolysis atmosphere on the mechanical properties of polymer‐derived SiOC and SiCN"
+  },
+  "10.1111/jace.18130": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Porous polymer‐derived ceramics: Flexible morphological and compositional controls through sol–gel chemistry"
+  },
+  "10.1111/jace.18270": {
+   "relevance": "低",
+   "reason": "致密SiOC热解",
+   "title": "On the pyrolysis of a methyl‐silsesquioxane in reactive CO 2 atmosphere: A TG/MS and FT‐IR study"
+  },
+  "10.1360/ssc-2020-0049": {
+   "relevance": "低",
+   "reason": "BN气凝胶综述",
+   "title": "Research progress in preparation of hexagonal boron nitride aerogels and their applications in thermal conductivity and adsorption"
+  },
+  "10.15168/11572_367759": {
+   "relevance": "低",
+   "reason": "学位论文，致密SiOCN",
+   "title": "Synthesis and Characterization of Multifunctional Polymer-Derived SiOCN"
+  },
+  "10.15541/jim20160380": {
+   "relevance": "中",
+   "reason": "气凝胶结构SiC/C，路线不明",
+   "title": "Development of SiO2/C and SiC/C Composites Featuring Aerogel Structures"
+  },
+  "10.1557/jmr.2015.44": {
+   "relevance": "低",
+   "reason": "致密Si(N)OC",
+   "title": "N-doped polymer-derived Si(N)OC: The role of the N-containing precursor"
+  },
+  "10.2109/jcersj2.119.16": {
+   "relevance": "低",
+   "reason": "有机-无机杂化气凝胶",
+   "title": "Organic-inorganic hybrid aerogels with high mechanical properties via organotrialkoxysilane-derived sol-gel process"
+  },
+  "10.2139/ssrn.3967528": {
+   "relevance": "中",
+   "reason": "SiC/Si3N4气凝胶，碳热路线",
+   "title": "Designed Fabrication of Lightweight SiC/Si 3N 4 Aerogels for Enhanced Electromagnetic Wave Absorption and Thermal Insulation"
+  },
+  "10.30919/esmm5f459": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Design, Synthesis, and Use of High Temperature Resistant Aerogels Exceeding 800 oC"
+  },
+  "10.3139/146.111517": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "Si- and Sn-containing SiOCN-based nanocomposites as anode materials for lithium ion batteries: synthesis, thermodynamic characterization and modeling"
+  },
+  "10.3390/c2020009": {
+   "relevance": "低",
+   "reason": "BCN",
+   "title": "Electrochemical Li Storage Properties of Carbon-Rich B–C–N Ceramics"
+  },
+  "10.3390/ma11050781": {
+   "relevance": "低",
+   "reason": "聚吡咯气凝胶",
+   "title": "Decorating MOF-Derived Nanoporous Co/C in Chain-Like Polypyrrole (PPy) Aerogel: A Lightweight Material with Excellent Electromagnetic Absorption"
+  },
+  "10.3390/ma11122589": {
+   "relevance": "高",
+   "reason": "PMHS/DVB先驱体气凝胶",
+   "title": "Towards Porous Silicon Oxycarbide Materials: Effects of Solvents on Microstructural Features of Poly(methylhydrosiloxane)/Divynilbenzene Aerogels"
+  },
+  "10.3390/ma13194302": {
+   "relevance": "低",
+   "reason": "电极",
+   "title": "Silicon Oxycarbide-Graphite Electrodes for High-Power Energy Storage Devices"
+  },
+  "10.3390/ma14020334": {
+   "relevance": "低",
+   "reason": "致密复合",
+   "title": "Fabrication of (SiC-AlN)/ZrB2 Composite with Nano-Micron Hybrid Microstructure via PCS-Derived Ceramics Route"
+  },
+  "10.3390/ma8105343": {
+   "relevance": "低",
+   "reason": "综述",
+   "title": "Polymer/Carbon-Based Hybrid Aerogels: Preparation, Properties and Applications"
+  },
+  "10.3390/molecules24213847": {
+   "relevance": "低",
+   "reason": "碳气凝胶",
+   "title": "Electrochemical Properties of Carbon Aerogel Electrodes: Dependence on Synthesis Temperature"
+  },
+  "10.3390/nano5010233": {
+   "relevance": "低",
+   "reason": "负极",
+   "title": "New Insights into Understanding Irreversible and Reversible Lithium Storage within SiOC and SiCN Ceramics"
+  },
+  "10.3390/nano5010366": {
+   "relevance": "低",
+   "reason": "致密SiCN结构",
+   "title": "On the Mass Fractal Character of Si-Based Structural Networks in Amorphous Polymer Derived Ceramics"
+  },
+  "10.3390/nano9010040": {
+   "relevance": "高",
+   "reason": "SiBCO气凝胶",
+   "title": "Preparation and Properties of SiBCO Aerogel and Its Composites"
+  },
+  "10.4028/www.scientific.net/msf.848.770": {
+   "relevance": "低",
+   "reason": "氧化物气凝胶",
+   "title": "Effect of Heat-Treatment on the Microstructure and Properties of SiO2-TiO2 Aerogels Synthesized via Supercritical Drying"
+  },
+  "10.5255/ukda-sn-855089": {
+   "relevance": "不相关",
+   "reason": "教育数据集",
+   "title": "Multi-metric Evaluation of the Effectiveness of Remote Learning in Mechanical and Industrial Engineering During the COVID-19 Pandemic: Indicators and Guidance for Future Preparedness, 2020"
+  },
+  "10.70675/1387d42fz4ab0z4342za801z1ea0be33837e": {
+   "relevance": "低",
+   "reason": "涂层",
+   "title": "Élaboration par caléfaction de revêtements carbone, oxycarbure et carbure pour des composites à matrice céramique à vocation aéronautique et nucléaire"
+  }
+ }
+}
