@@ -45,7 +45,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "batch_default_lanes": True,  # batch downloads default to pretriage + channel-lane scheduling (fast HTTP -> grey -> institutional)
     "lane_s2_batch_min": 10,  # minimum batch size to enrich OA URLs via the S2 batch endpoint (500 ids/request)
     "lane_mdpi_cdn": True,  # fast lane: construct mdpi-res.com CDN URLs for 10.3390 DOIs (bypasses the bot-walled main site)
-    "scihub_enabled": True,
+    # Grey sources (Sci-Hub, LibGen, SciBban) only when the user turns them on (2026-10-16).
+    "scihub_enabled": False,
     "scihub_domains": DEFAULT_SCIHUB_DOMAINS,
     "vpnsci_enabled": False,
     "vpnsci_school": "",
@@ -172,8 +173,11 @@ def load_config() -> dict[str, Any]:
 
 
 def save_config(config: dict[str, Any]) -> None:
+    """Write only what differs from DEFAULT_CONFIG, so a later change of a default
+    reaches everyone who never set that key (load_config fills defaults back in)."""
     # Keys that came from the environment stay there: never write them to disk.
     config = {k: ("" if k in ENV_KEYS and v and v == os.environ.get(ENV_KEYS[k]) else v) for k, v in config.items()}
+    config = {k: v for k, v in config.items() if k not in DEFAULT_CONFIG or v != DEFAULT_CONFIG[k]}
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with CONFIG_FILE.open("w", encoding="utf-8") as fh:
         json.dump(config, fh, indent=2, ensure_ascii=False)

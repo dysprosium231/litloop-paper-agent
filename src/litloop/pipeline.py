@@ -504,11 +504,11 @@ def grey_allowed(config: dict[str, Any] | None) -> bool:
     """Whether grey-source (Sci-Hub/LibGen/SciBban) authorization survives lane
     scheduling. A user-explicit restriction is a veto: ``scihub_enabled=false``
     or ``download_strategy=legal_only`` can never be widened by ``--lanes`` or
-    any other scheduling mode. Without an explicit restriction the product
-    default (grey sources participate in fastest / scihub_* strategies) holds.
+    any other scheduling mode. Grey sources are off unless the user turned
+    ``scihub_enabled`` on.
     """
     cfg = config or {}
-    if not cfg.get("scihub_enabled", True):
+    if not cfg.get("scihub_enabled", False):
         return False
     return cfg.get("download_strategy", "fastest") != "legal_only"
 

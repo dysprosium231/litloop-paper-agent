@@ -164,3 +164,21 @@ def warnings() -> list[str]:
         if s["throttled_today"] >= 5:
             notes.append(f"{name}: throttled {s['throttled_today']} times today; requests are slowed down")
     return notes
+
+
+def openalex_live(timeout: float = 20.0) -> dict[str, Any] | None:
+    """OpenAlex's own account of today's budget, from its /rate-limit endpoint
+    (no credits charged): used, remaining, limit, reset time, price per call type."""
+    import requests
+    key = str(_config.load_config().get("openalex_api_key") or "").strip()
+    try:
+        r = requests.get("https://api.openalex.org/rate-limit", params={"api_key": key} if key else None,
+                         timeout=timeout, proxies={"http": None, "https": None})
+        if r.status_code != 200:
+            return {"error": f"HTTP {r.status_code}"}
+        info = r.json().get("rate_limit") or {}
+    except Exception as exc:  # diagnostics only
+        return {"error": str(exc)}
+    return {"credits_used": info.get("credits_used"), "credits_remaining": info.get("credits_remaining"),
+            "credits_limit": info.get("credits_limit"), "resets_at": info.get("resets_at"),
+            "credit_costs": info.get("credit_costs"), "has_key": bool(key)}

@@ -142,7 +142,7 @@ def get_paper(
 
     result = download(
         identifier, output,
-        scihub_enabled=True, use_tor=True, use_vpnsci=True,
+        scihub_enabled=None, use_tor=True, use_vpnsci=True,  # None: follow scihub_enabled in the config
         bibtex=not no_bibtex,
         strategy=strategy if strategy else None,
     )

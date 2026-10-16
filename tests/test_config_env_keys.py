@@ -67,5 +67,14 @@ def test_keys_from_the_environment_are_not_written_to_disk(tmp_path: Path, monke
     cfg["connect_timeout"] = 7
     config.save_config(cfg)
     saved = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
-    assert saved["openalex_api_key"] == "" and saved["connect_timeout"] == 7
+    assert saved.get("openalex_api_key", "") == "" and saved["connect_timeout"] == 7
     assert config.load_config()["openalex_api_key"] == "env-openalex-secret"
+
+
+def test_only_changed_settings_are_written(tmp_path: Path):
+    cfg = config.load_config()
+    cfg["scihub_enabled"] = not config.DEFAULT_CONFIG["scihub_enabled"]
+    config.save_config(cfg)
+    saved = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    assert saved == {"scihub_enabled": cfg["scihub_enabled"]}   # defaults are not pinned in the file
+    assert config.load_config()["output_dir"] == config.DEFAULT_CONFIG["output_dir"]

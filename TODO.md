@@ -74,6 +74,8 @@
 
 ### 维护
 - [x] **真 Chrome 副本自动跟随**（2026-10-15）：启动浏览器前比较系统 Chrome 与副本的版本号，系统更新了就先复制到临时目录再对调，正在运行时跳过；配置项 `browser_copy_follow_system`，默认开启。本机副本当时已落后（.39 → .41），已更新。
+- [x] Sci-Hub、LibGen 等灰色来源默认关闭（2026-10-16 用户决定），由首次引导让用户选；`litloop get` 不再写死开启、改为遵从配置。
+- [x] 保存配置时只写用户改过的项（2026-10-16）：现在 `save_config` 把所有默认值一起写进文件，默认值一旦被固定，以后改默认值对老用户不生效（如本机 `scihub_enabled` 仍是 true）。
 - [ ] **新版本提醒**：每周后台检查 LitLoop、scansci-find（easyseek）、zotero-mcp 是否有新版本，有则在检索/下载结果里提示“运行 scripts/deploy.py 更新”。只提醒，不自动安装。
 - [x] ZCode 插件的技能文档补上“检索与筛选”流程和 Zotero 本地推送（2026-10-15）。
 - [ ] 三份技能文档已经分叉，需要合成一份来源、生成其余副本：`skills/litloop/SKILL.md`（简短入口）、`skill/SKILL.md`（完整参考，还写着 17 个工具）、`zcode-plugin/skills/litloop/SKILL.md`（中文操作手册）。`litloop-sort` 也有两份不同的。

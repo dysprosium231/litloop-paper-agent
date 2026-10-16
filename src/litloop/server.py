@@ -535,7 +535,7 @@ def litloop_health_check(detailed: bool = False) -> str:
 
     result: dict[str, Any] = {
         "overall": overall,
-        "scihub_enabled": config.get("scihub_enabled", True),
+        "scihub_enabled": config.get("scihub_enabled", False),
         "checks": checks,
     }
 
@@ -1583,7 +1583,8 @@ def litloop_diagnostics(check: str = "health", detailed: bool = False) -> str:
     """Diagnostics: check=health|network|sources|setup|auto_setup|quota (API usage and limits)."""
     if check == "quota":
         from . import quota
-        return json.dumps({"providers": quota.summary(), "warnings": quota.warnings()}, ensure_ascii=False)
+        return json.dumps({"openalex_official": quota.openalex_live(), "providers": quota.summary(),
+                           "warnings": quota.warnings()}, ensure_ascii=False)
     if check == "network":
         return litloop_network_diagnose()
     if check == "sources":

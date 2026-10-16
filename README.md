@@ -345,7 +345,7 @@ litloop_login(kind="ezproxy")
 | `output_dir` | `~/.litloop/papers` | PDF 保存目录 |
 | `auto_rename` | `true` | 按作者、年份、标题和 DOI 重命名 |
 | `download_strategy` | `fastest` | 可选 `fastest`、`oa_first`、`legal_only`（不用 Sci-Hub/LibGen）、`scihub_first`、`scihub_only` |
-| `scihub_enabled` | `true` | 是否使用 Sci-Hub/LibGen 类来源 |
+| `scihub_enabled` | `false` | 是否使用 Sci-Hub/LibGen 类来源；默认关闭，由你自己决定是否打开 |
 | `search_fill_abstracts` | `true` | 检索结果自动补全摘要 |
 | `openalex_api_key` | 空 | OpenAlex Key（强烈推荐，见[依赖与 Key](#依赖与-key)）；也可用环境变量 `OPENALEX_API_KEY` |
 | `elsevier_api_key` | 空 | Elsevier Key，用于全文下载和 Scopus 摘要；也可用环境变量 `ELSEVIER_API_KEY` |

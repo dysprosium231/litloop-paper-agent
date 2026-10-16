@@ -18,12 +18,13 @@ from litloop.pipeline import QueueEntry
 
 
 class TestGreyAllowed:
-    def test_default_permits_grey(self):
-        assert grey_allowed(None) is True
-        assert grey_allowed({}) is True
-        assert grey_allowed({"download_strategy": "fastest"}) is True
-        assert grey_allowed({"download_strategy": "scihub_only"}) is True
+    def test_grey_sources_are_off_until_the_user_turns_them_on(self):
+        assert grey_allowed(None) is False
+        assert grey_allowed({}) is False
+        assert grey_allowed({"download_strategy": "scihub_only"}) is False
         assert grey_allowed({"scihub_enabled": True}) is True
+        assert grey_allowed({"scihub_enabled": True, "download_strategy": "fastest"}) is True
+        assert grey_allowed({"scihub_enabled": True, "download_strategy": "scihub_only"}) is True
 
     def test_explicit_vetoes(self):
         assert grey_allowed({"scihub_enabled": False}) is False
