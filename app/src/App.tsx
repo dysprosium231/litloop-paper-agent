@@ -27,6 +27,83 @@ import {
 
 const short = (q: string) => (q.length > 28 ? q.slice(0, 28) + "…" : q)
 
+// Width of the icon rail plus the paper list, which the user drags; remembered between runs.
+const WIDTH_KEY = "litloop.listWidth"
+const MIN_WIDTH = 300
+const MAX_WIDTH = 900
+
+function useStoredWidth(): [number, (w: number) => void] {
+  const [width, setWidth] = React.useState(() => {
+    try {
+      const w = Number(localStorage.getItem(WIDTH_KEY))
+      return w >= MIN_WIDTH && w <= MAX_WIDTH ? w : 420
+    } catch {
+      return 420
+    }
+  })
+  const set = React.useCallback((w: number) => {
+    const clamped = Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w)))
+    setWidth(clamped)
+    try {
+      localStorage.setItem(WIDTH_KEY, String(clamped))
+    } catch {
+      /* storage unavailable: the width just isn't remembered */
+    }
+  }, [])
+  return [width, set]
+}
+
+/** A draggable line on the list's right edge; arrow keys also move it when focused. */
+function ResizeHandle({ width, onWidth }: { width: number; onWidth: (w: number) => void }) {
+  // While dragging, set the CSS variable directly and switch off the sidebar's width
+  // transition: going through React state on every move (and the 200 ms transition)
+  // made the line lag behind the pointer. The width is stored once, on release.
+  const start = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const wrapper = e.currentTarget.closest<HTMLElement>("[data-slot=sidebar-wrapper]")
+    const x0 = e.clientX
+    const w0 = width
+    let w = w0
+    let frame = 0
+    const clamp = (v: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, v))
+    const move = (ev: PointerEvent) => {
+      w = clamp(w0 + ev.clientX - x0)
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => wrapper?.style.setProperty("--sidebar-width", `${w}px`))
+    }
+    const up = () => {
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+      document.documentElement.classList.remove("resizing")
+      onWidth(w)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+    document.documentElement.classList.add("resizing")
+  }
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="调节列表宽度"
+      aria-valuenow={width}
+      aria-valuemin={MIN_WIDTH}
+      aria-valuemax={MAX_WIDTH}
+      tabIndex={0}
+      onPointerDown={start}
+      onDoubleClick={() => onWidth(420)}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.stopPropagation()
+          e.preventDefault()
+          onWidth(width + (e.key === "ArrowRight" ? 20 : -20))
+        }
+      }}
+      className="absolute inset-y-0 left-0 z-20 hidden w-1.5 -translate-x-1/2 cursor-col-resize transition-colors hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none md:block"
+    />
+  )
+}
+
 export default function App() {
   const [sessions, setSessions] = React.useState<SessionListEntry[]>([])
   const [sid, setSid] = React.useState<string | null>(null)
@@ -36,6 +113,7 @@ export default function App() {
   const [current, setCurrent] = React.useState<string | null>(null)
   const [onlyBatch, setOnlyBatch] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [listWidth, setListWidth] = useStoredWidth()
 
   React.useEffect(() => {
     api.sessions().then((s) => {
@@ -132,10 +210,11 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <SidebarProvider style={{ "--sidebar-width": "380px" } as React.CSSProperties}>
+      <SidebarProvider style={{ "--sidebar-width": `${listWidth}px` } as React.CSSProperties}>
         <AppSidebar rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
           onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
-        <SidebarInset className="min-h-0">
+        <SidebarInset className="relative min-h-0">
+          <ResizeHandle width={listWidth} onWidth={setListWidth} />
           <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-background px-4 py-3">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />

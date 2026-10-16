@@ -109,18 +109,18 @@ export function AppSidebar({
                   key={r.key}
                   onClick={() => onPick(r.key)}
                   className={cn(
-                    "flex w-full flex-col items-start gap-1.5 border-b p-4 text-left text-sm leading-tight last:border-b-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    "flex w-full flex-col items-start gap-1.5 border-b p-4 text-left text-sm leading-snug break-words whitespace-normal last:border-b-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     r.key === current && "bg-sidebar-accent text-sidebar-accent-foreground",
                   )}
                 >
-                  <div className="flex w-full items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2">
                     <RelevanceBadge rel={r.rel} />
                     {r.edited && <span className="rounded bg-warning px-1.5 text-xs text-warning-foreground">你改过</span>}
                     {r.selected && <span className="text-xs text-primary">已选中</span>}
-                    <span className="ml-auto truncate text-xs text-muted-foreground">{r.meta}</span>
                   </div>
-                  <span className="line-clamp-2 font-medium">{r.title}</span>
-                  <span className="line-clamp-1 text-xs text-muted-foreground">{r.reason}</span>
+                  <span className="w-full font-medium">{r.title}</span>
+                  {r.meta && <span className="w-full text-xs text-muted-foreground">{r.meta}</span>}
+                  {r.reason && <span className="w-full text-xs text-muted-foreground">{r.reason}</span>}
                 </button>
               ))}
               {shown.length === 0 && <p className="p-4 text-sm text-muted-foreground">这里还没有文章。</p>}

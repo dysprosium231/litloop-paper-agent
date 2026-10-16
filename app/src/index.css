@@ -138,3 +138,10 @@
     @apply font-sans;
     }
 }
+/* While the list edge is dragged: no transitions (they made it lag), no text selection. */
+.resizing,
+.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  transition: none !important;
+}
