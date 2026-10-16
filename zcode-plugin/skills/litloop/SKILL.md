@@ -69,6 +69,9 @@ litloop search "关键词" --limit 10 --sort cited_by_count   # 13源引擎,失�
    - 课题调研、综述等深度检索：先列出标准请用户确认或修改，再检索。
 2. **检索**：`litloop_search` 用英文关键词；中文问题先译成英文检索词，必要时换 2–3 组同义词分别检索。用户在意期刊质量时用 `max_cas_zone` / `max_cas_sub_zone` / `max_jcr_quartile` / `exclude_warning`，不要擅自加过滤。
 3. **逐篇判断**：读每篇的标题和 `abstract`，按标准给相关度 **高 / 中 / 低 / 不相关**，写一句中文理由，说明它对应哪条标准、缺了什么。`abstract_missing` 的文章在理由里注明“仅凭标题”。不要编造摘要里没有的内容。
+   - **怎么分档**：研究对象、方法、关注点都符合 → 高；对象相同但方法或路线不同，或只覆盖问题的一部分，或与问题直接相关的综述 → 中；方法相同但对象是相邻体系，或泛泛的综述、书章 → 低；与问题无关 → 不相关。
+   - **拿不准时往高评**：漏掉一篇相关文章的代价比多读一篇大得多。只有标题、但标题明确符合时也可以评高，理由里注明“仅凭标题”。
+   - 用户定过的判定规则（如“某某路线算目标”）优先于上面的通用规则，并前后一致地用在所有批次上。
 4. **保存**：`litloop_screening(action="save", question=..., criteria=[...], query=..., mode="quick"|"deep", items=[{doi, title, year, journal, journal_rank, cited_by_count, abstract_missing, retracted, concern, relevance, reason}, ...])`。同一课题的后续检索传 `session=` 合并进同一会话。
 5. **呈现**：中文表格，列为 序号、相关度、文章、年份、期刊/分区、理由。**序号和顺序一律用 save 返回的 `numbering`**（保存时会按相关度重排），不要用自己发送时的顺序。`retracted` 标“⚠已撤稿”，`concern` 标“⚠关注声明”，`journal_warning` 标“⚠预警期刊”。不相关的文章也列出（可折叠在最后），**不替用户删除任何文章**。附上会话的 Markdown 文件路径。
 6. **用户选择**：用户说“要 1、3、5”后调用 `litloop_screening(action="decide", session=..., selected=[...], rejected=[...], out_file=...)` 记录。每次 decide 记录的是**完整选择**，会覆盖上一次；用户追加或改选时传入全部选中项。把返回的 `chosen` 列表（序号 + 标题）念给用户核对，再按需要下载（`litloop_batch_download`）或推送 Zotero。

@@ -4,7 +4,7 @@ description: >
   Use this skill whenever the user wants to download academic papers, search for research literature,
   get citations (BibTeX/RIS/EndNote), manage WebVPN institutional proxy for paper access,
   import .bib files, or batch-download papers. This skill orchestrates the litloop MCP server
-  which exposes 17 high-level tools covering download (OA/grey/institutional channels),
+  which exposes 20 high-level tools covering download (OA/grey/institutional channels),
   discovery, queue preparation, diagnostics, and login.
   TRIGGER when: user mentions downloading papers, DOI, arXiv ID, Sci-Hub, paper search,
   literature review, citation export, WebVPN, institutional access, "帮我下载论文", "搜索文献",
@@ -23,9 +23,9 @@ description: >
 镜像健康存储曾被重复造过三代）。
 ## 概述
 
-litloop 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学术论文的搜索、下载（开放获取 / 灰色源 / 机构渠道）、发现与队列准备、引文导出和诊断排障。下载引擎支持 13+ 数据源并行竞速、100+ 中国高校 WebVPN。
+litloop 是一个 MCP 服务器，提供 **20 个高层工具**，覆盖学术论文的搜索、下载（开放获取 / 灰色源 / 机构渠道）、发现与队列准备、引文导出和诊断排障。下载引擎支持 13+ 数据源并行竞速、100+ 中国高校 WebVPN。
 
-## MCP 工具参考（17 个）
+## MCP 工具参考（20 个）
 
 ### 下载
 
@@ -54,7 +54,7 @@ litloop 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学术�
 | 工具 | 功能 | 关键参数 |
 |------|------|----------|
 | `litloop_find` | ScanSci Find 引擎：`action=plan\|estimate\|smoke\|calibrate` 系统综述搜索协议 | `action`、`query`、`domain`、`depth`、`sample_size` |
-| `litloop_expand_citations` | 引文追踪（Semantic Scholar/OpenCitations） | `query`、`rounds`（≤5）、`citation_source` |
+| `litloop_deep_search` | 深度迭代检索与主动学习筛选：`action=start\|rate\|next\|status` | `action`（start/rate/next/status）、`question`、`queries`、`seeds`、`core_terms`、`criteria`、`must_find`、`session`、`ratings`、`batch_size` |
 | `litloop_prepare_queue` | 准备下载队列：`action=verify\|resolve_oa\|build\|full` | `candidates_json`、`query`、`limit` |
 | `litloop_search` | 关键词/作者搜索（OpenAlex），带摘要、期刊分区、撤稿标记 | `query`/`author`/`author_id`、`limit`、`year_from`、`year_to`、`sort`（cited/date）、`max_cas_zone`、`max_cas_sub_zone`、`max_jcr_quartile`、`exclude_warning`、`exclude_retracted` |
 | `litloop_screening` | 保存筛选记录、记录用户选择 | `action`=save/decide/list/show、`question`、`criteria`、`items`、`session`、`selected`、`out_file` |
@@ -95,14 +95,33 @@ litloop 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学术�
 
 **关键点**：搜索后必须让用户确认，不要自动下载所有结果。
 
-### 流程 2：论文列表全文下载
+### 流程 2：深度检索与主动学习筛选（查全课题）
+
+用于需要系统性查全某一课题的场景（共同引用扩展 + 持续主动学习）：
+
+```
+1. 准备种子：确认 1–3 篇已知相关种子文章 DOI（没有时先用 litloop_search 寻找并请用户确认）。
+2. 发起检索：litloop_deep_search(action="start", question=..., queries=[4–8 组英文检索词], seeds=[DOI], core_terms=[1–3 个核心词], criteria=[...])
+   → 返回首批候选（默认 20 篇）与 session。
+   - 检索词与核心词需覆盖缩写、全称与同义词，核心词中用 "|" 分隔同义词（如 "Al|aluminum SiC"）。
+   - 核心词必须覆盖整个问题的范围，英美拼写差异由插件自动处理。
+3. 逐篇评分：litloop_deep_search(action="rate", session=..., ratings=[{"n": 1, "relevance": "高", "reason": "..."}, ...])
+   - 按批次内编号 n 提交评分（高/中/低/不相关），整批每篇都要评。
+   - 分档：对象、方法、关注点都符合 → 高；对象相同但方法不同、只覆盖一部分或直接相关的综述 → 中；相邻体系或泛泛综述 → 低。拿不准时往高评；只有标题但明确符合也可评高，注明“仅凭标题”；用户定过的规则优先。
+4. 获取下批：litloop_deep_search(action="next", session=...)
+   - 评为“高”的文章自动滚雪球扩展为新种子，排序模型根据全部评分持续学习重排。
+   - 随时可用 litloop_deep_search(action="status", session=...) 查看筛选进度。
+   - 当返回 stop_suggested=true 时向用户展示 stop_reason 并建议结束；用户同意后用 litloop_screening 记录选择并按需下载。
+```
+
+### 流程 3：论文列表全文下载
 
 ```
 1. litloop_parse_list(file_path="papers.md") → 查看解析结果
 2. litloop_batch_download(identifiers=entries)（或 resolve_and_download 的等价组合）
 ```
 
-### 流程 3：WebVPN 机构代理
+### 流程 4：WebVPN 机构代理
 
 ```
 1. litloop_schools(action="search", query="清华") → 找到学校
@@ -112,7 +131,7 @@ litloop 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学术�
 5. litloop_download(identifier="...") → 自动走 WebVPN 渠道
 ```
 
-### 流程 4：付费论文登录下载（出版社 SSO）
+### 流程 5：付费论文登录下载（出版社 SSO）
 
 当下载返回 `error_type="paywall"` 和 `action="login_required"` 时：
 
@@ -129,7 +148,7 @@ litloop 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学术�
 - Cookies 持久化，同一出版商登录一次即可
 - 浏览器引擎为 **CloakBrowser**（Playwright 兼容反检测浏览器），能通过 Cloudflare Turnstile；出版社检测 TLS 指纹，Python HTTP 客户端即使带 cookies 也可能 403
 
-### 流程 5：Elsevier API 快速通道（1-2 秒下载）
+### 流程 6：Elsevier API 快速通道（1-2 秒下载）
 
 ```
 1. litloop_elsevier_setup → 浏览器注册指引 → 复制 API Key
@@ -140,7 +159,7 @@ litloop 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学术�
 
 **NOT_ENTITLED 含义**：未连校园网或学校未订阅该刊，不是缺 insttoken。
 
-### 流程 6：内嵌 Tor（灰色源被墙时）
+### 流程 7：内嵌 Tor（灰色源被墙时）
 
 ```
 1. litloop_tor(action="install")   # 首次下载 Tor Expert Bundle
@@ -165,7 +184,7 @@ litloop 是一个 MCP 服务器，提供 **17 个高层工具**，覆盖学术�
 
 - 科学符号（版权 ©、重音姓名）在 Markdown 导出中可能有质量告警（`markdown_warnings`）——文本可读，罕见字符需人工核对。
 - 批量任务无论成功、失败或超时都会在预算内退出并写 `batch_results.json`（原子写入）；挂住的源会被放弃而不是拖住整批。
-- `scan_find` 未安装时，`find`/`search`/`expand_citations` 会给出安装指引；`verify`/`resolve_oa` 超时返回结构化错误。
+- `scan_find` 未安装时，`find`/`search`/`deep_search` 会给出安装指引；`verify`/`resolve_oa` 超时返回结构化错误。
 
 ## 环境安装引导
 
