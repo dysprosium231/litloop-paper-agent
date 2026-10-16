@@ -29,3 +29,10 @@ are the commits after upstream commit fb796df and include:
 The compiled extensions of the original project (src/scansci_pdf/_core/*.pyd,
 *.so) are distributed by the original authors via PyPI only and are NOT part
 of this repository; LitLoop uses the pure-Python fallbacks.
+
+Third-party data
+----------------
+
+src/litloop/data/spelling_*.tsv.gz are derived from VarCon (Variant Conversion
+Info), Copyright 2000-2020 Kevin Atkinson and Benjamin Titze, part of SCOWL
+(http://wordlist.aspell.net/). See src/litloop/data/VARCON-LICENSE.txt.

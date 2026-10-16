@@ -578,6 +578,7 @@ def _query_terms(query: str) -> list[str]:
     terms with digits are split into their parts, since papers write Al-Si-Mg
     as Al-Mg-Si or AlSiMg. Long words are cut to a crude stem so
     "infiltration" also matches "infiltrated"."""
+    from .spelling import to_us
     terms = []
     for word in re.findall(r"[A-Za-z0-9%]+(?:-[A-Za-z0-9%]+)*", query or ""):
         parts = word.split("-")
@@ -586,7 +587,7 @@ def _query_terms(query: str) -> list[str]:
         else:
             pieces = [word.lower()]
         for w in pieces:
-            w = w.strip("%")
+            w = to_us(w.strip("%"))
             if w in _STOPWORDS or len(w) < 2:
                 continue
             w = w.replace("-", " ")
@@ -600,8 +601,9 @@ def _query_terms(query: str) -> list[str]:
 
 
 def _plain(text: str) -> str:
-    """Lower case, every kind of dash read as a space."""
-    return re.sub(r"[\-‐-―]", " ", text.lower())
+    """Lower case, American spelling, every kind of dash read as a space."""
+    from .spelling import to_us
+    return re.sub(r"[\-‐-―]", " ", to_us(text))
 
 
 def _match_tier(results: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:

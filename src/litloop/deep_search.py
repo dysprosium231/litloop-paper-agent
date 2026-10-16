@@ -148,14 +148,19 @@ def _citing(work_ids: list[str], years: list[str], max_records: int = 400) -> li
 def _topic_search(term: str) -> str:
     """Core term -> OpenAlex search text. Words must all appear; ``a|b`` means either.
 
-    Papers often write only the abbreviation ("Al/SiC") or the British spelling,
-    so "Al|aluminum|aluminium SiC" becomes "(Al OR aluminum OR aluminium) AND SiC".
+    Papers often write only the abbreviation ("Al/SiC"), so the agent writes
+    "Al|aluminum SiC"; British spellings are added here, giving
+    "(Al OR aluminum OR aluminium) AND SiC".
     """
-    words = [w for w in term.replace(",", " ").split() if w.strip("|")]
-    if not any("|" in w for w in words):
-        return " ".join(words)
-    parts = [("(" + " OR ".join(a for a in w.split("|") if a) + ")") if "|" in w else w for w in words]
-    return " AND ".join(parts)
+    from .spelling import variants
+    groups = []
+    for w in term.replace(",", " ").split():
+        alts = [v for a in w.split("|") if a for v in variants(a)]
+        if alts:
+            groups.append(list(dict.fromkeys(alts)))
+    if all(len(g) == 1 for g in groups):
+        return " ".join(g[0] for g in groups)
+    return " AND ".join(("(" + " OR ".join(g) + ")") if len(g) > 1 else g[0] for g in groups)
 
 
 def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[str],
@@ -273,8 +278,9 @@ _STOP = set("the and of in for with by on to a an is are was were from as at thi
 
 
 def _tokens(rec: dict[str, Any]) -> Counter:
+    from .spelling import to_us
     text = (rec.get("title") or "") + " " + (rec.get("abstract") or "")
-    return Counter(w[:7] for w in _WORD.findall(text.lower()) if w not in _STOP)
+    return Counter(w[:7] for w in _WORD.findall(to_us(text)) if w not in _STOP)
 
 
 def _features(state: dict[str, Any]) -> dict[str, dict[str, float]]:

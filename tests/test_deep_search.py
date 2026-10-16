@@ -220,10 +220,13 @@ def test_prefill_abstracts_picks_among_records_lacking_abstract(monkeypatch):
 
 
 def test_topic_search_expands_alternatives_and_handles_punctuation():
-    assert deep_search._topic_search("aluminum SiC") == "aluminum SiC"
+    assert deep_search._topic_search("ceramic aerogel") == "ceramic aerogel"
     assert deep_search._topic_search("Al|aluminum|aluminium SiC") == "(Al OR aluminum OR aluminium) AND SiC"
-    assert deep_search._topic_search("aluminum, SiC") == "aluminum SiC"
+    assert deep_search._topic_search("ceramic, aerogel") == "ceramic aerogel"
     assert deep_search._topic_search("a||b") == "(a OR b)"
+    # British spellings are added on their own
+    assert deep_search._topic_search("aluminum SiC") == "(aluminum OR aluminium) AND SiC"
+    assert deep_search._topic_search("Al|aluminum fiber") == "(Al OR aluminum OR aluminium) AND (fiber OR fibre)"
 
 
 

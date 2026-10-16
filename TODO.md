@@ -23,6 +23,7 @@
   - 存评分要把每篇的 DOI、标题逐篇抄回去（一批约 8KB）。新增 `litloop_deep_search(action="rate", ratings=[{n, relevance, reason}])`，按编号存，标题、DOI、年份、期刊由插件补；编号或相关度不对时整批不存；返回漏评的编号。工具总数仍为 20。技能文档同步改写。
   - `next` 一次约 2 分 20 秒（17 篇新种子、新增 755 篇：扩展 101 秒、补摘要和排序 34 秒），没有超时，但 Agent 只能干等。
 - [x] README 新增「依赖与 Key」：OpenAlex、Elsevier（强烈推荐）、发现引擎、Zotero、Chrome、学校账号、Semantic Scholar（审批严）、期刊分区插件，各写用途、没有时的影响、怎么获取。
+- [x] 缩写与拼写变体（2026-10-16，用户：不只是化学元素，其他术语也要考虑缩写和变体）：新增 `spelling.py`，英美拼写由插件自动处理。用户要求找成熟方案后（2026-10-16），由手写规则改为 VarCon（SCOWL 的英美加澳拼写对照库，宽松许可，需随附版权声明）：`scripts/build_spelling_table.py` 从 varcon.txt 生成两张压缩表（约 150KB，13357 种拼写→美式、12651 个美式词的英式写法），随包分发，许可声明在 `data/VARCON-LICENSE.txt`、NOTICE 已注明。相比手写规则不再误伤（precise）、能处理不规则词（tyre/tire、programme/program、mould/mold）；VarCon 把 aerogel 当英式、airgel 当美式，科研写法不对，列入例外。实测 OpenAlex 不会合并两种拼写（2020 年 aluminum 20869 篇、aluminium 8278 篇、OR 28282 篇）。用法：核心词自动展开成 OR，检索词匹配和排序模型的词特征先统一成美式拼写；缩写、化学式、同义词（PDC|polymer-derived、EMW|microwave、MMC|metal-matrix 等）需要领域知识，由 Agent 用 `|` 写，技能文档已写明并给例子。
 - 之后再做：扩展与补摘要并行；技能文档写明边界情况的评分；停止时估计剩余相关文章数；`skill/SKILL.md` 补深度检索。
 
 然后开始**可视化 app 第一版：筛选页**（设计见 CHARTER「可视化 app」）。
