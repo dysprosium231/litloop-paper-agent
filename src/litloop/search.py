@@ -37,6 +37,10 @@ class _AcademicSession(requests.Session):
                 params = dict(kwargs.get("params") or {})
                 params.setdefault("api_key", key)
                 kwargs["params"] = params
+            resp = super().request(method, url, *args, **kwargs)
+            from . import quota  # count keyword searches too (10 credits each), not only deep search
+            quota.record("openalex", resp)
+            return resp
         return super().request(method, url, *args, **kwargs)
 
 

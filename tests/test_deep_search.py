@@ -33,9 +33,9 @@ def net(tmp_path, monkeypatch):
             return [by_doi[v] for v in values if v in by_doi]
         return []  # seed references: no metadata needed for these tests
 
-    def cites_refs(refs, terms, years, max_records=1000):
+    def cites_refs(refs, terms, years, max_records=1000, credits0=None):
         calls["cites_refs"].append(sorted(refs))
-        return [REF_TARGET, NOISE] if "R1" in refs else ([LATE] if "R7" in refs else [])
+        return ([REF_TARGET, NOISE] if "R1" in refs else ([LATE] if "R7" in refs else [])), set(refs)
 
     def citing(ids, years, max_records=400):
         calls["citing"].append(sorted(ids))
@@ -136,7 +136,7 @@ def test_start_needs_queries_and_seeds(net):
 def test_rated_paper_without_doi_is_not_served_again(net, monkeypatch):
     no_doi = dict(rec("10.1/x", "Infiltration of SiC foams by aluminium", abstract="pressureless infiltration SiC aluminum"),
                   doi=None, openalex="WNODOI")
-    monkeypatch.setattr(deep_search, "_cites_refs_on_topic", lambda refs, terms, years, max_records=1000: [no_doi])
+    monkeypatch.setattr(deep_search, "_cites_refs_on_topic", lambda refs, terms, years, max_records=1000, credits0=None: ([no_doi], set(refs)))
     out = deep_search.start("q", ["pressureless infiltration SiC aluminum"], ["10.1/seed"], ["aluminum"], batch_size=10)
     first = [b for b in out["batch"] if b["doi"] is None]
     assert first
@@ -244,9 +244,55 @@ def test_citation_query_that_hits_the_cap_is_split(monkeypatch):
         return [rec(f"10.1/{i}_{n}", "t") for i in ids for n in range(2)]
 
     monkeypatch.setattr(deep_search, "_pages", pages)
-    out = deep_search._cites_refs_on_topic(["A", "B", "C", "D"], ["x"], [], max_records=3)
+    out, asked = deep_search._cites_refs_on_topic(["A", "B", "C", "D"], ["x"], [], max_records=3)
     assert len({r["doi"] for r in out}) == 8          # nothing lost to the cap
     assert seen == [4, 2, 2, 1, 1, 1, 1]              # split down to single references
+    assert asked == {"A", "B", "C", "D"}
+
+
+def test_a_single_reference_over_the_cap_keeps_only_one_page(monkeypatch):
+    caps = []
+
+    def pages(flt, max_records, split_over=False):
+        caps.append((max_records, split_over))
+        return None if split_over else [rec("10.1/x", "t")]
+
+    monkeypatch.setattr(deep_search, "_pages", pages)
+    deep_search._cites_refs_on_topic(["A", "B"], ["x"], [])
+    assert caps[-1] == (deep_search.SINGLE_REF_CAP, False)
+
+
+def test_expansion_stops_at_the_round_budget_and_keeps_the_rest_for_later(monkeypatch):
+    from litloop import quota
+    spent = [0]
+    monkeypatch.setattr(quota, "spent", lambda provider: spent[0])
+    monkeypatch.setattr(quota, "summary", lambda: {"openalex": {"remaining": 5000}})
+
+    def pages(flt, max_records, split_over=False):
+        spent[0] += deep_search.ROUND_CREDITS  # the first wave uses up the round
+        return [rec("10.1/" + flt.split("cites:")[1].split(",")[0].split("|")[0], "t")]
+
+    monkeypatch.setattr(deep_search, "_pages", pages)
+    refs = [f"W{i}" for i in range(50 * deep_search.WORKERS * 2 + 50)]  # one wave more than fits
+    out, asked = deep_search._cites_refs_on_topic(refs, ["x"], [])
+    assert len(asked) == 50 * deep_search.WORKERS * 2
+    assert asked == set(refs[:len(asked)])            # the most important references were asked
+
+
+def test_expansion_waits_when_the_daily_budget_is_nearly_spent(monkeypatch):
+    from litloop import quota
+    monkeypatch.setattr(quota, "spent", lambda provider: 0)
+    monkeypatch.setattr(quota, "summary", lambda: {"openalex": {"remaining": deep_search.RESERVE_CREDITS - 1}})
+    monkeypatch.setattr(deep_search, "_pages", lambda *a, **k: [rec("10.1/x", "t")])
+    assert deep_search._cites_refs_on_topic(["A"], ["x"], []) == ([], set())
+
+
+def test_angewandte_german_edition_is_the_same_paper():
+    pool = {}
+    deep_search._add(pool, rec("10.1002/anie.202116983", "Nanoagents"), "seed")
+    deep_search._add(pool, rec("10.1002/ange.202116983", "Nanoagents"), "cites_seed_references")
+    assert list(pool) == ["10.1002/anie.202116983"]
+    assert pool["10.1002/anie.202116983"]["via"] == ["seed", "cites_seed_references"]
 
 
 def test_openalex_retries_when_throttled_and_explains_a_spent_budget(monkeypatch):
@@ -272,3 +318,19 @@ def test_openalex_retries_when_throttled_and_explains_a_spent_budget(monkeypatch
     replies[:] = [R(429, remaining="0")]
     with pytest.raises(RuntimeError, match="daily budget used up"):
         deep_search._get({"filter": "x"})
+
+
+def test_keyword_searches_are_counted_against_the_openalex_budget(monkeypatch):
+    import requests
+    from litloop import quota, search
+
+    class R:
+        status_code = 200
+        headers = {"X-RateLimit-Credits-Used": "10", "X-RateLimit-Remaining": "4000", "X-RateLimit-Limit": "10000"}
+
+    monkeypatch.setattr(requests.Session, "request", lambda self, method, url, *a, **k: R())
+    before = quota.spent("openalex")
+    search._plain_session().get("https://api.openalex.org/works", params={"search": "x"})
+    search._plain_session().get("https://api.crossref.org/works")  # other APIs are not OpenAlex's business
+    assert quota.spent("openalex") - before == 10
+    assert quota.summary()["openalex"]["remaining"] == 4000

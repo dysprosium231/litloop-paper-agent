@@ -163,7 +163,8 @@ def warnings() -> list[str]:
     notes = []
     for name, s in summary().items():
         if s["remaining"] is not None and s["limit"] and s["remaining"] < s["limit"] * WARN_FRACTION:
-            notes.append(f"{name}: only {s['remaining']} of {s['limit']} requests left"
+            unit = "credits" if name == "openalex" else "requests"  # OpenAlex's headers count credits
+            notes.append(f"{name}: only {s['remaining']} of {s['limit']} {unit} left"
                          + (f", resets at {s['resets_at']}" if s["resets_at"] else ""))
         if s["throttled_today"] >= 5:
             notes.append(f"{name}: throttled {s['throttled_today']} times today; requests are slowed down")

@@ -57,6 +57,13 @@ PSEUDO_NEGATIVES = 100
 TITLE_WEIGHT = 0.3     # extra weight of each title word in the ranking model
 KNEE_RATIO = 6         # stop when 高 per batch falls below 1/6 of the best batch
 WORKERS = 4            # parallel OpenAlex requests (each chunk of 50 ids is independent)
+# OpenAlex budget guards (LitLoop's own choices, not official limits; the daily budget
+# itself is in docs/API_LIMITS.md). A reference cited by thousands of on-topic papers
+# (common in biomedicine) used to cost 50 credits for its 1000 most cited citers;
+# one 2026-10-16 round spent 2184 credits this way.
+SINGLE_REF_CAP = 200   # one reference over the cap: keep only its 200 most cited citers (one page)
+ROUND_CREDITS = 800    # stop asking for more citers once a round has spent this many credits
+RESERVE_CREDITS = 1000 # and leave this much of the daily budget for everything else
 
 
 # --------------------------------------------------------------------------- OpenAlex
@@ -203,10 +210,28 @@ def _topic_search(term: str) -> str:
     return " AND ".join(("(" + " OR ".join(g) + ")") if len(g) > 1 else g[0] for g in groups)
 
 
+def _budget_ok(credits0: int) -> bool:
+    """True while this round may still spend OpenAlex credits (see ROUND_CREDITS, RESERVE_CREDITS)."""
+    from . import quota
+    if quota.spent("openalex") - credits0 >= ROUND_CREDITS:
+        return False
+    remaining = (quota.summary().get("openalex") or {}).get("remaining")
+    return remaining is None or remaining > RESERVE_CREDITS
+
+
 def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[str],
-                         max_records: int = 1000) -> list[dict[str, Any]]:
-    """Works citing any of ``ref_ids`` whose title/abstract mentions a core term."""
-    jobs = [(term, chunk) for term in (core_terms or [""]) for chunk in _chunks(ref_ids)]
+                         max_records: int = 1000, credits0: int | None = None,
+                         ) -> tuple[list[dict[str, Any]], set[str]]:
+    """Works citing any of ``ref_ids`` whose title/abstract mentions a core term.
+
+    ``ref_ids`` come most important first. Returns the works and the references
+    actually asked about: once the round's credit budget is spent, the rest
+    are left for a later round.
+    """
+    from . import quota
+    credits0 = quota.spent("openalex") if credits0 is None else credits0
+    terms = core_terms or [""]
+    jobs = [(term, chunk) for chunk in _chunks(ref_ids) for term in terms]
 
     def flt(term: str, chunk: list[str]) -> str:
         topic = [f"title_and_abstract.search:{_topic_search(term)}"] if term else []
@@ -214,21 +239,27 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
 
     def one(job: tuple[str, list[str]]) -> list[tuple[bool, list[dict[str, Any]]]]:
         term, chunk = job
-        got = _pages(flt(term, chunk), max_records, split_over=len(chunk) > 1)
+        single = len(chunk) == 1
+        got = _pages(flt(term, chunk), SINGLE_REF_CAP if single else max_records, split_over=not single)
         return [(True, [])] if got is None else [(False, got)]
 
     out: list[dict[str, Any]] = []
-    while jobs:  # a query over the cap is split in halves and asked again, all in parallel
-        results = _parallel(one, jobs)
+    done: dict[str, int] = Counter()  # ref -> how many core terms were fully asked
+    while jobs:  # a query over the cap is split in halves; a few jobs at a time, budget permitting
+        if not _budget_ok(credits0):
+            break
+        wave, jobs = jobs[:WORKERS * 2], jobs[WORKERS * 2:]
         again = []
-        for (term, chunk), (split, got) in zip(jobs, results):
+        for (term, chunk), (split, got) in zip(wave, _parallel(one, wave)):
             if split:
                 half = len(chunk) // 2
                 again += [(term, chunk[:half]), (term, chunk[half:])]
             else:
                 out += got
-        jobs = again
-    return out
+                for ref in chunk:
+                    done[ref] += 1
+        jobs = again + jobs  # finish the halves of important references first
+    return out, {ref for ref, n in done.items() if n == len(terms)}
 
 
 # --------------------------------------------------------------------------- pool
@@ -252,6 +283,9 @@ def _key(rec: dict[str, Any]) -> str:
 
 
 def _add(pool: dict[str, dict], rec: dict[str, Any], via: str) -> None:
+    doi = rec.get("doi") or ""
+    if doi.startswith("10.1002/ange."):  # Angewandte's German edition: same article as 10.1002/anie.*
+        rec = {**rec, "doi": "10.1002/anie." + doi[len("10.1002/ange."):]}
     k = _key(rec)
     if not k or not rec.get("title") or rec.get("type") in NON_PAPER:
         return
@@ -416,19 +450,34 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
     """Add citation-route candidates for new seeds; returns how many records were added."""
     pool = state["pool"]
     years = _year_filter(state.get("year_from"), state.get("year_to"))
+    from . import quota
+    credits0 = quota.spent("openalex")
     seeds = [pool[k] for k in new_seed_keys if k in pool]
-    new_refs = sorted({r for s in seeds for r in (s.get("refs") or [])} - set(state["queried_refs"]))
+    # References shared by more seeds (the user's own seeds count double) are asked first,
+    # so a spent budget drops the least informative ones; they stay for a later round.
+    orig = set(_orig_seeds(state))
+    weight = Counter(r for k in set(state["seeds"]) | set(new_seed_keys) if k in pool
+                     for r in set(pool[k].get("refs") or []) for _ in range(2 if k in orig else 1))
+    all_seeds = seeds + [pool[k] for k in state["seeds"] if k in pool]
+    new_refs = sorted({r for s in all_seeds for r in (s.get("refs") or [])} - set(state["queried_refs"]),
+                      key=lambda r: (-weight[r], r))
     before = len(pool)
+    asked: set[str] = set()
     if new_refs:
         for rec in _by_filter("openalex", new_refs, years):
             _add(pool, rec, "seed_reference")
-        for rec in _cites_refs_on_topic(new_refs, state["core_terms"], years):
+        got, asked = _cites_refs_on_topic(new_refs, state["core_terms"], years, credits0=credits0)
+        for rec in got:
             _add(pool, rec, "cites_seed_references")
     seed_ids = [s["openalex"] for s in seeds if s.get("openalex")]
-    if seed_ids:
+    if seed_ids and _budget_ok(credits0):
         for rec in _citing(seed_ids, years):
             _add(pool, rec, "cites_seed")
-    state["queried_refs"] = sorted(set(state["queried_refs"]) | set(new_refs))
+    deferred = len(new_refs) - len(asked)
+    state["deferred_refs"] = deferred
+    if deferred:
+        logger.info("deep search: OpenAlex budget for this round used; %d references left for later", deferred)
+    state["queried_refs"] = sorted(set(state["queried_refs"]) | asked)
     state["seed_refs"] = sorted(set(state["seed_refs"]) | {r for s in seeds for r in (s.get("refs") or [])})
     for k in new_seed_keys:
         if k not in state["seeds"]:
@@ -661,6 +710,9 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
     if not str(load_config().get("openalex_api_key") or "").strip():
         notes.insert(0, "no OpenAlex API key: the free daily budget without one is about 1,000 credits, "
                         "which one deep search can use up; add a free key (openalex_api_key)")
+    if state.get("deferred_refs"):
+        notes.append(f"openalex: this round's credit budget was used; {state['deferred_refs']} seed references "
+                     "were not followed yet and are tried again in later rounds")
     return {"session": state["session"], "pool": len(state["pool"]), "screened": len(rated),
             "api_warnings": notes,
             "remaining": len(order) - len(picked), "ranked_by": state.get("ranked_by", "formula"), "batch": batch,
