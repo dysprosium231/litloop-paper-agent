@@ -20,6 +20,7 @@ from . import store
 from .identifiers import canonical_doi
 
 RELEVANCE = ("高", "中", "低", "不相关")
+ABSTRACT_CHARS = 1200  # as much as a deep-search batch shows
 _RANK = {r: i for i, r in enumerate(RELEVANCE)}
 _EN = {"high": "高", "medium": "中", "low": "低", "irrelevant": "不相关", "none": "不相关"}
 
@@ -96,9 +97,13 @@ def _save(sid: str, existing: bool, question: str, items: list[dict[str, Any]], 
     by_key = {_key(it): it for it in data["items"]}
     added = 0
     for raw in items:
-        item = {k: raw.get(k) for k in ("doi", "title", "year", "journal", "journal_rank",
-                                        "cited_by_count", "abstract_missing", "retracted", "concern")
+        item = {k: raw.get(k) for k in ("doi", "title", "year", "journal", "journal_rank", "authors",
+                                        "cited_by_count", "abstract", "abstract_missing", "retracted", "concern")
                 if raw.get(k) not in (None, "", [])}
+        if item.get("abstract"):  # for the app's detail pane; trimmed so a record stays small
+            item["abstract"] = str(item["abstract"])[:ABSTRACT_CHARS]
+        if isinstance(item.get("authors"), list):
+            item["authors"] = item["authors"][:3]
         item["relevance"] = _norm_relevance(raw.get("relevance"))
         item["reason"] = str(raw.get("reason") or "").strip()
         old = by_key.get(_key(item))

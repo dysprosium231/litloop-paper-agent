@@ -25,7 +25,7 @@ def test_save_sorts_by_relevance_and_writes_json_and_markdown():
     assert r["added"] == 3 and r["by_relevance"] == {"高": 1, "中": 1, "低": 1, "不相关": 0}
     data = screening.load(r["session"])
     assert [it["doi"] for it in data["items"]] == ["10.1/HIGH", "10.1/mid", "10.1/low"]
-    assert "abstract" not in data["items"][0]  # abstracts are not stored
+    assert len(data["items"][0].get("abstract", "")) <= screening.ABSTRACT_CHARS  # kept for the app, trimmed
     md = open(r["markdown"], encoding="utf-8").read()
     assert "| 1 | 高 | [HEC / thermal](https://doi.org/10.1/HIGH)" in md
     assert "⚠已撤稿 （仅凭标题）只讨论热膨胀" in md and "- 筛选标准：" in md

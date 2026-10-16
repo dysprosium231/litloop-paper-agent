@@ -445,7 +445,7 @@ def _prefill_abstracts(state: dict[str, Any], rated: dict[str, str]) -> int:
         return 0
     _phase("abstracts", len(todo))
     # Scopus answers about 3 papers a second at its allowed pace: budget for that.
-    fill_abstracts(todo, load_config(), budget_s=min(90.0, max(30.0, len(todo) / 3)))
+    fill_abstracts(todo, load_config(), budget_s=min(90.0, max(30.0, len(todo) / 3)), progress=_step)
     for r in todo:
         if r.get("abstract") or r.pop("abstract_decided", False):
             r["abstract_tried"] = True  # undecided ones (timeout, throttled) are asked again next round
@@ -646,7 +646,7 @@ def rate(session: str, ratings: list[dict[str, Any]]) -> dict[str, Any]:
             bad.append(r)
             continue
         b = batch[n - 1]
-        items.append({**{f: b.get(f) for f in ("doi", "title", "year", "journal", "journal_rank", "retracted", "concern")},
+        items.append({**{f: b.get(f) for f in _BATCH_FIELDS},
                       "relevance": rel, "reason": str(r.get("reason") or rel)})
     if bad:
         raise ValueError(f"nothing saved: invalid entries {bad[:3]}; n is 1-{len(batch)}, "
@@ -732,8 +732,15 @@ def _coverage(state: dict[str, Any], rated: dict[str, str], order: list[str]) ->
     return out
 
 
+# What a rated paper keeps in the screening record, so the app can show it
+# (abstract and authors included: the app never reads the pool).
+_BATCH_FIELDS = ("doi", "title", "year", "journal", "journal_rank", "retracted", "concern",
+                 "authors", "cited_by_count", "abstract", "abstract_missing")
+
+
 def _write_summary(state: dict[str, Any], rated: dict[str, str], stop: dict[str, Any],
-                   coverage: list[dict[str, Any]], notes: list[str], remaining: int) -> None:
+                   coverage: list[dict[str, Any]], notes: list[str], remaining: int,
+                   batch: list[dict[str, Any]]) -> None:
     """A small overview of the session for the app, which never reads the (huge) pool."""
     batches = []
     for i, keys in enumerate(b for b in state["served"] if b):
@@ -748,7 +755,7 @@ def _write_summary(state: dict[str, Any], rated: dict[str, str], stop: dict[str,
                "seeds": len(state["seeds"]), "batches": batches, "rounds": rounds,
                "stop_suggested": stop.get("stop_suggested", False), "stop_reason": stop.get("stop_reason", ""),
                "coverage": coverage, "api_warnings": notes, "core_terms": state.get("core_terms", []),
-               "queries": state.get("queries", [])}
+               "queries": state.get("queries", []), "current_batch": batch}
     try:
         store.write_json(store.summary_path(state["session"]), summary)
     except OSError as exc:
@@ -774,7 +781,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
     items = [dict(state["pool"][k]) for k in picked]
     if items:
         _phase("batch", len(items))
-        fill_abstracts([it for it in items if not it.get("abstract")], load_config())
+        fill_abstracts([it for it in items if not it.get("abstract")], load_config(), progress=_step)
         for k, it in zip(picked, items):  # keep what was found, so ranking can use it too
             if it.get("abstract") and not state["pool"][k].get("abstract"):
                 state["pool"][k]["abstract"] = it["abstract"]
@@ -796,9 +803,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
     if picked:
         state["served"].append([k for k in picked if k not in served_before])
         # What action="rate" needs to turn "n=3 高" back into a screening item.
-        state["last_batch"] = [{"key": k, **{f: it.get(f) for f in ("doi", "title", "year", "journal", "journal_rank",
-                                                                     "retracted", "concern")}}
-                               for k, it in zip(picked, items)]
+        state["last_batch"] = [{"key": k, **{f: b.get(f) for f in _BATCH_FIELDS}} for k, b in zip(picked, batch)]
         _save(state)
     from . import quota
     notes = quota.warnings()
@@ -809,7 +814,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
         notes.append(f"openalex: this round's credit budget was used; {state['deferred_refs']} seed references "
                      "were not followed yet and are tried again in later rounds")
     coverage = _coverage(state, rated, _ranked(state))
-    _write_summary(state, rated, stop, coverage, notes, remaining=len(order) - len(picked))
+    _write_summary(state, rated, stop, coverage, notes, remaining=len(order) - len(picked), batch=batch)
     return {"session": state["session"], "pool": len(state["pool"]), "screened": len(rated),
             "api_warnings": notes,
             "remaining": len(order) - len(picked), "ranked_by": state.get("ranked_by", "formula"), "batch": batch,

@@ -61,12 +61,14 @@
 1. **可视化 app**（2026-10-16 规划，用户定：独立桌面 app 用 Tauri 2；先做 app，阶段 2 剩下的穿插；用户在 app 里改的评分覆盖 Agent 的评分。设计见 CHARTER「可视化 app」）：
    - [x] 开发环境（2026-10-16）：Node 24、WebView2 152（系统自带）；Visual Studio Build Tools 2022（C++ 桌面开发，C 盘）；Rust 1.99.1 MSVC 工具链装在 `D:\dev\rust`（用户环境变量 `RUSTUP_HOME`、`CARGO_HOME`，已加入 PATH）。
    - [x] 桌面版筛选页设计（2026-10-16 用户认可，质感以后再打磨）：高保真示意 https://claude.ai/artifact/Esd3rbAG6VZa494Y2WCZHe 。三栏固定布局（会话 / 本批文章 / 详情与评分），顶部五段式进度（关键词、扩展、补摘要、排序、出批，含用时和预计剩余），每批高相关小柱图，键盘评分（↑↓ 换篇、1–4 评分、空格选中），改过评分的标“你改过”并保留 Agent 原判，侧栏底部显示 OpenAlex 今日剩余；Segoe UI Variable + 微软雅黑；浅色 / 深色。
-   - [~] 0 期地基：
+   - [x] 0 期地基：
      - [x] `store.py`（2026-10-16）：跨进程文件锁（`filelock`，新依赖）、先写临时文件再替换、格式版本号 `schema`（读到更新的版本时要求更新）；筛选记录的保存和用户选择在锁内读改写；候选池整份原子写入。两进程各写 40 次的测试不丢更新。
      - [x] 用户在 app 里改的评分存为 `user_relevance`，覆盖 Agent 的评分（排序、停止判断都用它）；Agent 重评不会抹掉它。
      - [x] 深度检索每轮写 `<session>.progress.json`（阶段：keywords / expand / abstracts / rank / batch，已完成数、总数、各阶段用时）和 `<session>.summary.json`（候选池大小、已筛、每批各相关度篇数、各轮耗时与积分、停止建议、必找文章状态、额度提醒）；app 只读这些小文件，不读候选池。
      - [x] 修复：会话列表把 `.pool.json`（可达上百 MB、没有 id）也当会话读，会报错。
-     - [ ] 补摘要阶段的细粒度进度（现在只有开始和总数）；接口格式写成文档，供前端对照。
+     - [x] 补摘要阶段的细粒度进度：`fill_abstracts(progress=...)` 按已有结论的篇数上报（2026-10-16）。
+     - [x] 接口格式文档 [docs/APP_DATA.md](docs/APP_DATA.md)：读写规则、三个文件的字段、app 可写的字段（`user_relevance`、`decision`）。筛选记录改为保存摘要（前 1200 字）和前 3 位作者，概况文件带当前这一批（app 不读候选池也能显示详情）。
+     - 0 期完成。
    - [ ] 1 期筛选页：Tauri 壳 + React/shadcn 前端 + Python 后台子进程（127.0.0.1 随机端口、随机令牌）；深度链接、完成通知；Windows 安装包与自动更新。
    - [ ] 2 期任务层（2026-10-16 用户要求“app 内能完成几乎一切操作”）：新建检索表单 → 提示词模板（随技能文档、带版本号）→ 后端 A：app 后台启动 Claude Code 等的非交互模式并挂 LitLoop MCP；确认点①检索方案与预计积分、②每批评分复核后点“下一批”；任务的进度、中断、日志、报错。
    - [ ] 3 期后端 B 内置 Agent（用户要求 A、B 都做，且不绑定模型）：技能文档作系统提示词、LitLoop 工具同名同参；Anthropic 原生接口 + OpenAI 兼容接口（DeepSeek、通义千问、Kimi、GLM、OpenRouter、Ollama 等）；按任务分配模型；测试按钮检查工具调用；用测试集存档判断比较各模型的评分质量。

@@ -25,6 +25,11 @@
 - 限额、并发、配额只写官方文档里明确写着的数字，附链接和核对日期；实测、自定、未核对的分别标明，不凭印象填。
 - 集中记录在 [docs/API_LIMITS.md](docs/API_LIMITS.md)；改了 `quota.py` 或 `network.py` 里的限速，同步改这份文档。
 
+## app 与 Agent 共用的文件
+
+- 筛选记录、深度检索概况、进度文件的格式写在 [docs/APP_DATA.md](docs/APP_DATA.md)；改了字段就同步改它，改字段含义或删字段时把 `store.SCHEMA` 加一。
+- 这些文件只通过 `store.py` 读写（加锁、整份替换），不要直接 `write_text`。
+
 ## 其他
 
 - 与用户交流用简体中文；提交信息可以用英文。

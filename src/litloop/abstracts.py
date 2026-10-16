@@ -194,8 +194,12 @@ def _springer(doi: str, timeout: float, key: str, daily_limit: int) -> str | Non
 
 
 def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None = None,
-                   budget_s: float = 20.0) -> None:
-    """Clean every abstract in place; fetch missing ones within BUDGET_S seconds."""
+                   budget_s: float = 20.0, progress: Any = None) -> None:
+    """Clean every abstract in place; fetch missing ones within BUDGET_S seconds.
+
+    ``progress(done, total)``, if given, is called as papers are settled
+    (found, or every source asked said there is none), for a progress bar.
+    """
     for r in results:
         r["abstract"] = clean_abstract(r.get("abstract") or "")
         if r["abstract"] and not r.get("abstract_source"):
@@ -246,6 +250,10 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
                      ([] if scopus and doi.startswith(ELSEVIER_PREFIX) else ["crossref"]) for doi in missing}
             jobs += [pool.submit(ask, "springer", doi) for doi in missing if "springer" in asked[doi]]
             jobs += [pool.submit(ask, "crossref", doi) for doi in missing if "crossref" in asked[doi]]
+            settled = lambda: sum(1 for d, r in missing.items()  # noqa: E731
+                                  if r["abstract"] or (asked.get(d) and set(asked[d]) <= answered.get(d, set())))
+            if progress:
+                progress(settled(), len(missing))
             for job in as_completed(jobs, timeout=max(0.1, deadline - time.monotonic())):
                 res = job.result()
                 if res[0] == "semantic_scholar":
@@ -255,6 +263,8 @@ def fill_abstracts(results: list[dict[str, Any]], config: dict[str, Any] | None 
                     if res[2] is not None:
                         answered.setdefault(res[1], set()).add(res[0])
                         take(res[1], res[2], res[0])
+                if progress:
+                    progress(settled(), len(missing))
                 if all(r["abstract"] for r in missing.values()):
                     break
         except FuturesTimeout:

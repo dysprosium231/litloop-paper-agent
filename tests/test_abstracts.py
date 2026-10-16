@@ -168,3 +168,13 @@ def test_springer_stops_at_the_daily_limit(monkeypatch):
     monkeypatch.setattr(a.quota, "summary", lambda: {"springer": {"requests_today": 500}})
     monkeypatch.setattr(a, "_session", lambda: (_ for _ in ()).throw(AssertionError("no request expected")))
     assert a._springer("10.1007/x", 5, "k", 500) is None
+
+
+def test_fill_reports_progress_as_papers_are_settled(monkeypatch):
+    from litloop import abstracts
+    monkeypatch.setattr(abstracts, "_semantic_scholar", lambda dois, timeout: {"10.1/a": "Found by S2."})
+    monkeypatch.setattr(abstracts, "_crossref", lambda doi, timeout, email="": "")
+    seen = []
+    rows = [{"doi": "10.1/a", "title": "A"}, {"doi": "10.1/b", "title": "B"}]
+    abstracts.fill_abstracts(rows, {}, budget_s=5, progress=lambda done, total: seen.append((done, total)))
+    assert seen[0] == (0, 2) and seen[-1] == (2, 2)   # a found, b: Crossref said there is none
