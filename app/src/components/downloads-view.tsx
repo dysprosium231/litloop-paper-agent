@@ -296,7 +296,7 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
   const failed = job.items.filter((i) => i.status === "failed")
   const finished = done + failed.length
   const missing = job.items.filter((i) => i.status !== "done")  // failed, or never reached (cancelled, interrupted)
-  const attention = running ? Object.values(live?.attention ?? {}) : []
+  const attention = running ? Object.entries(live?.attention ?? {}) : []
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title={<Crumb onBack={onBack} title={job.title} />}>
@@ -326,8 +326,16 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${(finished / Math.max(1, job.items.length)) * 100}%` }} />
         </div>
-        {attention.map((a, i) => (
-          <p key={i} className="rounded-md bg-warning px-3 py-2 text-sm text-warning-foreground">{a.message}</p>
+        {attention.map(([key, a]) => (
+          <div key={key} className="flex items-center gap-3 rounded-md bg-warning px-3 py-2 text-sm text-warning-foreground">
+            <span className="min-w-0 flex-1">{a.message}</span>
+            {/* A paper waiting for the user's login or check: the user may decline it. */}
+            {key.startsWith("wait:") && (
+              <Button size="sm" variant="outline" className="shrink-0" onClick={() => act(() => downloadsApi.skip(key.slice(5)))}>
+                跳过这篇
+              </Button>
+            )}
+          </div>
         ))}
         {job.error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" title={job.error}>{job.error_text ?? job.error}</p>}
         {job.state === "interrupted" && <p className="text-sm text-muted-foreground">下载任务未完成时应用已退出，可重试未完成项。</p>}

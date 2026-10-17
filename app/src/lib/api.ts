@@ -348,6 +348,7 @@ export const downloadsApi = {
   start: (papers: PendingGroup["papers"], title: string, session?: string, zoteroTarget?: string) =>
     call<DownloadJob>("/api/downloads", { papers, title, session: session ?? null, zotero_target: zoteroTarget ?? null }),
   cancel: () => call<{ cancelled: boolean }>("/api/downloads/cancel", {}),
+  skip: (doi: string) => call<{ skipped: boolean }>("/api/downloads/skip", { doi }),
   open: (path: string) => call<{ opened: string }>("/api/open", { path }),
   push: (job: string, collection: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(job)}/zotero`, { collection, tags: [] }),
   collections: () => call<ZoteroCollection[]>("/api/zotero/collections"),

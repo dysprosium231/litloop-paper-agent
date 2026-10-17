@@ -55,6 +55,10 @@ class Paper(BaseModel):
     journal: str | None = None
 
 
+class SkipPaper(BaseModel):
+    doi: str
+
+
 class NewSearch(BaseModel):
     """The app's search form; agent_runner.build_prompt turns it into the message."""
     question: str
@@ -556,6 +560,12 @@ def create_app(token: str) -> FastAPI:
     def search_cancel(run: str) -> dict[str, Any]:
         from . import agent_runner
         return {"cancelled": agent_runner.cancel(run)}
+
+    @app.post("/api/downloads/skip")
+    def download_skip(body: SkipPaper) -> dict[str, Any]:
+        """The user will not log in for this paper: give it up, go on with the next."""
+        from .sources import skip_download
+        return {"skipped": skip_download(body.doi)}
 
     @app.post("/api/downloads/cancel")
     def download_cancel() -> dict[str, Any]:

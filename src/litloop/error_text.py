@@ -18,6 +18,7 @@ import re
 # case-insensitively; the first hit wins. Keep the most specific first.
 _RULES: list[tuple[str, str, str]] = [
     (r"\bcancel", "已取消", ""),
+    (r"skipped by user", "已跳过", "可在任务结束后重试未完成项"),
     (r"NOT_ENTITLED", "学校未订阅此期刊，或当前不在校园网", "连接校园网或在「设置 → 学校认证」中登录后重试"),
     (r"No valid session|session (expired|invalid)|login required|需要机构登录",
      "学校认证已过期或未登录", "在「设置 → 学校认证」中重新登录"),

@@ -978,11 +978,38 @@ def _user_waiting_for(doi: str) -> bool:
 # are unaffected.
 _CANCEL_GEN = [0]
 _DL_TLS = threading.local()
+# Papers the user chose to skip while one of their windows waited for them
+# (the app's 跳过这篇): that download stops as if cancelled; the others go on.
+_SKIPPED: set[str] = set()
 
 
 def _cancelled() -> bool:
     gen = getattr(_DL_TLS, "gen", None)
-    return gen is not None and gen != _CANCEL_GEN[0]
+    if gen is not None and gen != _CANCEL_GEN[0]:
+        return True
+    return getattr(_DL_TLS, "key", None) in _SKIPPED
+
+
+def skip_download(identifier: str) -> bool:
+    """Give up on one paper in flight: its windows stop waiting for the user and
+    close, its race returns, the batch moves on to the next paper."""
+    key = identifier.strip()
+    if not is_arxiv_identifier(key):
+        key = normalize_doi(key)
+    with _INFLIGHT_LOCK:
+        if key not in _INFLIGHT:
+            return False
+        _SKIPPED.add(key)
+        _SETTLED.add(key)  # its sources stop waiting, launch nothing, drop late results
+    try:
+        from .. import progress_reporter as _pr
+        _pr.clear_attention(f"wait:{key}")
+        from ..browser_backend import close_browsers_since
+        close_browsers_since(0.0)  # papers download one at a time: these windows are its own
+    except Exception as exc:
+        log.info(f"   Skip: browser cleanup skipped: {exc}")
+    log.info(f"   Skipped by the user: {key}")
+    return True
 
 
 def cancel_downloads() -> dict[str, Any]:
@@ -1061,6 +1088,8 @@ def download(
         _INFLIGHT.add(key)
         _SETTLED.discard(key)
     t0 = time.perf_counter()  # same clock as browser_backend._remember
+    prev_key = getattr(_DL_TLS, "key", None)
+    _DL_TLS.key = key
     prev_gen = getattr(_DL_TLS, "gen", None)
     if prev_gen is None:  # nested calls (batch phase 2) keep the batch's generation
         _DL_TLS.gen = _CANCEL_GEN[0]
@@ -1077,10 +1106,14 @@ def download(
             strategy=strategy,
             _batch=_batch,
         )
+        if key in _SKIPPED and not result.get("success"):
+            return fail(key, "skipped by user", error_type="skipped", action="none")
         if _cancelled() and not result.get("success"):
             return fail(key, "cancelled by user", error_type="cancelled", action="none")
         return result
     finally:
+        _DL_TLS.key = prev_key
+        _SKIPPED.discard(key)
         try:  # whatever this paper waited on the user for is over now
             from .. import progress_reporter as _pr
             _pr.clear_attention(f"wait:{normalize_doi(key) if not is_arxiv_identifier(key) else key}")
@@ -1271,7 +1304,7 @@ def _download_impl(
 
     # Phase 2: Institutional access — only when Phase 1 failed
     # Skip institutional fallback for grey_only/scihub_only strategy
-    if _institutional and config.get("download_strategy") not in ("scihub_only", "grey_only"):
+    if _institutional and config.get("download_strategy") not in ("scihub_only", "grey_only") and not _cancelled():
         # Session self-healing: validate and refresh institutional sessions
         # before racing them (WebVPN only; CARSI self-heals inside login()).
         try:

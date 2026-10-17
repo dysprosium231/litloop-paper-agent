@@ -381,6 +381,10 @@ def open_login_browser(
             except Exception:
                 time.sleep(2)
             elapsed += 2
+            # Tell the download this window waits for the user (the race keeps
+            # waiting, the app shows a notice); raises once the paper is settled.
+            from .sources import note_user_waiting
+            note_user_waiting("login")
 
             if elapsed % 10 == 0:
                 log.info(f"   [browser] Waiting for user login... elapsed={elapsed}s, open_tabs={len(context.pages)}")

@@ -840,7 +840,9 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
         if "登录" in title or "身份" in title or "二次认证" in title or "CAS" in title or any(t in url_now for t in _auth_url_signals):
             print(f"  检测到登录页面，请完成登录...")
             # Wait up to 5 minutes, checking title every 3 seconds
+            from . import note_user_waiting
             for i in range(100):
+                note_user_waiting("login")  # the race waits, the app asks the user; stops if the paper is done
                 try:
                     page.wait_for_timeout(3000)
                     # Post-login SAML/redirect hops also pass through interstitials

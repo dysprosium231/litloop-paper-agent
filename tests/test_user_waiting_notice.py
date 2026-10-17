@@ -47,3 +47,31 @@ def test_a_stopped_source_is_not_scored_as_a_failure(tmp_path, monkeypatch):
         raise sources.SourceWaived("done")
     assert sources._try_source(waiting_source, "10.1/y", tmp_path / "y.pdf", {}, "CARSI") is None
     assert scored == []
+
+
+def test_skipping_a_paper_stops_its_download_and_only_that_one(tmp_path, monkeypatch):
+    import threading
+
+    started, release = threading.Event(), threading.Event()
+    out = {}
+
+    def impl(identifier, output_dir=None, **kw):
+        started.set()
+        release.wait(5)
+        return {"success": False, "doi": identifier, "error": "all sources failed"}
+    monkeypatch.setattr(sources, "_download_impl", impl)
+    monkeypatch.setattr(progress_reporter, "clear_attention", lambda key: None)
+    t = threading.Thread(target=lambda: out.setdefault("r", sources.download("10.1/skip-me", str(tmp_path))))
+    t.start()
+    assert started.wait(5)
+    assert sources.skip_download("10.1/skip-me") is True
+    assert sources.skip_download("10.1/not-running") is False
+    release.set()
+    t.join(5)
+    assert out["r"]["error_type"] == "skipped"
+    assert "10.1/skip-me" not in sources._SKIPPED            # a later retry starts afresh
+
+
+def test_a_skipped_paper_reads_as_skipped():
+    from litloop import error_text
+    assert error_text.reason("skipped by user") == "已跳过"
