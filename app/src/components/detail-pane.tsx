@@ -110,13 +110,13 @@ export function DetailPane({
         <div className="flex-1" />
         <Card className="sticky bottom-4 space-y-3 px-5 py-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <span className="text-xs text-muted-foreground">我的评分</span>
+              <span className="text-sm text-muted-foreground">我的评分</span>
               <div role="group" aria-label="我的评分" className="inline-flex rounded-lg bg-muted p-0.5">
-                {RELEVANCE.map((r, i) => (
+                {RELEVANCE.map((r) => (
                   <button key={r} type="button" aria-pressed={rel === r} onClick={() => onRate(r)}
                     className={cn("flex h-8 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground hover:text-foreground",
-                      rel === r && "bg-background font-medium text-foreground shadow-xs")}>
-                    {r}<span className="text-[10px] text-muted-foreground/70 tabular-nums">{i + 1}</span>
+                      rel === r && "bg-background font-medium text-primary shadow-xs")}>
+                    {r}
                   </button>
                 ))}
               </div>

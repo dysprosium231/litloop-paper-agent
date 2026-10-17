@@ -361,15 +361,15 @@ export default function App() {
           <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-background px-4 py-3">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">{record?.mode === "deep" ? "深度检索" : "快速检索"}</BreadcrumbItem>
+            <Breadcrumb className="min-w-0">
+              <BreadcrumbList className="flex-nowrap">
+                <BreadcrumbItem className="hidden shrink-0 whitespace-nowrap md:block">{record?.mode === "deep" ? "深度检索" : "快速检索"}</BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
+                <BreadcrumbItem className="min-w-0">
                   <DropdownMenu>
-                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-md px-1 outline-none hover:bg-accent">
-                      <BreadcrumbPage>{record ? short(record.question) : "选择检索会话"}</BreadcrumbPage>
-                      <ChevronDownIcon className="size-3.5 text-muted-foreground" />
+                    <DropdownMenuTrigger className="flex min-w-0 items-center gap-1 rounded-md px-1 outline-none hover:bg-accent">
+                      <BreadcrumbPage className="min-w-0 max-w-[32rem] truncate whitespace-nowrap">{record ? short(record.question) : "选择检索会话"}</BreadcrumbPage>
+                      <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="max-w-md">
                       {sessions.map((s) => (
@@ -387,10 +387,10 @@ export default function App() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setNewSearch(true)}>
+            <Button size="sm" variant="ghost" className="ml-auto shrink-0" onClick={() => setNewSearch(true)}>
               <PlusIcon />新建检索
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setHistory(true)}>
+            <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setHistory(true)}>
               <HistoryIcon />历史
             </Button>
           </header>

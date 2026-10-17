@@ -6,8 +6,11 @@
 
 @theme inline {
     --font-heading: var(--font-sans);
-    /* Geist (bundled, OFL) for Latin and digits; Chinese falls through to the system font */
-    --font-sans: 'Geist Variable', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+    /* Geist for Latin and digits, Noto Sans SC (思源黑体) for Chinese: both bundled (OFL),
+       with matching 400/500/600 weights; the system font only if they fail to load */
+    --font-sans: 'Geist Variable', 'Noto Sans SC Variable', 'Microsoft YaHei UI', 'PingFang SC', system-ui, sans-serif;
+    /* Chinese reads small at 12px: small text is 12.5px */
+    --text-xs: 0.78125rem;
     --color-warning: var(--warning);
     --color-warning-foreground: var(--warning-foreground);
     --color-sidebar-ring: var(--sidebar-ring);
@@ -81,7 +84,7 @@
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --radius: 0.375rem;
+    --radius: 0.5rem;
     --sidebar: #fafafa;
     --sidebar-foreground: #171717;
     --sidebar-primary: #004CD8;
@@ -142,6 +145,7 @@
     }
   html {
     @apply font-sans antialiased;
+    letter-spacing: 0.01em;
     }
   h1, h2 {
     letter-spacing: -0.015em;
