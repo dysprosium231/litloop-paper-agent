@@ -4,6 +4,7 @@ import { ChevronDownIcon } from "lucide-react"
 import { AppSidebar, type Section } from "@/components/app-sidebar"
 import { PaperList, type PaperRow } from "@/components/paper-list"
 import { SettingsNav, SettingsPane } from "@/components/settings-view"
+import { DownloadsNav, JobPane, PENDING, PendingPane, useDownloads } from "@/components/downloads-view"
 import { DetailPane, type Paper } from "@/components/detail-pane"
 import { ProgressStrip } from "@/components/progress-strip"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
@@ -122,6 +123,9 @@ export default function App() {
   const [section, setSection] = React.useState<Section>("screen")
   const [groups, setGroups] = React.useState<SettingGroup[]>([])
   const [settingsGroup, setSettingsGroup] = React.useState("sources")
+  const downloads = useDownloads(section === "download")
+  const [downloadView, setDownloadView] = React.useState(PENDING)
+  const startedJob = (job: string) => { setDownloadView(job); downloads.refresh() }
   React.useEffect(() => {
     if (section === "settings") settingsApi.list().then(setGroups).catch((e) => setError(String(e)))
   }, [section])
@@ -229,14 +233,20 @@ export default function App() {
           ) : section === "screen" ? (
             <PaperList rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
               onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
+          ) : section === "download" ? (
+            <DownloadsNav jobs={downloads.jobs} pending={downloads.pending} current={downloadView} onPick={setDownloadView} />
           ) : (
-            <p className="p-4 text-sm text-muted-foreground">{section === "download" ? "下载队列" : "Zotero"}还在做。</p>
+            <p className="p-4 text-sm text-muted-foreground">Zotero 还在做。</p>
           )}
         </AppSidebar>
         <SidebarInset className="relative min-h-0 min-w-0">
           {section !== "settings" && <ResizeHandle width={listWidth} onWidth={setListWidth} />}
           {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-          {section === "settings" ? (
+          {section === "download" ? (
+            downloadView === PENDING
+              ? <PendingPane pending={downloads.pending} busy={Boolean(downloads.running)} onStarted={startedJob} />
+              : <JobPane key={downloadView} id={downloadView} live={downloads.live} onChanged={downloads.refresh} onStarted={startedJob} />
+          ) : section === "settings" ? (
             <SettingsPane groups={groups} current={settingsGroup}
               onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
           ) : (<>

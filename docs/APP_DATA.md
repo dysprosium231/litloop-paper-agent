@@ -110,3 +110,30 @@ with store.update(screening_dir() / f"{session}.json", indent=2) as data:
 - `phases`：已经结束的阶段及用时，可用来估计剩余时间。
 - `state` 为 `idle` 时，`seconds` 是这一轮总用时；`phase` 为 `null`。
 - 读不到或读到坏文件时当作“没有在运行”。
+
+### 下载任务 `<litloop home>/downloads/<job>.json`
+
+app 发起的下载，每次一个文件，由 app 后台的 `download_jobs.py` 写（同样经 `store` 加锁、整份替换）；Agent 走 MCP 的批量下载不写这里。
+
+```json
+{
+  "schema": 1,
+  "job": "20261017-101500",
+  "title": "含稀土的非晶纳米药物载体",
+  "session": "…",
+  "state": "running",
+  "created": "2026-10-17 10:15:00",
+  "finished": null,
+  "output_dir": "C:\Users\…\papers",
+  "error": null,
+  "items": [
+    {"doi": "10.3390/nano8110961", "title": "…", "year": 2018, "journal": "Nanomaterials",
+     "status": "done", "source": "mdpi", "file": "C:\…\xxx.pdf", "error": null}
+  ]
+}
+```
+
+- `state`：`running` → `done` / `cancelled` / `failed`（引擎本身出错，原因在 `error`）。文件里仍是 `running`、但当前后台并没有在跑它（app 中途关闭），读出时当作 `interrupted`。
+- `items[].status`：`waiting` → `done` / `failed`。引擎每完成一篇就更新一次状态；`source`、`file`、`error` 在整批结束时填入。
+- 同一时间只运行一个任务：引擎的进度报告和取消开关是整个进程共用的。运行中的实时信息（正在处理哪篇、需要用户处理的验证码或登录提示）不存进这个文件，app 通过 `/api/downloads` 读取 `progress_reporter` 的报告。
+- “待下载”不单独存文件：取各筛选记录里 `decision` 为 `selected`、且还没有被任何任务下载成功的文章。

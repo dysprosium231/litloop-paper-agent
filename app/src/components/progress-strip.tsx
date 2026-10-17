@@ -34,9 +34,11 @@ export function ProgressStrip({ progress, summary }: { progress: Progress | null
   const now = progress.phase
   const elapsed = progress.updated - progress.started
   let eta = ""
-  if (now?.total && now.done > 0) {
+  if (now?.total && now.done >= now.total) {
+    eta = "，这一步即将完成"  // counted out, still writing results: "约还要 0 秒" read as stuck
+  } else if (now?.total && now.done > 0) {
     const rate = (progress.updated - now.started) / now.done
-    eta = `，这一步约还要 ${secs(rate * (now.total - now.done))}`
+    eta = `，这一步约还要 ${secs(Math.max(1, rate * (now.total - now.done)))}`
   }
   return (
     <div className="space-y-2 border-b px-6 py-3">

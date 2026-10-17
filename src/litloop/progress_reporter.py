@@ -26,6 +26,21 @@ _STARTED_MONO: float = 0.0
 
 STALE_SECONDS = 120  # reader shows "idle" when no update for this long
 
+# In-process listeners told about every finished item: (ok, current). The
+# desktop app's download jobs use this to mark papers one by one.
+_LISTENERS: list[Any] = []
+
+
+def add_listener(fn: Any) -> None:
+    _LISTENERS.append(fn)
+
+
+def remove_listener(fn: Any) -> None:
+    try:
+        _LISTENERS.remove(fn)
+    except ValueError:
+        pass
+
 
 def _progress_dir() -> Path:
     data_dir = Path(os.environ.get("LITLOOP_DATA_DIR", str(Path.home() / ".litloop")))
@@ -161,6 +176,11 @@ def update(**kw: Any) -> None:
 
 def advance(ok: bool, current: str = "", phase: str = "") -> None:
     """Record one finished item (the hot path for per-paper lanes)."""
+    for fn in list(_LISTENERS):
+        try:
+            fn(ok, current)
+        except Exception:
+            pass
     with _LOCK:
         if not _STATE:
             return

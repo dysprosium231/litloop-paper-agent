@@ -48,6 +48,23 @@ class Setting(BaseModel):
     value: Any = None
 
 
+class Paper(BaseModel):
+    doi: str
+    title: str | None = None
+    year: int | None = None
+    journal: str | None = None
+
+
+class NewDownload(BaseModel):
+    papers: list[Paper]
+    title: str
+    session: str | None = None
+
+
+class OpenPath(BaseModel):
+    path: str
+
+
 class Decision(BaseModel):
     doi: str | None = None
     title: str | None = None
@@ -163,7 +180,92 @@ def create_app(token: str) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
 
+    # Downloads: jobs started from the app (download_jobs), one at a time.
+    @app.get("/api/downloads")
+    def downloads() -> dict[str, Any]:
+        from . import download_jobs, progress_reporter
+        live = progress_reporter.read_state() if download_jobs.running() else None
+        return {"jobs": download_jobs.list_jobs(), "running": download_jobs.running(), "live": live}
+
+    @app.get("/api/downloads/pending")
+    def downloads_pending() -> list[dict[str, Any]]:
+        """Papers picked 选中下载 in screening that no job has downloaded yet, by session."""
+        from . import download_jobs
+        from .identifiers import canonical_doi
+        got = download_jobs.downloaded_dois()
+        out = []
+        for s in screening.list_sessions(200):
+            if not s["selected"]:
+                continue
+            try:
+                items = store.read_json(_record_path(s["session"]))["items"]
+            except (OSError, ValueError, HTTPException):
+                continue
+            papers = [{k: it.get(k) for k in ("doi", "title", "year", "journal")} for it in items
+                      if it.get("decision") == "selected" and it.get("doi") and canonical_doi(it["doi"]) not in got]
+            if papers:
+                out.append({"session": s["session"], "question": s["question"], "papers": papers})
+        return out
+
+    @app.get("/api/downloads/{job}")
+    def download_job(job: str) -> dict[str, Any]:
+        from . import download_jobs
+        if not re.fullmatch(r"[\w-]{1,40}", job):
+            raise HTTPException(400, "bad job id")
+        try:
+            return download_jobs.get(job)
+        except FileNotFoundError as exc:
+            raise HTTPException(404, f"no job {job}") from exc
+
+    @app.post("/api/downloads")
+    def download_start(body: NewDownload) -> dict[str, Any]:
+        from . import download_jobs
+        try:
+            return download_jobs.start([p.model_dump() for p in body.papers], body.title, body.session)
+        except download_jobs.Busy as exc:
+            raise HTTPException(409, "已有下载在进行") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/downloads/cancel")
+    def download_cancel() -> dict[str, Any]:
+        from . import download_jobs
+        return {"cancelled": download_jobs.cancel()}
+
+    @app.post("/api/open")
+    def open_path(body: OpenPath) -> dict[str, Any]:
+        """Open a downloaded PDF or a job's folder with the system's default program.
+
+        Only paths a download job recorded (its files and output folder) are
+        opened, never an arbitrary path: opening runs whatever handles it.
+        """
+        from pathlib import Path
+
+        from . import download_jobs
+        target = Path(body.path).resolve()
+        allowed = set()
+        for j in download_jobs.list_jobs(200):
+            d = download_jobs.get(j["job"])
+            if d.get("output_dir"):
+                allowed.add(Path(d["output_dir"]).resolve())
+            allowed |= {Path(i["file"]).resolve() for i in d["items"] if i.get("file")}
+        ok_file = target in allowed and target.suffix.lower() == ".pdf" and target.is_file()
+        ok_dir = target.is_dir() and (target in allowed or any(target == a.parent for a in allowed if a.suffix))
+        if not (ok_file or ok_dir):
+            raise HTTPException(403, "only downloaded PDFs and their folders can be opened")
+        _open_with_system(target)
+        return {"opened": str(target)}
+
     return app
+
+
+def _open_with_system(path) -> None:
+    import os
+    import subprocess
+    if os.name == "nt":
+        os.startfile(str(path))  # noqa: S606 - a vetted PDF or folder
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(path)])
 
 
 def _free_port() -> int:
@@ -177,7 +279,11 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--token", required=True, help="random token every request must carry")
     ap.add_argument("--port", type=int, default=0, help="0 = pick a free port")
     args = ap.parse_args(argv)
+    import os
+
     import uvicorn
+    # The app shows download progress itself; no floating progress bar next to it.
+    os.environ.setdefault("LITLOOP_PROGRESS_BAR", "0")
     port = args.port or _free_port()
     print(json.dumps({"litloop_app_server": 1, "port": port}), flush=True)
     uvicorn.run(create_app(args.token), host="127.0.0.1", port=port, log_level="warning")

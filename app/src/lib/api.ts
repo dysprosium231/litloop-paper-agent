@@ -182,3 +182,63 @@ export const settingsApi = {
   quota: () => call<Record<string, ProviderUsage>>("/api/quota"),
   openalex: () => call<{ credits_used?: number; credits_remaining?: number; credits_limit?: number; resets_at?: string; has_key?: boolean; error?: string } | null>("/api/quota/openalex"),
 }
+
+// ------------------------------------------------------------------ downloads
+
+export interface DownloadItem {
+  doi: string
+  title: string
+  year?: number | null
+  journal?: string | null
+  status: "waiting" | "done" | "failed"
+  source?: string | null
+  file?: string | null
+  error?: string | null
+}
+
+export type JobState = "running" | "done" | "cancelled" | "failed" | "interrupted"
+
+export interface DownloadJobEntry {
+  job: string
+  title: string
+  session?: string | null
+  state: JobState
+  created: string
+  finished?: string | null
+  total: number
+  done: number
+  failed: number
+}
+
+export interface DownloadJob extends Omit<DownloadJobEntry, "total" | "done" | "failed"> {
+  output_dir: string
+  error?: string | null
+  items: DownloadItem[]
+}
+
+/** The engine's process-wide report while a job runs (progress_reporter). */
+export interface LiveDownload {
+  total: number
+  done: number
+  success: number
+  failed: number
+  current?: string
+  phase?: string
+  attention?: Record<string, { message: string; current?: string }>
+}
+
+export interface PendingGroup {
+  session: string
+  question: string
+  papers: { doi: string; title?: string; year?: number | null; journal?: string | null }[]
+}
+
+export const downloadsApi = {
+  list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null }>("/api/downloads"),
+  pending: () => call<PendingGroup[]>("/api/downloads/pending"),
+  job: (id: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(id)}`),
+  start: (papers: PendingGroup["papers"], title: string, session?: string) =>
+    call<DownloadJob>("/api/downloads", { papers, title, session: session ?? null }),
+  cancel: () => call<{ cancelled: boolean }>("/api/downloads/cancel", {}),
+  open: (path: string) => call<{ opened: string }>("/api/open", { path }),
+}

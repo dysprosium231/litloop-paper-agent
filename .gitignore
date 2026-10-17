@@ -32,11 +32,11 @@ test_output/
 # Claude Code local settings
 .claude/
 
-# Temporary test scripts
-batch_download_*.py
-download_*.py
-login_and_download.py
-test_download*.py
+# Temporary test scripts (repo root only: src/ and tests/ have real files with these names)
+/batch_download_*.py
+/download_*.py
+/login_and_download.py
+/test_download*.py
 ISSUE_REPORT*.md
 
 # Browser profile/cache directories (Chrome user data, CloakBrowser kernels)
