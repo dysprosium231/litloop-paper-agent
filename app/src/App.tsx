@@ -4,9 +4,8 @@ import { ChevronDownIcon } from "lucide-react"
 import { AppSidebar, RAIL_COLLAPSED, RAIL_OPEN, type Section } from "@/components/app-sidebar"
 import { PaperList, type PaperRow } from "@/components/paper-list"
 import { SettingsNav, SettingsPane } from "@/components/settings-view"
-import { DownloadsNav, JobPane, PENDING, PendingPane, useDownloads } from "@/components/downloads-view"
-import { useZotero, ZoteroNav, ZoteroPane, type ZoteroView } from "@/components/zotero-view"
-import { ZoteroCheckPane } from "@/components/zotero-check"
+import { DownloadsOverview, JobPane, OVERVIEW, useDownloads } from "@/components/downloads-view"
+import { useZotero, ZoteroPage, type ZoteroView } from "@/components/zotero-view"
 import { DetailPane, type Paper } from "@/components/detail-pane"
 import { ProgressStrip } from "@/components/progress-strip"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
@@ -38,11 +37,9 @@ const short = (q: string) => (q.length > 28 ? q.slice(0, 28) + "…" : q)
 // Width of the collapsed icon rail plus each section's list, which the user drags; each
 // section keeps its own width between runs. An open rail adds RAIL_OPEN - RAIL_COLLAPSED
 // on top, so the list keeps its width.
-type Resizable = "screen" | "download" | "zotero"
+type Resizable = "screen"
 const WIDTHS: Record<Resizable, { min: number; initial: number }> = {
   screen: { min: 360, initial: 420 },  // 360 keeps the list header (title + 只看本批) whole
-  download: { min: 260, initial: 320 },
-  zotero: { min: 260, initial: 320 },
 }
 const MAX_WIDTH = 900
 const SETTINGS_WIDTH = 320  // the settings list is short: fixed width, no handle
@@ -59,7 +56,7 @@ function readWidth(s: Resizable): number {
 
 function useStoredWidths(): [Record<Resizable, number>, (s: Resizable, w: number) => void] {
   const [widths, setWidths] = React.useState(() => ({
-    screen: readWidth("screen"), download: readWidth("download"), zotero: readWidth("zotero"),
+    screen: readWidth("screen"),
   }))
   const set = React.useCallback((s: Resizable, w: number) => {
     const clamped = Math.round(Math.min(MAX_WIDTH, Math.max(WIDTHS[s].min, w)))
@@ -163,7 +160,7 @@ export default function App() {
   const [groups, setGroups] = React.useState<SettingGroup[]>([])
   const [settingsGroup, setSettingsGroup] = React.useState("sources")
   const downloads = useDownloads(section === "download")
-  const [downloadView, setDownloadView] = React.useState(PENDING)
+  const [downloadView, setDownloadView] = React.useState(OVERVIEW)
   const startedJob = (job: string) => { setDownloadView(job); downloads.refresh() }
   const zotero = useZotero(section === "zotero")
   const [zoteroView, setZoteroView] = React.useState<ZoteroView>("queue")
@@ -269,33 +266,30 @@ export default function App() {
   return (
     <TooltipProvider>
       {/* The header's toggle hides the list; the rail then shows icons only (--sidebar-width-icon). */}
-      <SidebarProvider style={{ "--sidebar-width": `${(section === "settings" ? SETTINGS_WIDTH : widths[section]) + railExtra}px` } as React.CSSProperties}>
+      <SidebarProvider style={{ "--sidebar-width": `${(section === "settings" ? SETTINGS_WIDTH : section === "screen" ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
         <AppSidebar section={section} onSection={setSection} railOpen={railOpen} onRailOpen={setRailOpen}>
           {section === "settings" ? (
             <SettingsNav groups={groups} current={settingsGroup} onPick={setSettingsGroup} />
           ) : section === "screen" ? (
             <PaperList rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
               onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
-          ) : section === "download" ? (
-            <DownloadsNav jobs={downloads.jobs} pending={downloads.pending} outputDir={downloads.outputDir} current={downloadView} onPick={setDownloadView} />
-          ) : (
-            <ZoteroNav data={zotero.data} mode={zotero.mode} onModeChanged={zotero.loadMode} view={zoteroView} onView={setZoteroView} onOpenJob={openJob} />
-          )}
+          ) : null}
         </AppSidebar>
         <SidebarInset className="relative min-h-0 min-w-0">
-          {section !== "settings" && (
+          {section === "screen" && (
             <ResizeHandle key={section} width={widths[section]} min={WIDTHS[section].min} initial={WIDTHS[section].initial}
               offset={railExtra} onWidth={(w) => setWidth(section, w)} />
           )}
           {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           {section === "zotero" ? (
-            zoteroView === "check"
-              ? <ZoteroCheckPane running={Boolean(zotero.data?.running)} onStarted={openJob} />
-              : <ZoteroPane data={zotero.data} error={zotero.error} onChanged={zotero.refresh} onOpenJob={openJob} />
+            <ZoteroPage data={zotero.data} error={zotero.error} mode={zotero.mode} onModeChanged={zotero.loadMode}
+              onChanged={zotero.refresh} onOpenJob={openJob} view={zoteroView} onView={setZoteroView} />
           ) : section === "download" ? (
-            downloadView === PENDING
-              ? <PendingPane pending={downloads.pending} busy={Boolean(downloads.running)} onStarted={startedJob} />
-              : <JobPane key={downloadView} id={downloadView} live={downloads.live} onChanged={downloads.refresh} onStarted={startedJob} />
+            downloadView === OVERVIEW
+              ? <DownloadsOverview jobs={downloads.jobs} pending={downloads.pending} outputDir={downloads.outputDir}
+                  busy={Boolean(downloads.running)} onStarted={startedJob} onOpen={setDownloadView} />
+              : <JobPane key={downloadView} id={downloadView} live={downloads.live} onChanged={downloads.refresh} onStarted={startedJob}
+                  onBack={() => setDownloadView(OVERVIEW)} />
           ) : section === "settings" ? (
             <SettingsPane groups={groups} current={settingsGroup}
               onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />

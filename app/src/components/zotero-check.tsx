@@ -88,10 +88,7 @@ export function ZoteroCheckPane({ running, onStarted }: { running: boolean; onSt
   return (
     <div className="min-h-0 flex-1 overflow-y-auto scrollable">
       <div className="space-y-3 border-b px-6 py-4">
-        <div>
-          <h2 className="text-lg font-semibold">附件检查</h2>
-          <div className="mt-0.5 text-xs text-muted-foreground">{counts || "检测分类中缺失或为空的 PDF 附件"}</div>
-        </div>
+        <div className="text-xs text-muted-foreground">{counts || "检测分类中缺失或为空的 PDF 附件"}</div>
         <div className="flex items-center gap-2">
           <CollectionPicker collections={collections} value={key} onChange={(v) => { setKey(v); setItems(null) }}
             disabled={!running || !collections} placeholder={running ? (collections ? "选择分类" : "正在加载…") : "Zotero 未运行"} />

@@ -1,8 +1,8 @@
 import * as React from "react"
-import { CheckCircle2Icon, FileSearchIcon, InboxIcon, LoaderIcon, XCircleIcon } from "lucide-react"
+import { CheckCircle2Icon, LoaderIcon, XCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar"
+import { ZoteroCheckPane } from "@/components/zotero-check"
 import { downloadsApi, zoteroApi, type WriteMode, type ZoteroHistoryEntry, type ZoteroOverview, type ZoteroPendingGroup, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -82,52 +82,89 @@ function Check({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   )
 }
 
-/** Second column of the Zotero section: connection, the pending queue, past pushes (they open the download job). */
-export type ZoteroView = "queue" | "check"
+export type ZoteroView = "queue" | "check" | "history"
 
-export function ZoteroNav({ data, mode, onModeChanged, view, onView, onOpenJob }: {
-  data: ZoteroOverview | null; mode: WriteMode | null | undefined; onModeChanged: () => void
-  view: ZoteroView; onView: (v: ZoteroView) => void; onOpenJob: (job: string) => void
+/**
+ * The Zotero page: connection and write mode on top, then tabs for the push
+ * queue, the attachment check and past pushes (they open the download job).
+ */
+export function ZoteroPage({ data, error, mode, onModeChanged, onChanged, onOpenJob, view, onView }: {
+  data: ZoteroOverview | null; error: string | null; mode: WriteMode | null | undefined; onModeChanged: () => void
+  onChanged: () => void; onOpenJob: (job: string) => void; view: ZoteroView; onView: (v: ZoteroView) => void
 }) {
-  const entry = (v: ZoteroView) => cn("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-sidebar-accent",
-    view === v && "bg-sidebar-accent font-medium")
   const waiting = data?.pending.reduce((n, g) => n + g.papers.length, 0) ?? 0
+  const tabs: { id: ZoteroView; label: string; count?: number }[] = [
+    { id: "queue", label: "推送队列", count: waiting },
+    { id: "check", label: "附件检查" },
+    { id: "history", label: "推送记录", count: data?.history.length },
+  ]
   return (
-    <>
-      <SidebarHeader className="border-b p-4">
-        <div className="text-base font-medium text-foreground">Zotero</div>
-        {data && (
-          <div className="space-y-1 pt-1 text-xs text-muted-foreground">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-stretch gap-5 border-b px-6">
+        <h2 className="flex items-center py-3 text-lg font-semibold">Zotero</h2>
+        <div className="my-4 w-px bg-border" />
+        <div role="tablist" className="flex gap-6">
+          {tabs.map((t) => (
+            <button key={t.id} type="button" role="tab" aria-selected={view === t.id} onClick={() => onView(t.id)}
+              className={cn("-mb-px flex items-center gap-1.5 border-b-2 text-sm text-muted-foreground hover:text-foreground",
+                view === t.id ? "border-primary font-medium text-foreground" : "border-transparent")}>
+              {t.label}
+              {!!t.count && <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">{t.count}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b px-6 py-2.5 text-xs text-muted-foreground">
+        {data ? (
+          <>
             <Check ok={data.running} yes="Zotero 运行中" no="Zotero 未运行" />
             <Check ok={Boolean(data.mcp)} yes="zotero-mcp 已就绪" no="未找到 zotero-mcp（「设置 → Zotero」）" />
             {data.mcp && <WriteModeLine mode={mode} running={data.running} onDone={onModeChanged} />}
-          </div>
-        )}
-      </SidebarHeader>
-      <SidebarContent className="scrollable gap-0.5 p-2">
-        <button type="button" className={entry("queue")} onClick={() => onView("queue")}>
-          <InboxIcon className="size-4 shrink-0" />
-          <span className="flex-1">推送队列</span>
-          {waiting > 0 && <span className="rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">{waiting}</span>}
-        </button>
-        <button type="button" className={entry("check")} onClick={() => onView("check")}>
-          <FileSearchIcon className="size-4 shrink-0" />
-          <span className="flex-1">附件检查</span>
-        </button>
-        {!!data?.history.length && <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground">历史记录</div>}
-        {data?.history.map((h) => (
-          <button key={h.job} type="button" onClick={() => onOpenJob(h.job)}
-            className="flex w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-sidebar-accent">
-            <span className="line-clamp-2 text-sm">{h.title}</span>
-            <span className="truncate text-xs text-muted-foreground" title={h.collection}>{h.collection}</span>
-            <span className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", (h.failed > 0 || h.no_pdf > 0) && "text-warning-foreground")}>
-              {h.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
-              {h.state === "running" ? "进行中" : h.state === "interrupted" ? "已中断" : outcome(h)}
-            </span>
-          </button>
+          </>
+        ) : (error ?? "正在加载…")}
+      </div>
+      {view === "check" ? (
+        <ZoteroCheckPane running={Boolean(data?.running)} onStarted={onOpenJob} />
+      ) : view === "history" ? (
+        <ZoteroHistory history={data?.history ?? []} onOpenJob={onOpenJob} />
+      ) : (
+        <ZoteroPane data={data} error={error} onChanged={onChanged} onOpenJob={onOpenJob} />
+      )}
+    </div>
+  )
+}
+
+function ZoteroHistory({ history, onOpenJob }: { history: ZoteroHistoryEntry[]; onOpenJob: (job: string) => void }) {
+  if (!history.length) {
+    return (
+      <div className="px-6 py-12 text-center">
+        <p className="text-sm font-medium">暂无推送记录</p>
+        <p className="mt-1 text-xs text-muted-foreground">推送到 Zotero 的下载任务将显示在此处</p>
+      </div>
+    )
+  }
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto scrollable">
+      <ul className="mx-6 my-4 divide-y rounded-lg border">
+        {history.map((h) => (
+          <li key={h.job}>
+            <button type="button" onClick={() => onOpenJob(h.job)}
+              className="flex w-full items-center gap-4 px-4 py-2.5 text-left hover:bg-accent/60">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm">{h.title}</div>
+                <div className="truncate text-xs text-muted-foreground" title={h.collection}>{h.collection}</div>
+              </div>
+              <span className={cn("flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground",
+                (h.failed > 0 || h.no_pdf > 0) && "text-warning-foreground")}>
+                {h.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
+                {h.state === "running" ? "进行中" : h.state === "interrupted" ? "已中断" : outcome(h)}
+              </span>
+              <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{(h.finished ?? h.started ?? "").slice(5, 16)}</span>
+            </button>
+          </li>
         ))}
-      </SidebarContent>
-    </>
+      </ul>
+    </div>
   )
 }
 
@@ -145,10 +182,7 @@ export function ZoteroPane({ data, error, onChanged, onOpenJob }: {
   const blocked = !data.mcp || !data.running || Boolean(data.pushing)
   return (
     <div className="min-h-0 flex-1 overflow-y-auto scrollable">
-      <div className="border-b px-6 py-4">
-        <h2 className="text-lg font-semibold">推送队列</h2>
-        <div className="mt-0.5 text-xs text-muted-foreground">{all ? `${all} 篇 · ${data.pending.length} 个下载任务` : "已全部推送"}</div>
-      </div>
+      {all > 0 && <div className="px-6 pt-4 text-xs text-muted-foreground">{all} 篇 · {data.pending.length} 个下载任务</div>}
       {failure && <p className="mx-6 mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{failure}</p>}
       {!data.running && all > 0 && <p className="mx-6 mt-4 rounded-md bg-warning px-3 py-2 text-sm text-warning-foreground">Zotero 未运行，请先启动 Zotero。</p>}
       {data.pushing && (

@@ -1,9 +1,8 @@
 import * as React from "react"
-import { CheckCircle2Icon, CircleDashedIcon, FolderOpenIcon, InboxIcon, LoaderIcon, XCircleIcon } from "lucide-react"
+import { CheckCircle2Icon, ChevronLeftIcon, CircleDashedIcon, FolderOpenIcon, LoaderIcon, XCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar"
 import {
   downloadsApi,
   type DownloadItem,
@@ -17,7 +16,7 @@ import {
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-export const PENDING = "pending"
+export const OVERVIEW = "overview"
 
 const STATE: Record<JobState, string> = {
   running: "进行中", done: "已完成", cancelled: "已取消", failed: "失败", interrupted: "已中断",
@@ -54,79 +53,6 @@ export function useDownloads(active: boolean) {
 }
 
 /** Second column of the download section: what waits, then the jobs, newest first. */
-type Filter = "all" | "failed" | "unfinished"
-const FILTERS: { id: Filter; label: string; keep: (j: DownloadJobEntry) => boolean }[] = [
-  { id: "all", label: "全部", keep: () => true },
-  { id: "failed", label: "有失败", keep: (j) => j.failed > 0 },
-  { id: "unfinished", label: "未完成", keep: (j) => j.state !== "done" },
-]
-
-export function DownloadsNav({ jobs, pending, outputDir, current, onPick }: {
-  jobs: DownloadJobEntry[]; pending: PendingGroup[]; outputDir: string; current: string; onPick: (id: string) => void
-}) {
-  const waiting = pending.reduce((n, g) => n + g.papers.length, 0)
-  const [filter, setFilter] = React.useState<Filter>("all")
-  const [openError, setOpenError] = React.useState<string | null>(null)
-  const done = jobs.reduce((n, j) => n + j.done, 0)
-  const failed = jobs.reduce((n, j) => n + j.failed, 0)
-  const shown = jobs.filter(FILTERS.find((f) => f.id === filter)!.keep)
-  const openFolder = () => {
-    setOpenError(null)
-    downloadsApi.open(outputDir).catch((e) => setOpenError(errorMessage(e)))
-  }
-  return (
-    <>
-      <SidebarHeader className="gap-2 border-b p-4">
-        <div className="text-base font-medium text-foreground">下载</div>
-        <div className="text-xs text-muted-foreground">
-          已下载 {done} 篇{failed ? ` · 失败 ${failed} 篇` : ""}
-        </div>
-        {outputDir && (
-          <button type="button" onClick={openFolder} title={outputDir}
-            className="flex min-w-0 items-center gap-1.5 text-left text-xs text-muted-foreground hover:text-foreground">
-            <FolderOpenIcon className="size-3.5 shrink-0" />
-            <span className="truncate">{outputDir}</span>
-          </button>
-        )}
-        {openError && <p className="text-xs text-destructive">{openError}</p>}
-      </SidebarHeader>
-      <SidebarContent className="scrollable gap-0.5 p-2">
-        <button type="button" onClick={() => onPick(PENDING)}
-          className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-sidebar-accent",
-            current === PENDING && "bg-sidebar-accent font-medium")}>
-          <InboxIcon className="size-4 shrink-0" />
-          <span className="flex-1">下载队列</span>
-          {waiting > 0 && <span className="rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">{waiting}</span>}
-        </button>
-        {jobs.length > 0 && (
-          <div className="flex items-center gap-1 px-3 pt-4 pb-1">
-            <span className="flex-1 text-xs text-muted-foreground">历史记录</span>
-            {FILTERS.map((f) => (
-              <button key={f.id} type="button" onClick={() => setFilter(f.id)}
-                className={cn("rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground",
-                  filter === f.id && "bg-sidebar-accent font-medium text-foreground")}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
-        {jobs.length > 0 && shown.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">无符合条件的记录</p>}
-        {shown.map((j) => (
-          <button key={j.job} type="button" onClick={() => onPick(j.job)}
-            className={cn("flex w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-sidebar-accent",
-              current === j.job && "bg-sidebar-accent")}>
-            <span className={cn("line-clamp-2 text-sm", current === j.job && "font-medium")}>{j.title}</span>
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {j.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
-              {STATE[j.state]} · {j.done}/{j.total}{j.failed ? ` · 失败 ${j.failed}` : ""} · {j.created.slice(5, 16)}
-            </span>
-          </button>
-        ))}
-      </SidebarContent>
-    </>
-  )
-}
-
 function Header({ title, meta, children }: { title: string; meta?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b px-6 py-4">
@@ -139,13 +65,34 @@ function Header({ title, meta, children }: { title: string; meta?: React.ReactNo
   )
 }
 
+function BackLink({ onBack }: { onBack: () => void }) {
+  return (
+    <button type="button" onClick={onBack}
+      className="flex items-center gap-1 px-5 pt-3 text-xs text-muted-foreground hover:text-foreground">
+      <ChevronLeftIcon className="size-3.5" />下载
+    </button>
+  )
+}
+
 const metaLine = (p: { journal?: string | null; year?: number | null }) => [p.year, p.journal].filter(Boolean).join(" · ")
 
-/** Papers picked 选中下载 in screening, grouped by session, each group one click away from a job. */
-export function PendingPane({ pending, busy, onStarted }: {
-  pending: PendingGroup[]; busy: boolean; onStarted: (job: string) => void
+type Filter = "all" | "failed" | "unfinished"
+const FILTERS: { id: Filter; label: string; keep: (j: DownloadJobEntry) => boolean }[] = [
+  { id: "all", label: "全部", keep: () => true },
+  { id: "failed", label: "有失败", keep: (j) => j.failed > 0 },
+  { id: "unfinished", label: "未完成", keep: (j) => j.state !== "done" },
+]
+
+/**
+ * The downloads page: totals and the save folder, the papers picked 选中下载 in
+ * screening (grouped by session, one click from a job), then the job history.
+ */
+export function DownloadsOverview({ jobs, pending, outputDir, busy, onStarted, onOpen }: {
+  jobs: DownloadJobEntry[]; pending: PendingGroup[]; outputDir: string; busy: boolean
+  onStarted: (job: string) => void; onOpen: (job: string) => void
 }) {
   const [error, setError] = React.useState<string | null>(null)
+  const [filter, setFilter] = React.useState<Filter>("all")
   const start = async (papers: PendingGroup["papers"], title: string, session?: string) => {
     try {
       onStarted((await downloadsApi.start(papers, title, session)).job)
@@ -153,24 +100,40 @@ export function PendingPane({ pending, busy, onStarted }: {
       setError(errorMessage(e))
     }
   }
+  const openFolder = () => {
+    setError(null)
+    downloadsApi.open(outputDir).catch((e) => setError(errorMessage(e)))
+  }
   const all = pending.flatMap((g) => g.papers)
+  const done = jobs.reduce((n, j) => n + j.done, 0)
+  const failed = jobs.reduce((n, j) => n + j.failed, 0)
+  const shown = jobs.filter(FILTERS.find((f) => f.id === filter)!.keep)
   return (
     <div className="min-h-0 flex-1 overflow-y-auto scrollable">
-      <Header title="下载队列" meta={all.length ? `${all.length} 篇 · ${pending.length} 个检索会话` : undefined}>
-        {pending.length > 1 && <Button size="sm" disabled={busy} onClick={() => start(all, `${pending.length} 个检索会话 · ${all.length} 篇`)}>全部下载</Button>}
+      <Header title="下载" meta={`已下载 ${done} 篇${failed ? ` · 失败 ${failed} 篇` : ""}`}>
+        {outputDir && (
+          <Button size="sm" variant="outline" onClick={openFolder} title={outputDir}>
+            <FolderOpenIcon />打开保存位置
+          </Button>
+        )}
       </Header>
       {error && <p className="mx-6 mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-      {busy && <p className="mx-6 mt-4 text-sm text-muted-foreground">当前有下载任务进行中。</p>}
-      {pending.length === 0 && (
-        <div className="px-6 py-12 text-center">
-          <p className="text-sm font-medium">暂无待下载文献</p>
-          <p className="mt-1 text-xs text-muted-foreground">在筛选中加入下载的文献将显示在此处</p>
-        </div>
-      )}
+
+      <div className="flex items-center justify-between gap-4 px-6 pt-5 pb-2">
+        <h3 className="text-sm font-medium">
+          下载队列
+          {all.length > 0 && <span className="ml-2 font-normal text-muted-foreground">{all.length} 篇 · {pending.length} 个检索会话</span>}
+        </h3>
+        {pending.length > 1 && (
+          <Button size="sm" disabled={busy} onClick={() => start(all, `${pending.length} 个检索会话 · ${all.length} 篇`)}>全部下载</Button>
+        )}
+      </div>
+      {busy && <p className="px-6 pb-2 text-sm text-muted-foreground">当前有下载任务进行中。</p>}
+      {pending.length === 0 && <p className="px-6 pb-2 text-sm text-muted-foreground">暂无待下载文献。在筛选中加入下载的文献将显示在此处。</p>}
       {pending.map((g) => (
-        <section key={g.session} className="border-b px-6 py-4">
+        <section key={g.session} className="mx-6 mb-3 rounded-lg border px-4 py-3">
           <div className="mb-2 flex items-center justify-between gap-4">
-            <h3 className="min-w-0 truncate text-sm font-medium">{g.question || g.session}</h3>
+            <h4 className="min-w-0 truncate text-sm font-medium">{g.question || g.session}</h4>
             <Button size="sm" variant={pending.length > 1 ? "outline" : "default"} disabled={busy}
               onClick={() => start(g.papers, g.question || g.session, g.session)}>开始下载</Button>
           </div>
@@ -184,6 +147,40 @@ export function PendingPane({ pending, busy, onStarted }: {
           </ul>
         </section>
       ))}
+
+      <div className="flex items-center gap-1 px-6 pt-5 pb-2">
+        <h3 className="flex-1 text-sm font-medium">历史记录</h3>
+        {jobs.length > 0 && FILTERS.map((f) => (
+          <button key={f.id} type="button" onClick={() => setFilter(f.id)}
+            className={cn("rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground",
+              filter === f.id && "bg-accent font-medium text-foreground")}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+      {jobs.length === 0 && <p className="px-6 pb-6 text-sm text-muted-foreground">暂无下载记录</p>}
+      {jobs.length > 0 && shown.length === 0 && <p className="px-6 pb-6 text-sm text-muted-foreground">无符合条件的记录</p>}
+      {shown.length > 0 && (
+        <ul className="mx-6 mb-6 divide-y rounded-lg border">
+          {shown.map((j) => (
+            <li key={j.job}>
+              <button type="button" onClick={() => onOpen(j.job)}
+                className="flex w-full items-center gap-4 px-4 py-2.5 text-left hover:bg-accent/60">
+                <span className="min-w-0 flex-1 truncate text-sm">{j.title}</span>
+                <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  {j.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
+                  {STATE[j.state]}
+                </span>
+                <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                  {j.done}/{j.total}
+                  {j.failed ? <span className="text-destructive"> · 失败 {j.failed}</span> : null}
+                </span>
+                <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{j.created.slice(5, 16)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -245,8 +242,9 @@ function StatusIcon({ item, running }: { item: DownloadItem; running: boolean })
 }
 
 /** One job: progress, what needs the user (captcha, sign-in), and every paper's result. */
-export function JobPane({ id, live, onChanged, onStarted }: {
+export function JobPane({ id, live, onChanged, onStarted, onBack }: {
   id: string; live: LiveDownload | null; onChanged: () => void; onStarted: (job: string) => void
+  onBack: () => void
 }) {
   const [job, setJob] = React.useState<DownloadJob | null>(null)
   const [error, setError] = React.useState<string | null>(null)
@@ -260,7 +258,14 @@ export function JobPane({ id, live, onChanged, onStarted }: {
   }, [id])
   const act = (f: () => Promise<unknown>) => f().then(onChanged).catch((e) => setError(errorMessage(e)))
 
-  if (!job) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "正在加载…"}</div>
+  if (!job) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <BackLink onBack={onBack} />
+        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "正在加载…"}</div>
+      </div>
+    )
+  }
   const done = job.items.filter((i) => i.status === "done").length
   const failed = job.items.filter((i) => i.status === "failed")
   const finished = done + failed.length
@@ -268,6 +273,7 @@ export function JobPane({ id, live, onChanged, onStarted }: {
   const attention = running ? Object.values(live?.attention ?? {}) : []
   return (
     <div className="min-h-0 flex-1 overflow-y-auto scrollable">
+      <BackLink onBack={onBack} />
       <Header title={job.title} meta={`${STATE[job.state]} · ${job.created}${job.finished ? `–${job.finished.slice(11)}` : ""}`}>
         {running && <Button size="sm" variant="outline" onClick={() => act(downloadsApi.cancel)}>取消下载</Button>}
         {!running && missing.length > 0 && (

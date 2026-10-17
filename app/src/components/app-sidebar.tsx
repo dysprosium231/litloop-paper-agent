@@ -24,8 +24,22 @@ const sections: { id: Section; title: string; icon: React.ComponentType }[] = [
   { id: "screen", title: "筛选", icon: ListFilterIcon },
   { id: "download", title: "下载", icon: DownloadIcon },
   { id: "zotero", title: "Zotero", icon: BookMarkedIcon },
-  { id: "settings", title: "设置", icon: SettingsIcon },
 ]
+const settings = { id: "settings" as const, title: "设置", icon: SettingsIcon }  // at the foot of the rail
+
+function RailItem({ item, active, railOpen, onSection }: {
+  item: { id: Section; title: string; icon: React.ComponentType }; active: boolean; railOpen: boolean; onSection: (s: Section) => void
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton tooltip={{ children: item.title, hidden: railOpen }} isActive={active} onClick={() => onSection(item.id)}
+        className="h-9 gap-3 px-2.5">
+        <item.icon />
+        <span className={railOpen ? "truncate" : "sr-only"}>{item.title}</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  )
+}
 
 /** Icon rail on the left (sections) plus a second column whose content the section decides. */
 export function AppSidebar({
@@ -40,7 +54,7 @@ export function AppSidebar({
   onSection: (s: Section) => void
   railOpen: boolean
   onRailOpen: (open: boolean) => void
-  children: React.ReactNode
+  children?: React.ReactNode  // none: the section has no list column (downloads)
 }) {
   const ToggleIcon = railOpen ? PanelLeftCloseIcon : PanelLeftOpenIcon
   return (
@@ -61,25 +75,14 @@ export function AppSidebar({
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {sections.map((s) => (
-                  <SidebarMenuItem key={s.id}>
-                    <SidebarMenuButton
-                      tooltip={{ children: s.title, hidden: railOpen }}
-                      isActive={s.id === section}
-                      onClick={() => onSection(s.id)}
-                      className="h-9 gap-3 px-2.5"
-                    >
-                      <s.icon />
-                      <span className={railOpen ? "truncate" : "sr-only"}>{s.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {sections.map((s) => <RailItem key={s.id} item={s} active={s.id === section} railOpen={railOpen} onSection={onSection} />)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter>
+        <SidebarFooter className="border-t">
           <SidebarMenu>
+            <RailItem item={settings} active={section === "settings"} railOpen={railOpen} onSection={onSection} />
             <SidebarMenuItem>
               <SidebarMenuButton tooltip={{ children: railOpen ? "收起侧栏" : "展开侧栏", hidden: railOpen }} onClick={() => onRailOpen(!railOpen)}
                 className="h-9 gap-3 px-2.5 text-muted-foreground" aria-label={railOpen ? "收起侧栏" : "展开侧栏"}>
@@ -91,9 +94,11 @@ export function AppSidebar({
         </SidebarFooter>
       </Sidebar>
 
-      <Sidebar collapsible="none" className="hidden min-w-0 flex-1 md:flex">
-        {children}
-      </Sidebar>
+      {children && (
+        <Sidebar collapsible="none" className="hidden min-w-0 flex-1 md:flex">
+          {children}
+        </Sidebar>
+      )}
     </Sidebar>
   )
 }
