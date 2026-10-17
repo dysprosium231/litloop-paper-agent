@@ -553,8 +553,15 @@ def run_scihub_then_single(
     _progress.start_task("文献下载", total=len(ids))
     _progress.set_output_dir(str(out))
     results: dict[str, dict[str, Any]] = {}
+    t_all = t = time.time()
+
+    def _lap(what: str) -> None:
+        nonlocal t
+        logger.info(f"[timing] {what}: {time.time() - t:.1f}s (total {time.time() - t_all:.0f}s)")
+        t = time.time()
 
     _enrich_oa_urls(entries, config)
+    _lap("open-access links looked up")
     springer_key = str(config.get("springer_api_key", "") or "")
     from .sources.elsevier_api import fulltext_enabled
     fast_channels = ("oa", "elsevier") if fulltext_enabled(config) else ("oa",)
@@ -578,6 +585,7 @@ def run_scihub_then_single(
                 results[r["doi"]] = r
                 _progress.advance(True, current=r["doi"])
                 _progress.item_result(r["doi"], r)
+        _lap(f"open-access round, {len(results)}/{len(fast)} papers")
 
     def _one(ident: str, **kw: Any) -> dict[str, Any]:
         if _sources._CANCEL_GEN[0] != gen0:
@@ -603,6 +611,7 @@ def run_scihub_then_single(
             measure(config)
         except Exception as exc:
             logger.info(f"Sci-Hub speed test skipped: {exc}")
+        _lap("Sci-Hub speed test")
         _progress.update(phase="Sci-Hub")
         with ThreadPoolExecutor(max_workers=min(int(config.get("scihub_round_workers", 10) or 10), len(grey_ids))) as ex:
             for i in grey_ids:
@@ -617,6 +626,7 @@ def run_scihub_then_single(
                     results[i] = r
                     _progress.item_result(i, r)
                 _progress.advance(bool(r.get("success")), current=i)  # a miss goes on to round 2
+        _lap(f"Sci-Hub round, {sum(1 for i in grey_ids if i in results)}/{len(grey_ids)} papers")
 
     left = [i for i in ids if i not in results]
     if left:
@@ -629,13 +639,20 @@ def run_scihub_then_single(
             def _staged(i: str) -> dict[str, Any]:
                 _progress.update(current=i)
                 _progress.item_stage(i, "正在查找免费全文和出版商官网")
-                return _one(i, _institutional=True, use_vpnsci=use_vpnsci)
+                t_one = time.time()
+                r = _one(i, _institutional=True, use_vpnsci=use_vpnsci)
+                logger.info(f"[timing] {i}: {time.time() - t_one:.1f}s, "
+                            f"{r.get('source') if r.get('success') else 'failed'}")
+                return r
             futs = {ex.submit(_staged, i): i for i in left}
             for f in as_completed(futs):
                 i, r = futs[f], f.result()
                 results[i] = r
                 _progress.advance(bool(r.get("success")), current=i)
                 _progress.item_result(i, r)  # final: nothing else will be tried for it
+        _lap(f"one-by-one round, {sum(1 for i in left if results[i].get('success'))}/{len(left)} papers")
+    logger.info(f"[timing] whole list: {time.time() - t_all:.0f}s, "
+                f"{sum(1 for r in results.values() if r.get('success'))}/{len(ids)} papers")
     _progress.finish()
     return [results[i] for i in ids if i in results]
 

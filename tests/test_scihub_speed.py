@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import pytest
 
 import litloop.config
@@ -35,9 +36,10 @@ def test_measure_auto_selects_fastest(monkeypatch):
     }
 
     def fake_one(doi, mirror, rt, cfg, tmp):
-        if mirror == "https://sci-hub.ru" and rt == "direct":
-            return mirror, rt, 2.0, 1024 * 1024
-        return mirror, rt, 10.0, 1024 * 1024
+        # measure() keeps the first to finish, so the fake takes real time
+        dt = 2.0 if (mirror == "https://sci-hub.ru" and rt == "direct") else 10.0
+        time.sleep(dt / 20)
+        return mirror, rt, dt, 1024 * 1024
 
     monkeypatch.setattr(scihub_speed, "_one", fake_one)
 

@@ -127,6 +127,16 @@ def _one(doi: str, mirror: str, rt: str, config: dict[str, Any], tmp: Path) -> t
     return mirror, rt, float("inf"), 0
 
 
+def _cleanup_later(futs: list[Any], tmp: str) -> None:
+    import shutil
+    for f in futs:
+        try:
+            f.result(timeout=120)
+        except Exception:
+            pass
+    shutil.rmtree(tmp, ignore_errors=True)
+
+
 def measure(config: dict[str, Any], *, force: bool = False) -> dict[str, Any] | None:
     """Pick the fastest mirror and route for this batch (cached for the hour)."""
     if mode(config) == "direct" and not force:
@@ -141,15 +151,21 @@ def measure(config: dict[str, Any], *, force: bool = False) -> dict[str, Any] | 
     budget = float(config.get("scihub_speedtest_seconds", 40) or 40)
     log.info(f"   [scihub-speed] measuring {len(mirrors)} mirrors x {routes} with {doi}")
     results: list[tuple[str, str, float, int]] = []
-    with tempfile.TemporaryDirectory(prefix="litloop-speed-") as tmp:
-        ex = ThreadPoolExecutor(max_workers=len(mirrors) * len(routes))
-        futs = [ex.submit(_one, doi, m, r, config, Path(tmp)) for m in mirrors for r in routes]
-        try:
-            for f in as_completed(futs, timeout=budget):
-                results.append(f.result())
-        except Exception:
-            pass  # past the budget: the slow ones lose anyway
-        ex.shutdown(wait=False, cancel_futures=True)
+    # All start together, so the first to finish is the fastest: stop there
+    # (waiting out the budget for a dead mirror cost 40 s on 2026-10-17).
+    # Losers still writing keep their files open: leave the folder to them.
+    tmp = tempfile.mkdtemp(prefix="litloop-speed-")
+    ex = ThreadPoolExecutor(max_workers=len(mirrors) * len(routes))
+    futs = [ex.submit(_one, doi, m, r, config, Path(tmp)) for m in mirrors for r in routes]
+    try:
+        for f in as_completed(futs, timeout=budget):
+            results.append(f.result())
+            if results[-1][2] != float("inf"):
+                break
+    except Exception:
+        pass  # past the budget: nothing finished
+    ex.shutdown(wait=False, cancel_futures=True)
+    threading.Thread(target=_cleanup_later, args=(futs, tmp), daemon=True).start()
     ok = [r for r in results if r[2] != float("inf")]
     for m, rt, dt, size in sorted(results, key=lambda r: r[2]):
         log.info(f"   [scihub-speed] {m} via {rt}: " + (f"{dt:.1f}s, {size // 1024} KB" if dt != float("inf") else "failed"))

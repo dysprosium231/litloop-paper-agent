@@ -188,12 +188,15 @@ def _try_source(
     from .scoring import record_result, classify_error, get_user_advice
     t0 = time.time()
     _SOURCE_TLS.doi = normalize_doi(doi) if not is_arxiv_identifier(doi) else doi
+    result = None
     try:
         result = _try_source_inner(source_fn, doi, output_path, config, label, use_tor, t0,
                                    record_result, classify_error, get_user_advice)
     finally:
         settled = _SOURCE_TLS.doi in _SETTLED
         _SOURCE_TLS.doi = None
+        ok = bool(result and result.get("success"))
+        log.info(f"   [timing] {label}: {time.time() - t0:.1f}s, {'PDF' if ok else 'no PDF'}")
     if settled:
         # Late finisher of an already-returned download: its copy is a duplicate.
         if output_path.exists():
@@ -215,7 +218,10 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
         is_browser = False  # pure-HTTP Sci-Hub must not queue behind the browser lanes
     sem = _get_browser_semaphore(config) if is_browser else None
     if sem:
+        t_wait = time.time()
         sem.acquire()
+        if time.time() - t_wait > 1:
+            log.info(f"   [timing] {label}: waited {time.time() - t_wait:.1f}s for the browser")
     try:
         sig = inspect.signature(source_fn)
         if "use_tor" in sig.parameters:
@@ -483,6 +489,7 @@ def _run_institutional_sequence(steps: list[tuple[Any, str]], doi: str, target_d
     """Try the school's routes one at a time; the first PDF wins."""
     from .. import progress_reporter
     log.info(f"   School routes in turn: {', '.join(label for _, label in steps)}")
+    t_seq = time.time()
     for fn, label in steps:
         if _cancelled():
             return None
@@ -497,11 +504,13 @@ def _run_institutional_sequence(steps: list[tuple[Any, str]], doi: str, target_d
                 final_path.rename(output_path)
                 result["file"] = str(output_path)
             log.info(f"   OK {label}")
+            log.info(f"   [timing] school routes: {time.time() - t_seq:.1f}s")
             return result
         if failures is not None:
             _record_source_failure(failures, label, result or {"success": False, "error": "no PDF"})
         if src_output.exists():
             src_output.unlink(missing_ok=True)
+    log.info(f"   [timing] school routes: {time.time() - t_seq:.1f}s, none had it")
     return None
 
 
@@ -758,6 +767,7 @@ def _run_tiers_parallel(
         grace = float(config.get("race_grace_seconds", 15))
         grace_browser = float(config.get("race_grace_browser_seconds", 180))
         log.info(f"   Racing timed out after {overall_timeout + 5}s, waiting for late results...")
+        t_grace = time.time()
         quick_until = time.time() + grace
         stop_at = time.time() + max(grace, grace_browser)
         while not success_event.is_set() and not all_done_event.is_set() and not _cancelled():
@@ -786,7 +796,7 @@ def _run_tiers_parallel(
                     output_path.unlink()
                 final_path.rename(output_path)
                 result["file"] = str(output_path)
-            log.info(f"   OK {label} (late)")
+            log.info(f"   OK {label} (late, after {time.time() - t_grace:.1f}s)")
             return result
         if all_done_event.is_set():
             log.info("   All sources failed")
@@ -1382,12 +1392,16 @@ def _download_impl(
     doi = normalize_doi(identifier)
 
     # Phase 1: Free sources (OA + grey) — parallel race
+    t_phase = time.time()
     free_sources = _build_free_sources(doi, config)
+    log.info(f"   [timing] phase 1 sources built: {time.time() - t_phase:.1f}s")
     if free_sources:
         result = _run_tiers_parallel(
             [(free_sources, "Free", 15)], doi, target_dir, output_path, config, use_tor, 15,
             failures=race_failures,
         )
+        log.info(f"   [timing] phase 1 (free sources and publisher site): {time.time() - t_phase:.1f}s, "
+                 f"{'PDF' if result else 'no PDF'}")
         if result:
             _update_doi_index(
                 target_dir,
@@ -1410,6 +1424,7 @@ def _download_impl(
     if _institutional and config.get("download_strategy") not in ("scihub_only", "grey_only") and not _cancelled():
         # Session self-healing: validate and refresh institutional sessions
         # before racing them (WebVPN only; CARSI self-heals inside login()).
+        t_heal = time.time()
         try:
             from ..session_heal import ensure_institutional_sessions
             heal_report = ensure_institutional_sessions(
@@ -1418,6 +1433,7 @@ def _download_impl(
                 log.info(f"   [session-heal] {channel}: {state.get('status')}")
         except Exception as exc:
             log.info(f"   [session-heal] skipped: {exc}")
+        log.info(f"   [timing] session check: {time.time() - t_heal:.1f}s")
         inst_sources = _build_institutional_sources(doi, config, use_vpnsci=use_vpnsci)
         if inst_sources:
             log.info("   Phase 1 failed, trying institutional access...")
