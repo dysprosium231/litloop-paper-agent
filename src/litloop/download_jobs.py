@@ -238,7 +238,10 @@ def _run(job: str) -> None:
 
     from . import progress_reporter
     from .sources import _SKIPPED
+    from .sources.scihub import note_years
     _SKIPPED.clear()  # skips asked for in an earlier job do not carry over
+    # The publication year decides whether Sci-Hub is asked (scihub_skip_from_year).
+    note_years({i["doi"]: i.get("year") for i in store.read_json(path)["items"] if i.get("year")})
     progress_reporter.add_listener(on_item)
     progress_reporter.add_stage_listener(on_stage)
     progress_reporter.add_result_listener(on_result)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import atexit
+import re
 import threading
 import time
 import urllib.parse
@@ -626,6 +627,39 @@ def recently_absent(doi: str) -> bool:
     return time.time() - _ABSENT_AT.get((doi or "").strip().lower(), 0.0) < _ABSENT_TTL
 
 
+# Publication years the caller knows (an app job has them), by DOI.
+_YEARS: dict[str, int] = {}
+_DOI_YEAR = re.compile(r"[./](20[0-9]{2})[./]")  # 10.1016/j.ceramint.2026.06.274, 10.26599/jac.2025.9221068
+
+
+def note_years(years: dict[str, Any]) -> None:
+    for doi, year in years.items():
+        try:
+            _YEARS[(doi or "").strip().lower()] = int(str(year)[:4])
+        except (TypeError, ValueError):
+            pass
+
+
+def publication_year(doi: str) -> int | None:
+    """The year noted by the caller, else one written in the DOI, else None."""
+    key = (doi or "").strip().lower()
+    if key in _YEARS:
+        return _YEARS[key]
+    m = _DOI_YEAR.search(key.split("/", 1)[-1])
+    return int(m.group(1)) if m else None
+
+
+def too_new(doi: str, config: dict[str, Any]) -> bool:
+    """Published in or after scihub_skip_from_year: Sci-Hub has almost none of
+    those (2026-10-17: 0 of 19 papers from 2024-2026), so it is not asked."""
+    try:
+        start = int(config.get("scihub_skip_from_year") or 0)
+    except (TypeError, ValueError):
+        return False
+    year = publication_year(doi) if start else None
+    return bool(year and year >= start)
+
+
 def _http_altcha_download(landing_url: str, domain: str, doi: str, output_path: Path,
                           config: dict[str, Any]) -> dict[str, Any] | None:
     """Open the mirror page over HTTP, solve an ALTCHA gate if any, fetch the PDF.
@@ -995,6 +1029,9 @@ def try_scihub(doi: str, output_path: Path, config: dict[str, Any], use_tor: boo
     # thread-local browser is created once and reused across papers — no
     # per-paper window flashing. Do NOT shut browsers down here; cleanup is
     # _shutdown_scihub_pool (atexit) plus browser_engine's process-exit reaper.
+    if too_new(doi, config):
+        log.info(f"   Sci-Hub: skipped, published {publication_year(doi)} (scihub_skip_from_year)")
+        return None
     try:
         return _try_scihub_impl(doi, output_path, config, use_tor)
     except Exception as e:

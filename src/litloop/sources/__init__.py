@@ -406,10 +406,12 @@ def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str
     # (scihub_enabled=false / strategy=legal_only).
     grey_sources: list[tuple[Any, str]] = []
     if config.get("scihub_enabled", True):
-        from .scihub import recently_absent
-        grey_sources.append((try_scibban, "SciBban"))
+        from .scihub import recently_absent, too_new
+        new = too_new(doi, config)  # published in or after scihub_skip_from_year
+        if not new:
+            grey_sources.append((try_scibban, "SciBban"))  # a Sci-Hub mirror
         grey_sources.append((try_libgen, "LibGen"))
-        if not recently_absent(doi):  # Sci-Hub said within the hour it does not have it
+        if not new and not recently_absent(doi):  # Sci-Hub said within the hour it does not have it
             grey_sources.append((try_scihub, "Sci-Hub"))
 
     if strategy == "scihub_only":

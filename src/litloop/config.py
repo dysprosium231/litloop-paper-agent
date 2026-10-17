@@ -156,6 +156,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Sci-Hub and LibGen through host_proxy_url (the user's proxy) instead of
     # the school's exit; direct when that proxy's port is closed.
     "scihub_via_proxy": False,
+    # Papers published in or after this year skip Sci-Hub (and SciBban): it
+    # has almost none of them. The year comes from the app's list or the DOI
+    # (j.ceramint.2026.06.274); a paper with no known year is still asked. 0: off.
+    "scihub_skip_from_year": 2024,
     # Route for Sci-Hub and LibGen: "direct", "proxy" (host_proxy_url only) or
     # "auto" (a batch first measures mirrors on both routes, the fastest wins;
     # sources/scihub_speed.py). Empty: "proxy" if scihub_via_proxy else "direct".

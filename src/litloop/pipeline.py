@@ -599,7 +599,8 @@ def run_scihub_then_single(
         r.setdefault("identifier", ident)
         return r
 
-    grey_ids = [i for i in ids if i not in results]
+    from .sources.scihub import too_new
+    grey_ids = [i for i in ids if i not in results and not too_new(i, config)]
     if grey_ids and allow_grey and grey_allowed(config):
         # Which mirror and route (proxy or direct) is fastest right now: the
         # whole round uses it (scihub_route; a no-op for "direct").

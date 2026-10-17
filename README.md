@@ -368,6 +368,7 @@ LitLoop 自己不带 Zotero 网页接口的代码（2026-10 删除了原项目�
 | `rename_format` | `author_year_title_doi` | 文件名格式：`author_year_title_doi`、`author_year_title`、`zotero`（作者 - 年份 - 完整标题）、`year_author_title`、`title`、`doi`、`off`（保持原名）。旧配置 `auto_rename: false` 等于 `off` |
 | `download_strategy` | `fastest` | 可选 `fastest`、`oa_first`、`legal_only`（不用 Sci-Hub/LibGen）、`scihub_first`、`scihub_only` |
 | `scihub_enabled` | `false` | 是否使用 Sci-Hub/LibGen 类来源；默认关闭，由你自己决定是否打开 |
+| `scihub_skip_from_year` | `2024` | 此年份及以后发表的文献不查 Sci-Hub（新文献基本没有）；年份取自 app 的文献列表或 DOI，不知年份的照查；0 表示都查 |
 | `scihub_route` | `direct` | Sci-Hub 与 LibGen 路由：`direct`（直连）、`proxy`（走 `host_proxy_url`）或 `auto`（批量前在两条线路上测速，用最快的镜像和线路，在 `<data dir>/scihub_route.json` 缓存 1 小时） |
 | `scihub_speedtest_doi` | `10.1016/j.colsurfb.2017.09.051` | Sci-Hub 测速所用的已知文献 DOI（约 1 MB） |
 | `scihub_speedtest_mirrors` | `5` | Sci-Hub 测速并行测试的镜像数 |
