@@ -157,6 +157,21 @@ export default function App() {
   const [railOpen, setRailOpen] = useRailOpen()
   const railExtra = railOpen ? RAIL_OPEN - RAIL_COLLAPSED : 0
   const [section, setSection] = React.useState<Section>("screen")
+  // Only screening has a list column: switching sections changes the sidebar
+  // width, and its transition (meant for collapsing) would slide. Skip it here.
+  React.useLayoutEffect(() => {
+    const root = document.documentElement
+    root.classList.add("no-transition")
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("no-transition")))
+    return () => {
+      cancelAnimationFrame(frame)
+      root.classList.remove("no-transition")
+    }
+  }, [section])
+  // The settings page's quota view asks OpenAlex, which takes seconds: start early.
+  React.useEffect(() => {
+    if (section === "settings") settingsApi.openalex().catch(() => {})
+  }, [section])
   const [groups, setGroups] = React.useState<SettingGroup[]>([])
   const [settingsGroup, setSettingsGroup] = React.useState("sources")
   const downloads = useDownloads(section === "download")

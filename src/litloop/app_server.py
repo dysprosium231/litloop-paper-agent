@@ -93,6 +93,7 @@ class Decision(BaseModel):
     decision: str | None = None  # "selected", "rejected" or None
 
 
+_OPENALEX: dict[str, Any] = {"at": 0.0, "data": None}  # see /api/quota/openalex
 _WRITE_MODE: dict[str, Any] = {}  # zotero-mcp's write mode, cached until the user authorizes
 
 
@@ -220,9 +221,14 @@ def create_app(token: str) -> FastAPI:
         return quota.summary()
 
     @app.get("/api/quota/openalex")
-    def quota_openalex() -> dict[str, Any] | None:
+    def quota_openalex(fresh: bool = False) -> dict[str, Any] | None:
+        """OpenAlex's own count (costs no credits, but takes seconds): kept two minutes."""
+        import time
+
         from . import quota
-        return quota.openalex_live()  # OpenAlex's own count; costs no credits
+        if fresh or time.time() - _OPENALEX["at"] > 120:
+            _OPENALEX.update(at=time.time(), data=quota.openalex_live())
+        return _OPENALEX["data"]
 
     @app.get("/api/settings")
     def settings_list() -> list[dict[str, Any]]:

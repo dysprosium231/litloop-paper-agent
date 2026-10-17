@@ -27,19 +27,24 @@ export function ProgressStrip({ progress, summary }: { progress: Progress | null
     if (!summary) return null
     const highs = summary.batches.map((b) => (b.rated ? b.高 / b.rated : 0))
     return (
-      <div className="flex min-w-0 items-center gap-x-5 gap-y-1.5 overflow-hidden border-b px-6 py-2.5 text-xs text-muted-foreground">
+      <div className="flex min-h-13 min-w-0 items-center gap-x-6 gap-y-1.5 overflow-hidden border-b px-6 py-3 text-sm text-muted-foreground">
         <span className="shrink-0 whitespace-nowrap">候选池 {summary.pool.toLocaleString()} 篇 · 已评分 {summary.screened.toLocaleString()} 篇</span>
-        <span className="flex h-4 shrink-0 items-end gap-0.5" role="img" aria-label="每批高相关比例">
-          {highs.map((h, i) => (
-            <span key={i} className="w-1.5 rounded-sm bg-primary" style={{ height: `${Math.max(8, h * 100)}%`, opacity: i === highs.length - 1 ? 1 : 0.45 }} />
-          ))}
+        <span className="flex shrink-0 items-center gap-2" title="每一批中评为高的比例，最右是最近一批；越来越低说明相关文献快找完了">
+          <span className="whitespace-nowrap">每批高相关比例</span>
+          <span className="flex h-6 items-end gap-1" role="img" aria-label="每批高相关比例">
+            {summary.batches.map((b, i) => (
+              <span key={i} title={`第 ${b.batch} 批：高 ${b.高} / 已评 ${b.rated}`}
+                className="w-2.5 rounded-sm bg-primary" style={{ height: `${Math.max(8, highs[i] * 100)}%`, opacity: i === highs.length - 1 ? 1 : 0.45 }} />
+            ))}
+          </span>
+          {highs.length > 0 && <span className="font-medium text-foreground tabular-nums">{Math.round(highs[highs.length - 1] * 100)}%</span>}
         </span>
         {summary.stop_suggested && (
           <span className="min-w-0 truncate rounded bg-warning px-2 py-0.5 text-warning-foreground" title={summary.stop_reason}>建议停止：{summary.stop_reason}</span>
         )}
         {!!summary.api_warnings?.length && (
           <span className="ml-auto flex min-w-0 items-center gap-1.5 text-warning-foreground" title={summary.api_warnings.join("\n")}>
-            <TriangleAlertIcon className="size-3.5 shrink-0" />
+            <TriangleAlertIcon className="size-4 shrink-0" />
             <span className="truncate">{summary.api_warnings[0]}{summary.api_warnings.length > 1 ? `，另有 ${summary.api_warnings.length - 1} 条` : ""}</span>
           </span>
         )}

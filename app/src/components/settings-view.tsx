@@ -297,16 +297,22 @@ const PROVIDERS: Record<string, string> = {
 
 function QuotaPane() {
   const [usage, setUsage] = React.useState<Record<string, ProviderUsage> | null>(null)
-  const [live, setLive] = React.useState<Awaited<ReturnType<typeof settingsApi.openalex>>>(null)
-  const load = React.useCallback(() => {
+  const [live, setLive] = React.useState<Awaited<ReturnType<typeof settingsApi.openalex>> | undefined>(undefined)
+  const load = React.useCallback((fresh: boolean) => {
     settingsApi.quota().then(setUsage).catch(() => {})
-    settingsApi.openalex().then(setLive).catch(() => {})
+    if (fresh) setLive(undefined)
+    settingsApi.openalex(fresh).then(setLive).catch(() => setLive(null))
   }, [])
-  React.useEffect(load, [load])
+  React.useEffect(() => load(false), [load])
   const pct = live?.credits_limit ? (live.credits_remaining ?? 0) / live.credits_limit : null
   return (
-    <Page id={QUOTA} title="接口额度" action={<Button variant="outline" size="sm" onClick={load}>刷新</Button>}>
+    <Page id={QUOTA} title="接口额度" action={<Button variant="outline" size="sm" onClick={() => load(true)}>刷新</Button>}>
       <Card>
+      {live === undefined && (
+        <Row title="OpenAlex 今日剩余" note="正在向 OpenAlex 查询…">
+          <LoaderIcon className="size-4 animate-spin text-muted-foreground" />
+        </Row>
+      )}
       {live && !live.error && (
         <Row title="OpenAlex 今日剩余" note={`重置 ${live.resets_at ? new Date(live.resets_at).toLocaleString() : "未知"}`}>
           <div className="w-56 space-y-1.5 text-right">

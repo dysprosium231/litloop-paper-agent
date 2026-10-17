@@ -91,3 +91,13 @@ def test_download_folder_test(client, config_home, tmp_path):
     got = client.post("/api/settings/test/downloads").json()["results"][0]
     assert got["ok"] is True
     assert client.post("/api/settings/test/nope").status_code == 404
+
+
+def test_openalex_live_count_is_kept_two_minutes(client, monkeypatch):
+    from litloop import quota
+    calls = []
+    monkeypatch.setattr(app_server, "_OPENALEX", {"at": 0.0, "data": None})
+    monkeypatch.setattr(quota, "openalex_live", lambda: calls.append(1) or {"credits_remaining": len(calls)})
+    assert client.get("/api/quota/openalex").json() == {"credits_remaining": 1}
+    assert client.get("/api/quota/openalex").json() == {"credits_remaining": 1}  # from the cache
+    assert client.get("/api/quota/openalex?fresh=true").json() == {"credits_remaining": 2}

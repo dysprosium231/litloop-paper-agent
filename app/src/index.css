@@ -155,6 +155,12 @@
   transition: none !important;
 }
 
+/* For one frame while switching sections: the sidebar takes its new width at once. */
+.no-transition,
+.no-transition * {
+  transition: none !important;
+}
+
 /* The sidebar hides scrollbars (no-scrollbar); lists that scroll get a thin, quiet one back. */
 .scrollable {
   scrollbar-width: thin !important;
