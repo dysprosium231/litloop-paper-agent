@@ -3,6 +3,7 @@ import { CheckCircle2Icon, LoaderIcon, XCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ZoteroCheckPane } from "@/components/zotero-check"
+import { Card, Empty, PageBody, PageHeader, PageToolbar, SectionTitle } from "@/components/page"
 import { downloadsApi, zoteroApi, type WriteMode, type ZoteroHistoryEntry, type ZoteroOverview, type ZoteroPendingGroup, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -100,21 +101,8 @@ export function ZoteroPage({ data, error, mode, onModeChanged, onChanged, onOpen
   ]
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-stretch gap-5 border-b px-6">
-        <h2 className="flex items-center py-3 text-lg font-semibold">Zotero</h2>
-        <div className="my-4 w-px bg-border" />
-        <div role="tablist" className="flex gap-6">
-          {tabs.map((t) => (
-            <button key={t.id} type="button" role="tab" aria-selected={view === t.id} onClick={() => onView(t.id)}
-              className={cn("-mb-px flex items-center gap-1.5 border-b-2 text-sm text-muted-foreground hover:text-foreground",
-                view === t.id ? "border-primary font-medium text-foreground" : "border-transparent")}>
-              {t.label}
-              {!!t.count && <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">{t.count}</span>}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b px-6 py-2.5 text-xs text-muted-foreground">
+      <PageHeader title="Zotero" tabs={tabs} active={view} onTab={(id) => onView(id as ZoteroView)} />
+      <PageToolbar className="text-xs text-muted-foreground">
         {data ? (
           <>
             <Check ok={data.running} yes="Zotero 运行中" no="Zotero 未运行" />
@@ -122,7 +110,7 @@ export function ZoteroPage({ data, error, mode, onModeChanged, onChanged, onOpen
             {data.mcp && <WriteModeLine mode={mode} running={data.running} onDone={onModeChanged} />}
           </>
         ) : (error ?? "正在加载…")}
-      </div>
+      </PageToolbar>
       {view === "check" ? (
         <ZoteroCheckPane running={Boolean(data?.running)} onStarted={onOpenJob} />
       ) : view === "history" ? (
@@ -135,36 +123,31 @@ export function ZoteroPage({ data, error, mode, onModeChanged, onChanged, onOpen
 }
 
 function ZoteroHistory({ history, onOpenJob }: { history: ZoteroHistoryEntry[]; onOpenJob: (job: string) => void }) {
-  if (!history.length) {
-    return (
-      <div className="px-6 py-12 text-center">
-        <p className="text-sm font-medium">暂无推送记录</p>
-        <p className="mt-1 text-xs text-muted-foreground">推送到 Zotero 的下载任务将显示在此处</p>
-      </div>
-    )
-  }
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto scrollable">
-      <ul className="mx-6 my-4 divide-y rounded-lg border">
-        {history.map((h) => (
-          <li key={h.job}>
-            <button type="button" onClick={() => onOpenJob(h.job)}
-              className="flex w-full items-center gap-4 px-4 py-2.5 text-left hover:bg-accent/60">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm">{h.title}</div>
-                <div className="truncate text-xs text-muted-foreground" title={h.collection}>{h.collection}</div>
-              </div>
-              <span className={cn("flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground",
-                (h.failed > 0 || h.no_pdf > 0) && "text-warning-foreground")}>
-                {h.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
-                {h.state === "running" ? "进行中" : h.state === "interrupted" ? "已中断" : outcome(h)}
-              </span>
-              <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{(h.finished ?? h.started ?? "").slice(5, 16)}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <PageBody wide>
+      <Card>
+        {!history.length && <Empty title="暂无推送记录" note="推送到 Zotero 的下载任务将显示在此处" />}
+        <ul className="divide-y">
+          {history.map((h) => (
+            <li key={h.job}>
+              <button type="button" onClick={() => onOpenJob(h.job)}
+                className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-accent/60">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm">{h.title}</div>
+                  <div className="truncate text-xs text-muted-foreground" title={h.collection}>{h.collection}</div>
+                </div>
+                <span className={cn("flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground",
+                  (h.failed > 0 || h.no_pdf > 0) && "text-warning-foreground")}>
+                  {h.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
+                  {h.state === "running" ? "进行中" : h.state === "interrupted" ? "已中断" : outcome(h)}
+                </span>
+                <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{(h.finished ?? h.started ?? "").slice(5, 16)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </PageBody>
   )
 }
 
@@ -173,7 +156,7 @@ export function ZoteroPane({ data, error, onChanged, onOpenJob }: {
   data: ZoteroOverview | null; error: string | null; onChanged: () => void; onOpenJob: (job: string) => void
 }) {
   const [failure, setFailure] = React.useState<string | null>(null)
-  if (!data) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "正在加载…"}</div>
+  if (!data) return <div className="flex flex-1 items-center justify-center bg-canvas text-sm text-muted-foreground">{error ?? "正在加载…"}</div>
   const push = (g: ZoteroPendingGroup) => {
     setFailure(null)
     downloadsApi.push(g.job, g.collection).then(onChanged).catch((e) => setFailure(errorMessage(e)))
@@ -181,46 +164,45 @@ export function ZoteroPane({ data, error, onChanged, onOpenJob }: {
   const all = data.pending.reduce((n, g) => n + g.papers.length, 0)
   const blocked = !data.mcp || !data.running || Boolean(data.pushing)
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto scrollable">
-      {all > 0 && <div className="px-6 pt-4 text-xs text-muted-foreground">{all} 篇 · {data.pending.length} 个下载任务</div>}
-      {failure && <p className="mx-6 mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{failure}</p>}
-      {!data.running && all > 0 && <p className="mx-6 mt-4 rounded-md bg-warning px-3 py-2 text-sm text-warning-foreground">Zotero 未运行，请先启动 Zotero。</p>}
+    <PageBody wide>
+      {failure && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{failure}</p>}
+      {!data.running && all > 0 && <p className="rounded-md bg-warning px-3 py-2 text-sm text-warning-foreground">Zotero 未运行，请先启动 Zotero。</p>}
       {data.pushing && (
-        <p className="mx-6 mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <LoaderIcon className="size-3.5 animate-spin" />当前有推送任务进行中。
         </p>
       )}
-      {all === 0 && (
-        <div className="px-6 py-12 text-center">
-          <p className="text-sm font-medium">暂无待推送文献</p>
-          <p className="mt-1 text-xs text-muted-foreground">下载完成的文献将显示在此处</p>
-        </div>
-      )}
-      {data.pending.map((g) => (
-        <section key={g.job} className="border-b px-6 py-4">
-          <div className="mb-2 flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h3 className="truncate text-sm font-medium">{g.title}</h3>
-              <div className="truncate text-xs text-muted-foreground">目标分类：{g.collection}</div>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <Button size="sm" variant="ghost" onClick={() => onOpenJob(g.job)}>更改分类</Button>
-              <Button size="sm" disabled={blocked} onClick={() => push(g)}>推送</Button>
-            </div>
-          </div>
-          <ul className="space-y-1.5">
-            {g.papers.map((p) => (
-              <li key={p.doi} className="text-sm">
-                <div className="line-clamp-2">{p.title || p.doi}</div>
-                <div className="text-xs text-muted-foreground">
-                  {[p.year, p.journal].filter(Boolean).join(" · ") || p.doi}
-                  {p.zotero === "no_pdf" ? " · 上次附件缺失" : p.zotero === "failed" ? " · 上次推送失败" : ""}
+      <section>
+        <SectionTitle title="待推送" note={all ? `${all} 篇 · ${data.pending.length} 个下载任务` : undefined} />
+        <Card className="divide-y">
+          {all === 0 && <Empty title="暂无待推送文献" note="下载完成的文献将显示在此处" />}
+          {data.pending.map((g) => (
+            <div key={g.job} className="px-5 py-4">
+              <div className="mb-2 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-medium">{g.title}</h3>
+                  <div className="truncate text-xs text-muted-foreground">目标分类：{g.collection}</div>
                 </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => onOpenJob(g.job)}>更改分类</Button>
+                  <Button size="sm" disabled={blocked} onClick={() => push(g)}>推送</Button>
+                </div>
+              </div>
+              <ul className="space-y-1.5">
+                {g.papers.map((p) => (
+                  <li key={p.doi} className="text-sm">
+                    <div className="line-clamp-2">{p.title || p.doi}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {[p.year, p.journal].filter(Boolean).join(" · ") || p.doi}
+                      {p.zotero === "no_pdf" ? " · 上次附件缺失" : p.zotero === "failed" ? " · 上次推送失败" : ""}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </Card>
+      </section>
+    </PageBody>
   )
 }

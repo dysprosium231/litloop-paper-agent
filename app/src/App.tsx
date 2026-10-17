@@ -3,7 +3,7 @@ import { ChevronDownIcon } from "lucide-react"
 
 import { AppSidebar, RAIL_COLLAPSED, RAIL_OPEN, type Section } from "@/components/app-sidebar"
 import { PaperList, type PaperRow } from "@/components/paper-list"
-import { SettingsNav, SettingsPane } from "@/components/settings-view"
+import { SettingsPage } from "@/components/settings-view"
 import { DownloadsOverview, JobPane, OVERVIEW, useDownloads } from "@/components/downloads-view"
 import { useZotero, ZoteroPage, type ZoteroView } from "@/components/zotero-view"
 import { DetailPane, type Paper } from "@/components/detail-pane"
@@ -42,7 +42,6 @@ const WIDTHS: Record<Resizable, { min: number; initial: number }> = {
   screen: { min: 360, initial: 420 },  // 360 keeps the list header (title + 只看本批) whole
 }
 const MAX_WIDTH = 900
-const SETTINGS_WIDTH = 320  // the settings list is short: fixed width, no handle
 const widthKey = (s: Resizable) => (s === "screen" ? "litloop.listWidth" : `litloop.listWidth.${s}`)  // screen keeps its old key
 
 function readWidth(s: Resizable): number {
@@ -266,11 +265,9 @@ export default function App() {
   return (
     <TooltipProvider>
       {/* The header's toggle hides the list; the rail then shows icons only (--sidebar-width-icon). */}
-      <SidebarProvider style={{ "--sidebar-width": `${(section === "settings" ? SETTINGS_WIDTH : section === "screen" ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
+      <SidebarProvider style={{ "--sidebar-width": `${(section === "screen" ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
         <AppSidebar section={section} onSection={setSection} railOpen={railOpen} onRailOpen={setRailOpen}>
-          {section === "settings" ? (
-            <SettingsNav groups={groups} current={settingsGroup} onPick={setSettingsGroup} />
-          ) : section === "screen" ? (
+          {section === "screen" ? (
             <PaperList rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
               onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
           ) : null}
@@ -291,7 +288,7 @@ export default function App() {
               : <JobPane key={downloadView} id={downloadView} live={downloads.live} onChanged={downloads.refresh} onStarted={startedJob}
                   onBack={() => setDownloadView(OVERVIEW)} />
           ) : section === "settings" ? (
-            <SettingsPane groups={groups} current={settingsGroup}
+            <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup}
               onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
           ) : (<>
           <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-background px-4 py-3">

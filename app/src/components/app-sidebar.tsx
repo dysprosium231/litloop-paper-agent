@@ -16,7 +16,7 @@ import {
 // Width of the icon rail: icons only, or icons with their names. App adds the
 // difference to the sidebar width so the list next to it keeps its own width.
 export const RAIL_COLLAPSED = 49  // --sidebar-width-icon (3rem) + its border
-export const RAIL_OPEN = 168
+export const RAIL_OPEN = 184
 
 export type Section = "screen" | "download" | "zotero" | "settings"
 
@@ -33,7 +33,8 @@ function RailItem({ item, active, railOpen, onSection }: {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton tooltip={{ children: item.title, hidden: railOpen }} isActive={active} onClick={() => onSection(item.id)}
-        className="h-9 gap-3 px-2.5">
+        className="relative h-10 gap-3 px-2.5 text-[15px] data-[active=true]:bg-primary/10 data-[active=true]:font-medium data-[active=true]:text-primary [&>svg]:size-[18px]">
+        {active && <span className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-full bg-primary" />}
         <item.icon />
         <span className={railOpen ? "truncate" : "sr-only"}>{item.title}</span>
       </SidebarMenuButton>
@@ -85,7 +86,7 @@ export function AppSidebar({
             <RailItem item={settings} active={section === "settings"} railOpen={railOpen} onSection={onSection} />
             <SidebarMenuItem>
               <SidebarMenuButton tooltip={{ children: railOpen ? "收起侧栏" : "展开侧栏", hidden: railOpen }} onClick={() => onRailOpen(!railOpen)}
-                className="h-9 gap-3 px-2.5 text-muted-foreground" aria-label={railOpen ? "收起侧栏" : "展开侧栏"}>
+                className="h-10 gap-3 px-2.5 text-[15px] text-muted-foreground [&>svg]:size-[18px]" aria-label={railOpen ? "收起侧栏" : "展开侧栏"}>
                 <ToggleIcon />
                 <span className={railOpen ? "truncate" : "sr-only"}>收起</span>
               </SidebarMenuButton>

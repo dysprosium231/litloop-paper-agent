@@ -1,8 +1,9 @@
 import * as React from "react"
-import { CheckCircle2Icon, ChevronLeftIcon, CircleDashedIcon, FolderOpenIcon, LoaderIcon, XCircleIcon } from "lucide-react"
+import { CheckCircle2Icon, ChevronRightIcon, CircleDashedIcon, FolderOpenIcon, LoaderIcon, XCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Card, Empty, PageBody, PageHeader, SectionTitle } from "@/components/page"
 import {
   downloadsApi,
   type DownloadItem,
@@ -53,24 +54,24 @@ export function useDownloads(active: boolean) {
 }
 
 /** Second column of the download section: what waits, then the jobs, newest first. */
-function Header({ title, meta, children }: { title: string; meta?: React.ReactNode; children?: React.ReactNode }) {
+/** "下载 › <job>" in the page header; the first part goes back to the overview. */
+function Crumb({ onBack, title }: { onBack: () => void; title?: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b px-6 py-4">
-      <div className="min-w-0">
-        <h2 className="line-clamp-2 text-lg font-semibold">{title}</h2>
-        {meta && <div className="mt-0.5 text-xs text-muted-foreground">{meta}</div>}
-      </div>
-      <div className="flex shrink-0 gap-2">{children}</div>
-    </div>
+    <span className="flex min-w-0 items-center gap-1.5">
+      <button type="button" onClick={onBack} className="shrink-0 text-muted-foreground hover:text-foreground">下载</button>
+      {title && <><ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" /><span className="truncate">{title}</span></>}
+    </span>
   )
 }
 
-function BackLink({ onBack }: { onBack: () => void }) {
+function Stat({ label, value, tone }: { label: string; value: number; tone?: "bad" }) {
   return (
-    <button type="button" onClick={onBack}
-      className="flex items-center gap-1 px-5 pt-3 text-xs text-muted-foreground hover:text-foreground">
-      <ChevronLeftIcon className="size-3.5" />下载
-    </button>
+    <Card className="px-5 py-4">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={cn("mt-1 text-2xl font-semibold tabular-nums", tone === "bad" && value > 0 && "text-destructive")}>
+        {value.toLocaleString()}<span className="ml-1 text-sm font-normal text-muted-foreground">篇</span>
+      </div>
+    </Card>
   )
 }
 
@@ -109,78 +110,88 @@ export function DownloadsOverview({ jobs, pending, outputDir, busy, onStarted, o
   const failed = jobs.reduce((n, j) => n + j.failed, 0)
   const shown = jobs.filter(FILTERS.find((f) => f.id === filter)!.keep)
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto scrollable">
-      <Header title="下载" meta={`已下载 ${done} 篇${failed ? ` · 失败 ${failed} 篇` : ""}`}>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader title="下载">
         {outputDir && (
           <Button size="sm" variant="outline" onClick={openFolder} title={outputDir}>
             <FolderOpenIcon />打开保存位置
           </Button>
         )}
-      </Header>
-      {error && <p className="mx-6 mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+      </PageHeader>
+      <PageBody wide>
+        {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+        <div className="grid grid-cols-3 gap-4">
+          <Stat label="已下载" value={done} />
+          <Stat label="失败" value={failed} tone="bad" />
+          <Stat label="待下载" value={all.length} />
+        </div>
 
-      <div className="flex items-center justify-between gap-4 px-6 pt-5 pb-2">
-        <h3 className="text-sm font-medium">
-          下载队列
-          {all.length > 0 && <span className="ml-2 font-normal text-muted-foreground">{all.length} 篇 · {pending.length} 个检索会话</span>}
-        </h3>
-        {pending.length > 1 && (
-          <Button size="sm" disabled={busy} onClick={() => start(all, `${pending.length} 个检索会话 · ${all.length} 篇`)}>全部下载</Button>
-        )}
-      </div>
-      {busy && <p className="px-6 pb-2 text-sm text-muted-foreground">当前有下载任务进行中。</p>}
-      {pending.length === 0 && <p className="px-6 pb-2 text-sm text-muted-foreground">暂无待下载文献。在筛选中加入下载的文献将显示在此处。</p>}
-      {pending.map((g) => (
-        <section key={g.session} className="mx-6 mb-3 rounded-lg border px-4 py-3">
-          <div className="mb-2 flex items-center justify-between gap-4">
-            <h4 className="min-w-0 truncate text-sm font-medium">{g.question || g.session}</h4>
-            <Button size="sm" variant={pending.length > 1 ? "outline" : "default"} disabled={busy}
-              onClick={() => start(g.papers, g.question || g.session, g.session)}>开始下载</Button>
-          </div>
-          <ul className="space-y-1.5">
-            {g.papers.map((p) => (
-              <li key={p.doi} className="text-sm">
-                <div className="line-clamp-2">{p.title || p.doi}</div>
-                <div className="text-xs text-muted-foreground">{metaLine(p) || p.doi}</div>
-              </li>
+        <section>
+          <SectionTitle title="下载队列" note={all.length ? `${all.length} 篇 · ${pending.length} 个检索会话` : undefined}>
+            {pending.length > 1 && (
+              <Button size="sm" disabled={busy} onClick={() => start(all, `${pending.length} 个检索会话 · ${all.length} 篇`)}>全部下载</Button>
+            )}
+          </SectionTitle>
+          {busy && <p className="mb-3 text-sm text-muted-foreground">当前有下载任务进行中。</p>}
+          <Card className="divide-y">
+            {pending.length === 0 && <Empty title="暂无待下载文献" note="在筛选中加入下载的文献将显示在此处" />}
+            {pending.map((g) => (
+              <div key={g.session} className="px-5 py-4">
+                <div className="mb-2 flex items-center justify-between gap-4">
+                  <h3 className="min-w-0 truncate text-sm font-medium">{g.question || g.session}</h3>
+                  <Button size="sm" variant={pending.length > 1 ? "outline" : "default"} disabled={busy}
+                    onClick={() => start(g.papers, g.question || g.session, g.session)}>开始下载</Button>
+                </div>
+                <ul className="space-y-1.5">
+                  {g.papers.map((p) => (
+                    <li key={p.doi} className="text-sm">
+                      <div className="line-clamp-2">{p.title || p.doi}</div>
+                      <div className="text-xs text-muted-foreground">{metaLine(p) || p.doi}</div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </Card>
         </section>
-      ))}
 
-      <div className="flex items-center gap-1 px-6 pt-5 pb-2">
-        <h3 className="flex-1 text-sm font-medium">历史记录</h3>
-        {jobs.length > 0 && FILTERS.map((f) => (
-          <button key={f.id} type="button" onClick={() => setFilter(f.id)}
-            className={cn("rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground",
-              filter === f.id && "bg-accent font-medium text-foreground")}>
-            {f.label}
-          </button>
-        ))}
-      </div>
-      {jobs.length === 0 && <p className="px-6 pb-6 text-sm text-muted-foreground">暂无下载记录</p>}
-      {jobs.length > 0 && shown.length === 0 && <p className="px-6 pb-6 text-sm text-muted-foreground">无符合条件的记录</p>}
-      {shown.length > 0 && (
-        <ul className="mx-6 mb-6 divide-y rounded-lg border">
-          {shown.map((j) => (
-            <li key={j.job}>
-              <button type="button" onClick={() => onOpen(j.job)}
-                className="flex w-full items-center gap-4 px-4 py-2.5 text-left hover:bg-accent/60">
-                <span className="min-w-0 flex-1 truncate text-sm">{j.title}</span>
-                <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                  {j.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
-                  {STATE[j.state]}
-                </span>
-                <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-                  {j.done}/{j.total}
-                  {j.failed ? <span className="text-destructive"> · 失败 {j.failed}</span> : null}
-                </span>
-                <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{j.created.slice(5, 16)}</span>
+        <section>
+          <SectionTitle title="历史记录">
+            {jobs.length > 0 && FILTERS.map((f) => (
+              <button key={f.id} type="button" onClick={() => setFilter(f.id)}
+                className={cn("rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground",
+                  filter === f.id && "bg-background font-medium text-foreground shadow-xs ring-1 ring-border")}>
+                {f.label}
               </button>
-            </li>
-          ))}
-        </ul>
-      )}
+            ))}
+          </SectionTitle>
+          <Card>
+            {jobs.length === 0 && <Empty title="暂无下载记录" />}
+            {jobs.length > 0 && shown.length === 0 && <Empty title="无符合条件的记录" />}
+            {shown.length > 0 && (
+              <ul className="divide-y">
+                {shown.map((j) => (
+                  <li key={j.job}>
+                    <button type="button" onClick={() => onOpen(j.job)}
+                      className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-accent/60">
+                      <span className="min-w-0 flex-1 truncate text-sm">{j.title}</span>
+                      <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                        {j.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
+                        {STATE[j.state]}
+                      </span>
+                      <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                        {j.done}/{j.total}
+                        {j.failed ? <span className="text-destructive"> · 失败 {j.failed}</span> : null}
+                      </span>
+                      <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{j.created.slice(5, 16)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </section>
+      </PageBody>
     </div>
   )
 }
@@ -261,8 +272,8 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
   if (!job) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <BackLink onBack={onBack} />
-        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "正在加载…"}</div>
+        <PageHeader title={<Crumb onBack={onBack} />} />
+        <div className="flex flex-1 items-center justify-center bg-canvas text-sm text-muted-foreground">{error ?? "正在加载…"}</div>
       </div>
     )
   }
@@ -272,9 +283,8 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
   const missing = job.items.filter((i) => i.status !== "done")  // failed, or never reached (cancelled, interrupted)
   const attention = running ? Object.values(live?.attention ?? {}) : []
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto scrollable">
-      <BackLink onBack={onBack} />
-      <Header title={job.title} meta={`${STATE[job.state]} · ${job.created}${job.finished ? `–${job.finished.slice(11)}` : ""}`}>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader title={<Crumb onBack={onBack} title={job.title} />}>
         {running && <Button size="sm" variant="outline" onClick={() => act(downloadsApi.cancel)}>取消下载</Button>}
         {!running && missing.length > 0 && (
           <Button size="sm" variant="outline" onClick={() => act(async () => onStarted((await downloadsApi.start(missing, `重试 · ${job.title}`, job.session ?? undefined)).job))}>
@@ -284,10 +294,17 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
         {job.output_dir && done > 0 && (
           <Button size="sm" variant="outline" onClick={() => act(() => downloadsApi.open(job.output_dir))}><FolderOpenIcon />打开文件夹</Button>
         )}
-      </Header>
-      <div className="space-y-3 border-b px-6 py-4">
-        <div className="flex items-baseline justify-between text-sm">
-          <span>已完成 {done}{failed.length ? ` · 失败 ${failed.length}` : ""} · 共 {job.items.length}</span>
+      </PageHeader>
+      <PageBody wide>
+      <Card className="space-y-3 p-5">
+        <div className="flex items-baseline justify-between gap-4 text-sm">
+          <span>
+            <span className="font-medium">{STATE[job.state]}</span>
+            <span className="text-muted-foreground"> · 已完成 {done}{failed.length ? ` · 失败 ${failed.length}` : ""} · 共 {job.items.length}</span>
+          </span>
+          {running && live?.current
+            ? <span className="max-w-[50%] truncate text-xs text-muted-foreground">正在处理：{live.current}</span>
+            : <span className="text-xs text-muted-foreground tabular-nums">{job.created}{job.finished ? `–${job.finished.slice(11)}` : ""}</span>}
           {running && live?.current && <span className="max-w-[50%] truncate text-xs text-muted-foreground">正在处理：{live.current}</span>}
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -300,10 +317,11 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
         {job.state === "interrupted" && <p className="text-sm text-muted-foreground">下载任务未完成时应用已退出，可重试未完成项。</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         {done > 0 && <ZoteroPanel job={job} onPushed={onChanged} />}
-      </div>
-      <ul>
+      </Card>
+      <Card>
+      <ul className="divide-y">
         {job.items.map((it) => (
-          <li key={it.doi} className="flex items-start gap-3 border-b px-6 py-3">
+          <li key={it.doi} className="flex items-start gap-3 px-5 py-3">
             <span className="mt-0.5"><StatusIcon item={it} running={running} /></span>
             <div className="min-w-0 flex-1">
               <div className="line-clamp-2 text-sm">{it.title}</div>
@@ -324,6 +342,8 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
           </li>
         ))}
       </ul>
+      </Card>
+      </PageBody>
     </div>
   )
 }

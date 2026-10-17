@@ -148,6 +148,9 @@ def create_app(token: str) -> FastAPI:
         record = store.read_json(_record_path(session))
         try:
             summary = store.read_json(store.summary_path(session))
+            # The file keeps the agent's English notes; the app shows today's, in Chinese.
+            from . import quota
+            summary["api_warnings"] = quota.warnings("zh")
         except FileNotFoundError:
             summary = None
         return {"record": record, "summary": summary}

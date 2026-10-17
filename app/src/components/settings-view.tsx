@@ -18,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { SidebarContent, SidebarHeader, SidebarInput } from "@/components/ui/sidebar"
+import { Card, PageBody, PageHeader } from "@/components/page"
 import { Switch } from "@/components/ui/switch"
 import { settingsApi, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -39,37 +39,58 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   zotero: BookMarkedIcon, [QUOTA]: GaugeIcon,
 }
 
-/** Second column on the settings section: a search box and the groups. */
-export function SettingsNav({ groups, current, onPick }: { groups: SettingGroup[]; current: string; onPick: (id: string) => void }) {
+// Groups of the settings list; ids the backend adds later fall into the last one.
+const SECTIONS: { title: string; ids: string[] }[] = [
+  { title: "检索与下载", ids: ["sources", "downloads", QUOTA] },
+  { title: "连接", ids: ["network", "school", "zotero"] },
+]
+
+// One line under each page title.
+const ABOUT: Record<string, string> = {
+  sources: "检索与下载使用的数据接口和密钥。",
+  downloads: "PDF 的保存位置、文件名和下载方式。",
+  network: "代理和校园网的访问方式。",
+  school: "通过学校认证下载订阅期刊。",
+  zotero: "推送到 Zotero 的方式和默认分类。",
+  [QUOTA]: "各检索接口今日的用量和剩余额度。",
+}
+
+/** The settings list: a search box and the groups, inside the page (left of the content). */
+function SettingsNav({ groups, current, onPick }: { groups: SettingGroup[]; current: string; onPick: (id: string) => void }) {
   const [query, setQuery] = React.useState("")
   const q = query.trim().toLowerCase()
   const entries = [...groups.map((g) => ({ id: g.id, title: g.title, words: g.fields.map((f) => f.label).join(" ") })),
     { id: QUOTA, title: "接口额度", words: "额度 用量 限流 OpenAlex Scopus" }]
   const shown = q ? entries.filter((e) => (e.title + " " + e.words).toLowerCase().includes(q)) : entries
+  const known = new Set(SECTIONS.flatMap((s) => s.ids))
+  const sections = SECTIONS.map((s, i) => ({
+    title: s.title,
+    items: shown.filter((e) => s.ids.includes(e.id) || (i === SECTIONS.length - 1 && !known.has(e.id))),
+  })).filter((s) => s.items.length)
   return (
-    <>
-      <SidebarHeader className="gap-3 p-4">
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <SidebarInput className="pl-8" placeholder="搜索" value={query} onChange={(e) => setQuery(e.target.value)} />
+    <nav className="scrollable flex w-60 shrink-0 flex-col gap-5 overflow-y-auto border-r bg-background px-4 py-5">
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input className="h-9 pl-8" placeholder="搜索设置" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </div>
+      {sections.map((s) => (
+        <div key={s.title} className="space-y-1">
+          <div className="px-3 pb-1 text-xs font-semibold text-muted-foreground">{s.title}</div>
+          {s.items.map((e) => {
+            const Icon = ICONS[e.id] ?? DatabaseIcon
+            return (
+              <button key={e.id} type="button" onClick={() => onPick(e.id)}
+                className={cn("flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm hover:bg-accent",
+                  e.id === current && "bg-primary/10 font-medium text-primary hover:bg-primary/10")}>
+                <Icon className="size-[18px] shrink-0" />
+                <span>{e.title}</span>
+              </button>
+            )
+          })}
         </div>
-        <div className="px-2 pt-1 text-xs text-muted-foreground">设置</div>
-      </SidebarHeader>
-      <SidebarContent className="scrollable px-2">
-        {shown.map((e) => {
-          const Icon = ICONS[e.id] ?? DatabaseIcon
-          return (
-            <button key={e.id} type="button" onClick={() => onPick(e.id)}
-              className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-sidebar-foreground/85 hover:bg-sidebar-accent",
-                e.id === current && "bg-sidebar-accent font-medium text-sidebar-accent-foreground")}>
-              <Icon className="size-4 shrink-0" />
-              <span>{e.title}</span>
-            </button>
-          )
-        })}
-        {shown.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">没有匹配的设置</p>}
-      </SidebarContent>
-    </>
+      ))}
+      {shown.length === 0 && <p className="px-3 text-sm text-muted-foreground">没有匹配的设置</p>}
+    </nav>
   )
 }
 
@@ -84,10 +105,10 @@ const SOURCE: Record<SettingField["source"], string> = { file: "", env: "来自�
 /** A settings row: name (and a short note) on the left, the control on the right. */
 function Row({ title, note, children, wide }: { title: React.ReactNode; note?: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className={cn("flex flex-wrap gap-x-6 gap-y-3 border-b py-4 last:border-b-0", wide ? "flex-col" : "items-center")}>
+    <div className={cn("flex flex-wrap gap-x-6 gap-y-3 border-b px-5 py-4 last:border-b-0", wide ? "flex-col" : "items-center")}>
       <div className="min-w-48 flex-1 space-y-1">
-        <div className="text-[15px]">{title}</div>
-        {note && <div className="text-sm text-muted-foreground">{note}</div>}
+        <div className="text-sm font-medium">{title}</div>
+        {note && <div className="text-[13px] leading-relaxed text-muted-foreground">{note}</div>}
       </div>
       <div className={cn("max-w-full min-w-0", wide && "w-full")}>{children}</div>
     </div>
@@ -197,15 +218,18 @@ function CopyLine({ text }: { text: string }) {
   )
 }
 
-function Page({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Page({ id, title, action, children }: { id: string; title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-8 py-8">
-      <div className="mb-2 flex items-center gap-4">
-        <h1 className="text-lg font-semibold">{title}</h1>
-        <div className="ml-auto">{action}</div>
+    <PageBody>
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-semibold">{title}</h2>
+          {ABOUT[id] && <p className="mt-1 text-[13px] text-muted-foreground">{ABOUT[id]}</p>}
+        </div>
+        {action}
       </div>
       {children}
-    </div>
+    </PageBody>
   )
 }
 
@@ -230,9 +254,9 @@ function GroupPane({ group, onSaved }: { group: SettingGroup; onSaved: (f: Setti
     </Button>
   )
   return (
-    <Page title={group.title} action={action}>
+    <Page id={group.id} title={group.title} action={action}>
       {results && (
-        <div className="my-3 space-y-2 rounded-xl bg-muted/50 p-4">
+        <Card className="space-y-2 p-5">
           {results.map((r) => (
             <div key={r.name} className="space-y-2">
               <div className="flex items-start gap-2 text-sm">
@@ -241,7 +265,7 @@ function GroupPane({ group, onSaved }: { group: SettingGroup; onSaved: (f: Setti
                 <span className="text-muted-foreground">{r.detail}{r.cost && <span className="ml-1 text-xs">（{r.cost}）</span>}</span>
               </div>
               {r.guides?.map((g) => (
-                <section key={g.title} className="ml-6 min-w-0 space-y-3 rounded-lg border bg-background p-4">
+                <section key={g.title} className="ml-6 min-w-0 space-y-3 rounded-lg border bg-canvas p-4">
                   <h3 className="text-sm font-medium">{g.title}</h3>
                   <ol className="list-decimal space-y-1.5 pl-5 text-sm text-foreground/90">
                     {g.steps.map((s) => <li key={s}>{s}</li>)}
@@ -257,9 +281,9 @@ function GroupPane({ group, onSaved }: { group: SettingGroup; onSaved: (f: Setti
               ))}
             </div>
           ))}
-        </div>
+        </Card>
       )}
-      <div>{group.fields.map((f) => <Field key={f.key} field={f} onSaved={onSaved} />)}</div>
+      <Card>{group.fields.map((f) => <Field key={f.key} field={f} onSaved={onSaved} />)}</Card>
     </Page>
   )
 }
@@ -279,7 +303,8 @@ function QuotaPane() {
   React.useEffect(load, [load])
   const pct = live?.credits_limit ? (live.credits_remaining ?? 0) / live.credits_limit : null
   return (
-    <Page title="接口额度" action={<Button variant="outline" size="sm" onClick={load}>刷新</Button>}>
+    <Page id={QUOTA} title="接口额度" action={<Button variant="outline" size="sm" onClick={load}>刷新</Button>}>
+      <Card>
       {live && !live.error && (
         <Row title="OpenAlex 今日剩余" note={`重置 ${live.resets_at ? new Date(live.resets_at).toLocaleString() : "未知"}`}>
           <div className="w-56 space-y-1.5 text-right">
@@ -298,14 +323,27 @@ function QuotaPane() {
           </span>
         </Row>
       ))}
+      </Card>
     </Page>
   )
 }
 
-/** Main area on the settings section. */
-export function SettingsPane({ groups, current, onSaved }: { groups: SettingGroup[]; current: string; onSaved: (f: SettingField) => void }) {
-  if (current === QUOTA) return <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto scrollable"><QuotaPane /></div>
+/** The settings section: header, the list of groups, and the chosen group. */
+export function SettingsPage({ groups, current, onPick, onSaved }: {
+  groups: SettingGroup[]; current: string; onPick: (id: string) => void; onSaved: (f: SettingField) => void
+}) {
   const group = groups.find((g) => g.id === current)
-  if (!group) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">正在读取设置…</div>
-  return <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto scrollable"><GroupPane key={group.id} group={group} onSaved={onSaved} /></div>
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader title="设置" />
+      <div className="flex min-h-0 flex-1">
+        <SettingsNav groups={groups} current={current} onPick={onPick} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {current === QUOTA ? <QuotaPane />
+            : group ? <GroupPane key={group.id} group={group} onSaved={onSaved} />
+            : <div className="flex flex-1 items-center justify-center bg-canvas text-sm text-muted-foreground">正在读取设置…</div>}
+        </div>
+      </div>
+    </div>
+  )
 }

@@ -1,3 +1,5 @@
+import { TriangleAlertIcon } from "lucide-react"
+
 import type { Progress, Summary } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -25,15 +27,22 @@ export function ProgressStrip({ progress, summary }: { progress: Progress | null
     if (!summary) return null
     const highs = summary.batches.map((b) => (b.rated ? b.高 / b.rated : 0))
     return (
-      <div className="flex items-center gap-4 border-b px-6 py-2.5 text-xs text-muted-foreground">
-        <span>候选池 {summary.pool.toLocaleString()} 篇 · 已评分 {summary.screened.toLocaleString()} 篇</span>
-        <span className="flex h-4 items-end gap-0.5" role="img" aria-label="每批高相关比例">
+      <div className="flex min-w-0 items-center gap-x-5 gap-y-1.5 overflow-hidden border-b px-6 py-2.5 text-xs text-muted-foreground">
+        <span className="shrink-0 whitespace-nowrap">候选池 {summary.pool.toLocaleString()} 篇 · 已评分 {summary.screened.toLocaleString()} 篇</span>
+        <span className="flex h-4 shrink-0 items-end gap-0.5" role="img" aria-label="每批高相关比例">
           {highs.map((h, i) => (
             <span key={i} className="w-1.5 rounded-sm bg-primary" style={{ height: `${Math.max(8, h * 100)}%`, opacity: i === highs.length - 1 ? 1 : 0.45 }} />
           ))}
         </span>
-        {summary.stop_suggested && <span className="rounded bg-warning px-2 py-0.5 text-warning-foreground">建议停止：{summary.stop_reason}</span>}
-        {summary.api_warnings?.map((w) => <span key={w} className="truncate">{w}</span>)}
+        {summary.stop_suggested && (
+          <span className="min-w-0 truncate rounded bg-warning px-2 py-0.5 text-warning-foreground" title={summary.stop_reason}>建议停止：{summary.stop_reason}</span>
+        )}
+        {!!summary.api_warnings?.length && (
+          <span className="ml-auto flex min-w-0 items-center gap-1.5 text-warning-foreground" title={summary.api_warnings.join("\n")}>
+            <TriangleAlertIcon className="size-3.5 shrink-0" />
+            <span className="truncate">{summary.api_warnings[0]}{summary.api_warnings.length > 1 ? `，另有 ${summary.api_warnings.length - 1} 条` : ""}</span>
+          </span>
+        )}
       </div>
     )
   }

@@ -158,16 +158,29 @@ def summary() -> dict[str, Any]:
     return out
 
 
-def warnings() -> list[str]:
-    """Plain-language notes for providers that are nearly out of budget or being throttled."""
+DISPLAY = {"openalex": "OpenAlex", "scopus": "Scopus", "springer": "Springer Nature", "crossref": "Crossref",
+           "semantic_scholar": "Semantic Scholar"}
+
+
+def warnings(lang: str = "en") -> list[str]:
+    """Plain-language notes for providers that are nearly out of budget or being throttled.
+
+    ``lang="zh"`` gives the app's wording (docs/UI_COPY.md); agents get English.
+    """
     notes = []
     for name, s in summary().items():
+        shown = DISPLAY.get(name, name)
         if s["remaining"] is not None and s["limit"] and s["remaining"] < s["limit"] * WARN_FRACTION:
-            unit = "credits" if name == "openalex" else "requests"  # OpenAlex's headers count credits
-            notes.append(f"{name}: only {s['remaining']} of {s['limit']} {unit} left"
-                         + (f", resets at {s['resets_at']}" if s["resets_at"] else ""))
+            credits = name == "openalex"  # OpenAlex's headers count credits
+            if lang == "zh":
+                notes.append(f"{shown} 剩余 {s['remaining']:,} / {s['limit']:,} {'积分' if credits else '次请求'}"
+                             + (f"，{s['resets_at']} 重置" if s["resets_at"] else ""))
+            else:
+                notes.append(f"{name}: only {s['remaining']} of {s['limit']} {'credits' if credits else 'requests'} left"
+                             + (f", resets at {s['resets_at']}" if s["resets_at"] else ""))
         if s["throttled_today"] >= 5:
-            notes.append(f"{name}: throttled {s['throttled_today']} times today; requests are slowed down")
+            notes.append(f"{shown} 今日被限流 {s['throttled_today']} 次，已放慢请求" if lang == "zh"
+                         else f"{name}: throttled {s['throttled_today']} times today; requests are slowed down")
     return notes
 
 

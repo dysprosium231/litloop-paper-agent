@@ -3,6 +3,7 @@ import { CheckCircle2Icon, LoaderIcon, XCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { CollectionPicker } from "@/components/collection-picker"
+import { Card, Empty, PageBody, SectionTitle } from "@/components/page"
 import { downloadsApi, zoteroApi, type ZoteroCheckItem, type ZoteroCollection, errorMessage } from "@/lib/api"
 
 const STATE: Record<ZoteroCheckItem["state"], string> = { ok: "附件完整", missing: "附件缺失", empty: "附件为空" }
@@ -86,67 +87,65 @@ export function ZoteroCheckPane({ running, onStarted }: { running: boolean; onSt
     (problems.some((i) => i.state === "empty") ? ` · 附件为空 ${problems.filter((i) => i.state === "empty").length}` : "")
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto scrollable">
-      <div className="space-y-3 border-b px-6 py-4">
-        <div className="text-xs text-muted-foreground">{counts || "检测分类中缺失或为空的 PDF 附件"}</div>
+    <PageBody wide>
+      <Card className="space-y-3 p-5">
+        <div>
+          <h2 className="text-[15px] font-semibold">检测分类</h2>
+          <div className="mt-0.5 text-xs text-muted-foreground">{counts || "找出分类中缺失或为空的 PDF 附件；检测只读取，不做修改"}</div>
+        </div>
         <div className="flex items-center gap-2">
           <CollectionPicker collections={collections} value={key} onChange={(v) => { setKey(v); setItems(null) }}
             disabled={!running || !collections} placeholder={running ? (collections ? "选择分类" : "正在加载…") : "Zotero 未运行"} />
-          <Button size="sm" variant="outline" disabled={!key || busy} onClick={check}>
+          <Button variant="outline" disabled={!key || busy} onClick={check}>
             {checking && <LoaderIcon className="animate-spin" />}检测
           </Button>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-      </div>
+      </Card>
 
       {items && problems.length === 0 && (
-        <div className="px-6 py-12 text-center">
-          <p className="text-sm font-medium">附件完整</p>
-          <p className="mt-1 text-xs text-muted-foreground">此分类中的文献均有 PDF 附件</p>
-        </div>
+        <Card><Empty title="附件完整" note="此分类中的文献均有 PDF 附件" /></Card>
       )}
 
       {problems.length > 0 && (
-        <>
-          <div className="flex items-center justify-between gap-4 border-b px-6 py-3">
-            <span className="text-xs text-muted-foreground">
-              {chosen.some((i) => i.state === "empty") ? "附件为空的文献会先将空附件移到 Zotero 回收站" : `已选 ${chosen.length} 篇`}
-            </span>
-            <div className="flex shrink-0 gap-2">
-              <Button size="sm" variant="outline" disabled={busy || toDownload.length === 0} onClick={download}>
-                加入下载（{toDownload.length}）
-              </Button>
-              <Button size="sm" disabled={busy || toAttach.length === 0} onClick={attach}>
-                重新附加（{toAttach.length}）
-              </Button>
-            </div>
-          </div>
-          <ul>
-            {problems.map((it) => {
-              const o = outcome[it.key]
-              return (
-                <li key={it.key} className="flex items-start gap-3 border-b px-6 py-3">
-                  <input type="checkbox" className="mt-1 size-4 accent-primary" aria-label={it.title}
-                    checked={picked.has(it.key)} disabled={busy || o?.state === "done"} onChange={() => toggle(it.key)} />
-                  <div className="min-w-0 flex-1">
-                    <div className="line-clamp-2 text-sm">{it.title || it.doi}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {[it.year, it.journal, STATE[it.state], it.local_pdf ? "本机有 PDF" : it.doi ? "需下载" : "无 DOI，无法下载"]
-                        .filter(Boolean).join(" · ")}
+        <section>
+          <SectionTitle title="需要处理"
+            note={chosen.some((i) => i.state === "empty") ? "附件为空的文献会先将空附件移到 Zotero 回收站" : `已选 ${chosen.length} 篇`}>
+            <Button size="sm" variant="outline" disabled={busy || toDownload.length === 0} onClick={download}>
+              加入下载（{toDownload.length}）
+            </Button>
+            <Button size="sm" disabled={busy || toAttach.length === 0} onClick={attach}>
+              重新附加（{toAttach.length}）
+            </Button>
+          </SectionTitle>
+          <Card>
+            <ul className="divide-y">
+              {problems.map((it) => {
+                const o = outcome[it.key]
+                return (
+                  <li key={it.key} className="flex items-start gap-3 px-5 py-3">
+                    <input type="checkbox" className="mt-1 size-4 accent-primary" aria-label={it.title}
+                      checked={picked.has(it.key)} disabled={busy || o?.state === "done"} onChange={() => toggle(it.key)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-2 text-sm">{it.title || it.doi}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {[it.year, it.journal, STATE[it.state], it.local_pdf ? "本机有 PDF" : it.doi ? "需下载" : "无 DOI，无法下载"]
+                          .filter(Boolean).join(" · ")}
+                      </div>
+                      {o?.text && <div className={o.state === "error" ? "mt-0.5 text-xs text-destructive" : "mt-0.5 text-xs text-muted-foreground"}>{o.text}</div>}
                     </div>
-                    {o?.text && <div className={o.state === "error" ? "mt-0.5 text-xs text-destructive" : "mt-0.5 text-xs text-muted-foreground"}>{o.text}</div>}
-                  </div>
-                  <span className="mt-0.5 shrink-0">
-                    {o?.state === "working" && <LoaderIcon className="size-4 animate-spin text-muted-foreground" />}
-                    {o?.state === "done" && <CheckCircle2Icon className="size-4 text-emerald-600 dark:text-emerald-400" />}
-                    {o?.state === "error" && <XCircleIcon className="size-4 text-destructive" />}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        </>
+                    <span className="mt-0.5 shrink-0">
+                      {o?.state === "working" && <LoaderIcon className="size-4 animate-spin text-muted-foreground" />}
+                      {o?.state === "done" && <CheckCircle2Icon className="size-4 text-emerald-600 dark:text-emerald-400" />}
+                      {o?.state === "error" && <XCircleIcon className="size-4 text-destructive" />}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </Card>
+        </section>
       )}
-    </div>
+    </PageBody>
   )
 }

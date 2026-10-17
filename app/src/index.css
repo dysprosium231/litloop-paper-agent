@@ -31,6 +31,7 @@
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
     --color-muted: var(--muted);
+    --color-canvas: var(--canvas);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);
@@ -54,6 +55,7 @@
    Both keep the icon's colours: BUAA blue as the one accent, amber for things waiting on the user. */
 :root {
     --background: #ffffff;
+    --canvas: #f6f7f8;  /* behind cards: content areas of the pages */
     --foreground: #171717;
     --card: #ffffff;
     --card-foreground: #171717;
@@ -92,6 +94,7 @@
 
 .dark {
     --background: #0f1011;
+    --canvas: #0a0b0c;
     --foreground: #f7f8f8;
     --card: #141516;
     --card-foreground: #f7f8f8;
