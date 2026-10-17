@@ -10,6 +10,14 @@ import os
 
 os.environ.setdefault("LITLOOP_PROGRESS_BAR", "0")  # pytest 不得弹出 GUI
 
+# Tests never touch the user's ~/.litloop: the desktop app reads its progress
+# file, download jobs and settings from there while it runs (2026-10-17 a test
+# run's "please pass the check" notice showed up in the user's live download).
+# Set before litloop is imported: config.DATA_DIR is read once, at import.
+import tempfile
+
+os.environ["LITLOOP_DATA_DIR"] = tempfile.mkdtemp(prefix="litloop-tests-")
+
 
 @pytest.fixture(autouse=True)
 def _isolated_api_usage(tmp_path, monkeypatch):
