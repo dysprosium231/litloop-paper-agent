@@ -180,21 +180,24 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
 
 - **出版商网站**（ACS、Wiley、ScienceDirect、Science、Nature、IOP、IEEE、AIP、RSC、Taylor & Francis、SAGE、OUP 等约 30 家）：
   - 官方没有公开的限额；批量下载过快会被封 IP，例如 ACS 的 “IP Address Blocked”，封禁在出版商那边。
-  - 配置：`batch_workers`、`institutional_workers`、`max_browser_workers`、`request_delay_min` / `request_delay_max`、`browser_*`。
+  - 配置：`batch_workers`、`institutional_workers`、`max_browser_workers`、`request_delay_min` / `request_delay_max`、`browser_*`、`race_grace_seconds`、`race_grace_browser_seconds`。
+  - 迟到等待：多源竞速结束后非浏览器渠道等待 `race_grace_seconds`（默认 15 秒），浏览器通道在工作时等待 `race_grace_browser_seconds`（默认 180 秒）。
   - LitLoop：连续 3 次检测到封锁页、403 或 429 时自动停止批量任务；被封时可调低并发、加大间隔（见 README）。
 - **机构认证**：
   - WebVPN（`vpnsci_*`）、CARSI（`carsi_*`）、EZProxy（`ezproxy_*`）、OpenAthens；
-  - 限制由学校决定，主要是会话过期；`auto_relogin` 控制是否自动弹出浏览器重新登录。
+  - 限制由学校决定，主要是会话过期；`auto_relogin` 控制是否自动弹出浏览器重新登录；`institutional_order`（默认 `["webvpn_http", "webvpn_browser", "carsi", "ezproxy"]`）控制机构通道尝试顺序。
 - **网络**：
   - `network_proxy`：所有请求走同一个代理；
-  - `host_proxy_url` / `host_proxy_hosts`：只给指定出版商域名走代理；机构通道必须绕开代理；
+  - `host_proxy_url` / `host_proxy_hosts`：只给指定出版商域名走代理，Sci-Hub、LibGen 选代理线路时也走它；机构通道必须绕开代理；
   - `proxy_pool`。
 
 ## 三、灰色来源
 
 - Sci-Hub、LibGen 等：**默认关闭**（`scihub_enabled`），由用户自己决定是否打开。
-- 相关配置：`scihub_domains`、`scihub_use_browser`、`use_tor_for_scihub`、`tor_proxy`、`tor_use_bridges`、`flaresolverr_url`。
+- 相关配置：`scihub_domains`、`scihub_route`、`scihub_speedtest_doi`、`scihub_speedtest_mirrors`、`scihub_speedtest_seconds`、`scihub_round_workers`、`scihub_http_workers`、`host_proxy_url`、`scihub_use_browser`、`use_tor_for_scihub`、`tor_proxy`、`tor_use_bridges`、`flaresolverr_url`。
 - 没有官方限额；镜像经常失效。
+- 路由与测速：`scihub_route` 支持 `direct`（直连）、`proxy`（通过 `host_proxy_url`）或 `auto`；设为 `auto` 时在批量下载前测试双路由镜像并取最快者（`scihub_speedtest_doi`、`scihub_speedtest_mirrors` 默认 5、`scihub_speedtest_seconds` 默认 40 秒），结果在 `<data dir>/scihub_route.json` 缓存 1 小时。
+- 并发控制：第一轮纯 HTTP 并发文献数 `scihub_round_workers=10` 与镜像请求共享线程数 `scihub_http_workers=12` 均为**自定值（Sci-Hub 没有公开限额）**；2026-10-17 实测 20 篇老文献一轮 137 秒，未见限流。
 
 ## 四、Zotero
 
