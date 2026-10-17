@@ -8,7 +8,10 @@ The item is added by DOI (or arXiv URL) with attach_mode="none", so CrossRef
 metadata is used, then the downloaded PDF is attached with zotero-mcp's own
 attach_file, which uploads to WebDAV when ZOTERO_WEBDAV_* is set.
 
-Request: {"identifier", "file", "collections", "tags", "env_script"}
+Request: {"op", "env_script", ...}
+  op "push" (default): {"identifier", "file", "collections", "tags"}
+  op "collections":    list every collection as {"key", "name", "parent", "path"}
+  op "ensure_collection": {"path": "LitLoop/My topic"} -> key, creating missing levels
 """
 
 from __future__ import annotations
@@ -33,7 +36,7 @@ def _source_for(identifier: str) -> str:
     return ident
 
 
-def run(req: dict) -> dict:
+def _setup(req: dict) -> None:
     if req.get("env_script"):
         # The user's launcher sets ZOTERO_* env vars (decrypting secrets);
         # its serve() call is guarded by __main__, so this only sets env.
@@ -46,6 +49,59 @@ def run(req: dict) -> dict:
         setup_zotero_environment()
     except Exception:
         pass
+
+
+def _collections() -> list[dict]:
+    """Every collection with its '/'-path, parents before children."""
+    from zotero_mcp.client import get_zotero_client
+    zot = get_zotero_client()
+    rows = zot.everything(zot.collections())
+    by_key = {c["data"]["key"]: c["data"] for c in rows}
+
+    def path(key: str, seen=()) -> str:
+        d = by_key[key]
+        parent = d.get("parentCollection") or None
+        if parent and parent in by_key and parent not in seen:
+            return path(parent, seen + (key,)) + "/" + d["name"]
+        return d["name"]
+
+    out = [{"key": k, "name": d["name"], "parent": d.get("parentCollection") or None, "path": path(k)}
+           for k, d in by_key.items()]
+    return sorted(out, key=lambda c: c["path"].lower())
+
+
+def _ensure_collection(path: str) -> dict:
+    """Find the collection at path ('A/B/C'), creating the levels that are missing."""
+    from zotero_mcp.cli_standalone import CLIContext
+    from zotero_mcp.tools import write
+    parts = [p.strip() for p in path.split("/") if p.strip()]
+    if not parts:
+        return {"success": False, "error": "empty collection path"}
+    created, parent = [], None
+    for i in range(len(parts)):
+        want = "/".join(parts[: i + 1])
+        found = next((c for c in _collections() if c["path"] == want), None)
+        if found:
+            parent = found["key"]
+            continue
+        out = write.create_collection(name=parts[i], parent_collection=parent, ctx=CLIContext())
+        m = re.search(r"Collection key: `([A-Z0-9]{8})`", out or "")
+        if not m:
+            return {"success": False, "error": (out or "").strip()[:500]}
+        parent = m.group(1)
+        created.append(want)
+    return {"success": True, "key": parent, "path": "/".join(parts), "created": created}
+
+
+def run(req: dict) -> dict:
+    _setup(req)
+    op = req.get("op") or "push"
+    if op == "collections":
+        return {"success": True, "collections": _collections()}
+    if op == "ensure_collection":
+        return _ensure_collection(req.get("path") or "")
+    if op != "push":
+        return {"success": False, "error": f"unknown op {op}"}
 
     from zotero_mcp.cli_standalone import CLIContext
     from zotero_mcp.tools import write

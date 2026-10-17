@@ -122,7 +122,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "max_browser_workers": 1,
     "scihub_browser_workers": 3,  # Number of Sci-Hub domains to race in parallel via browser
     "host_concurrency": {},
-    "auto_rename": True,
+    "auto_rename": True,  # older switch; false means rename_format "off"
+    "rename_format": "author_year_title_doi",  # see rename.FORMATS
     "zotero_api_key": "",
     "zotero_library_type": "user",
     "zotero_library_id": "",
@@ -136,6 +137,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "zotero_mcp_python": "",
     "zotero_mcp_env_script": "",
     "zotero_push_timeout": 900,
+    # Desktop app: push a download job to Zotero when it finishes (off: the
+    # user pushes from the job page), into <root>/<the job's title>.
+    "zotero_auto_push": False,
+    "zotero_collection_root": "LitLoop",
     "flaresolverr_url": "http://127.0.0.1:8191/v1",
     # Per-host proxy exception: these domains (and subdomains) go through
     # host_proxy_url, everything else stays direct. For publishers that grant

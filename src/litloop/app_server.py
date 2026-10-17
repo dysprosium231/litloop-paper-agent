@@ -61,6 +61,11 @@ class NewDownload(BaseModel):
     session: str | None = None
 
 
+class ZoteroPush(BaseModel):
+    collection: str | None = None  # None: <zotero_collection_root>/<job title>
+    tags: list[str] = []
+
+
 class OpenPath(BaseModel):
     path: str
 
@@ -185,7 +190,8 @@ def create_app(token: str) -> FastAPI:
     def downloads() -> dict[str, Any]:
         from . import download_jobs, progress_reporter
         live = progress_reporter.read_state() if download_jobs.running() else None
-        return {"jobs": download_jobs.list_jobs(), "running": download_jobs.running(), "live": live}
+        return {"jobs": download_jobs.list_jobs(), "running": download_jobs.running(), "live": live,
+                "pushing": download_jobs.pushing()}
 
     @app.get("/api/downloads/pending")
     def downloads_pending() -> list[dict[str, Any]]:
@@ -213,9 +219,53 @@ def create_app(token: str) -> FastAPI:
         if not re.fullmatch(r"[\w-]{1,40}", job):
             raise HTTPException(400, "bad job id")
         try:
-            return download_jobs.get(job)
+            d = download_jobs.get(job)
         except FileNotFoundError as exc:
             raise HTTPException(404, f"no job {job}") from exc
+        d["zotero_default"] = download_jobs.default_collection(d["title"])
+        return d
+
+    @app.post("/api/downloads/{job}/zotero")
+    def download_push(job: str, body: ZoteroPush) -> dict[str, Any]:
+        from . import download_jobs
+        if not re.fullmatch(r"[\w-]{1,40}", job):
+            raise HTTPException(400, "bad job id")
+        try:
+            return download_jobs.push_zotero(job, body.collection, body.tags)
+        except FileNotFoundError as exc:
+            raise HTTPException(404, f"no job {job}") from exc
+        except download_jobs.Busy as exc:
+            raise HTTPException(409, "已有推送在进行") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.get("/api/zotero")
+    def zotero_overview() -> dict[str, Any]:
+        """Is Zotero up, which zotero-mcp is used, what waits to be pushed, what was pushed."""
+        import requests
+
+        from . import download_jobs
+        from .config import load_config
+        from .zotero import discover_zotero_mcp
+        try:
+            running = requests.get("http://127.0.0.1:23119/connector/ping", timeout=2,
+                                   proxies={"http": None, "https": None}).status_code == 200
+        except requests.RequestException:
+            running = False
+        found = discover_zotero_mcp(load_config())
+        return {"running": running, "mcp": found["python"] if found else None,
+                "pending": download_jobs.zotero_pending(), "history": download_jobs.zotero_history(),
+                "pushing": download_jobs.pushing()}
+
+    @app.get("/api/zotero/collections")
+    def zotero_collections() -> list[dict[str, Any]]:
+        """The library's collections as '/'-paths (read through zotero-mcp)."""
+        from .config import load_config
+        from .zotero import zotero_collections as read
+        r = read(load_config())
+        if not r.get("success"):
+            raise HTTPException(503, r.get("error") or "Zotero is not reachable")
+        return r["collections"]
 
     @app.post("/api/downloads")
     def download_start(body: NewDownload) -> dict[str, Any]:

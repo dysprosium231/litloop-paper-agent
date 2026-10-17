@@ -11,12 +11,22 @@ replaced in one step) so the app can poll it while the job runs::
      "created": "...", "finished": "...", "output_dir": "...", "error": "...",
      "items": [{"doi", "title", "year", "journal",
                 "status": "waiting" | "done" | "failed",
-                "source", "file", "error"}]}
+                "source", "file", "error",
+                "zotero": {"status": "pushing" | "added" | "reused" | "no_pdf" | "failed",
+                           "key", "error"}}],
+     "zotero": {"state": "running" | "done" | "failed", "collection", "key",
+                "started", "finished", "error"}}
 
 Papers are marked done/failed one by one as the engine reports them
 (``progress_reporter.advance``); source, file and error are filled in when
 the batch returns. One job runs at a time: the engine's progress report and
 cancel switch are process-wide.
+
+Downloaded papers are pushed to Zotero (zotero.push_via_zotero_mcp) by hand
+from the job page, or right after the download when ``zotero_auto_push`` is
+on, into ``<zotero_collection_root>/<job title>`` unless another collection
+is chosen. A push runs in its own thread, one at a time, and can overlap a
+download.
 """
 
 from __future__ import annotations
@@ -32,6 +42,8 @@ from .identifiers import canonical_doi
 
 _RUN_LOCK = threading.Lock()
 _CURRENT: dict[str, Any] = {"job": None, "cancelled": False}
+_PUSH_LOCK = threading.Lock()
+_PUSHING: dict[str, Any] = {"job": None}
 
 
 class Busy(RuntimeError):
@@ -53,6 +65,12 @@ def _settled(d: dict[str, Any]) -> dict[str, Any]:
     """A job still marked running that this process is not running was cut off (app closed)."""
     if d.get("state") == "running" and d.get("job") != _CURRENT["job"]:
         d["state"] = "interrupted"
+    z = d.get("zotero")
+    if z and z.get("state") == "running" and d.get("job") != _PUSHING["job"]:
+        z["state"] = "interrupted"
+        for it in d.get("items", []):
+            if (it.get("zotero") or {}).get("status") == "pushing":
+                it["zotero"]["status"] = "failed"
     return d
 
 
@@ -177,3 +195,121 @@ def _run(job: str) -> None:
         finally:
             _CURRENT.update(job=None, cancelled=False)
             _RUN_LOCK.release()
+    from .config import load_config
+    if load_config().get("zotero_auto_push"):
+        try:
+            push_zotero(job)
+        except (Busy, ValueError):
+            pass  # another push runs, or nothing was downloaded: the user can push later
+
+
+def default_collection(title: str) -> str:
+    """<zotero_collection_root>/<title>, shortened; '/' would start a sub-collection."""
+    from .config import load_config
+    root = str(load_config().get("zotero_collection_root") or "LitLoop").strip().strip("/")
+    name = " ".join(title.replace("/", "-").split())
+    name = name if len(name) <= 40 else name[:39] + "…"
+    return f"{root}/{name}" if root else name
+
+
+def pushing() -> str | None:
+    return _PUSHING["job"]
+
+
+def _jobs_full(limit: int = 200) -> list[dict[str, Any]]:
+    out = []
+    for j in list_jobs(limit):
+        try:
+            out.append(get(j["job"]))
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def zotero_pending() -> list[dict[str, Any]]:
+    """Downloaded papers not in Zotero yet (never pushed, PDF not attached, or failed), by job."""
+    out = []
+    for d in _jobs_full():
+        papers = [{k: i.get(k) for k in ("doi", "title", "year", "journal")} | {"zotero": (i.get("zotero") or {}).get("status")}
+                  for i in d["items"] if i["status"] == "done" and i.get("file")
+                  and (i.get("zotero") or {}).get("status") not in ("added", "reused")]
+        if papers:
+            out.append({"job": d["job"], "title": d["title"], "created": d["created"], "papers": papers,
+                        "collection": (d.get("zotero") or {}).get("collection") or default_collection(d["title"])})
+    return out
+
+
+def zotero_history() -> list[dict[str, Any]]:
+    """Jobs that were pushed, newest first, with counts per outcome."""
+    out = []
+    for d in _jobs_full():
+        z = d.get("zotero")
+        if not z:
+            continue
+        counts = {k: sum(1 for i in d["items"] if (i.get("zotero") or {}).get("status") == k)
+                  for k in ("added", "reused", "no_pdf", "failed")}
+        out.append({"job": d["job"], "title": d["title"], **{k: z.get(k) for k in ("state", "collection", "started", "finished", "error")}, **counts})
+    return out
+
+
+def push_zotero(job: str, collection: str | None = None, tags: list[str] | None = None) -> dict[str, Any]:
+    """Push the job's downloaded papers to Zotero in the background (those not pushed yet)."""
+    data = get(job)
+    todo = [i for i in data["items"] if i["status"] == "done" and i.get("file")
+            and (i.get("zotero") or {}).get("status") not in ("added", "reused")]
+    if not todo:
+        raise ValueError("nothing to push: no downloaded paper waits for Zotero")
+    collection = (collection or "").strip().strip("/") or default_collection(data["title"])
+    if not _PUSH_LOCK.acquire(blocking=False):
+        raise Busy("another Zotero push is still running")
+    try:
+        with store.update(job_path(job), indent=1) as d:
+            d["zotero"] = {"state": "running", "collection": collection, "key": None,
+                           "started": time.strftime("%Y-%m-%d %H:%M:%S"), "finished": None, "error": None}
+        _PUSHING["job"] = job
+        threading.Thread(target=_push, args=(job, collection, list(tags or [])),
+                         name=f"zotero-{job}", daemon=True).start()
+        return get(job)
+    except BaseException:
+        _PUSHING["job"] = None
+        _PUSH_LOCK.release()
+        raise
+
+
+def _set_zotero(job: str, **fields: Any) -> None:
+    with store.update(job_path(job), indent=1) as d:
+        d["zotero"] = {**(d.get("zotero") or {}), **fields}
+
+
+def _push(job: str, collection: str, tags: list[str]) -> None:
+    from .config import load_config
+    from .zotero import ensure_collection, push_via_zotero_mcp
+    cfg = load_config()
+    try:
+        found = ensure_collection(collection, cfg)
+        if not found.get("success"):
+            _set_zotero(job, state="failed", error=found.get("error") or "cannot create the collection")
+            return
+        _set_zotero(job, key=found["key"])
+        for it in get(job)["items"]:
+            if it["status"] != "done" or not it.get("file") or (it.get("zotero") or {}).get("status") in ("added", "reused"):
+                continue
+            _mark(job, it["doi"], zotero={"status": "pushing", "key": None, "error": None})
+            try:
+                r = push_via_zotero_mcp(it["doi"], Path(it["file"]), cfg, collections=[found["key"]], tags=tags)
+            except Exception as exc:
+                r = {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+            if not r.get("success"):
+                z = {"status": "failed", "key": None, "error": r.get("error")}
+            elif not r.get("pdf_attached"):
+                z = {"status": "no_pdf", "key": r.get("zotero_key"), "error": r.get("attach_message")}
+            else:
+                z = {"status": "reused" if r.get("reused") else "added", "key": r.get("zotero_key"), "error": None}
+            _mark(job, it["doi"], zotero=z)
+        _set_zotero(job, state="done", finished=time.strftime("%Y-%m-%d %H:%M:%S"))
+    except Exception as exc:
+        _set_zotero(job, state="failed", error=f"{type(exc).__name__}: {exc}",
+                    finished=time.strftime("%Y-%m-%d %H:%M:%S"))
+    finally:
+        _PUSHING["job"] = None
+        _PUSH_LOCK.release()

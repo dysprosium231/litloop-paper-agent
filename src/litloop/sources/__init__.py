@@ -859,7 +859,8 @@ def _update_doi_index(
 
 def _auto_rename(result: dict[str, Any], identifier: str, config: dict[str, Any], doi: str = "", target_dir: Path | None = None) -> None:
     """Auto-rename downloaded PDF based on metadata."""
-    if not config.get("auto_rename", True):
+    from ..rename import rename_format
+    if rename_format(config) == "off":
         return
     file_path = Path(result.get("file", ""))
     if not file_path.exists():
@@ -874,7 +875,7 @@ def _auto_rename(result: dict[str, Any], identifier: str, config: dict[str, Any]
     _doi = doi or result.get("doi", identifier)
     metadata = fetch_metadata(_doi, config)
     if metadata:
-        new_path = rename_pdf(file_path, metadata, doi=_doi)
+        new_path = rename_pdf(file_path, metadata, doi=_doi, fmt=rename_format(config))
         if new_path and new_path != file_path:
             result["file"] = str(new_path)
             result["renamed"] = True
@@ -1167,7 +1168,8 @@ def _download_impl(
     from ..citation import fetch_metadata
     metadata = fetch_metadata(doi, config)
     if metadata:
-        expected_name = rename_pdf_generate_filename(metadata, doi=doi)
+        from ..rename import rename_format
+        expected_name = rename_pdf_generate_filename(metadata, doi=doi, fmt=rename_format(config))
         if expected_name:
             # Generated names can collide across papers, so a name match
             # alone is not proof: skip files the index gives to

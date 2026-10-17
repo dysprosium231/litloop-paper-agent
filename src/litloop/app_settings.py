@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Any
 
 from . import config as _config
+from .rename import FORMATS as _RENAME_FORMATS
+from .rename import rename_format as _rename_format
 
 # type: secret | text | email | path | bool | select; a path may say pick: dir | file (the app offers a chooser)
 GROUPS: list[dict[str, Any]] = [
@@ -38,7 +40,8 @@ GROUPS: list[dict[str, Any]] = [
         "id": "downloads", "title": "下载", "test": "downloads",
         "fields": [
             {"key": "output_dir", "label": "保存位置", "type": "path", "pick": "dir"},
-            {"key": "auto_rename", "label": "按作者-年份-标题重命名", "type": "bool"},
+            {"key": "rename_format", "label": "文件名", "type": "select",
+             "options": [[k, v] for k, v in _RENAME_FORMATS.items()]},
             {"key": "download_strategy", "label": "来源顺序", "type": "select",
              "options": [["fastest", "谁快用谁"], ["oa_first", "开放获取优先"], ["legal_only", "只用合法来源"],
                          ["scihub_first", "Sci-Hub 优先"], ["scihub_only", "只用 Sci-Hub"], ["grey_only", "只用 Sci-Hub、LibGen 等"]]},
@@ -69,6 +72,9 @@ GROUPS: list[dict[str, Any]] = [
         "id": "zotero", "title": "Zotero", "test": "zotero",
         "fields": [
             {"key": "zotero_mcp_python", "label": "zotero-mcp 的 Python", "type": "path", "pick": "file", "placeholder": "留空自动查找"},
+            {"key": "zotero_auto_push", "label": "下载完自动推送", "type": "bool"},
+            {"key": "zotero_collection_root", "label": "默认分类", "type": "text", "placeholder": "LitLoop",
+             "help": "推送到「默认分类/检索问题」"},
         ],
     },
 ]
@@ -106,7 +112,7 @@ def settings() -> list[dict[str, Any]]:
     for g in GROUPS:
         fields = []
         for f in g["fields"]:
-            value = cfg.get(f["key"])
+            value = _rename_format(cfg) if f["key"] == "rename_format" else cfg.get(f["key"])
             if f["key"] == "email" and str(value).endswith(".invalid"):
                 value = ""  # the shipped placeholder is not an address
             shown = {**f, "set": bool(value), "source": _source(f["key"], cfg)}
@@ -130,6 +136,8 @@ def update(key: str, value: Any) -> dict[str, Any]:
     elif field["type"] == "email" and value and "@" not in str(value):
         raise ValueError("not an email address")
     _config.update_config(key, str(value if value is not None else "").strip())
+    if key == "rename_format":
+        _config.update_config("auto_rename", "true")  # the older switch must not override the choice
     return next(f for g in settings() for f in g["fields"] if f["key"] == key)
 
 

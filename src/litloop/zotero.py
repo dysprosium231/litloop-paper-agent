@@ -194,21 +194,47 @@ def push_via_zotero_mcp(
     duplicates are reused, and the PDF goes to WebDAV when zotero-mcp is
     configured for it.
     """
-    import subprocess
-
     found = discover_zotero_mcp(config)
     if not found:
         return {"success": False, "error": "zotero-mcp not found; install it "
                 "(pip install zotero-mcp-server) or set zotero_mcp_python"}
-    python = found["python"]
-    env_script = found.get("env_script") or ""
     req = {
         "identifier": identifier,
         "file": str(pdf_path.resolve()) if pdf_path and pdf_path.is_file() else "",
         "collections": collections or [],
         "tags": tags or [],
-        "env_script": str(Path(env_script).expanduser()) if env_script else "",
     }
+    # WebDAV uploads of large PDFs are allowed up to 600 s by zotero-mcp.
+    result = _run_bridge(found, req, int(config.get("zotero_push_timeout", 900)))
+    if result.get("success"):
+        log.info(f"Zotero (zotero-mcp): item {result.get('zotero_key')}, "
+                 f"pdf_attached={result.get('pdf_attached')}")
+    return result
+
+
+def zotero_collections(config: dict[str, Any]) -> dict[str, Any]:
+    """Every collection of the library as {key, name, parent, path} (read only)."""
+    found = discover_zotero_mcp(config)
+    if not found:
+        return {"success": False, "error": "zotero-mcp not found"}
+    return _run_bridge(found, {"op": "collections"}, 120)
+
+
+def ensure_collection(path: str, config: dict[str, Any]) -> dict[str, Any]:
+    """The key of the collection at path ('LitLoop/My topic'), creating missing levels."""
+    found = discover_zotero_mcp(config)
+    if not found:
+        return {"success": False, "error": "zotero-mcp not found"}
+    return _run_bridge(found, {"op": "ensure_collection", "path": path}, 120)
+
+
+def _run_bridge(found: dict[str, Any], req: dict[str, Any], timeout: int) -> dict[str, Any]:
+    """Run zotero_bridge.py with zotero-mcp's interpreter: one JSON request in, one result out."""
+    import subprocess
+
+    python = found["python"]
+    env_script = found.get("env_script") or ""
+    req = {**req, "env_script": str(Path(env_script).expanduser()) if env_script else ""}
     bridge = Path(__file__).with_name("zotero_bridge.py")
     # The MCP client's env block for the zotero server (API key, WebDAV...).
     env = dict(os.environ, **found.get("env", {}), PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
@@ -221,8 +247,8 @@ def push_via_zotero_mcp(
             encoding="utf-8",
             errors="replace",
             env=env,
-            # WebDAV uploads of large PDFs are allowed up to 600 s by zotero-mcp.
-            timeout=int(config.get("zotero_push_timeout", 900)),
+            timeout=timeout,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "zotero-mcp bridge timed out"}
@@ -238,9 +264,6 @@ def push_via_zotero_mcp(
         tail = (proc.stderr or proc.stdout or "").strip()[-500:]
         return {"success": False, "error": f"zotero-mcp bridge failed (exit {proc.returncode}): {tail}"}
     result["via"] = "zotero-mcp"
-    if result.get("success"):
-        log.info(f"Zotero (zotero-mcp): item {result.get('zotero_key')}, "
-                 f"pdf_attached={result.get('pdf_attached')}")
     return result
 
 

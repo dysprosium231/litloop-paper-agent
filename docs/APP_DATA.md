@@ -128,12 +128,16 @@ app 发起的下载，每次一个文件，由 app 后台的 `download_jobs.py` 
   "error": null,
   "items": [
     {"doi": "10.3390/nano8110961", "title": "…", "year": 2018, "journal": "Nanomaterials",
-     "status": "done", "source": "mdpi", "file": "C:\…\xxx.pdf", "error": null}
-  ]
+     "status": "done", "source": "mdpi", "file": "C:\…\xxx.pdf", "error": null,
+     "zotero": {"status": "added", "key": "ABCD1234", "error": null}}
+  ],
+  "zotero": {"state": "done", "collection": "LitLoop/含稀土的非晶纳米药物载体", "key": "QWER1234",
+             "started": "…", "finished": "…", "error": null}
 }
 ```
 
 - `state`：`running` → `done` / `cancelled` / `failed`（引擎本身出错，原因在 `error`）。文件里仍是 `running`、但当前后台并没有在跑它（app 中途关闭），读出时当作 `interrupted`。
 - `items[].status`：`waiting` → `done` / `failed`。引擎每完成一篇就更新一次状态；`source`、`file`、`error` 在整批结束时填入。
 - 同一时间只运行一个任务：引擎的进度报告和取消开关是整个进程共用的。运行中的实时信息（正在处理哪篇、需要用户处理的验证码或登录提示）不存进这个文件，app 通过 `/api/downloads` 读取 `progress_reporter` 的报告。
+- `zotero`（推送过才有）：`state` 为 `running` → `done` / `failed`，app 中途关闭读出为 `interrupted`；`collection` 是分类路径，`key` 是它在 Zotero 里的键。`items[].zotero.status`：`pushing` → `added`（新建）/ `reused`（库里已有）/ `no_pdf`（条目在了但 PDF 没附上，再推送一次会补附）/ `failed`。推送和下载可以同时进行，同一时间只推送一个任务。
 - “待下载”不单独存文件：取各筛选记录里 `decision` 为 `selected`、且还没有被任何任务下载成功的文章。

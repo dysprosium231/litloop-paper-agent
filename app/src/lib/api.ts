@@ -194,6 +194,7 @@ export interface DownloadItem {
   source?: string | null
   file?: string | null
   error?: string | null
+  zotero?: { status: "pushing" | "added" | "reused" | "no_pdf" | "failed"; key?: string | null; error?: string | null } | null
 }
 
 export type JobState = "running" | "done" | "cancelled" | "failed" | "interrupted"
@@ -214,7 +215,12 @@ export interface DownloadJob extends Omit<DownloadJobEntry, "total" | "done" | "
   output_dir: string
   error?: string | null
   items: DownloadItem[]
+  zotero?: { state: "running" | "done" | "failed" | "interrupted"; collection: string; error?: string | null } | null
+  /** Where a push goes unless another collection is chosen. */
+  zotero_default: string
 }
+
+export interface ZoteroCollection { key: string; name: string; parent: string | null; path: string }
 
 /** The engine's process-wide report while a job runs (progress_reporter). */
 export interface LiveDownload {
@@ -234,11 +240,49 @@ export interface PendingGroup {
 }
 
 export const downloadsApi = {
-  list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null }>("/api/downloads"),
+  list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; pushing: string | null }>("/api/downloads"),
   pending: () => call<PendingGroup[]>("/api/downloads/pending"),
   job: (id: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(id)}`),
   start: (papers: PendingGroup["papers"], title: string, session?: string) =>
     call<DownloadJob>("/api/downloads", { papers, title, session: session ?? null }),
   cancel: () => call<{ cancelled: boolean }>("/api/downloads/cancel", {}),
   open: (path: string) => call<{ opened: string }>("/api/open", { path }),
+  push: (job: string, collection: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(job)}/zotero`, { collection, tags: [] }),
+  collections: () => call<ZoteroCollection[]>("/api/zotero/collections"),
+}
+
+// ------------------------------------------------------------------ zotero
+
+export interface ZoteroPendingGroup {
+  job: string
+  title: string
+  created: string
+  collection: string
+  papers: { doi: string; title?: string; year?: number | null; journal?: string | null; zotero?: string | null }[]
+}
+
+export interface ZoteroHistoryEntry {
+  job: string
+  title: string
+  state: "running" | "done" | "failed" | "interrupted"
+  collection: string
+  started?: string
+  finished?: string | null
+  error?: string | null
+  added: number
+  reused: number
+  no_pdf: number
+  failed: number
+}
+
+export interface ZoteroOverview {
+  running: boolean
+  mcp: string | null
+  pending: ZoteroPendingGroup[]
+  history: ZoteroHistoryEntry[]
+  pushing: string | null
+}
+
+export const zoteroApi = {
+  overview: () => call<ZoteroOverview>("/api/zotero"),
 }

@@ -1,10 +1,11 @@
 import * as React from "react"
 import { ChevronDownIcon } from "lucide-react"
 
-import { AppSidebar, type Section } from "@/components/app-sidebar"
+import { AppSidebar, RAIL_COLLAPSED, RAIL_OPEN, type Section } from "@/components/app-sidebar"
 import { PaperList, type PaperRow } from "@/components/paper-list"
 import { SettingsNav, SettingsPane } from "@/components/settings-view"
 import { DownloadsNav, JobPane, PENDING, PendingPane, useDownloads } from "@/components/downloads-view"
+import { useZotero, ZoteroNav, ZoteroPane } from "@/components/zotero-view"
 import { DetailPane, type Paper } from "@/components/detail-pane"
 import { ProgressStrip } from "@/components/progress-strip"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
@@ -32,7 +33,8 @@ import {
 
 const short = (q: string) => (q.length > 28 ? q.slice(0, 28) + "…" : q)
 
-// Width of the icon rail plus the paper list, which the user drags; remembered between runs.
+// Width of the collapsed icon rail plus the paper list, which the user drags; remembered
+// between runs. An open rail adds RAIL_OPEN - RAIL_COLLAPSED on top, so the list keeps its width.
 const WIDTH_KEY = "litloop.listWidth"
 const MIN_WIDTH = 360  // keeps the list header (title + 只看本批) whole
 const MAX_WIDTH = 900
@@ -59,8 +61,29 @@ function useStoredWidth(): [number, (w: number) => void] {
   return [width, set]
 }
 
+const RAIL_KEY = "litloop.railOpen"
+
+function useRailOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = React.useState(() => {
+    try {
+      return localStorage.getItem(RAIL_KEY) !== "0"
+    } catch {
+      return true
+    }
+  })
+  const set = React.useCallback((v: boolean) => {
+    setOpen(v)
+    try {
+      localStorage.setItem(RAIL_KEY, v ? "1" : "0")
+    } catch {
+      /* storage unavailable: the rail opens next time */
+    }
+  }, [])
+  return [open, set]
+}
+
 /** A draggable line on the list's right edge; arrow keys also move it when focused. */
-function ResizeHandle({ width, onWidth }: { width: number; onWidth: (w: number) => void }) {
+function ResizeHandle({ width, offset, onWidth }: { width: number; offset: number; onWidth: (w: number) => void }) {
   // While dragging, set the CSS variable directly and switch off the sidebar's width
   // transition: going through React state on every move (and the 200 ms transition)
   // made the line lag behind the pointer. The width is stored once, on release.
@@ -75,7 +98,7 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (w: number) 
     const move = (ev: PointerEvent) => {
       w = clamp(w0 + ev.clientX - x0)
       cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => wrapper?.style.setProperty("--sidebar-width", `${w}px`))
+      frame = requestAnimationFrame(() => wrapper?.style.setProperty("--sidebar-width", `${w + offset}px`))
     }
     const up = () => {
       window.removeEventListener("pointermove", move)
@@ -120,12 +143,16 @@ export default function App() {
   const [onlyBatch, setOnlyBatch] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [listWidth, setListWidth] = useStoredWidth()
+  const [railOpen, setRailOpen] = useRailOpen()
+  const railExtra = railOpen ? RAIL_OPEN - RAIL_COLLAPSED : 0
   const [section, setSection] = React.useState<Section>("screen")
   const [groups, setGroups] = React.useState<SettingGroup[]>([])
   const [settingsGroup, setSettingsGroup] = React.useState("sources")
   const downloads = useDownloads(section === "download")
   const [downloadView, setDownloadView] = React.useState(PENDING)
   const startedJob = (job: string) => { setDownloadView(job); downloads.refresh() }
+  const zotero = useZotero(section === "zotero")
+  const openJob = (job: string) => { setSection("download"); setDownloadView(job) }
   React.useEffect(() => {
     if (section === "settings") settingsApi.list().then(setGroups).catch((e) => setError(String(e)))
   }, [section])
@@ -226,8 +253,9 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <SidebarProvider style={{ "--sidebar-width": `${section === "settings" ? SETTINGS_WIDTH : listWidth}px` } as React.CSSProperties}>
-        <AppSidebar section={section} onSection={setSection}>
+      {/* The header's toggle hides the list; the rail then shows icons only (--sidebar-width-icon). */}
+      <SidebarProvider style={{ "--sidebar-width": `${(section === "settings" ? SETTINGS_WIDTH : listWidth) + railExtra}px` } as React.CSSProperties}>
+        <AppSidebar section={section} onSection={setSection} railOpen={railOpen} onRailOpen={setRailOpen}>
           {section === "settings" ? (
             <SettingsNav groups={groups} current={settingsGroup} onPick={setSettingsGroup} />
           ) : section === "screen" ? (
@@ -236,13 +264,15 @@ export default function App() {
           ) : section === "download" ? (
             <DownloadsNav jobs={downloads.jobs} pending={downloads.pending} current={downloadView} onPick={setDownloadView} />
           ) : (
-            <p className="p-4 text-sm text-muted-foreground">Zotero 还在做。</p>
+            <ZoteroNav data={zotero.data} onOpenJob={openJob} />
           )}
         </AppSidebar>
         <SidebarInset className="relative min-h-0 min-w-0">
-          {section !== "settings" && <ResizeHandle width={listWidth} onWidth={setListWidth} />}
+          {section !== "settings" && <ResizeHandle width={listWidth} offset={railExtra} onWidth={setListWidth} />}
           {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-          {section === "download" ? (
+          {section === "zotero" ? (
+            <ZoteroPane data={zotero.data} error={zotero.error} onChanged={zotero.refresh} onOpenJob={openJob} />
+          ) : section === "download" ? (
             downloadView === PENDING
               ? <PendingPane pending={downloads.pending} busy={Boolean(downloads.running)} onStarted={startedJob} />
               : <JobPane key={downloadView} id={downloadView} live={downloads.live} onChanged={downloads.refresh} onStarted={startedJob} />

@@ -1,4 +1,4 @@
-"""PDF auto-rename based on metadata (AuthorYear_Title format)."""
+"""PDF auto-rename based on metadata, in the format the user picked (``rename_format``)."""
 
 from __future__ import annotations
 
@@ -14,9 +14,46 @@ from .log import get_logger
 log = get_logger()
 
 
+# rename_format values -> what the settings page shows. "off" keeps the name the source gave.
+FORMATS = {
+    "author_year_title_doi": "作者年份_标题_DOI",
+    "author_year_title": "作者年份_标题",
+    "zotero": "作者 - 年份 - 完整标题",
+    "year_author_title": "年份_作者_标题",
+    "title": "完整标题",
+    "doi": "DOI",
+    "off": "保持原名",
+}
+DEFAULT_FORMAT = "author_year_title_doi"
+
+
+def rename_format(config: dict[str, Any]) -> str:
+    """The configured format; the older ``auto_rename: false`` means off."""
+    if config.get("auto_rename") is False:
+        return "off"
+    fmt = config.get("rename_format") or DEFAULT_FORMAT
+    return fmt if fmt in FORMATS else DEFAULT_FORMAT
+
+
+_ILLEGAL = re.compile('[' + re.escape('<>:"/' + chr(92) + '|?*') + chr(0) + '-' + chr(31) + ']')
+
+
+def _full_title(metadata: dict[str, Any], max_len: int = 120) -> str:
+    """The whole title, kept in its own script, with characters Windows forbids removed."""
+    titles = metadata.get("title", metadata.get("titles", []))
+    title = titles[0] if isinstance(titles, list) and titles else titles
+    if not isinstance(title, str):
+        return ""
+    title = re.sub(r"<[^>]+>", "", title)
+    title = " ".join(_ILLEGAL.sub(" ", title).split()).strip(" .")
+    if len(title) > max_len:
+        title = title[:max_len].rsplit(" ", 1)[0].rstrip(" .,;")
+    return title
+
+
 def generate_filename(metadata: dict[str, Any], doi: str | None = None,
-                      max_len: int = 60, max_words: int = 4) -> str:
-    """Generate a clean filename from paper metadata.
+                      max_len: int = 60, max_words: int = 4, fmt: str = DEFAULT_FORMAT) -> str:
+    """Generate a clean filename from paper metadata in format ``fmt`` (see FORMATS).
 
     Format: LastNameYear_First_Title_Words_<DOI>.pdf. The readable part is
     capped at ``max_words`` words / ``max_len`` chars; the DOI (from ``doi``
@@ -81,8 +118,28 @@ def generate_filename(metadata: dict[str, Any], doi: str | None = None,
     if title_word:
         parts.append(title_word)
 
-    if not parts:
-        return ""
+    if not parts and fmt not in ("doi", "title"):
+        doi = doi or metadata.get("DOI") or metadata.get("doi")
+        return safe_filename(str(doi).strip().lower()) if doi and fmt != "author_year_title_doi" else ""
+
+    doi = doi or metadata.get("DOI") or metadata.get("doi")
+    doi_part = safe_filename(str(doi).strip().lower()) if doi else ""
+    if fmt == "doi":
+        return doi_part
+    if fmt == "title":
+        return _full_title(metadata) or doi_part
+    if fmt == "zotero":
+        # Zotero's own pattern keeps names in their script (李, Müller).
+        raw = authors[0] if authors and isinstance(authors, list) else ""
+        raw = (raw.get("family") or raw.get("name") or "") if isinstance(raw, dict) else str(raw).split(",")[0]
+        author = " ".join(_ILLEGAL.sub(" ", raw).split())[:30] or first_author
+        named = " - ".join(x for x in (author, year, _full_title(metadata)) if x)
+        return named or doi_part
+    if fmt == "year_author_title":
+        name = "_".join(x for x in (year, first_author, title_word) if x)
+        if len(name) > max_len:
+            name = name[:max_len].rsplit("_", 1)[0]
+        return name or doi_part
 
     # Join first two parts directly (AuthorYear), then underscore with title
     if len(parts) >= 3:
@@ -94,9 +151,8 @@ def generate_filename(metadata: dict[str, Any], doi: str | None = None,
     # Truncate at a word boundary if too long
     if len(name) > max_len:
         name = name[:max_len].rsplit("_", 1)[0] if "_" in name[:max_len] else name[:max_len]
-    doi = doi or metadata.get("DOI") or metadata.get("doi")
-    if doi:
-        name = f"{name}_{safe_filename(str(doi).strip().lower())}"
+    if fmt == "author_year_title_doi" and doi_part:
+        name = f"{name}_{doi_part}"
     return name
 
 
@@ -118,12 +174,13 @@ def rename_pdf(
     metadata: dict[str, Any],
     target_dir: Path | None = None,
     doi: str | None = None,
+    fmt: str = DEFAULT_FORMAT,
 ) -> Path | None:
     """Rename a downloaded PDF based on metadata. Returns new path or None if failed."""
-    if not file_path.exists():
+    if not file_path.exists() or fmt == "off":
         return None
 
-    new_name = generate_filename(metadata, doi=doi)
+    new_name = generate_filename(metadata, doi=doi, fmt=fmt)
     if not new_name:
         return None
 

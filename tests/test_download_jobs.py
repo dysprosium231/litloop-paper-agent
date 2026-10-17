@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import requests
 from fastapi.testclient import TestClient
 
-from litloop import app_server, config, download_jobs, progress_reporter, screening, server, store
+from litloop import app_server, config, download_jobs, progress_reporter, screening, server, store, zotero
 
 TOKEN = "t0ken"
 
@@ -77,20 +78,32 @@ def setup_dirs_and_cleanup(tmp_path, monkeypatch, fake_batch):
             download_jobs._RUN_LOCK.release()
         except RuntimeError:
             pass
+    if download_jobs._PUSH_LOCK.locked():
+        try:
+            download_jobs._PUSH_LOCK.release()
+        except RuntimeError:
+            pass
     download_jobs._CURRENT.update(job=None, cancelled=False)
+    download_jobs._PUSHING["job"] = None
     progress_reporter._LISTENERS.clear()
 
     yield
 
     for t in threading.enumerate():
-        if t.name.startswith("download-"):
+        if t.name.startswith("download-") or t.name.startswith("zotero-"):
             t.join(timeout=2.0)
     if download_jobs._RUN_LOCK.locked():
         try:
             download_jobs._RUN_LOCK.release()
         except RuntimeError:
             pass
+    if download_jobs._PUSH_LOCK.locked():
+        try:
+            download_jobs._PUSH_LOCK.release()
+        except RuntimeError:
+            pass
     download_jobs._CURRENT.update(job=None, cancelled=False)
+    download_jobs._PUSHING["job"] = None
     progress_reporter._LISTENERS.clear()
 
 
@@ -116,6 +129,24 @@ def wait_job(job_id: str, timeout: float = 3.0) -> dict[str, Any]:
             return data
         time.sleep(0.02)
     raise TimeoutError(f"Job {job_id} did not finish within {timeout}s")
+
+
+def wait_push(job_id: str, timeout: float = 3.0) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for t in threading.enumerate():
+            if t.name == f"zotero-{job_id}":
+                t.join(timeout=0.05)
+                break
+        data = download_jobs.get(job_id)
+        z = data.get("zotero") or {}
+        if z.get("state") in ("done", "failed"):
+            for t in threading.enumerate():
+                if t.name == f"zotero-{job_id}":
+                    t.join(timeout=0.5)
+            return data
+        time.sleep(0.02)
+    raise TimeoutError(f"Zotero push for job {job_id} did not finish within {timeout}s")
 
 
 def test_start_runs_in_thread_and_finishes(fake_batch, tmp_path):
@@ -405,7 +436,7 @@ def test_api_downloads_endpoints(client):
     # List when empty
     resp = client.get("/api/downloads")
     assert resp.status_code == 200
-    assert resp.json() == {"jobs": [], "running": None, "live": None}
+    assert resp.json() == {"jobs": [], "running": None, "live": None, "pushing": None}
 
 
 def test_job_failure_on_engine_exception(fake_batch):
@@ -416,3 +447,717 @@ def test_job_failure_on_engine_exception(fake_batch):
     data = wait_job(job_info["job"])
     assert data["state"] == "failed"
     assert "RuntimeError: Engine crash" in (data.get("error") or "")
+
+
+def test_default_collection(tmp_path, monkeypatch):
+    """(1) default_collection(title) gives "<root>/<title>", replaces "/", collapses whitespace,
+    shortens >40 chars with "…", and uses "LitLoop" when empty/unset."""
+    # Unset config uses "LitLoop"
+    assert download_jobs.default_collection("Simple Title") == "LitLoop/Simple Title"
+
+    # Empty config string uses "LitLoop"
+    cfg_file = tmp_path / "config.json"
+    cfg_file.write_text(json.dumps({"zotero_collection_root": ""}), encoding="utf-8")
+    assert download_jobs.default_collection("Simple Title") == "LitLoop/Simple Title"
+
+    # Custom root with whitespace / slashes stripped
+    cfg_file.write_text(json.dumps({"zotero_collection_root": " /MyLibrary/Sub/ "}), encoding="utf-8")
+    assert download_jobs.default_collection("Simple Title") == "MyLibrary/Sub/Simple Title"
+
+    # Replaces "/" in title with "-"
+    assert download_jobs.default_collection("COVID-19/SARS-CoV-2/Review") == "MyLibrary/Sub/COVID-19-SARS-CoV-2-Review"
+
+    # Collapses whitespace in title
+    assert download_jobs.default_collection("  Paper   with \t\n  lots   of   spaces  ") == "MyLibrary/Sub/Paper with lots of spaces"
+
+    # Exact 40 chars is not shortened
+    title40 = "A" * 40
+    assert download_jobs.default_collection(title40) == f"MyLibrary/Sub/{title40}"
+
+    # Over 40 chars shortened to 39 chars + "…"
+    title45 = "B" * 45
+    expected = "B" * 39 + "…"
+    assert len(expected) == 40
+    assert download_jobs.default_collection(title45) == f"MyLibrary/Sub/{expected}"
+
+
+def test_push_zotero_items_status_and_skips_on_second_push(monkeypatch, tmp_path):
+    """(2) push_zotero pushes only done items with file, records added/reused/no_pdf/failed,
+    sets state done with collection and key, and skips added/reused on second push."""
+    papers_dir = tmp_path / "papers"
+    papers_dir.mkdir(parents=True, exist_ok=True)
+    f1 = papers_dir / "p1.pdf"
+    f2 = papers_dir / "p2.pdf"
+    f3 = papers_dir / "p3.pdf"
+    f4 = papers_dir / "p4.pdf"
+    for f in (f1, f2, f3, f4):
+        f.write_bytes(b"%PDF-1.4")
+
+    job_id = "20261017-120000"
+    job_data = {
+        "schema": store.SCHEMA,
+        "job": job_id,
+        "title": "Zotero Test Job",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 12:00:00",
+        "finished": "2026-10-17 12:05:00",
+        "output_dir": str(papers_dir),
+        "error": None,
+        "items": [
+            {"doi": "10.1000/1", "title": "Added", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": str(f1), "error": None},
+            {"doi": "10.1000/2", "title": "Reused", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": str(f2), "error": None},
+            {"doi": "10.1000/3", "title": "No PDF", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": str(f3), "error": None},
+            {"doi": "10.1000/4", "title": "Failed", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": str(f4), "error": None},
+            {"doi": "10.1000/5", "title": "Download Failed", "year": None, "journal": None,
+             "status": "failed", "source": None, "file": None, "error": "not found"},
+            {"doi": "10.1000/6", "title": "No File", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": None, "error": None},
+        ],
+    }
+    store.write_json(download_jobs.job_path(job_id), job_data)
+
+    monkeypatch.setattr(zotero, "ensure_collection",
+                        lambda col, cfg: {"success": True, "key": "COL_KEY_1", "path": col})
+
+    pushed: list[dict[str, Any]] = []
+
+    def fake_push(identifier, pdf_path, cfg, collections=None, tags=None):
+        pushed.append({"doi": identifier, "file": pdf_path, "collections": collections, "tags": tags})
+        if identifier == "10.1000/1":
+            return {"success": True, "zotero_key": "ZK1", "pdf_attached": True, "reused": False}
+        elif identifier == "10.1000/2":
+            return {"success": True, "zotero_key": "ZK2", "pdf_attached": True, "reused": True}
+        elif identifier == "10.1000/3":
+            return {"success": True, "zotero_key": "ZK3", "pdf_attached": False, "attach_message": "too large"}
+        elif identifier == "10.1000/4":
+            return {"success": False, "error": "bridge error"}
+        raise AssertionError(f"Unexpected doi pushed: {identifier}")
+
+    monkeypatch.setattr(zotero, "push_via_zotero_mcp", fake_push)
+
+    # First push
+    res = download_jobs.push_zotero(job_id, collection="Custom/Coll", tags=["tag1", "tag2"])
+    assert res["zotero"]["state"] == "running"
+
+    data = wait_push(job_id)
+    assert data["zotero"]["state"] == "done"
+    assert data["zotero"]["collection"] == "Custom/Coll"
+    assert data["zotero"]["key"] == "COL_KEY_1"
+    assert data["zotero"]["finished"] is not None
+
+    items_by_doi = {i["doi"]: i for i in data["items"]}
+    assert items_by_doi["10.1000/1"]["zotero"] == {"status": "added", "key": "ZK1", "error": None}
+    assert items_by_doi["10.1000/2"]["zotero"] == {"status": "reused", "key": "ZK2", "error": None}
+    assert items_by_doi["10.1000/3"]["zotero"] == {"status": "no_pdf", "key": "ZK3", "error": "too large"}
+    assert items_by_doi["10.1000/4"]["zotero"] == {"status": "failed", "key": None, "error": "bridge error"}
+    assert "zotero" not in items_by_doi["10.1000/5"]
+    assert "zotero" not in items_by_doi["10.1000/6"]
+
+    assert len(pushed) == 4
+    for p in pushed:
+        assert p["collections"] == ["COL_KEY_1"]
+        assert p["tags"] == ["tag1", "tag2"]
+
+    # Second push: 10.1000/1 and 10.1000/2 are already added/reused -> skipped!
+    pushed.clear()
+    download_jobs.push_zotero(job_id)
+    data2 = wait_push(job_id)
+    assert [p["doi"] for p in pushed] == ["10.1000/3", "10.1000/4"]
+
+
+def test_push_zotero_nothing_waits_raises_and_api_400(client, tmp_path):
+    """(3a) push_zotero raises ValueError when nothing waits; API returns 400."""
+    job_id = "20261017-121000"
+    job_data = {
+        "schema": store.SCHEMA,
+        "job": job_id,
+        "title": "Nothing Waits Job",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 12:10:00",
+        "finished": "2026-10-17 12:11:00",
+        "output_dir": "",
+        "error": None,
+        "items": [
+            {"doi": "10.1000/fail", "title": "F", "year": None, "journal": None,
+             "status": "failed", "source": None, "file": None, "error": "fail"},
+            {"doi": "10.1000/nofile", "title": "NF", "year": None, "journal": None,
+             "status": "done", "source": "oa", "file": None, "error": None},
+        ],
+    }
+    store.write_json(download_jobs.job_path(job_id), job_data)
+
+    with pytest.raises(ValueError, match="nothing to push"):
+        download_jobs.push_zotero(job_id)
+
+    resp = client.post(f"/api/downloads/{job_id}/zotero", json={})
+    assert resp.status_code == 400
+    assert "nothing to push" in resp.json()["detail"]
+
+
+def test_push_zotero_busy_raises_and_api_409(client, monkeypatch, tmp_path):
+    """(3b) push_zotero raises Busy when a push is already running; API returns 409."""
+    f = tmp_path / "paper.pdf"
+    f.write_bytes(b"%PDF-1.4")
+
+    job_id = "20261017-122000"
+    job_data = {
+        "schema": store.SCHEMA,
+        "job": job_id,
+        "title": "Busy Push Job",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 12:20:00",
+        "finished": "2026-10-17 12:21:00",
+        "output_dir": "",
+        "error": None,
+        "items": [
+            {"doi": "10.1000/busy", "title": "Busy Paper", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": str(f), "error": None},
+        ],
+    }
+    store.write_json(download_jobs.job_path(job_id), job_data)
+
+    block_event = threading.Event()
+    entered_event = threading.Event()
+
+    def fake_ensure(col, cfg):
+        entered_event.set()
+        block_event.wait(timeout=5.0)
+        return {"success": True, "key": "KEY_BUSY", "path": col}
+
+    monkeypatch.setattr(zotero, "ensure_collection", fake_ensure)
+    monkeypatch.setattr(zotero, "push_via_zotero_mcp",
+                        lambda *a, **k: {"success": True, "zotero_key": "K", "pdf_attached": True})
+
+    download_jobs.push_zotero(job_id)
+    assert entered_event.wait(timeout=2.0)
+    assert download_jobs.pushing() == job_id
+
+    # Python direct call raises Busy
+    with pytest.raises(download_jobs.Busy, match="another Zotero push is still running"):
+        download_jobs.push_zotero(job_id)
+
+    # API returns 409
+    resp = client.post(f"/api/downloads/{job_id}/zotero", json={})
+    assert resp.status_code == 409
+    assert "已有推送在进行" in resp.json()["detail"]
+
+    block_event.set()
+    wait_push(job_id)
+    assert download_jobs.pushing() is None
+
+
+def test_push_zotero_ensure_collection_failed(monkeypatch, tmp_path):
+    """(4) ensure_collection failing sets zotero state failed with its error."""
+    f = tmp_path / "paper.pdf"
+    f.write_bytes(b"%PDF-1.4")
+
+    job_id = "20261017-123000"
+    job_data = {
+        "schema": store.SCHEMA,
+        "job": job_id,
+        "title": "Ensure Fail Job",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 12:30:00",
+        "finished": "2026-10-17 12:31:00",
+        "output_dir": "",
+        "error": None,
+        "items": [
+            {"doi": "10.1000/efail", "title": "P", "year": None, "journal": None,
+             "status": "done", "source": "oa", "file": str(f), "error": None},
+        ],
+    }
+    store.write_json(download_jobs.job_path(job_id), job_data)
+
+    monkeypatch.setattr(zotero, "ensure_collection",
+                        lambda col, cfg: {"success": False, "error": "Zotero collection forbidden"})
+
+    download_jobs.push_zotero(job_id)
+    data = wait_push(job_id)
+    assert data["zotero"]["state"] == "failed"
+    assert data["zotero"]["error"] == "Zotero collection forbidden"
+    assert download_jobs.pushing() is None
+
+
+def test_interrupted_zotero_job_reads_back(client, tmp_path):
+    """(5) a job file whose zotero.state is running while no push runs reads back
+    as interrupted and its 'pushing' items as failed."""
+    job_id = "20261017-124000"
+    job_data = {
+        "schema": store.SCHEMA,
+        "job": job_id,
+        "title": "Interrupted Zotero Job",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 12:40:00",
+        "finished": "2026-10-17 12:41:00",
+        "output_dir": "",
+        "error": None,
+        "items": [
+            {"doi": "10.1000/already-done", "title": "P1", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": "p1.pdf", "error": None,
+             "zotero": {"status": "added", "key": "K1", "error": None}},
+            {"doi": "10.1000/was-pushing", "title": "P2", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": "p2.pdf", "error": None,
+             "zotero": {"status": "pushing", "key": None, "error": None}},
+        ],
+        "zotero": {
+            "state": "running",
+            "collection": "LitLoop/Test",
+            "key": "COL1",
+            "started": "2026-10-17 12:42:00",
+            "finished": None,
+            "error": None,
+        },
+    }
+    store.write_json(download_jobs.job_path(job_id), job_data)
+
+    got = download_jobs.get(job_id)
+    assert got["zotero"]["state"] == "interrupted"
+    items = {i["doi"]: i for i in got["items"]}
+    assert items["10.1000/already-done"]["zotero"]["status"] == "added"
+    assert items["10.1000/was-pushing"]["zotero"]["status"] == "failed"
+
+    # API also sees it as interrupted
+    resp = client.get(f"/api/downloads/{job_id}")
+    assert resp.status_code == 200
+    api_data = resp.json()
+    assert api_data["zotero"]["state"] == "interrupted"
+    api_items = {i["doi"]: i for i in api_data["items"]}
+    assert api_items["10.1000/was-pushing"]["zotero"]["status"] == "failed"
+
+
+def test_auto_push_triggers_on_finished_download_job(fake_batch, monkeypatch, tmp_path):
+    """(6) with config zotero_auto_push true a finished download job triggers a push automatically."""
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "zotero_auto_push", True)
+
+    monkeypatch.setattr(zotero, "ensure_collection",
+                        lambda col, cfg: {"success": True, "key": "AUTO_COL_KEY", "path": col})
+
+    pushed_dois: list[str] = []
+
+    def fake_push(doi, path, cfg, collections=None, tags=None):
+        pushed_dois.append(doi)
+        return {"success": True, "zotero_key": f"KEY_{doi}", "pdf_attached": True, "reused": False}
+
+    monkeypatch.setattr(zotero, "push_via_zotero_mcp", fake_push)
+
+    papers = [
+        {"doi": "10.1000/auto-ok", "title": "Auto OK"},
+        {"doi": "10.1000/fail-paper", "title": "Auto Fail"},
+    ]
+    job_info = download_jobs.start(papers, title="Auto Push Job")
+    job_id = job_info["job"]
+
+    wait_job(job_id)
+    data = wait_push(job_id)
+
+    assert data["state"] == "done"
+    assert data["zotero"]["state"] == "done"
+    assert data["zotero"]["key"] == "AUTO_COL_KEY"
+    assert pushed_dois == ["10.1000/auto-ok"]
+
+    items = {i["doi"]: i for i in data["items"]}
+    assert items["10.1000/auto-ok"]["zotero"]["status"] == "added"
+    assert "zotero" not in items["10.1000/fail-paper"]
+
+
+def test_api_download_job_includes_zotero_default(client, tmp_path):
+    """(7a) GET /api/downloads/{job} includes zotero_default."""
+    job_id = "20261017-125000"
+    job_data = {
+        "schema": store.SCHEMA,
+        "job": job_id,
+        "title": "Machine Learning in Medicine",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 12:50:00",
+        "finished": "2026-10-17 12:51:00",
+        "output_dir": "",
+        "error": None,
+        "items": [],
+    }
+    store.write_json(download_jobs.job_path(job_id), job_data)
+
+    resp = client.get(f"/api/downloads/{job_id}")
+    assert resp.status_code == 200
+    assert resp.json()["zotero_default"] == "LitLoop/Machine Learning in Medicine"
+
+
+def test_api_zotero_collections_endpoint(client, monkeypatch):
+    """(7b) GET /api/zotero/collections returns list from zotero_collections, and 503 on failure."""
+    # Success
+    cols = [{"key": "C1", "name": "LitLoop", "parent": "", "path": "LitLoop"}]
+    monkeypatch.setattr(zotero, "zotero_collections", lambda cfg: {"success": True, "collections": cols})
+
+    resp = client.get("/api/zotero/collections")
+    assert resp.status_code == 200
+    assert resp.json() == cols
+
+    # Failure with error message
+    monkeypatch.setattr(zotero, "zotero_collections",
+                        lambda cfg: {"success": False, "error": "zotero-mcp not installed"})
+    resp_fail = client.get("/api/zotero/collections")
+    assert resp_fail.status_code == 503
+    assert resp_fail.json()["detail"] == "zotero-mcp not installed"
+
+    # Failure without error message
+    monkeypatch.setattr(zotero, "zotero_collections", lambda cfg: {"success": False})
+    resp_fail2 = client.get("/api/zotero/collections")
+    assert resp_fail2.status_code == 503
+    assert resp_fail2.json()["detail"] == "Zotero is not reachable"
+
+
+def test_zotero_pending():
+    """zotero_pending lists, per job, papers with status done and a file whose
+    zotero status is not added/reused (includes never pushed, no_pdf, failed),
+    with the job's pushed collection or default_collection(title); jobs with
+    nothing pending are left out."""
+    # Job 1: Has various items, no zotero block -> uses default_collection(title)
+    job1_id = "20261017-100000"
+    job1_data = {
+        "schema": store.SCHEMA,
+        "job": job1_id,
+        "title": "Job Pending Default",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 10:00:00",
+        "finished": "2026-10-17 10:05:00",
+        "output_dir": "",
+        "error": None,
+        "items": [
+            # never pushed (no zotero key) -> pending
+            {"doi": "10.1000/never-pushed", "title": "Paper 1", "year": 2021, "journal": "Nature",
+             "status": "done", "source": "unpaywall", "file": "p1.pdf", "error": None},
+            # failed push -> pending
+            {"doi": "10.1000/failed-push", "title": "Paper 2", "year": 2022, "journal": "Science",
+             "status": "done", "source": "unpaywall", "file": "p2.pdf", "error": None,
+             "zotero": {"status": "failed", "key": None, "error": "bridge error"}},
+            # no_pdf push -> pending
+            {"doi": "10.1000/no-pdf-push", "title": "Paper 3", "year": 2023, "journal": "Cell",
+             "status": "done", "source": "unpaywall", "file": "p3.pdf", "error": None,
+             "zotero": {"status": "no_pdf", "key": "ZK3", "error": "too large"}},
+            # added -> NOT pending
+            {"doi": "10.1000/added-push", "title": "Paper 4", "year": 2024, "journal": "Lancet",
+             "status": "done", "source": "unpaywall", "file": "p4.pdf", "error": None,
+             "zotero": {"status": "added", "key": "ZK4", "error": None}},
+            # reused -> NOT pending
+            {"doi": "10.1000/reused-push", "title": "Paper 5", "year": 2025, "journal": "JAMA",
+             "status": "done", "source": "unpaywall", "file": "p5.pdf", "error": None,
+             "zotero": {"status": "reused", "key": "ZK5", "error": None}},
+            # download failed -> NOT pending (status != done)
+            {"doi": "10.1000/download-failed", "title": "Paper 6", "year": 2026, "journal": "NEJM",
+             "status": "failed", "source": None, "file": None, "error": "not found"},
+            # done but no file -> NOT pending
+            {"doi": "10.1000/no-file", "title": "Paper 7", "year": 2027, "journal": "BMJ",
+             "status": "done", "source": "oa", "file": None, "error": None},
+        ],
+    }
+    store.write_json(download_jobs.job_path(job1_id), job1_data)
+
+    # Job 2: Has custom collection in zotero block -> uses pushed collection
+    job2_id = "20261017-090000"
+    job2_data = {
+        "schema": store.SCHEMA,
+        "job": job2_id,
+        "title": "Job Pending Pushed Coll",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 09:00:00",
+        "finished": "2026-10-17 09:05:00",
+        "output_dir": "",
+        "error": None,
+        "zotero": {
+            "state": "done",
+            "collection": "Custom/PushedColl",
+            "key": "COL_KEY",
+            "started": "2026-10-17 09:05:00",
+            "finished": "2026-10-17 09:06:00",
+            "error": None,
+        },
+        "items": [
+            {"doi": "10.1000/j2-pending", "title": "J2 Paper", "year": 2020, "journal": "PNAS",
+             "status": "done", "source": "unpaywall", "file": "j2.pdf", "error": None,
+             "zotero": {"status": "failed", "key": None, "error": "timeout"}},
+        ],
+    }
+    store.write_json(download_jobs.job_path(job2_id), job2_data)
+
+    # Job 3: All downloaded papers already added/reused -> left out
+    job3_id = "20261017-080000"
+    job3_data = {
+        "schema": store.SCHEMA,
+        "job": job3_id,
+        "title": "All Added Job",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 08:00:00",
+        "finished": "2026-10-17 08:05:00",
+        "output_dir": "",
+        "error": None,
+        "items": [
+            {"doi": "10.1000/j3-added", "title": "J3 Paper", "year": 2019, "journal": "PLOS",
+             "status": "done", "source": "unpaywall", "file": "j3.pdf", "error": None,
+             "zotero": {"status": "added", "key": "K3", "error": None}},
+        ],
+    }
+    store.write_json(download_jobs.job_path(job3_id), job3_data)
+
+    # Job 4: No items done with file -> left out
+    job4_id = "20261017-070000"
+    job4_data = {
+        "schema": store.SCHEMA,
+        "job": job4_id,
+        "title": "All Failed Job",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 07:00:00",
+        "finished": "2026-10-17 07:05:00",
+        "output_dir": "",
+        "error": None,
+        "items": [
+            {"doi": "10.1000/j4-fail", "title": "J4 Paper", "year": 2018, "journal": None,
+             "status": "failed", "source": None, "file": None, "error": "not found"},
+        ],
+    }
+    store.write_json(download_jobs.job_path(job4_id), job4_data)
+
+    pending = download_jobs.zotero_pending()
+    assert len(pending) == 2
+
+    # Job 1 is first (newest by id)
+    assert pending[0]["job"] == job1_id
+    assert pending[0]["title"] == "Job Pending Default"
+    assert pending[0]["created"] == "2026-10-17 10:00:00"
+    assert pending[0]["collection"] == "LitLoop/Job Pending Default"
+    assert pending[0]["papers"] == [
+        {"doi": "10.1000/never-pushed", "title": "Paper 1", "year": 2021, "journal": "Nature", "zotero": None},
+        {"doi": "10.1000/failed-push", "title": "Paper 2", "year": 2022, "journal": "Science", "zotero": "failed"},
+        {"doi": "10.1000/no-pdf-push", "title": "Paper 3", "year": 2023, "journal": "Cell", "zotero": "no_pdf"},
+    ]
+
+    # Job 2 is second
+    assert pending[1]["job"] == job2_id
+    assert pending[1]["title"] == "Job Pending Pushed Coll"
+    assert pending[1]["created"] == "2026-10-17 09:00:00"
+    assert pending[1]["collection"] == "Custom/PushedColl"
+    assert pending[1]["papers"] == [
+        {"doi": "10.1000/j2-pending", "title": "J2 Paper", "year": 2020, "journal": "PNAS", "zotero": "failed"},
+    ]
+
+
+def test_zotero_history():
+    """zotero_history lists only jobs that have a 'zotero' block,
+    with state/collection and counts added/reused/no_pdf/failed."""
+    # Job A: Done push with mixed outcomes
+    jobA_id = "20261017-150000"
+    jobA_data = {
+        "schema": store.SCHEMA,
+        "job": jobA_id,
+        "title": "Pushed Job A",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 15:00:00",
+        "finished": "2026-10-17 15:05:00",
+        "output_dir": "",
+        "error": None,
+        "zotero": {
+            "state": "done",
+            "collection": "LitLoop/Pushed Job A",
+            "key": "KEY_A",
+            "started": "2026-10-17 15:05:00",
+            "finished": "2026-10-17 15:06:00",
+            "error": None,
+        },
+        "items": [
+            {"doi": "10.1000/a1", "title": "A1", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": "a1.pdf", "error": None,
+             "zotero": {"status": "added", "key": "K1", "error": None}},
+            {"doi": "10.1000/a2", "title": "A2", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": "a2.pdf", "error": None,
+             "zotero": {"status": "added", "key": "K2", "error": None}},
+            {"doi": "10.1000/a3", "title": "A3", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": "a3.pdf", "error": None,
+             "zotero": {"status": "reused", "key": "K3", "error": None}},
+            {"doi": "10.1000/a4", "title": "A4", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": "a4.pdf", "error": None,
+             "zotero": {"status": "no_pdf", "key": "K4", "error": "too big"}},
+            {"doi": "10.1000/a5", "title": "A5", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": "a5.pdf", "error": None,
+             "zotero": {"status": "failed", "key": None, "error": "timeout"}},
+            {"doi": "10.1000/a6", "title": "A6", "year": None, "journal": None,
+             "status": "failed", "source": None, "file": None, "error": "not found"},
+        ],
+    }
+    store.write_json(download_jobs.job_path(jobA_id), jobA_data)
+
+    # Job B: Failed push
+    jobB_id = "20261017-140000"
+    jobB_data = {
+        "schema": store.SCHEMA,
+        "job": jobB_id,
+        "title": "Pushed Job B",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 14:00:00",
+        "finished": "2026-10-17 14:05:00",
+        "output_dir": "",
+        "error": None,
+        "zotero": {
+            "state": "failed",
+            "collection": "Custom/CollB",
+            "key": None,
+            "started": "2026-10-17 14:05:00",
+            "finished": "2026-10-17 14:05:10",
+            "error": "Zotero collection forbidden",
+        },
+        "items": [
+            {"doi": "10.1000/b1", "title": "B1", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": "b1.pdf", "error": None,
+             "zotero": {"status": "failed", "key": None, "error": "forbidden"}},
+        ],
+    }
+    store.write_json(download_jobs.job_path(jobB_id), jobB_data)
+
+    # Job C: No zotero block -> must be excluded from history
+    jobC_id = "20261017-130000"
+    jobC_data = {
+        "schema": store.SCHEMA,
+        "job": jobC_id,
+        "title": "Unpushed Job C",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 13:00:00",
+        "finished": "2026-10-17 13:05:00",
+        "output_dir": "",
+        "error": None,
+        "items": [
+            {"doi": "10.1000/c1", "title": "C1", "year": None, "journal": None,
+             "status": "done", "source": "unpaywall", "file": "c1.pdf", "error": None},
+        ],
+    }
+    store.write_json(download_jobs.job_path(jobC_id), jobC_data)
+
+    history = download_jobs.zotero_history()
+    assert len(history) == 2
+
+    # Newest first
+    assert history[0] == {
+        "job": jobA_id,
+        "title": "Pushed Job A",
+        "state": "done",
+        "collection": "LitLoop/Pushed Job A",
+        "started": "2026-10-17 15:05:00",
+        "finished": "2026-10-17 15:06:00",
+        "error": None,
+        "added": 2,
+        "reused": 1,
+        "no_pdf": 1,
+        "failed": 1,
+    }
+
+    assert history[1] == {
+        "job": jobB_id,
+        "title": "Pushed Job B",
+        "state": "failed",
+        "collection": "Custom/CollB",
+        "started": "2026-10-17 14:05:00",
+        "finished": "2026-10-17 14:05:10",
+        "error": "Zotero collection forbidden",
+        "added": 0,
+        "reused": 0,
+        "no_pdf": 0,
+        "failed": 1,
+    }
+
+
+def test_api_zotero_overview(client, monkeypatch):
+    """GET /api/zotero returns running, mcp, pending, history, pushing."""
+    # Write a job so pending and history have data
+    job_id = "20261017-160000"
+    job_data = {
+        "schema": store.SCHEMA,
+        "job": job_id,
+        "title": "API Zotero Test Job",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 16:00:00",
+        "finished": "2026-10-17 16:05:00",
+        "output_dir": "",
+        "error": None,
+        "zotero": {
+            "state": "done",
+            "collection": "LitLoop/API Zotero Test Job",
+            "key": "K_API",
+            "started": "2026-10-17 16:05:00",
+            "finished": "2026-10-17 16:06:00",
+            "error": None,
+        },
+        "items": [
+            {"doi": "10.1000/pending-item", "title": "Pending Item", "year": 2024, "journal": "Nature",
+             "status": "done", "source": "unpaywall", "file": "p.pdf", "error": None,
+             "zotero": {"status": "failed", "key": None, "error": "network"}},
+            {"doi": "10.1000/added-item", "title": "Added Item", "year": 2024, "journal": "Nature",
+             "status": "done", "source": "unpaywall", "file": "a.pdf", "error": None,
+             "zotero": {"status": "added", "key": "K1", "error": None}},
+        ],
+    }
+    store.write_json(download_jobs.job_path(job_id), job_data)
+
+    # Case 1: Zotero running (200), MCP discovered, pushing in progress
+    class FakeResponse:
+        status_code = 200
+
+    ping_calls = []
+
+    def fake_get(url, **kwargs):
+        ping_calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(zotero, "discover_zotero_mcp", lambda cfg: {"python": "C:/python/python.exe"})
+    download_jobs._PUSHING["job"] = "20261017-160000"
+
+    resp1 = client.get("/api/zotero")
+    assert resp1.status_code == 200
+    data1 = resp1.json()
+    assert data1["running"] is True
+    assert data1["mcp"] == "C:/python/python.exe"
+    assert data1["pushing"] == "20261017-160000"
+    assert data1["pending"] == download_jobs.zotero_pending()
+    assert len(data1["pending"]) == 1
+    assert data1["pending"][0]["papers"][0]["doi"] == "10.1000/pending-item"
+    assert data1["history"] == download_jobs.zotero_history()
+    assert len(data1["history"]) == 1
+    assert data1["history"][0]["job"] == job_id
+
+    assert len(ping_calls) == 1
+    assert ping_calls[0][0] == "http://127.0.0.1:23119/connector/ping"
+    assert ping_calls[0][1].get("timeout") == 2
+    assert ping_calls[0][1].get("proxies") == {"http": None, "https": None}
+
+    # Case 2: ping raises RequestException, MCP not found (None), no push in progress
+    def fake_get_fail(url, **kwargs):
+        raise requests.RequestException("connection refused")
+
+    monkeypatch.setattr(requests, "get", fake_get_fail)
+    monkeypatch.setattr(zotero, "discover_zotero_mcp", lambda cfg: None)
+    download_jobs._PUSHING["job"] = None
+
+    resp2 = client.get("/api/zotero")
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    assert data2["running"] is False
+    assert data2["mcp"] is None
+    assert data2["pushing"] is None
+    assert data2["pending"] == download_jobs.zotero_pending()
+    assert data2["history"] == download_jobs.zotero_history()
+
+

@@ -2,6 +2,7 @@ import * as React from "react"
 import { CheckCircle2Icon, CircleDashedIcon, FolderOpenIcon, InboxIcon, LoaderIcon, XCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar"
 import {
   downloadsApi,
@@ -11,6 +12,7 @@ import {
   type JobState,
   type LiveDownload,
   type PendingGroup,
+  type ZoteroCollection,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -141,6 +143,56 @@ export function PendingPane({ pending, busy, onStarted }: {
   )
 }
 
+const ZOTERO: Record<NonNullable<DownloadItem["zotero"]>["status"], string> = {
+  pushing: "正在推送到 Zotero", added: "已加入 Zotero", reused: "Zotero 里已有", no_pdf: "已加入 Zotero，PDF 未附上", failed: "推送 Zotero 失败",
+}
+
+/** Push the job's downloaded papers to a Zotero collection (an existing one or a new path). */
+function ZoteroPanel({ job, onPushed }: { job: DownloadJob; onPushed: () => void }) {
+  const [open, setOpen] = React.useState(false)
+  const [target, setTarget] = React.useState(job.zotero_default)
+  const [collections, setCollections] = React.useState<ZoteroCollection[] | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+  const z = job.zotero
+  const waiting = job.items.filter((i) => i.status === "done" && i.file && !["added", "reused"].includes(i.zotero?.status ?? "")).length
+  const pushed = job.items.filter((i) => ["added", "reused"].includes(i.zotero?.status ?? "")).length
+  const show = () => {
+    setOpen(true)
+    setError(null)
+    downloadsApi.collections().then(setCollections).catch(() => setCollections([]))
+  }
+  const push = () => downloadsApi.push(job.job, target).then(() => { setOpen(false); onPushed() })
+    .catch((e) => setError(String(e).replace(/^Error: \d+ /, "").replace(/^\{"detail":"(.*)"\}$/, "$1")))
+  if (z?.state === "running") {
+    const doneNow = job.items.filter((i) => i.zotero && i.zotero.status !== "pushing").length
+    return <p className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderIcon className="size-3.5 animate-spin" />正在推送到 Zotero「{z.collection}」，{doneNow} 篇已处理</p>
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-4 text-sm">
+        <span className="min-w-0 truncate text-muted-foreground">
+          {pushed > 0 ? `已推送 ${pushed} 篇到 Zotero「${z?.collection ?? ""}」` : "还没有推送到 Zotero"}
+          {waiting > 0 && pushed > 0 ? `，还有 ${waiting} 篇` : ""}
+        </span>
+        {waiting > 0 && !open && <Button size="sm" variant="outline" onClick={show}>推送到 Zotero</Button>}
+      </div>
+      {(z?.state === "failed" || z?.state === "interrupted") && z.error && <p className="text-sm text-destructive">{z.error}</p>}
+      {open && (
+        <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); push() }}>
+          <Input list="zotero-collections" value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Zotero 分类"
+            placeholder="分类，用 / 分隔子分类" className="flex-1" />
+          <datalist id="zotero-collections">{collections?.map((c) => <option key={c.key} value={c.path} />)}</datalist>
+          <Button type="submit" size="sm" disabled={!target.trim()}>推送 {waiting} 篇</Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>取消</Button>
+        </form>
+      )}
+      {open && collections?.length === 0 && <p className="text-xs text-muted-foreground">读不到 Zotero 的分类：请确认 Zotero 正在运行。仍可直接填写，没有的分类会新建。</p>}
+      {open && !!collections?.length && <p className="text-xs text-muted-foreground">可从已有分类中选，或填新的路径，没有的分类会新建。</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
+}
+
 function StatusIcon({ item, running }: { item: DownloadItem; running: boolean }) {
   if (item.status === "done") return <CheckCircle2Icon className="size-4 text-emerald-600 dark:text-emerald-400" />
   if (item.status === "failed") return <XCircleIcon className="size-4 text-destructive" />
@@ -196,6 +248,7 @@ export function JobPane({ id, live, onChanged, onStarted }: {
         {job.error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{job.error}</p>}
         {job.state === "interrupted" && <p className="text-sm text-muted-foreground">app 关闭时这次下载还没完成；可以重试没下载到的文章。</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {done > 0 && <ZoteroPanel job={job} onPushed={onChanged} />}
       </div>
       <ul>
         {job.items.map((it) => (
@@ -207,6 +260,12 @@ export function JobPane({ id, live, onChanged, onStarted }: {
                 {[metaLine(it), it.source && it.status === "done" ? `来源 ${it.source}` : null].filter(Boolean).join(" · ") || it.doi}
               </div>
               {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90">{it.error}</div>}
+              {it.zotero && (
+                <div className={cn("mt-0.5 text-xs", it.zotero.status === "failed" ? "text-destructive/90" : it.zotero.status === "no_pdf" ? "text-warning-foreground" : "text-muted-foreground")}
+                  title={it.zotero.error ?? undefined}>
+                  {ZOTERO[it.zotero.status]}{it.zotero.status === "failed" && it.zotero.error ? `：${it.zotero.error.slice(0, 120)}` : ""}
+                </div>
+              )}
             </div>
             {it.file && (
               <Button size="sm" variant="ghost" className="shrink-0" onClick={() => act(() => downloadsApi.open(it.file!))}>打开</Button>

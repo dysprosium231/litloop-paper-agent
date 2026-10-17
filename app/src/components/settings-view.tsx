@@ -147,7 +147,14 @@ function Field({ field, onSaved }: { field: SettingField; onSaved: (f: SettingFi
         {field.pick && inApp && (
           <Button type="button" variant="outline" size="icon" className="shrink-0" aria-label={field.pick === "dir" ? "选择文件夹" : "选择文件"}
             title={field.pick === "dir" ? "选择文件夹" : "选择文件"}
-            onClick={async () => { const p = await choosePath(field.pick!, draft); if (p) { setDraft(p); save(p) } }}>
+            onClick={async () => {
+              try {
+                const p = await choosePath(field.pick!, draft)
+                if (p) { setDraft(p); save(p) }
+              } catch (e) {
+                setState(`无法打开选择窗口：${String(e)}`)  // e.g. a window built before the dialog plugin
+              }
+            }}>
             <FolderOpenIcon />
           </Button>
         )}
