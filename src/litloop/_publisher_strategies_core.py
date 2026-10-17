@@ -1363,6 +1363,22 @@ _CHALLENGE_SIGNATURES = [
 ]
 
 
+# Challenge pages that cannot be passed in this browser at all: the check did
+# not even run ("extension or network configuration incompatible"). Waiting
+# for the user to click is pointless here: nothing to click.
+_CHALLENGE_DEAD_END = (
+    "浏览器扩展或网络配置不兼容",
+    "已阻止",
+    "browser extensions or network settings have blocked",
+    "incompatible browser extension or network configuration",
+)
+
+
+def _is_challenge_dead_end(html: str) -> bool:
+    lower = html[:20000].lower()
+    return any(sig.lower() in lower for sig in _CHALLENGE_DEAD_END)
+
+
 def _is_challenge_page(html: str) -> bool:
     """Detect if the page is an anti-bot challenge."""
     lower = html[:5000].lower()
@@ -1835,6 +1851,17 @@ def _browser_download(
         _set_error("browser_unavailable", "start_browser")
         return False
 
+    # A publisher already said this exit is not the school's: its site will not
+    # serve the subscription PDF either (and may stop the browser at a check).
+    # With a school route set up, the paper goes there instead.
+    from . import egress
+    from .pipeline import institution_configured
+    if egress.refused() and institution_configured(config) and not config.get("is_campus_network"):
+        log.info(f"   [{publisher}] skipping the publisher's site: this exit is not the school's; "
+                 "the school route (WebVPN / CARSI) takes it")
+        _set_error("not_entitled_egress", "use_institution")
+        return False
+
     log.info(f"   [{publisher}] browser download: {article_url[:80]}")
 
     # Create tab to a lightweight page first, inject cookies, then navigate
@@ -1965,6 +1992,9 @@ def _browser_download(
                     _user_waiting()
                 html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or ""
                 if not _is_challenge_page(html) or waited >= max_wait:
+                    break
+                if _is_challenge_dead_end(html):
+                    log.info(f"   [{publisher}] the check cannot run in this browser; giving up on the site")
                     break
             if _is_challenge_page(html):
                 log.info(f"   [{publisher}] challenge did not resolve")

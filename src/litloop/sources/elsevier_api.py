@@ -243,6 +243,8 @@ def _fetch_attachment_eids(
         if resp is not None and resp.status_code == 403:
             text = _error_status_text(resp)
             if "requestor configuration settings insufficient" in text.lower():
+                from .. import egress
+                egress.mark_refused()  # publisher sites will not see the school here either
                 logger.warning(
                     "Elsevier API: 403 '%s' on view=FULL for %s — requestor (key + egress IP) "
                     "has no full-text configuration. Either the egress IP is outside the "
