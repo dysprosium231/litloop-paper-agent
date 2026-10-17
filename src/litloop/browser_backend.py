@@ -332,7 +332,8 @@ def _launch_patchright(
 
     def _close_with_cleanup() -> None:
         try:
-            original_close()
+            if not _driver_killed(original_close):
+                original_close()
         finally:
             try:
                 pw.stop()
@@ -381,7 +382,8 @@ def _launch_patchright_persistent(
 
     def _close_with_cleanup() -> None:
         try:
-            original_close()
+            if not _driver_killed(original_close):
+                original_close()
         finally:
             try:
                 pw.stop()
@@ -557,7 +559,8 @@ def _launch_camoufox(
 
     def _close_with_cleanup() -> None:
         try:
-            original_close()
+            if not _driver_killed(original_close):
+                original_close()
         finally:
             try:
                 pw.stop()
@@ -607,7 +610,8 @@ def _launch_camoufox_persistent(
 
     def _close_with_cleanup() -> None:
         try:
-            original_close()
+            if not _driver_killed(original_close):
+                original_close()
         finally:
             try:
                 pw.stop()
@@ -807,6 +811,47 @@ import threading as _threading
 import time as _time
 
 _LAUNCHED: list[tuple[float, Any]] = []
+
+
+def _guard_dead_driver() -> None:
+    """Make every sync browser call fail once its driver is gone.
+
+    patchright's sync wrapper waits for an answer by switching to the
+    dispatcher greenlet until the task is done; after the driver dies (killed
+    by close_browsers_since on cancel, skip or the school-route watchdog) that
+    greenlet is dead, the switch returns at once and the wait spins forever
+    (2026-10-17: a cancelled download stuck in browser.close() at 100% CPU).
+    """
+    try:
+        from patchright._impl import _sync_base
+    except Exception:
+        return
+    if getattr(_sync_base.SyncBase._sync, "_litloop_guarded", False):
+        return
+    import asyncio
+    import greenlet
+    from patchright._impl._errors import Error
+
+    def _sync(self: Any, coro: Any) -> Any:
+        if self._loop.is_closed():
+            coro.close()
+            raise Error("Event loop is closed! Is Playwright already stopped?")
+        g_self = greenlet.getcurrent()
+        task = self._loop.create_task(coro)
+        task.add_done_callback(lambda _: g_self.switch())
+        while not task.done():
+            if self._dispatcher_fiber.dead:
+                task.cancel()
+                raise Error("the browser driver is gone")
+            self._dispatcher_fiber.switch()
+        asyncio._set_running_loop(self._loop)
+        return task.result()
+
+    _sync._litloop_guarded = True  # type: ignore[attr-defined]
+    _sync_base.SyncBase._sync = _sync  # type: ignore[method-assign]
+
+
+_guard_dead_driver()
 _LAUNCHED_LOCK = _threading.Lock()
 
 
@@ -840,6 +885,21 @@ def launch_persistent_context(user_data_dir: str, **kwargs: Any) -> Any:
     return _remember(_launch_persistent_unregistered(user_data_dir, **kwargs))
 
 
+def _connection_of(obj: Any) -> Any:
+    try:
+        return obj._impl_obj._connection  # type: ignore[attr-defined]
+    except Exception:
+        return None
+
+
+def _driver_killed(bound_close: Any) -> bool:
+    """Whether close_browsers_since killed this object's driver: close() would
+    then wait forever for an answer (2026-10-17: a cancelled download spun in
+    browser.close() after its driver was killed)."""
+    conn = _connection_of(getattr(bound_close, "__self__", None))
+    return bool(conn is not None and getattr(conn, "_litloop_killed", False))
+
+
 def close_browsers_since(t0: float) -> int:
     """Force-close every browser launched at or after ``time.perf_counter()`` value ``t0``.
 
@@ -855,10 +915,13 @@ def close_browsers_since(t0: float) -> int:
         _LAUNCHED[:] = [(ts, obj) for ts, obj in _LAUNCHED if ts < t0]
     closed = 0
     for obj in targets:
+        conn = _connection_of(obj)
         try:
-            proc = obj._impl_obj._connection._transport._proc  # type: ignore[attr-defined]
+            proc = conn._transport._proc  # type: ignore[union-attr]
         except Exception:
             proc = None
+        if conn is not None:
+            conn._litloop_killed = True  # its close() must not wait for the dead driver
         try:
             _tree_kill(proc)
             closed += 1

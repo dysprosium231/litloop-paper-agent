@@ -82,7 +82,9 @@ def wait_page_settled(page: Any, max_wait_s: float = 30.0) -> tuple[str, str]:
                 return title, url
         except Exception:
             pass
-        page.wait_for_timeout(1000)
+        # Not page.wait_for_timeout: on a page stuck loading (2026-10-17,
+        # auth.elsevier.com reached through WebVPN) it never returned.
+        time.sleep(1.0)
         waited += 1.0
     return title, url
 
