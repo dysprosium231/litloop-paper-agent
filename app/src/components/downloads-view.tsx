@@ -88,9 +88,9 @@ const FILTERS: { id: Filter; label: string; keep: (j: DownloadJobEntry) => boole
  * The downloads page: totals and the save folder, the papers picked 选中下载 in
  * screening (grouped by session, one click from a job), then the job history.
  */
-export function DownloadsOverview({ jobs, pending, outputDir, busy, onStarted, onOpen }: {
-  jobs: DownloadJobEntry[]; pending: PendingGroup[]; outputDir: string; busy: boolean
-  onStarted: (job: string) => void; onOpen: (job: string) => void
+export function DownloadsOverview({ jobs, pending, outputDir, busy, running, onStarted, onOpen, onChanged }: {
+  jobs: DownloadJobEntry[]; pending: PendingGroup[]; outputDir: string; busy: boolean; running: string | null
+  onStarted: (job: string) => void; onOpen: (job: string) => void; onChanged: () => void
 }) {
   const [error, setError] = React.useState<string | null>(null)
   const [filter, setFilter] = React.useState<Filter>("all")
@@ -109,6 +109,7 @@ export function DownloadsOverview({ jobs, pending, outputDir, busy, onStarted, o
   const done = jobs.reduce((n, j) => n + j.done, 0)
   const failed = jobs.reduce((n, j) => n + j.failed, 0)
   const shown = jobs.filter(FILTERS.find((f) => f.id === filter)!.keep)
+  const current = running ? jobs.find((j) => j.job === running) : undefined
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title="下载">
@@ -120,6 +121,17 @@ export function DownloadsOverview({ jobs, pending, outputDir, busy, onStarted, o
       </PageHeader>
       <PageBody wide>
         {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+        {current && (
+          <Card className="flex items-center gap-3 border-primary/30 bg-primary/5 px-5 py-3">
+            <LoaderIcon className="size-4 shrink-0 animate-spin text-primary" />
+            <span className="min-w-0 flex-1 truncate text-sm">
+              正在下载：{current.title}
+              <span className="ml-2 text-muted-foreground tabular-nums">{current.done + current.failed} / {current.total}</span>
+            </span>
+            <Button size="sm" variant="ghost" onClick={() => onOpen(current.job)}>查看</Button>
+            <Button size="sm" variant="outline" onClick={() => downloadsApi.cancel().then(onChanged).catch((e) => setError(errorMessage(e)))}>取消下载</Button>
+          </Card>
+        )}
         <div className="grid grid-cols-3 gap-4">
           <Stat label="已下载" value={done} />
           <Stat label="失败" value={failed} tone="bad" />

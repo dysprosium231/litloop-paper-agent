@@ -592,9 +592,23 @@ def _browser_first_download(
         return None
 
 
+def _said_absent(domain: str, fail_notes: list[str]) -> bool:
+    """The domain answered "not in the library": a correct answer, not a failure of the mirror."""
+    return any(n.endswith(f"@{domain}") and n.startswith("not_in_library") for n in fail_notes)
+
+
+# _http_altcha_download's answer when the gate was solved and the article page
+# has no PDF: the mirror does not hold the paper, so no browser is opened for it.
+ABSENT: dict[str, Any] = {"success": False, "not_in_library": True}
+
+
 def _http_altcha_download(landing_url: str, domain: str, doi: str, output_path: Path,
                           config: dict[str, Any]) -> dict[str, Any] | None:
-    """Open the mirror page over HTTP, solve an ALTCHA gate if any, fetch the PDF."""
+    """Open the mirror page over HTTP, solve an ALTCHA gate if any, fetch the PDF.
+
+    Returns the download, ABSENT (gate solved, no PDF on the page), or None
+    (nothing learned: unreachable, a gate that needs a browser, ...).
+    """
     from ..network import CHROME_UA
     from . import altcha
 
@@ -612,7 +626,8 @@ def _http_altcha_download(landing_url: str, domain: str, doi: str, output_path: 
     if resp.status_code != 200:
         return None
     html = resp.text
-    if altcha.is_altcha_page(html):
+    gated = altcha.is_altcha_page(html)
+    if gated:
         # The article page behind the gate still embeds an ALTCHA widget (for
         # its own buttons), so judge success by the PDF link, not by "altcha".
         html = altcha.pass_gate(session, html, landing_url, timeout) or ""
@@ -622,7 +637,7 @@ def _http_altcha_download(landing_url: str, domain: str, doi: str, output_path: 
         return None  # needs a real browser: leave it to the browser-first path
     pdf_url = extract_pdf_url_from_html(html, landing_url)
     if not pdf_url:
-        return None
+        return ABSENT if gated else None
     log.info(f"   [altcha-http] {domain}: PDF {pdf_url[:80]}")
     result = download_pdf_from_scihub(pdf_url, output_path, config, f"Sci-Hub({domain})",
                                       cookies=session.cookies, referer=landing_url)
@@ -647,6 +662,11 @@ def try_scihub_domain(
     # Only gates that need a real browser (Cloudflare Turnstile) fall through.
     if config.get("scihub_http_altcha", True) and not use_tor:
         result = _http_altcha_download(landing_url, domain, doi, output_path, config)
+        if result is ABSENT:
+            log.info(f"   [altcha-http] {domain}: gate solved, the paper is not in this mirror")
+            if fail_notes is not None:
+                fail_notes.append(f"not_in_library(after altcha)@{domain}")
+            return None
         if result:
             return result
 
@@ -1055,7 +1075,8 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
             if result:
                 record_result(domains[0], True, config)
                 return result
-            record_result(domains[0], False, config)
+            if not _said_absent(domains[0], fail_notes):
+                record_result(domains[0], False, config)
         except Exception:
             record_result(domains[0], False, config)
         log.info(f"   Sci-Hub: only domain {domains[0]} failed")
@@ -1080,7 +1101,8 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
             log.info(f"   Sci-Hub: OK {best_domain}")
             record_result(best_domain, True, config)
             return result
-        record_result(best_domain, False, config)
+        if not _said_absent(best_domain, fail_notes):
+            record_result(best_domain, False, config)
     except Exception:
         record_result(best_domain, False, config)
 
@@ -1125,7 +1147,8 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
                 log.info(f"   Sci-Hub: OK {domain}")
                 return result
             else:
-                record_result(domain, False, config)
+                if not _said_absent(domain, fail_notes):
+                    record_result(domain, False, config)
                 if src_output.exists():
                     try:
                         src_output.unlink(missing_ok=True)
@@ -1140,6 +1163,12 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
             except OSError:
                 pass
 
+    # Every mirror that answered said the paper is not there: Tor would ask the
+    # same library again, only slower.
+    absent = bool(fail_notes) and all(n.startswith("not_in_library") for n in fail_notes)
+    if absent:
+        log.warning(f"   Sci-Hub: {doi} is not in the Sci-Hub library (every mirror that answered said so)")
+        return None
     # All clearnet domains failed — auto-retry with Tor + .onion (only if config allows)
     if not use_tor and config.get("use_tor_for_scihub", True):
         log.info("   Sci-Hub: all clearnet domains failed, retrying via Tor...")

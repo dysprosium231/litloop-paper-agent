@@ -339,8 +339,51 @@ def test_network() -> list[dict[str, Any]]:
                 "note": "如果规则未生效，在「扩展配置」中加入 find-process-mode: always。",
             })
         out.append(_result("代理软件", False,
-                           f"{programs} 正以 TUN 模式运行。学校认证的流量会经由代理出口，无法通过学校的身份认证。",
+                           f"{programs} 正以 TUN 模式运行。学校认证的流量会经由代理出口，无法通过学校的身份认证。"
+                           "已按下方设置直连的，看下面两项的结果。",
                            guides=guides))
+    out += _egress_checks(cfg)
+    return out
+
+
+# A subscription paper whose full-text right says whether publishers accept this
+# network's exit (Ceramics International: subscribed by most universities).
+EGRESS_SAMPLE_DOI = "10.1016/j.ceramint.2024.08.002"
+
+
+def _egress_checks(cfg: dict[str, Any]) -> list[dict[str, Any]]:
+    """Where LitLoop's own traffic leaves this computer, and whether a publisher accepts it.
+
+    Being on campus is not enough: campuses with an education-network and a
+    commercial exit send most traffic out the commercial one, which publishers
+    do not know as the school.
+    """
+    import requests
+    out = []
+    try:
+        s = requests.Session()
+        s.trust_env = False  # LitLoop's own route (proxy programs in TUN mode still apply)
+        info = s.get("https://ipinfo.io/json", timeout=10).json()
+        where = " ".join(x for x in (info.get("city"), info.get("country")) if x)
+        out.append(_result("出口 IP", None, f"{info.get('ip')}（{where}，{info.get('org') or '运营商未知'}）"))
+    except Exception:
+        out.append(_result("出口 IP", None, "无法查询出口 IP"))
+    key = str(cfg.get("elsevier_api_key") or "").strip()
+    if not key:
+        out.append(_result("出版商权限", None, "未填写 Elsevier Key，无法检测出版商是否认可当前出口"))
+        return out
+    from .elsevier_check import ENTITLED, NOT_ENTITLED, _head_probe
+    proxy = str(cfg.get("network_proxy") or "").strip()
+    code, verdict = _head_probe(EGRESS_SAMPLE_DOI, key, {"http": proxy, "https": proxy} if proxy else None)
+    if verdict.startswith(ENTITLED):
+        out.append(_result("出版商权限", True, "出版商认可当前出口，可直接下载学校订阅的全文"))
+    elif verdict.startswith(NOT_ENTITLED):
+        out.append(_result("出版商权限", False,
+                           "出版商不认可当前出口：出口 IP 不在学校登记的范围内（校园网若有教育网和运营商两个出口，"
+                           "访问出版商可能走了运营商线路）。下载订阅论文需要在「设置 → 学校认证」中使用 WebVPN 或 CARSI，"
+                           "或填写学校提供的校园出口代理"))
+    else:
+        out.append(_result("出版商权限", None, f"无法判断（Elsevier 返回 {code or '无响应'}）"))
     return out
 
 

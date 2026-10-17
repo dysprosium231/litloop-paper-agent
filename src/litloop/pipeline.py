@@ -56,6 +56,11 @@ class QueueEntry:
     unresolved: bool = False
 
 
+def institution_configured(config: dict[str, Any]) -> bool:
+    """A school route exists: a login (WebVPN, CARSI, EZProxy) or the campus network."""
+    return any(bool(config.get(k)) for k in ("vpnsci_enabled", "carsi_enabled", "ezproxy_enabled", "is_campus_network"))
+
+
 def predict_channel(identifier: str) -> str:
     """Zero-cost channel prediction from the DOI prefix."""
     m = re.match(r"^(10\.\d{4,9})/", identifier.strip())
@@ -577,6 +582,17 @@ def run_lanes(
             ),
         )
         results += _normalize_engine_results(raw)
+
+    # What the faster lanes did not get goes on to the institutional cascade
+    # (WebVPN / CARSI / EZProxy, or the campus network), when the user has one:
+    # without this a subscription paper that missed the API and the grey
+    # sources never reached the school's route at all.
+    if allow_institution and institution_configured(config):
+        got = {str(r.get("doi") or "").strip().lower() for r in results if r.get("success")}
+        for e in entries:
+            if (e.identifier and not e.unresolved and e.identifier.lower() not in got
+                    and e.identifier not in inst and (e.channel or predict_channel(e.identifier)) != "oa"):
+                inst.append(e.identifier)
 
     if inst and allow_institution:
         from .institutional.config_adapter import ConfigAdapter

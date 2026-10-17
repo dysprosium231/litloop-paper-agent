@@ -332,7 +332,8 @@ export default function App() {
           ) : section === "download" ? (
             downloadView === OVERVIEW
               ? <DownloadsOverview jobs={downloads.jobs} pending={downloads.pending} outputDir={downloads.outputDir}
-                  busy={Boolean(downloads.running)} onStarted={startedJob} onOpen={setDownloadView} />
+                  busy={Boolean(downloads.running)} running={downloads.running} onStarted={startedJob} onOpen={setDownloadView}
+                  onChanged={downloads.refresh} />
               : <JobPane key={downloadView} id={downloadView} live={downloads.live} onChanged={downloads.refresh} onStarted={startedJob}
                   onBack={() => setDownloadView(OVERVIEW)} />
           ) : section === "settings" ? (
