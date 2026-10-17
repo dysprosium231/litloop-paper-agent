@@ -105,9 +105,9 @@
 - [x] **真 Chrome 副本自动跟随**（2026-10-15）：启动浏览器前比较系统 Chrome 与副本的版本号，系统更新了就先复制到临时目录再对调，正在运行时跳过；配置项 `browser_copy_follow_system`，默认开启。本机副本当时已落后（.39 → .41），已更新。
 - [x] Sci-Hub、LibGen 等灰色来源默认关闭（2026-10-16 用户决定），由首次引导让用户选；`litloop get` 不再写死开启、改为遵从配置。
 - [x] 保存配置时只写用户改过的项（2026-10-16）：现在 `save_config` 把所有默认值一起写进文件，默认值一旦被固定，以后改默认值对老用户不生效（如本机 `scihub_enabled` 仍是 true）。
-- [ ] **新版本提醒**：每周后台检查 LitLoop、scansci-find（easyseek）、zotero-mcp 是否有新版本，有则在检索/下载结果里提示“运行 scripts/deploy.py 更新”。只提醒，不自动安装。
+- [x] **新版本提醒**（2026-10-17）：`updates.py`，按 `update_check_days`（默认 7，0 关闭）在后台线程检查，结果缓存在 `~/.litloop/update_check.json`，不让任何操作等它。LitLoop、easyseek 读 GitHub main 分支 `pyproject.toml` 的版本（git 标签停在 v1.9.0，不能用），zotero-mcp 查 PyPI 并和它自己 Python 里装的版本比。检索、批量下载结果带 `update_notice`，app 设置页顶部显示。只提醒，不自动安装。实测：zotero-mcp 有 0.15.1（本机 0.14.1），升级前需确认桥接兼容。测试 `tests/test_updates.py`。
 - [x] ZCode 插件的技能文档补上“检索与筛选”流程和 Zotero 本地推送（2026-10-15）。
-- [ ] 三份技能文档已经分叉，需要合成一份来源、生成其余副本：`skills/litloop/SKILL.md`（简短入口）、`skill/SKILL.md`（完整参考，还写着 17 个工具）、`zcode-plugin/skills/litloop/SKILL.md`（中文操作手册）。`litloop-sort` 也有两份不同的。
+- [x] （2026-10-17：`skills-src/` 为唯一来源——三份模板各写独有内容，反爬必读、首次使用、检索与筛选三段放在 `shared/`，`scripts/build_skills.py` 生成；`skill/SKILL.md` 的深度检索改为引用共享的完整一节，不再另写精简版；发布一致性检查会报出没重新生成或直接改了生成文件的情况。`litloop-sort` 的两份是有意的（`skills/` 那份只是指向 ZCode 版的入口），只改正了 ZCode 版里“灰色来源默认开启”的过时说法）三份技能文档已经分叉，需要合成一份来源、生成其余副本：`skills/litloop/SKILL.md`（简短入口）、`skill/SKILL.md`（完整参考，还写着 17 个工具）、`zcode-plugin/skills/litloop/SKILL.md`（中文操作手册）。`litloop-sort` 也有两份不同的。
 - [x] 出版商巡检工作流（canary.yml）改为只手动触发（2026-10-15，用户同意）：GitHub 的美国服务器测不了机构渠道，网络环境也和国内不同；需要时在 Actions 页面手动运行，或在本机运行 `python scripts/canary.py`。
 
 ### 期刊分区插件

@@ -108,8 +108,15 @@ def _check_mcp_tool_count() -> list[str]:
 
 
 def _check_skill_docs() -> list[str]:
+    import subprocess
     problems = []
-    for rel in ("skill/SKILL.md", "skills/litloop/SKILL.md"):
+    # The skill docs are built from skills-src/ (scripts/build_skills.py): an edited
+    # output or a forgotten rebuild shows up here.
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_skills.py"), "--check"],
+                       capture_output=True, text=True, encoding="utf-8")
+    if r.returncode != 0:
+        problems.append(r.stdout.strip() or r.stderr.strip())
+    for rel in ("skill/SKILL.md", "skills/litloop/SKILL.md", "zcode-plugin/skills/litloop/SKILL.md"):
         text = (ROOT / rel).read_text(encoding="utf-8")
         for retired in RETIRED_TOOLS:
             if retired in text:

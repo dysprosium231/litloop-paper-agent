@@ -5,6 +5,7 @@ description: >
   arXiv identifiers, export citations, organize paper lists, or retrieve papers
   through configured open-access, publisher, or authorized institutional routes.
 ---
+<!-- 由 skills-src/ 生成：改那里的文件，再运行 python scripts/build_skills.py -->
 
 # LitLoop
 
@@ -19,6 +20,7 @@ tool routing or configuration guidance.
 先读 [`docs/PLAYBOOK.md`](../../docs/PLAYBOOK.md)：镜像健康唯一存储（domain_db wall_state 表）、
 结构性失败签名表、节奏参数、已知死镜像清单、以及六条铁律（含"造轮子前先 grep 家底"——
 镜像健康存储曾被重复造过三代）。
+
 ## Route by intent
 
 - Search or identify papers: `litloop_search`, `litloop_verify_identifiers`,

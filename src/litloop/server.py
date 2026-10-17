@@ -270,13 +270,27 @@ def litloop_search(
             if r.get("doi") or r.get("arxiv_id")
         ]
         path = write_queue(qe, out_file)
-        return json.dumps(
+        return _with_update_notice(json.dumps(
             {"results": results, "queue_file": str(path), "queued": len(qe),
              **({"filtered": filtered} if filtered else {})},
             ensure_ascii=False,
-        )
-    return json.dumps({"results": results, **({"filtered": filtered} if filtered else {})},
-                      ensure_ascii=False)
+        ))
+    return _with_update_notice(json.dumps({"results": results, **({"filtered": filtered} if filtered else {})},
+                                          ensure_ascii=False))
+
+
+def _with_update_notice(out: str) -> str:
+    """Add update_notice (updates.py: a newer LitLoop / easyseek / zotero-mcp) to a tool's JSON result."""
+    from . import updates
+    try:
+        note = updates.notice()
+        data = json.loads(out) if note else None
+    except Exception:  # the reminder must never break a result
+        return out
+    if not isinstance(data, dict):
+        return out
+    data["update_notice"] = note
+    return json.dumps(data, ensure_ascii=False)
 
 
 @mcp_app.tool()
@@ -1650,11 +1664,11 @@ def litloop_batch_download(
         )
     if not identifiers:
         return json.dumps({"error": "provide identifiers[] or file"}, ensure_ascii=False)
-    return _batch_download_impl(
+    return _with_update_notice(_batch_download_impl(
         identifiers=identifiers, output_dir=output_dir, scihub_enabled=scihub_enabled,
         use_tor=use_tor, use_vpnsci=use_vpnsci, batch_id=batch_id, resume=resume,
         lanes=lanes,
-    )
+    ))
 
 
 @mcp_app.tool()

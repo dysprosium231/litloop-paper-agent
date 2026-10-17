@@ -228,6 +228,12 @@ def create_app(token: str) -> FastAPI:
         threading.Thread(target=run, name=f"next-{session}", daemon=True).start()
         return {"started": True}
 
+    @app.get("/api/updates")
+    def updates_available() -> list[dict[str, Any]]:
+        """Components with a newer version (from the weekly check; a due check starts in the background)."""
+        from . import updates
+        return updates.available()
+
     @app.get("/api/translation")
     def translation() -> dict[str, Any]:
         """What the detail pane needs: who translates, which ratings without asking, whether it can."""

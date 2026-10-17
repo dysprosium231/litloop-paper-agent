@@ -214,6 +214,7 @@ export const settingsApi = {
   list: () => call<SettingGroup[]>("/api/settings"),
   save: (key: string, value: unknown) => call<SettingField>("/api/settings", { key, value }),
   test: (group: string) => call<{ results: TestResult[]; seconds: number }>(`/api/settings/test/${group}`, {}),
+  updates: () => call<{ name: string; installed: string; latest: string; how: string }[]>("/api/updates"),
   quota: () => call<Record<string, ProviderUsage>>("/api/quota"),
   openalex: (fresh = false) => call<{ credits_used?: number; credits_remaining?: number; credits_limit?: number; resets_at?: string; has_key?: boolean; error?: string } | null>(`/api/quota/openalex${fresh ? "?fresh=true" : ""}`),
 }

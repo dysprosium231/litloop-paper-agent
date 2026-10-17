@@ -132,6 +132,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # "deepl" (the app, when the paper is opened; needs the key) or "agent"
     # (the agent, when it rates: costs conversation tokens).
     "abstract_translation": "高",
+    # Look for new versions of LitLoop, easyseek and zotero-mcp every N days
+    # (updates.py; 0 = never). Only a notice in results; nothing is installed.
+    "update_check_days": 7,
     "translation_provider": "deepseek",
     "deepseek_api_key": "",
     "deepl_api_key": "",

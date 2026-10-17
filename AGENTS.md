@@ -30,6 +30,10 @@
 - 筛选记录、深度检索概况、进度文件的格式写在 [docs/APP_DATA.md](docs/APP_DATA.md)；改了字段就同步改它，改字段含义或删字段时把 `store.SCHEMA` 加一。
 - 这些文件只通过 `store.py` 读写（加锁、整份替换），不要直接 `write_text`。
 
+## 技能文档
+
+- `skills/litloop/SKILL.md`、`zcode-plugin/skills/litloop/SKILL.md`、`skill/SKILL.md` 由 `skills-src/` 生成：改 `skills-src/` 里的模板或 `shared/` 片段，再运行 `python scripts/build_skills.py`；不要直接改生成的文件（`check_release_consistency.py` 会报出来）。
+
 ## 其他
 
 - 与用户交流用简体中文；提交信息可以用英文。

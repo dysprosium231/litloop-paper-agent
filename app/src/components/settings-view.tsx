@@ -341,9 +341,22 @@ export function SettingsPage({ groups, current, onPick, onSaved }: {
   groups: SettingGroup[]; current: string; onPick: (id: string) => void; onSaved: (f: SettingField) => void
 }) {
   const group = groups.find((g) => g.id === current)
+  // The weekly version check (updates.py); nothing is installed from here.
+  const [updates, setUpdates] = React.useState<Awaited<ReturnType<typeof settingsApi.updates>>>([])
+  React.useEffect(() => { settingsApi.updates().then(setUpdates).catch(() => {}) }, [])
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title="设置" />
+      {updates.length > 0 && (
+        <div className="space-y-0.5 border-b bg-primary/5 px-8 py-2.5 text-sm">
+          {updates.map((u) => (
+            <p key={u.name}>
+              <span className="font-medium">{u.name} {u.latest}</span>
+              <span className="text-muted-foreground"> 可更新（当前 {u.installed}）：{u.how}</span>
+            </p>
+          ))}
+        </div>
+      )}
       <div className="flex min-h-0 flex-1">
         <SettingsNav groups={groups} current={current} onPick={onPick} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">

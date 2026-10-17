@@ -379,6 +379,8 @@ LitLoop 自己不带 Zotero 网页接口的代码（2026-10 删除了原项目�
 | `batch_workers` | `10` | 批量并发数，被封 IP 时调到 2 |
 | `request_delay_min` / `request_delay_max` | `2.0` / `5.0` | 请求间的随机延迟（秒） |
 | `cache_ttl_hours` | `168` | 下载缓存有效期，设 0 表示不缓存 |
+| `abstract_translation` / `translation_provider` | `高` / `deepseek` | 摘要翻译的范围和服务（见[桌面 app](#桌面-app)） |
+| `update_check_days` | `7` | 每隔几天检查 LitLoop、easyseek、zotero-mcp 有没有新版本，有则在检索、下载结果和 app 设置页提示（不自动安装）；设 0 关闭 |
 
 </details>
 
