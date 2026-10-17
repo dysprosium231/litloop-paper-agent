@@ -142,6 +142,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # (max_browser_workers): one at a time, so no paper's race clock runs out
     # while it queues for the browser and each login window is for one paper.
     # Longer lists use the lanes.
+    # The school's routes after phase 1, one after another (sources
+    # _INSTITUTIONAL_STEPS): no-login ones first, so one window at a time asks
+    # the user. Steps switched off in settings are skipped.
+    "institutional_order": ["webvpn_http", "webvpn_browser", "carsi", "ezproxy"],
+    # Late results after the 20 s race: a browser lane still at work gets up to
+    # race_grace_browser_seconds, otherwise race_grace_seconds; a lane waiting
+    # for the user is waited for as long as it says so (up to 10 min).
+    "race_grace_seconds": 15,
+    "race_grace_browser_seconds": 180,
     "batch_small_max": 30,
     "batch_small_workers": 1,
     # Desktop app: the first-run guide (app_settings.STEPS) was finished or skipped.

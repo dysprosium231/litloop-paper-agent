@@ -594,7 +594,10 @@ def run_scihub_then_single(
         with ThreadPoolExecutor(max_workers=min(4, len(grey_ids))) as ex:
             for i in grey_ids:
                 _progress.item_stage(i, "正在查 Sci-Hub")
-            futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False): i for i in grey_ids}
+            # Over HTTP only: no browser, so these really run side by side; a
+            # paper whose gate needs the browser gets it in round 2.
+            futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False, _scihub_http_only=True): i
+                    for i in grey_ids}
             for f in as_completed(futs):
                 i, r = futs[f], f.result()
                 if r.get("success"):

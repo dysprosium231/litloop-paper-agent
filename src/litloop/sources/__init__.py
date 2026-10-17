@@ -374,6 +374,14 @@ def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str
             extra_fast.append((fn, label))
 
     legal_sources = publisher_fast + extra_fast
+    # Every publisher's own site is tried here, in phase 1, from this exit:
+    # those without a browser lane of their own (PNAS, Optica, World Scientific,
+    # unlisted ones) get the generic one. Open-access hosts need none.
+    if not any("Browser" in label for label in _fast_names):
+        from .publishers import get_publisher
+        if get_publisher(doi) not in _OPEN_HOSTS:
+            from .publishers import _FN_MAP
+            legal_sources.append((_FN_MAP["GenericBrowser"], "GenericBrowser"))
     legal_sources += [(try_doaj, "DOAJ"), (try_crossref_page_scrape, "CrossrefPage")]
     legal_sources += [(try_europepmc, "EuropePMC"), (try_core, "CORE")]
     if not config.get("_batch"):
@@ -411,25 +419,93 @@ def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str
         return sort_sources(legal_sources + grey_sources)
 
 
+# Publishers whose papers are open: no site visit from phase 1 is needed.
+_OPEN_HOSTS = frozenset({"MDPI", "arXiv", "bioRxiv", "PLOS", "Frontiers", "BMC", "Beilstein", "EMBO",
+                         "Research Square", "chemRxiv", "Preprints.org"})
+
+
+def _webvpn_http(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str, Any] | None:
+    """WebVPN without a browser: the saved session over HTTP (and a campus
+    connector's SOCKS5 when one is configured). Asks the user nothing."""
+    from . import instsci
+    if instsci._is_campus_connector_mode(config):
+        result = instsci._try_instsci_socks5(doi, output_path, config)
+        if result:
+            return result
+    if not instsci.instsci_cookie_path(config).exists():
+        return None
+    return instsci._try_instsci_http(doi, output_path, config)
+
+
+def _webvpn_browser(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str, Any] | None:
+    from . import instsci
+    return instsci._try_instsci_browser(doi, output_path, config)
+
+
+# The school's routes, tried one after another (institutional_order): the ones
+# that ask the user nothing first, then those that may need a login, so at most
+# one window waits for the user at a time. Each step: (enabled?, function, label);
+# the label decides whether it takes the browser slot (_BROWSER_SOURCE_LABELS).
+_INSTITUTIONAL_STEPS: dict[str, tuple[Any, Any, str]] = {
+    "webvpn_http": (lambda c: bool(c.get("vpnsci_enabled")), _webvpn_http, "WebVPN-HTTP"),
+    "webvpn_browser": (lambda c: bool(c.get("vpnsci_enabled")), _webvpn_browser, "WebVPN"),
+    "carsi": (lambda c: bool(c.get("carsi_enabled") and str(c.get("carsi_idp_name") or "").strip()),
+              lambda d, o, c: try_carsi(d, o, c), "CARSI"),
+    "ezproxy": (lambda c: bool(c.get("ezproxy_enabled")), lambda d, o, c: try_ezproxy(d, o, c), "EZProxy"),
+}
+DEFAULT_INSTITUTIONAL_ORDER = ["webvpn_http", "webvpn_browser", "carsi", "ezproxy"]
+
+
 def _build_institutional_sources(doi: str, config: dict[str, Any], *, use_vpnsci: bool = False) -> list[tuple[Any, str]]:
-    """Build Phase 2 sources: institutional access only."""
-    from .scoring import sort_sources
+    """Phase 2: the school's routes that are switched on, in institutional_order.
 
-    sources: list[tuple[Any, str]] = []
+    WebVPN follows its setting (use_vpnsci is kept for callers; a single
+    download used to leave WebVPN out unless asked). The publisher's own site
+    is not here: phase 1 opened it from this same exit.
+    """
+    order = config.get("institutional_order") or DEFAULT_INSTITUTIONAL_ORDER
+    out = []
+    for name in order:
+        step = _INSTITUTIONAL_STEPS.get(str(name))
+        if step and step[0](config):
+            out.append((step[1], step[2]))
+    return out
 
-    if _any_institutional_path(config):
-        sources.append((_try_institutional_bridge, "InstSci"))
 
-    if config.get("carsi_enabled", False) and config.get("carsi_idp_name", "").strip():
-        sources.append((try_carsi, "CARSI"))
+def _run_institutional_sequence(steps: list[tuple[Any, str]], doi: str, target_dir: Path, output_path: Path,
+                                config: dict[str, Any], failures: list[dict[str, str]] | None = None,
+                                ) -> dict[str, Any] | None:
+    """Try the school's routes one at a time; the first PDF wins."""
+    from .. import progress_reporter
+    log.info(f"   School routes in turn: {', '.join(label for _, label in steps)}")
+    for fn, label in steps:
+        if _cancelled():
+            return None
+        progress_reporter.item_stage(doi, f"正在走学校通道：{_STEP_TEXT.get(label, label)}")
+        src_output = target_dir / f"{safe_filename(doi)}_{label}.pdf"
+        result = _try_source(fn, doi, src_output, config, label)
+        if result and result.get("success"):
+            final_path = Path(result.get("file", ""))
+            if final_path != output_path and final_path.exists():
+                if output_path.exists():
+                    output_path.unlink()
+                final_path.rename(output_path)
+                result["file"] = str(output_path)
+            log.info(f"   OK {label}")
+            return result
+        if failures is not None:
+            _record_source_failure(failures, label, result or {"success": False, "error": "no PDF"})
+        if src_output.exists():
+            src_output.unlink(missing_ok=True)
+    return None
 
-    if use_vpnsci and config.get("vpnsci_enabled", False):
-        sources.append((try_vpnsci, "WebVPN"))
 
-    if use_vpnsci and config.get("ezproxy_enabled", False):
-        sources.append((try_ezproxy, "EZProxy"))
+_STEP_TEXT = {"WebVPN-HTTP": "WebVPN 直接下载", "WebVPN": "WebVPN 浏览器", "CARSI": "CARSI", "EZProxy": "EZProxy"}
 
-    return sort_sources(sources)
+
+def _is_browser_lane(label: str) -> bool:
+    """A lane that opens a browser window (Sci-Hub mostly solves its gate over HTTP)."""
+    return label != "Sci-Hub" and label in _BROWSER_SOURCE_LABELS
 
 
 def _wait_any(events: tuple[threading.Event, threading.Event], timeout: float) -> bool:
@@ -670,19 +746,23 @@ def _run_tiers_parallel(
             log.info("   All sources failed")
             return None
 
-        # Timeout reached — give late-finishing threads a grace period.
-        # Visible browser login can take 60-300s (browser launch + SSO + redirect),
-        # so we wait much longer if browser-based sources are in the pool.
-        has_browser = any("Browser" in lbl for _, lbl, _, _ in all_sources)
-        has_carsi = any("CARSI" in lbl for _, lbl, _, _ in all_sources)
-        if has_carsi:
-            grace = 300
-        elif has_browser:
-            grace = 180
-        else:
-            grace = 15
-        log.info(f"   Racing timed out after {overall_timeout + 5}s, waiting up to {grace}s for late results...")
-        _wait_any((success_event, all_done_event), grace)
+        # Timeout reached — late results. A browser lane still at work (opening
+        # the page, reaching a login) gets up to race_grace_browser_seconds;
+        # once none is, only race_grace_seconds. A lane that waits for the user
+        # says so (note_user_waiting) and is waited for below.
+        grace = float(config.get("race_grace_seconds", 15))
+        grace_browser = float(config.get("race_grace_browser_seconds", 180))
+        log.info(f"   Racing timed out after {overall_timeout + 5}s, waiting for late results...")
+        quick_until = time.time() + grace
+        stop_at = time.time() + max(grace, grace_browser)
+        while not success_event.is_set() and not all_done_event.is_set() and not _cancelled():
+            now = time.time()
+            if now >= stop_at or _user_waiting_for(doi):
+                break
+            browser_at_work = any(not f.done() and _is_browser_lane(lbl) for f, (lbl, _) in futures.items())
+            if not browser_at_work and now >= quick_until:
+                break
+            _wait_any((success_event, all_done_event), 1.0)
         # A lane is waiting for the user's login: keep waiting while its
         # heartbeat is fresh instead of abandoning a login in progress.
         if _user_waiting_for(doi):
@@ -1071,6 +1151,7 @@ def download(
     _institutional: bool = True,
     strategy: str | None = None,
     _batch: bool = False,
+    _scihub_http_only: bool = False,
 ) -> dict[str, Any]:
     key = identifier.strip()
     if not is_arxiv_identifier(key):
@@ -1105,6 +1186,7 @@ def download(
             _institutional=_institutional,
             strategy=strategy,
             _batch=_batch,
+            _scihub_http_only=_scihub_http_only,
         )
         if key in _SKIPPED and not result.get("success"):
             return fail(key, "skipped by user", error_type="skipped", action="none")
@@ -1150,9 +1232,14 @@ def _download_impl(
     _institutional: bool = True,
     strategy: str | None = None,
     _batch: bool = False,
+    _scihub_http_only: bool = False,
 ) -> dict[str, Any]:
     race_failures: list[dict[str, str]] = []
     config = load_config()
+    if _scihub_http_only:
+        # Sci-Hub's gate solved over HTTP only: no browser, so the paper does
+        # not queue for the one browser slot (a batch's first round).
+        config["scihub_use_browser"] = False
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     if scihub_enabled is not None:
@@ -1309,7 +1396,8 @@ def _download_impl(
         # before racing them (WebVPN only; CARSI self-heals inside login()).
         try:
             from ..session_heal import ensure_institutional_sessions
-            heal_report = ensure_institutional_sessions(config, use_vpnsci=use_vpnsci)
+            heal_report = ensure_institutional_sessions(
+                config, use_vpnsci=use_vpnsci or bool(config.get("vpnsci_enabled")))
             for channel, state in heal_report.items():
                 log.info(f"   [session-heal] {channel}: {state.get('status')}")
         except Exception as exc:
@@ -1317,12 +1405,8 @@ def _download_impl(
         inst_sources = _build_institutional_sources(doi, config, use_vpnsci=use_vpnsci)
         if inst_sources:
             log.info("   Phase 1 failed, trying institutional access...")
-            from .. import progress_reporter
-            progress_reporter.item_stage(doi, "正在走学校通道")
-            result = _run_tiers_parallel(
-                [(inst_sources, "Institutional", 30)], doi, target_dir, output_path, config, use_tor, 30,
-                failures=race_failures,
-            )
+            result = _run_institutional_sequence(inst_sources, doi, target_dir, output_path, config,
+                                                 failures=race_failures)
             if result:
                 _update_doi_index(
                     target_dir,
@@ -1763,7 +1847,7 @@ def institutional_download(
     heal: bool = True,
 ) -> dict[str, Any] | None:
     """Phase 2 of a single download on its own: the school's routes (WebVPN,
-    CARSI, EZProxy, the InstSci bridge), after refreshing their sessions.
+    CARSI, EZProxy, one after another), after refreshing their sessions.
 
     Batches run it, one paper at a time, for what the faster lanes missed: a
     single download always had this phase, a batch had none (its grey lane
@@ -1781,7 +1865,8 @@ def institutional_download(
     if heal:
         try:
             from ..session_heal import ensure_institutional_sessions
-            for channel, state in ensure_institutional_sessions(config, use_vpnsci=use_vpnsci).items():
+            for channel, state in ensure_institutional_sessions(
+                    config, use_vpnsci=use_vpnsci or bool(config.get("vpnsci_enabled"))).items():
                 log.info(f"   [session-heal] {channel}: {state.get('status')}")
         except Exception as exc:
             log.info(f"   [session-heal] skipped: {exc}")
@@ -1789,10 +1874,7 @@ def institutional_download(
     if not inst_sources:
         return None
     log.info(f"   [school route] {doi}")
-    from .. import progress_reporter
-    progress_reporter.item_stage(doi, "正在走学校通道")
-    result = _run_tiers_parallel([(inst_sources, "Institutional", 30)], doi, target_dir, output_path,
-                                 config, False, 30, failures=[])
+    result = _run_institutional_sequence(inst_sources, doi, target_dir, output_path, config)
     if not result:
         return None
     _update_doi_index(target_dir, doi, Path(result.get("file", "")), source=result.get("source") or "",
