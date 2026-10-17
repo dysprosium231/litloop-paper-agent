@@ -14,7 +14,7 @@ def get_logger() -> logging.Logger:
         _logger = logging.getLogger("litloop")
         if not _logger.handlers:
             handler = logging.StreamHandler(sys.stderr)
-            handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+            handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", "%H:%M:%S"))
             _logger.addHandler(handler)
             _logger.setLevel(logging.INFO)
         # The entry points also basicConfig() a stderr handler on the root

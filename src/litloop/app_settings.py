@@ -49,8 +49,9 @@ GROUPS: list[dict[str, Any]] = [
                          ["scihub_first", "Sci-Hub 优先"], ["scihub_only", "只用 Sci-Hub"], ["grey_only", "只用 Sci-Hub、LibGen 等"]]},
             {"key": "scihub_enabled", "label": "允许 Sci-Hub、LibGen 等来源", "type": "bool",
              "help": "可能违反出版商条款或学校规定，自行判断是否开启", "warn": True},
-            {"key": "scihub_via_proxy", "label": "Sci-Hub、LibGen 走代理", "type": "bool",
-             "help": "经「网络」里的代理软件地址访问，不占用学校的出口；代理没开时直连"},
+            {"key": "scihub_route", "label": "Sci-Hub、LibGen 线路", "type": "select",
+             "options": [["direct", "直连"], ["proxy", "只走代理"], ["auto", "谁快用谁（下载前测速）"]],
+             "help": "代理即「网络」里的代理软件地址；只走代理时学校的出口不连 Sci-Hub"},
         ],
     },
     {

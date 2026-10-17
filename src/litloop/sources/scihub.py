@@ -24,6 +24,7 @@ from ..domain_db import (
     set_wall_state,
 )
 from ..log import get_logger
+from . import scihub_speed
 from ..network import fetch, proxy_dict, select_proxy_for_url, _is_cloudflare_block, USER_AGENT
 from ..pdf_utils import extract_pdf_url_from_html, is_pdf_file, success, _response_looks_pdf
 
@@ -1101,6 +1102,10 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
 
         cooldown_domains.sort(key=_domain_score, reverse=True)
         domains = cooldown_domains[:3]
+    # The batch's speed test picked a mirror: ask it first (the others follow).
+    fastest = scihub_speed.preferred_mirror()
+    if fastest and fastest in all_domains and not _wall_guard(fastest, config):
+        domains = [fastest] + [d for d in domains if d != fastest][:2]
     log.info(f"   Sci-Hub domains to try: {domains}")
 
     if len(domains) == 1:
@@ -1135,7 +1140,9 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
                 result["file"] = str(output_path)
             log.info(f"   Sci-Hub: OK {best_domain}")
             record_result(best_domain, True, config)
+            scihub_speed.note_result(best_domain, True)
             return result
+        scihub_speed.note_result(best_domain, False, absent=_said_absent(best_domain, fail_notes))
         if not _said_absent(best_domain, fail_notes):
             record_result(best_domain, False, config)
     except Exception:

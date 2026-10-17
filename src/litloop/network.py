@@ -104,12 +104,13 @@ def grey_hosts(config: dict[str, Any] | None) -> tuple[str, ...]:
 
 
 def grey_proxy(config: dict[str, Any] | None) -> str:
-    """The proxy Sci-Hub and LibGen go through (scihub_via_proxy): host_proxy_url
-    while its port answers, else "" (direct). Keeps those requests off the
-    school's exit, which publishers see as the school."""
+    """The proxy Sci-Hub and LibGen go through: host_proxy_url while its port
+    answers, when scihub_route says proxy (or auto measured the proxy faster,
+    sources/scihub_speed.py); else "" (direct)."""
     config = config or {}
     url = str(config.get("host_proxy_url") or "").strip()
-    if not config.get("scihub_via_proxy") or not url or not _proxy_reachable(url):
+    from .sources.scihub_speed import route
+    if route(config) != "proxy" or not url or not _proxy_reachable(url):
         return ""
     return url
 

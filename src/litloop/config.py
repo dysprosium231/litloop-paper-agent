@@ -156,10 +156,18 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Sci-Hub and LibGen through host_proxy_url (the user's proxy) instead of
     # the school's exit; direct when that proxy's port is closed.
     "scihub_via_proxy": False,
+    # Route for Sci-Hub and LibGen: "direct", "proxy" (host_proxy_url only) or
+    # "auto" (a batch first measures mirrors on both routes, the fastest wins;
+    # sources/scihub_speed.py). Empty: "proxy" if scihub_via_proxy else "direct".
+    "scihub_route": "direct",
+    # The speed test: a paper Sci-Hub has (about 1 MB), how many mirrors, how long.
+    "scihub_speedtest_doi": "10.1016/j.colsurfb.2017.09.051",
+    "scihub_speedtest_mirrors": 5,
+    "scihub_speedtest_seconds": 40,
     # A short list's first round: papers asked of Sci-Hub at once (HTTP only),
     # and the workers their mirror requests share. More papers at once risks
     # Sci-Hub's per-IP rate limit.
-    "scihub_round_workers": 6,
+    "scihub_round_workers": 10,
     "scihub_http_workers": 12,
     "race_grace_seconds": 15,
     "race_grace_browser_seconds": 180,
