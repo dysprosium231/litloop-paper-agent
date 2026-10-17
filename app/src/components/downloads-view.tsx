@@ -303,9 +303,10 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
             <span className="text-muted-foreground"> · 已完成 {done}{failed.length ? ` · 失败 ${failed.length}` : ""} · 共 {job.items.length}</span>
           </span>
           {running && live?.current
-            ? <span className="max-w-[50%] truncate text-xs text-muted-foreground">正在处理：{live.current}</span>
+            ? <span className="max-w-[50%] truncate text-xs text-muted-foreground" title={live.current}>
+                正在处理：{job.items.find((i) => i.doi === live.current?.toLowerCase())?.title ?? live.current}
+              </span>
             : <span className="text-xs text-muted-foreground tabular-nums">{job.created}{job.finished ? `–${job.finished.slice(11)}` : ""}</span>}
-          {running && live?.current && <span className="max-w-[50%] truncate text-xs text-muted-foreground">正在处理：{live.current}</span>}
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${(finished / Math.max(1, job.items.length)) * 100}%` }} />
@@ -328,6 +329,7 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
               <div className="text-xs text-muted-foreground">
                 {[metaLine(it), it.source && it.status === "done" ? `来源：${it.source}` : null].filter(Boolean).join(" · ") || it.doi}
               </div>
+              {it.status === "waiting" && it.retrying && running && <div className="mt-0.5 text-xs text-muted-foreground">换渠道重试中</div>}
               {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90" title={it.error}>{it.error_text ?? it.error}</div>}
               {it.zotero && (
                 <div className={cn("mt-0.5 text-xs", it.zotero.status === "failed" ? "text-destructive/90" : it.zotero.status === "no_pdf" ? "text-warning-foreground" : "text-muted-foreground")}

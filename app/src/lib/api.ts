@@ -229,6 +229,8 @@ export interface DownloadItem {
   year?: number | null
   journal?: string | null
   status: "waiting" | "done" | "failed"
+  /** A lane did not get it; the next lane is trying (download_jobs). */
+  retrying?: boolean
   source?: string | null
   file?: string | null
   error?: string | null

@@ -97,9 +97,37 @@ def running() -> str | None:
     return _CURRENT["job"]
 
 
+LOCAL = "本机已有"  # the source of a paper found in the save folder, not downloaded again
+
+
+def local_files(dois: list[str] | set[str] | None = None) -> dict[str, str]:
+    """DOI -> PDF already in the save folder, from its DOI index (.doi_index.json).
+
+    Only files that are still there count; age does not matter (a PDF on disk
+    does not expire, whatever cache_ttl_hours says about re-checking sources).
+    """
+    from .config import load_config
+    folder = Path(str(load_config().get("output_dir") or "")).expanduser()
+    try:
+        idx = json.loads((folder / ".doi_index.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    wanted = {canonical_doi(d) for d in dois} if dois is not None else None
+    out = {}
+    for key, entry in idx.items():
+        doi = canonical_doi(key)
+        if wanted is not None and doi not in wanted:
+            continue
+        f = entry.get("file") if isinstance(entry, dict) else entry
+        if f and Path(f).is_file():
+            out[doi] = str(f)
+    return out
+
+
 def downloaded_dois() -> set[str]:
-    """DOIs some job has already got, so they are not offered again."""
-    got = set()
+    """DOIs some job has already got, or whose PDF is already in the save folder:
+    they are not offered again."""
+    got = set(local_files())
     for p in jobs_dir().glob("*.json"):
         try:
             got |= {i["doi"] for i in store.read_json(p).get("items", []) if i.get("status") == "done"}
@@ -125,6 +153,10 @@ def start(papers: list[dict[str, Any]], title: str, session: str | None = None,
                       "journal": p.get("journal"), "status": "waiting", "source": None, "file": None, "error": None})
     if not items:
         raise ValueError("no paper with a DOI to download")
+    # Already in the save folder: done at once, the engine is not asked again.
+    for it, f in ((it, local_files([it["doi"]]).get(it["doi"])) for it in items):
+        if f:
+            it.update(status="done", source=LOCAL, file=f)
     if not _RUN_LOCK.acquire(blocking=False):
         raise Busy("another download is still running")
     try:
@@ -166,21 +198,28 @@ def _mark(job: str, doi: str, **fields: Any) -> None:
 
 def _run(job: str) -> None:
     path = job_path(job)
-    dois = [i["doi"] for i in store.read_json(path)["items"]]
+    dois = [i["doi"] for i in store.read_json(path)["items"] if i["status"] != "done"]  # not the ones already here
     wanted = set(dois)
 
     def on_item(ok: bool, current: str) -> None:
+        # A lane that fails hands the paper to the next one (grey, institutional,
+        # a cooled-down retry), so a failure here is not final: the engine's
+        # results at the end say what failed. Until then the paper is retrying.
         doi = canonical_doi(current or "")
         if doi in wanted:
-            _mark(job, doi, status="done" if ok else "failed")
+            if ok:
+                _mark(job, doi, status="done", retrying=False)
+            else:
+                _mark(job, doi, retrying=True)
 
     from . import progress_reporter
     progress_reporter.add_listener(on_item)
     state, error, results = "done", None, []
     try:
-        from .server import _batch_download_impl
-        out = json.loads(_batch_download_impl(dois, batch_id=f"app-{job}"))
-        results = out.get("results", [])
+        if dois:
+            from .server import _batch_download_impl
+            out = json.loads(_batch_download_impl(dois, batch_id=f"app-{job}"))
+            results = out.get("results", [])
     except Exception as exc:  # the job file says what went wrong; the app shows it
         state, error = "failed", f"{type(exc).__name__}: {exc}"
     finally:
@@ -191,7 +230,7 @@ def _run(job: str) -> None:
                 for it in data["items"]:
                     r = by_doi.get(it["doi"])
                     if r:
-                        it.update(status="done" if r.get("success") else "failed", source=r.get("source"),
+                        it.update(status="done" if r.get("success") else "failed", retrying=False, source=r.get("source"),
                                   file=r.get("file") or None, error=None if r.get("success") else r.get("error"))
                     elif it["status"] == "waiting" and state == "done":
                         it.update(status="failed", error="cancelled" if _CURRENT["cancelled"] else "no result")
