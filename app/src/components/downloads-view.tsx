@@ -369,6 +369,9 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
             {it.file && (
               <Button size="sm" variant="ghost" className="shrink-0" onClick={() => act(() => downloadsApi.open(it.file!))}>打开</Button>
             )}
+            {running && it.status === "waiting" && (
+              <Button size="sm" variant="ghost" className="shrink-0 text-muted-foreground" onClick={() => act(() => downloadsApi.skip(it.doi))}>跳过</Button>
+            )}
           </li>
         ))}
       </ul>

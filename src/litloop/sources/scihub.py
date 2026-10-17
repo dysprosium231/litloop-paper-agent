@@ -601,6 +601,16 @@ def _said_absent(domain: str, fail_notes: list[str]) -> bool:
 # has no PDF: the mirror does not hold the paper, so no browser is opened for it.
 ABSENT: dict[str, Any] = {"success": False, "not_in_library": True}
 
+# Papers every answering mirror said it does not have, with when: a later
+# download of the same paper within the hour (a short list's second round)
+# does not ask Sci-Hub again, so the browser slot goes to the publisher's site.
+_ABSENT_AT: dict[str, float] = {}
+_ABSENT_TTL = 3600.0
+
+
+def recently_absent(doi: str) -> bool:
+    return time.time() - _ABSENT_AT.get((doi or "").strip().lower(), 0.0) < _ABSENT_TTL
+
 
 def _http_altcha_download(landing_url: str, domain: str, doi: str, output_path: Path,
                           config: dict[str, Any]) -> dict[str, Any] | None:
@@ -769,6 +779,16 @@ def try_scihub_domain(
         log.warning("   [scihub] %s HTTP lane failed: %r", domain, e, exc_info=True)
         if fail_notes is not None:
             fail_notes.append(f"network({type(e).__name__})")
+        if isinstance(e, (requests.Timeout, requests.ConnectionError)):
+            # A mirror that does not answer (2026-10-17: sci-hub.mksa.top now
+            # redirects to a host that times out) costs every paper 15-30 s:
+            # mark it unreachable, so the next 10 minutes skip it.
+            try:
+                from ..domain_db import record_result as _db_result, update_probe
+                _db_result(domain, False, config)
+                update_probe(domain, False, 0.0, config)
+            except Exception:
+                pass
         return None
 
 
@@ -1170,6 +1190,7 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
     absent = bool(fail_notes) and all(n.startswith("not_in_library") for n in fail_notes)
     if absent:
         log.warning(f"   Sci-Hub: {doi} is not in the Sci-Hub library (every mirror that answered said so)")
+        _ABSENT_AT[(doi or "").strip().lower()] = time.time()
         return None
     # All clearnet domains failed — auto-retry with Tor + .onion (only if config allows)
     if not use_tor and config.get("use_tor_for_scihub", True):

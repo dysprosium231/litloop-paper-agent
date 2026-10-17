@@ -660,8 +660,12 @@ def _direct_args(backend: str, proxy: Any, args: list[str] | None,
         return args
     args = list(args or [])
     if not any(a.startswith(("--no-proxy-server", "--proxy-server", "--proxy-pac-url")) for a in args):
-        from .network import host_proxy
+        from .network import grey_hosts, grey_proxy, host_proxy
         url, hosts = host_proxy(config)
+        grey = grey_proxy(config)
+        if grey:  # Sci-Hub / LibGen pages opened in the browser go through it too
+            hosts = (tuple(hosts) if url == grey else ()) + grey_hosts(config)
+            url = grey
         args.append(_pac_arg(url, hosts) if url else "--no-proxy-server")
     return args
 

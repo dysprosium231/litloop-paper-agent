@@ -232,6 +232,17 @@ class CARSIClient:
                     title = page.title()
                     url = page.url
                     log.info(f"   [CARSI-Browser] Page: '{title[:40]}' {url[:60]}")
+                    if url.startswith("chrome-error://"):
+                        # The article did not load (network): that says nothing
+                        # about access, so no login is asked for. One more try.
+                        try:
+                            page.goto(article_url, wait_until="domcontentloaded", timeout=60000)
+                            time.sleep(3)
+                        except Exception:
+                            pass
+                        if page.url.startswith("chrome-error://"):
+                            log.info("   [CARSI-Browser] the article page did not load (network); not asking for a login")
+                            return None
 
                     # Wait for Cloudflare challenge to resolve (visible stealth browser can pass it)
                     from ..network import is_cloudflare_challenge

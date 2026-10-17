@@ -119,12 +119,34 @@ def _resolve_doi_landing(doi: str) -> str:
     return ""
 
 
-def _user_waiting(what: str = "verify") -> None:
+def _on_login_page(where: Any) -> bool:
+    """Whether a page (or any page of a browser context) shows a login."""
+    pages = list(getattr(where, "pages", None) or [where])
+    for pg in pages:
+        try:
+            title, url = pg.title() or "", (pg.url or "").lower()
+        except Exception:
+            continue
+        if any(x in title for x in _AUTH_TITLES) or any(x in url for x in _AUTH_KEYWORDS + ("carsi",)):
+            return True
+    return False
+
+
+def _user_waiting(what: str = "verify", where: Any = None) -> None:
     """Heartbeat while the user is logging in or passing a check, so racing does
-    not give up on us; the app shows what the user should do."""
+    not give up on us; the app shows what the user should do.
+
+    With ``where`` (a page or browser context) the heartbeat is sent only while
+    a login page is actually open: the steps before it (finding the
+    institution's link, an SSO click that goes nowhere) are not the user's to
+    wait for, and saying so would show a notice with nothing to log into."""
     try:
-        from .sources import SourceWaived, note_user_waiting
+        from .sources import SourceWaived, _source_may_continue, note_user_waiting
     except Exception:
+        return
+    if where is not None and not _on_login_page(where):
+        if not _source_may_continue():
+            raise SourceWaived("download already finished; stop waiting")
         return
     try:
         note_user_waiting(what)
@@ -466,7 +488,7 @@ def _wait_login_in_tab(tab_id: str, config: dict[str, Any], publisher: str, idp_
     print("  登录成功后会自动继续下载\n")
 
     for _ in range(100):  # ~5 min
-        _user_waiting("login")
+        _user_waiting("login", page)
         try:
             page.wait_for_timeout(3000)
             title = page.title() or ""
@@ -561,7 +583,7 @@ def _visible_institutional_login(
         print("  登录成功后浏览器会自动跳转回文章页面，程序会自动检测\n")
 
         for i in range(100):
-            _user_waiting("login")
+            _user_waiting("login", page)
             time.sleep(3)
             try:
                 title = page.title()
@@ -775,7 +797,7 @@ def _visible_browser_download(
         # SSO click never left the article, it is not a login.
         seen_auth = already_on_auth
         for i in range(100):
-            _user_waiting("login")
+            _user_waiting("login", context)
             time.sleep(3)
             if not seen_auth and i >= 10:
                 break  # ~30 s and the login page never appeared
@@ -798,15 +820,17 @@ def _visible_browser_download(
                 login_ok = True
                 break
 
-        if not login_ok:
-            if not seen_auth:
-                log.info(f"   [{publisher}] SSO entry did not reach a login page")
-            else:
-                log.info(f"   [{publisher}] visible login timed out")
-                _set_error("login_abandoned", "retry_login")
+        if not login_ok and seen_auth:
+            log.info(f"   [{publisher}] visible login timed out")
+            _set_error("login_abandoned", "retry_login")
             return None
-
-        log.info(f"   [{publisher}] login successful, downloading PDF...")
+        if not login_ok:
+            # The SSO entry led back to the article, not to a login: the school's
+            # exit may need none (2026-10-17, Wiley after a late Cloudflare
+            # check). Try the article page as it is rather than giving up.
+            log.info(f"   [{publisher}] SSO entry did not reach a login page: trying the article page as it is")
+        else:
+            log.info(f"   [{publisher}] login successful, downloading PDF...")
         time.sleep(3)
 
         # Save cookies for future use (all formats + bridge to browser-engine)
@@ -1656,7 +1680,7 @@ def _browser_download_visible(
 
             logged_in = False
             for _ in range(100):
-                _user_waiting("login")
+                _user_waiting("login", page)
                 time.sleep(3)
                 try:
                     cur_title = page.title()
@@ -1865,7 +1889,10 @@ def _browser_download(
 
     log.info(f"   [{publisher}] browser download: {article_url[:80]}")
     from . import progress_reporter
-    progress_reporter.item_stage(doi, f"正在打开 {publisher} 的页面")
+    # The generic lane does not know the publisher ("Unknown"): say 出版商官网.
+    _known = publisher not in ("", "Unknown")
+    _found_text = f"已在 {publisher} 找到 PDF，正在下载" if _known else "已在出版商官网找到 PDF，正在下载"
+    progress_reporter.item_stage(doi, f"正在打开 {publisher} 的页面" if _known else "正在打开出版商官网")
 
     # Create tab to a lightweight page first, inject cookies, then navigate
     # to target. about:blank — a google.com warm-up hard-fails on networks
@@ -1927,7 +1954,7 @@ def _browser_download(
             if _href:
                 from .browser_pdf import capture_pdf_via_cdp
                 log.info(f"   [{publisher}] page PDF link: {_href[:80]}")
-                progress_reporter.item_stage(doi, f"已在 {publisher} 找到 PDF，正在下载")
+                progress_reporter.item_stage(doi, _found_text)
                 _body = capture_pdf_via_cdp(_page.context, _page, _href)
                 if _body:
                     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2017,7 +2044,7 @@ def _browser_download(
                 if _href:
                     from .browser_pdf import capture_pdf_via_cdp
                     log.info(f"   [{publisher}] page PDF link after challenge: {_href[:80]}")
-                    progress_reporter.item_stage(doi, f"已在 {publisher} 找到 PDF，正在下载")
+                    progress_reporter.item_stage(doi, _found_text)
                     _body = capture_pdf_via_cdp(_page.context, _page, _href)
                     if _body:
                         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2334,7 +2361,7 @@ def _browser_download(
         """, config)
         if pdf_url and isinstance(pdf_url, str) and doi.replace("/", "_").lower() in pdf_url.lower():
             log.info(f"   [{publisher}] page data PDF: {pdf_url[:80]}")
-            progress_reporter.item_stage(doi, f"已在 {publisher} 找到 PDF，正在下载")
+            progress_reporter.item_stage(doi, _found_text)
             close_tab(tab_id, config)
             if _try_http_download(pdf_url, output_path, config):
                 return True
@@ -2819,6 +2846,15 @@ def _try_elsevier_text_fallback(
 
 
 def try_elsevier_api(
+    doi: str, output_path: Path, config: dict[str, Any],
+) -> dict[str, Any] | None:
+    from .sources.elsevier_api import fulltext_enabled
+    if not fulltext_enabled(config):
+        return None  # off in settings, or this key has no full-text entitlement
+    return _try_elsevier_api(doi, output_path, config)
+
+
+def _try_elsevier_api(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Download Elsevier/ScienceDirect PDF via Article Retrieval API.

@@ -149,6 +149,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Late results after the 20 s race: a browser lane still at work gets up to
     # race_grace_browser_seconds, otherwise race_grace_seconds; a lane waiting
     # for the user is waited for as long as it says so (up to 10 min).
+    # Download full text through the Elsevier API (abstracts and Scopus always
+    # use the key). Off when the key has no full-text entitlement; LitLoop also
+    # learns that from the API's 403 and stops asking for 30 days.
+    "elsevier_api_fulltext": True,
+    # Sci-Hub and LibGen through host_proxy_url (the user's proxy) instead of
+    # the school's exit; direct when that proxy's port is closed.
+    "scihub_via_proxy": False,
     "race_grace_seconds": 15,
     "race_grace_browser_seconds": 180,
     "batch_small_max": 30,

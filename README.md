@@ -244,7 +244,7 @@ ScienceDirect 和 Cell Press 的论文通过 API 下载，每篇只要 1–2 秒
 1. 在 [Elsevier Developer Portal](https://dev.elsevier.com/) 创建应用。最好用机构邮箱，并在校园网下操作。
 2. 配置：`litloop_elsevier_setup`，或 `litloop_config(key="elsevier_api_key", value="...")`。
 
-只要 Key 加上校园网出口就够了，不需要 insttoken。返回 `NOT_ENTITLED` 说明当前不在校园网，或者学校没订这本期刊。同一个 Key 也用来从 Scopus 补摘要。
+只要 Key 加上校园网出口就够了，不需要 insttoken。返回 `NOT_ENTITLED` 说明当前不在校园网，或者学校没订这本期刊。同一个 Key 也用来从 Scopus 补摘要。若 API 返回 403 `Requestor configuration settings insufficient`（Key 无全文权限），LitLoop 会在 `<data dir>/elsevier_no_fulltext.json` 记录该 Key 的 sha256 哈希前缀（不存明文 Key），并在 30 天内不再向 API 请求全文；也可通过配置项 `elsevier_api_fulltext: false`（默认 `true`）主动关闭 API 全文下载。
 
 ### WebVPN
 
@@ -371,6 +371,7 @@ LitLoop 自己不带 Zotero 网页接口的代码（2026-10 删除了原项目�
 | `search_fill_abstracts` | `true` | 检索结果自动补全摘要 |
 | `openalex_api_key` | 空 | OpenAlex Key（强烈推荐，见[依赖与 Key](#依赖与-key)）；也可用环境变量 `OPENALEX_API_KEY` |
 | `elsevier_api_key` | 空 | Elsevier Key，用于全文下载和 Scopus 摘要；也可用环境变量 `ELSEVIER_API_KEY` |
+| `elsevier_api_fulltext` | `true` | 是否通过 Elsevier API 下载全文；设为 `false` 时不请求全文，补摘要和 Scopus 仍使用 |
 | `network_proxy` | 空 | HTTP/SOCKS 代理；环境变量 `HTTP(S)_PROXY` 会被忽略 |
 | `host_proxy_url` | 空 | 只给指定出版商域名走的代理 |
 | `browser_executable` | 空 | 指定浏览器程序，例如本机 Chrome 的副本 |

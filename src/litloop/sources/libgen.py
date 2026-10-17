@@ -54,7 +54,8 @@ def _try_libgen_mirror(
         session = requests.Session()
         session.trust_env = False
         session.headers.update({"User-Agent": USER_AGENT})
-        proxy = str(config.get("network_proxy", "") or "")
+        from ..network import select_proxy_for_url
+        proxy = select_proxy_for_url(mirror, config)  # scihub_via_proxy / network_proxy
         if proxy:
             session.proxies = {"http": proxy, "https": proxy}
         try:

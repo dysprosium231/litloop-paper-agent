@@ -50,7 +50,7 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
 ### Elsevier（Scopus 摘要、ScienceDirect 全文）
 
 - **用途**：从 Scopus 补摘要；通过 API 下载 ScienceDirect 全文（需要校园网出口）。
-- **配置**：`elsevier_api_key`（环境变量 `ELSEVIER_API_KEY`），在 [dev.elsevier.com](https://dev.elsevier.com) 申请；`elsevier_insttoken` 一般不需要。
+- **配置**：`elsevier_api_key`（环境变量 `ELSEVIER_API_KEY`），在 [dev.elsevier.com](https://dev.elsevier.com) 申请；`elsevier_api_fulltext`（默认 `true`）；`elsevier_insttoken` 一般不需要。
 - **官方限额**（[API Key 设置](https://dev.elsevier.com/api_key_settings.html)）：
 
   | 接口 | 每周配额 | 每秒 |
@@ -66,6 +66,9 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
 - **LitLoop 怎么控制**：
   - 补摘要：每秒 8 次；并发 5 个（**自定**）。
   - 判断：只有带 `QUOTA_EXCEEDED` 才认定本周用完；其他 429 等待后重试，最多 3 次。
+  - 全文控制（`src/litloop/sources/elsevier_api.py` 中的 `fulltext_enabled` 与 `mark_no_fulltext`）：
+    - `elsevier_api_fulltext`：默认 `true`；设为 `false` 时 LitLoop 完全不向 Elsevier Article Retrieval API 请求全文（补摘要和 Scopus 检索仍使用该 Key）。
+    - 403 自动避让：当 API 返回 403 "Requestor configuration settings insufficient"（说明该 Key 没有全文权限）后，LitLoop 会按 Key 的 sha256 哈希前缀（绝不存明文 Key）记入 `<data dir>/elsevier_no_fulltext.json`，并在 30 天内不再用该 Key 请求全文。
 - **实测**（2026-10-16）：一次深度检索补摘要约用几百次 Abstract Retrieval；当天结束时本周还剩 5688 次。
 
 ### Springer Nature

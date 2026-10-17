@@ -373,6 +373,9 @@ def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str
         if label not in _fast_names:
             extra_fast.append((fn, label))
 
+    from .elsevier_api import fulltext_enabled
+    if not fulltext_enabled(config):  # off in settings, or the key has no full-text entitlement
+        publisher_fast = [(fn, label) for fn, label in publisher_fast if label != "ElsevierAPI"]
     legal_sources = publisher_fast + extra_fast
     # Every publisher's own site is tried here, in phase 1, from this exit:
     # those without a browser lane of their own (PNAS, Optica, World Scientific,
@@ -397,9 +400,11 @@ def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str
     # (scihub_enabled=false / strategy=legal_only).
     grey_sources: list[tuple[Any, str]] = []
     if config.get("scihub_enabled", True):
+        from .scihub import recently_absent
         grey_sources.append((try_scibban, "SciBban"))
         grey_sources.append((try_libgen, "LibGen"))
-        grey_sources.append((try_scihub, "Sci-Hub"))
+        if not recently_absent(doi):  # Sci-Hub said within the hour it does not have it
+            grey_sources.append((try_scihub, "Sci-Hub"))
 
     if strategy == "scihub_only":
         # Only Sci-Hub (not SciBban, not LibGen)
@@ -1071,15 +1076,17 @@ def _cancelled() -> bool:
 
 
 def skip_download(identifier: str) -> bool:
-    """Give up on one paper in flight: its windows stop waiting for the user and
-    close, its race returns, the batch moves on to the next paper."""
+    """Give up on one paper: in flight, its windows stop waiting for the user and
+    close and its race returns; not started yet, it is skipped when its turn
+    comes (download_jobs clears the requests when a job starts)."""
     key = identifier.strip()
     if not is_arxiv_identifier(key):
         key = normalize_doi(key)
     with _INFLIGHT_LOCK:
-        if key not in _INFLIGHT:
-            return False
         _SKIPPED.add(key)
+        if key not in _INFLIGHT:
+            log.info(f"   Will skip when its turn comes: {key}")
+            return True
         _SETTLED.add(key)  # its sources stop waiting, launch nothing, drop late results
     try:
         from .. import progress_reporter as _pr
@@ -1166,6 +1173,8 @@ def download(
                 action="wait for the in-flight attempt to finish (it is still "
                        "racing sources); retry in a minute only if it failed",
             )
+        if key in _SKIPPED:  # the user skipped it (kept until the next job starts)
+            return fail(key, "skipped by user", error_type="skipped", action="none")
         _INFLIGHT.add(key)
         _SETTLED.discard(key)
     t0 = time.perf_counter()  # same clock as browser_backend._remember
@@ -1195,7 +1204,6 @@ def download(
         return result
     finally:
         _DL_TLS.key = prev_key
-        _SKIPPED.discard(key)
         try:  # whatever this paper waited on the user for is over now
             from .. import progress_reporter as _pr
             _pr.clear_attention(f"wait:{normalize_doi(key) if not is_arxiv_identifier(key) else key}")

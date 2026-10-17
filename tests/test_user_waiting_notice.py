@@ -65,11 +65,12 @@ def test_skipping_a_paper_stops_its_download_and_only_that_one(tmp_path, monkeyp
     t.start()
     assert started.wait(5)
     assert sources.skip_download("10.1/skip-me") is True
-    assert sources.skip_download("10.1/not-running") is False
+    assert sources.skip_download("10.1/not-started") is True         # skipped when its turn comes
+    assert sources.download("10.1/not-started", str(tmp_path))["error_type"] == "skipped"
     release.set()
     t.join(5)
     assert out["r"]["error_type"] == "skipped"
-    assert "10.1/skip-me" not in sources._SKIPPED            # a later retry starts afresh
+    sources._SKIPPED.clear()                                  # a new job starts afresh
 
 
 def test_a_skipped_paper_reads_as_skipped():

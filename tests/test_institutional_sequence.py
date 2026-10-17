@@ -45,3 +45,18 @@ def test_a_publisher_without_a_browser_lane_gets_the_generic_one():
 def test_scihub_is_not_a_browser_lane_for_the_late_wait():
     assert sources._is_browser_lane("ElsevierBrowser") and sources._is_browser_lane("CARSI")
     assert not sources._is_browser_lane("Sci-Hub") and not sources._is_browser_lane("Unpaywall")
+
+
+def test_elsevier_api_full_text_can_be_off_or_learned_off(tmp_path, monkeypatch):
+    from litloop import config
+    from litloop.sources import elsevier_api
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    cfg = {"elsevier_api_key": "k", "scihub_enabled": False}
+    lanes = lambda c: {label for _, label in sources._build_free_sources("10.1016/j.x.2020.1", c)}  # noqa: E731
+    assert elsevier_api.fulltext_enabled(cfg) and "ElsevierAPI" in lanes(cfg)
+    assert "ElsevierAPI" not in lanes({**cfg, "elsevier_api_fulltext": False})   # the setting
+    elsevier_api.mark_no_fulltext("k")                                          # the API said 403
+    assert not elsevier_api.fulltext_enabled(cfg) and "ElsevierAPI" not in lanes(cfg)
+    assert elsevier_api.fulltext_enabled({**cfg, "elsevier_api_key": "another key"})
+    assert elsevier_api.fetch_pdf("10.1016/j.x.2020.1", "k", config=cfg) is None  # never asked
+    assert "k" not in (tmp_path / "elsevier_no_fulltext.json").read_text(encoding="utf-8").split('"')

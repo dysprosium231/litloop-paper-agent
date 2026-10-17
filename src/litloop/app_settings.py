@@ -30,6 +30,8 @@ GROUPS: list[dict[str, Any]] = [
             {"key": "openalex_api_key", "label": "OpenAlex Key", "type": "secret",
              "link": "https://help.openalex.org/how-to-use-the-api/rate-limits-and-authentication"},
             {"key": "elsevier_api_key", "label": "Elsevier Key", "type": "secret", "link": "https://dev.elsevier.com"},
+            {"key": "elsevier_api_fulltext", "label": "用 Elsevier Key 下载全文", "type": "bool",
+             "help": "Key 没有全文权限时关闭；补摘要和 Scopus 检索不受影响"},
             {"key": "springer_meta_api_key", "label": "Springer Nature Key", "type": "secret",
              "help": "Meta API 的 Key", "link": "https://dev.springernature.com"},
             {"key": "email", "label": "联系邮箱", "type": "email"},
@@ -47,6 +49,8 @@ GROUPS: list[dict[str, Any]] = [
                          ["scihub_first", "Sci-Hub 优先"], ["scihub_only", "只用 Sci-Hub"], ["grey_only", "只用 Sci-Hub、LibGen 等"]]},
             {"key": "scihub_enabled", "label": "允许 Sci-Hub、LibGen 等来源", "type": "bool",
              "help": "可能违反出版商条款或学校规定，自行判断是否开启", "warn": True},
+            {"key": "scihub_via_proxy", "label": "Sci-Hub、LibGen 走代理", "type": "bool",
+             "help": "经「网络」里的代理软件地址访问，不占用学校的出口；代理没开时直连"},
         ],
     },
     {
@@ -56,6 +60,8 @@ GROUPS: list[dict[str, Any]] = [
             # not a personal VPN: filling in Clash's port breaks institutional downloads.
             {"key": "network_proxy", "label": "校园出口代理", "type": "text",
              "help": "只填学校提供的代理地址，个人代理软件的端口会导致机构下载失败"},
+            {"key": "host_proxy_url", "label": "代理软件地址", "type": "text", "placeholder": "http://127.0.0.1:10808",
+             "help": "只有指定的网站（如 Sci-Hub）经它访问，其余直连"},
             {"key": "is_campus_network", "label": "电脑连在校园网上", "type": "bool",
              "help": "打开后直接按学校 IP 下载，不再登录 WebVPN 或 CARSI"},
         ],

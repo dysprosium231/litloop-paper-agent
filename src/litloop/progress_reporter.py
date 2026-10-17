@@ -58,6 +58,32 @@ def remove_stage_listener(fn: Any) -> None:
         pass
 
 
+# Listeners told a paper's final result: (identifier, result dict). Sent when
+# the engine knows nothing more will be tried for it (a short list's single
+# downloads), so the app shows it at once instead of when the job ends.
+_RESULT_LISTENERS: list[Any] = []
+
+
+def add_result_listener(fn: Any) -> None:
+    _RESULT_LISTENERS.append(fn)
+
+
+def remove_result_listener(fn: Any) -> None:
+    try:
+        _RESULT_LISTENERS.remove(fn)
+    except ValueError:
+        pass
+
+
+def item_result(identifier: str, result: dict) -> None:
+    """A paper is finished for good (downloaded or given up); never raises."""
+    for fn in list(_RESULT_LISTENERS):
+        try:
+            fn(identifier, result)
+        except Exception:
+            pass
+
+
 def item_stage(identifier: str, text: str) -> None:
     """Say what is happening to one paper; never raises."""
     for fn in list(_STAGE_LISTENERS):

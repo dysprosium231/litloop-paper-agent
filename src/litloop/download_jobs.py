@@ -227,9 +227,20 @@ def _run(job: str) -> None:
         if doi in wanted:
             _mark(job, doi, stage=text)
 
+    def on_result(current: str, r: dict) -> None:
+        # Final for this paper: show it now, as the end of the job would.
+        doi = canonical_doi(current or "")
+        if doi in wanted:
+            ok = bool(r.get("success"))
+            _mark(job, doi, status="done" if ok else "failed", retrying=False, stage=None,
+                  source=r.get("source"), file=r.get("file") or None, error=None if ok else r.get("error"))
+
     from . import progress_reporter
+    from .sources import _SKIPPED
+    _SKIPPED.clear()  # skips asked for in an earlier job do not carry over
     progress_reporter.add_listener(on_item)
     progress_reporter.add_stage_listener(on_stage)
+    progress_reporter.add_result_listener(on_result)
     state, error, results = "done", None, []
     try:
         if dois:
@@ -241,6 +252,7 @@ def _run(job: str) -> None:
     finally:
         progress_reporter.remove_listener(on_item)
         progress_reporter.remove_stage_listener(on_stage)
+        progress_reporter.remove_result_listener(on_result)
         try:
             with store.update(path, indent=1) as data:
                 by_doi = {canonical_doi(r.get("doi") or r.get("identifier") or ""): r for r in results}

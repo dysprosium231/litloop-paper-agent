@@ -336,7 +336,8 @@ def _resolve_doi_url(doi: str) -> str | None:
     return None
 
 
-_TF_BOOK = re.compile(r"taylorfrancis\.com/books/(mono|edit)/", re.I)
+# taylorfrancis.com itself, or its WebVPN-rewritten form (/https/<hex>/books/...)
+_TF_BOOK = re.compile(r"(?:taylorfrancis\.com|/https?/[0-9a-f]{16,})/books/(mono|edit)/10\.", re.I)
 
 
 def _taylorfrancis_book_pdf_url(doi: str, resolved_url: str) -> str | None:
@@ -1185,6 +1186,15 @@ def _try_instsci_http(doi: str, output_path: Path, config: dict[str, Any]) -> di
             browser_html = _try_browser_via_webvpn(doi_url, config)
             if browser_html:
                 html_str = browser_html
+
+        # Taylor & Francis books: the landing page tells authored from edited
+        # (the DOI alone does not); the download endpoint follows from it.
+        tf = _taylorfrancis_book_pdf_url(doi, resp.url)
+        if tf:
+            log.info(f"   [WebVPN] Taylor & Francis book PDF: {tf[:80]}...")
+            result = _download_pdf_instsci(tf, output_path, config, doi)
+            if result:
+                return result
 
         # Try _find_pdf_link (more thorough)
         found_pdf = _find_pdf_link(html_str, resp.url)

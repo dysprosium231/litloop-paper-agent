@@ -12,6 +12,58 @@ logger = logging.getLogger(__name__)
 ELSEVIER_API = "https://api.elsevier.com/content"
 
 
+# Full text through the API: off in settings (elsevier_api_fulltext), or learned
+# off for this key after the API answered 403 "Requestor configuration settings
+# insufficient" (the key has no full-text entitlement; abstracts and Scopus are
+# unaffected). Remembered per key (a hash, never the key) for 30 days.
+_NO_FULLTEXT_DAYS = 30
+
+
+def _no_fulltext_file():
+    from ..config import DATA_DIR
+    return DATA_DIR / "elsevier_no_fulltext.json"
+
+
+def _key_id(api_key: str) -> str:
+    import hashlib
+    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+
+
+def mark_no_fulltext(api_key: str) -> None:
+    import json
+    import time
+    if not api_key:
+        return
+    path = _no_fulltext_file()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except (OSError, ValueError):
+        data = {}
+    data[_key_id(api_key)] = time.time()
+    try:
+        from .. import store
+        store.write_json(path, data)
+    except Exception:
+        pass
+
+
+def fulltext_enabled(config: dict | None) -> bool:
+    """Whether to ask the Elsevier API for full text at all."""
+    import json
+    import time
+    config = config or {}
+    if not config.get("elsevier_api_fulltext", True):
+        return False
+    key = get_api_key(str(config.get("elsevier_api_key") or ""))
+    if not key:
+        return False
+    try:
+        data = json.loads(_no_fulltext_file().read_text(encoding="utf-8"))
+        return time.time() - float(data.get(_key_id(key), 0)) > _NO_FULLTEXT_DAYS * 86400
+    except (OSError, ValueError, TypeError):
+        return True
+
+
 def get_api_key(config_key: str = "") -> str:
     """Get Elsevier API key from config or environment."""
     return config_key or os.environ.get("ELSEVIER_API_KEY", "")
@@ -45,6 +97,8 @@ def fetch_pdf(doi: str, api_key: str, inst_token: str = "", config: dict | None 
     returns a 1-page preview for paywalled articles.
     """
     if not api_key:
+        return None
+    if config is not None and not fulltext_enabled({**config, "elsevier_api_key": api_key}):
         return None
 
     proxies = _resolve_proxies(config)
@@ -245,7 +299,9 @@ def _fetch_attachment_eids(
             if "requestor configuration settings insufficient" in text.lower():
                 # Not a verdict on the exit: on 2026-10-17 a campus exit that
                 # ScienceDirect recognizes got this 403 while the browser route
-                # downloaded the same paper. Publisher sites stay in play.
+                # downloaded the same paper. Publisher sites stay in play; the
+                # API is not asked for full text with this key again for a while.
+                mark_no_fulltext(api_key)
                 logger.warning(
                     "Elsevier API: 403 '%s' on view=FULL for %s — requestor (key + egress IP) "
                     "has no full-text configuration. Either the egress IP is outside the "

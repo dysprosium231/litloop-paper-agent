@@ -108,3 +108,19 @@ def test_a_paper_shows_where_it_is_and_clears_when_done(folder, monkeypatch):
     _deferred.run()
     assert seen["mid"]["stage"] == "已在 Sci-Hub 找到，正在下载"
     assert download_jobs.get(job_id[0])["items"][0]["stage"] is None
+
+
+def test_a_final_result_shows_at_once(folder, monkeypatch):
+    seen = {}
+
+    def engine(dois, **kw):
+        progress_reporter.advance(False, current="10.1/new")
+        progress_reporter.item_result("10.1/new", {"success": False, "error": "all sources failed"})
+        seen["mid"] = dict(download_jobs.get(job_id[0])["items"][0])
+        return json.dumps({"results": [{"doi": "10.1/new", "success": False, "error": "all sources failed"}]})
+    job_id = []
+    monkeypatch.setattr(server, "_batch_download_impl", engine)
+    monkeypatch.setattr(download_jobs.threading, "Thread", _deferred(job_id))
+    job_id.append(download_jobs.start([{"doi": "10.1/new"}], "t")["job"])
+    _deferred.run()
+    assert seen["mid"]["status"] == "failed" and seen["mid"]["retrying"] is False and seen["mid"]["stage"] is None

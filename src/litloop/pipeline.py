@@ -556,8 +556,10 @@ def run_scihub_then_single(
 
     _enrich_oa_urls(entries, config)
     springer_key = str(config.get("springer_api_key", "") or "")
+    from .sources.elsevier_api import fulltext_enabled
+    fast_channels = ("oa", "elsevier") if fulltext_enabled(config) else ("oa",)
     fast = [e for e in entries if e.identifier in ids and (
-        e.oa_url or (e.channel if e.channel not in ("", "auto") else predict_channel(e.identifier)) in ("oa", "elsevier")
+        e.oa_url or (e.channel if e.channel not in ("", "auto") else predict_channel(e.identifier)) in fast_channels
         or (springer_key and e.identifier.lower().startswith("10.1007/")))]
     if fast:
         _progress.update(phase="开放获取")
@@ -575,6 +577,7 @@ def run_scihub_then_single(
                     pass
                 results[r["doi"]] = r
                 _progress.advance(True, current=r["doi"])
+                _progress.item_result(r["doi"], r)
 
     def _one(ident: str, **kw: Any) -> dict[str, Any]:
         if _sources._CANCEL_GEN[0] != gen0:
@@ -602,6 +605,7 @@ def run_scihub_then_single(
                 i, r = futs[f], f.result()
                 if r.get("success"):
                     results[i] = r
+                    _progress.item_result(i, r)
                 _progress.advance(bool(r.get("success")), current=i)  # a miss goes on to round 2
 
     left = [i for i in ids if i not in results]
@@ -613,13 +617,15 @@ def run_scihub_then_single(
                 _progress.item_stage(i, "排队中：Sci-Hub 未找到，将逐篇查找")
 
             def _staged(i: str) -> dict[str, Any]:
-                _progress.item_stage(i, "正在查找全文（各来源同时尝试）")
+                _progress.update(current=i)
+                _progress.item_stage(i, "正在查找免费全文和出版商官网")
                 return _one(i, _institutional=True, use_vpnsci=use_vpnsci)
             futs = {ex.submit(_staged, i): i for i in left}
             for f in as_completed(futs):
                 i, r = futs[f], f.result()
                 results[i] = r
                 _progress.advance(bool(r.get("success")), current=i)
+                _progress.item_result(i, r)  # final: nothing else will be tried for it
     _progress.finish()
     return [results[i] for i in ids if i in results]
 

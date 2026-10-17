@@ -94,6 +94,26 @@ def host_proxy(config: dict[str, Any] | None) -> tuple[str, tuple[str, ...]]:
     return url, hosts
 
 
+def grey_hosts(config: dict[str, Any] | None) -> tuple[str, ...]:
+    """Sci-Hub and LibGen mirrors (from the settings' domain lists)."""
+    from urllib.parse import urlparse
+    config = config or {}
+    from .sources.libgen import LIBGEN_MIRRORS
+    urls = list(config.get("scihub_domains") or []) + list(LIBGEN_MIRRORS) + ["https://bban.top"]
+    return tuple(sorted({(urlparse(str(u)).hostname or "").lower() for u in urls} - {""}))
+
+
+def grey_proxy(config: dict[str, Any] | None) -> str:
+    """The proxy Sci-Hub and LibGen go through (scihub_via_proxy): host_proxy_url
+    while its port answers, else "" (direct). Keeps those requests off the
+    school's exit, which publishers see as the school."""
+    config = config or {}
+    url = str(config.get("host_proxy_url") or "").strip()
+    if not config.get("scihub_via_proxy") or not url or not _proxy_reachable(url):
+        return ""
+    return url
+
+
 def host_uses_proxy(host: str, hosts: tuple[str, ...]) -> bool:
     host = (host or "").lower()
     return any(host == h or host.endswith("." + h) for h in hosts)
@@ -170,6 +190,9 @@ def select_proxy_for_url(url: str, config: dict[str, Any], use_tor: bool = False
         host = (urlparse(url).hostname or "").lower()
     except Exception:
         host = ""
+    grey = grey_proxy(config)
+    if grey and host_uses_proxy(host, grey_hosts(config)):
+        return grey  # the user's choice wins over the direct default below
     direct_hosts = {"sci-hub.ru"}
     direct_hosts |= {str(d).lower().lstrip(".") for d in (config.get("direct_domains") or [])}
     if config.get("scihub_direct", True) and any(
