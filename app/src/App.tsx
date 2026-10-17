@@ -1,5 +1,7 @@
 import * as React from "react"
-import { ChevronDownIcon } from "lucide-react"
+import { ChevronDownIcon, HistoryIcon } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
 
 import { AppSidebar, RAIL_COLLAPSED, RAIL_OPEN, type Section } from "@/components/app-sidebar"
 import { PaperList, type PaperRow } from "@/components/paper-list"
@@ -8,6 +10,7 @@ import { DownloadsOverview, JobPane, OVERVIEW, useDownloads } from "@/components
 import { useZotero, ZoteroPage, type ZoteroView } from "@/components/zotero-view"
 import { DetailPane, type Paper } from "@/components/detail-pane"
 import { Onboarding } from "@/components/onboarding"
+import { HistoryPage } from "@/components/history-view"
 import { ProgressStrip } from "@/components/progress-strip"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import {
@@ -158,6 +161,7 @@ export default function App() {
   const [railOpen, setRailOpen] = useRailOpen()
   const railExtra = railOpen ? RAIL_OPEN - RAIL_COLLAPSED : 0
   const [section, setSection] = React.useState<Section>("screen")
+  const [history, setHistory] = React.useState(false)  // the screening section's history page
   // First run: the guide covers the window until it is finished or skipped.
   const [guide, setGuide] = React.useState<{ group: string; intro: string }[] | null>(null)
   React.useEffect(() => {
@@ -313,15 +317,15 @@ export default function App() {
   return (
     <TooltipProvider>
       {/* The header's toggle hides the list; the rail then shows icons only (--sidebar-width-icon). */}
-      <SidebarProvider className="h-svh overflow-hidden" style={{ "--sidebar-width": `${(section === "screen" ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
+      <SidebarProvider className="h-svh overflow-hidden" style={{ "--sidebar-width": `${(section === "screen" && !history ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
         <AppSidebar section={section} onSection={setSection} railOpen={railOpen} onRailOpen={setRailOpen}>
-          {section === "screen" ? (
+          {section === "screen" && !history ? (
             <PaperList rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
               onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
           ) : null}
         </AppSidebar>
         <SidebarInset className="relative min-h-0 min-w-0">
-          {section === "screen" && (
+          {section === "screen" && !history && (
             <ResizeHandle key={section} width={widths[section]} min={WIDTHS[section].min} initial={WIDTHS[section].initial}
               offset={railExtra} onWidth={(w) => setWidth(section, w)} />
           )}
@@ -339,6 +343,10 @@ export default function App() {
           ) : section === "settings" ? (
             <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup} onGuide={openGuide}
               onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
+          ) : history ? (
+            <HistoryPage onBack={() => setHistory(false)}
+              onOpen={(s) => { setSid(s); setHistory(false) }}
+              onDownloaded={(job) => { setHistory(false); openJob(job) }} />
           ) : (<>
           <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-background px-4 py-3">
             <SidebarTrigger className="-ml-1" />
@@ -369,6 +377,9 @@ export default function App() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setHistory(true)}>
+              <HistoryIcon />历史
+            </Button>
           </header>
           <ProgressStrip progress={progress} summary={summary} onContinue={continueSearch} />
           <DetailPane paper={paper} onRate={rate} onSelect={toggleSelect} onExclude={exclude}

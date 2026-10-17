@@ -91,6 +91,11 @@ class Translate(BaseModel):
     title: str | None = None
 
 
+class Export(BaseModel):
+    format: str = "bibtex"   # bibtex | ris | doi
+    which: str = "selected"  # selected | high
+
+
 class Decision(BaseModel):
     doi: str | None = None
     title: str | None = None
@@ -238,6 +243,23 @@ def create_app(token: str) -> FastAPI:
         from . import updates
         return updates.available()
 
+    @app.get("/api/history")
+    def history() -> list[dict[str, Any]]:
+        """Every screening session with its counts and its final picks (the app's history page)."""
+        return screening.history()
+
+    @app.post("/api/sessions/{session}/export")
+    def export_session(session: str, body: Export) -> dict[str, Any]:
+        """Write the session's picks (or its 高 papers) as BibTeX / RIS / a DOI list under <output_dir>/exports."""
+        from . import export
+        _record_path(session)
+        if body.which not in ("selected", "high"):
+            raise HTTPException(400, "which must be selected or high")
+        try:
+            return export.export(session, body.format, body.which)
+        except ValueError as exc:
+            raise HTTPException(400, "无法导出：没有可导出的文献。" if "no papers" in str(exc) else str(exc)) from exc
+
     @app.get("/api/translation")
     def translation() -> dict[str, Any]:
         """What the detail pane needs: who translates, which ratings without asking, whether it can."""
@@ -336,18 +358,24 @@ def create_app(token: str) -> FastAPI:
     def downloads_pending() -> list[dict[str, Any]]:
         """Papers picked 选中下载 in screening that no job has downloaded yet, by session."""
         from . import download_jobs
-        from .identifiers import canonical_doi
-        got = download_jobs.downloaded_dois()
+        got = {k for d in download_jobs.downloaded_dois() for k in download_jobs.same_paper(d)}
         out = []
-        for s in screening.list_sessions(200):
+        for s in screening.list_sessions(200):  # newest first: a paper picked twice shows in the newest
             if not s["selected"]:
                 continue
             try:
                 items = store.read_json(_record_path(s["session"]))["items"]
             except (OSError, ValueError, HTTPException):
                 continue
-            papers = [{k: it.get(k) for k in ("doi", "title", "year", "journal")} for it in items
-                      if it.get("decision") == "selected" and it.get("doi") and canonical_doi(it["doi"]) not in got]
+            papers = []
+            for it in items:
+                if it.get("decision") != "selected" or not it.get("doi"):
+                    continue
+                keys = download_jobs.same_paper(it["doi"])
+                if keys & got:
+                    continue
+                got |= keys
+                papers.append({k: it.get(k) for k in ("doi", "title", "year", "journal")})
             if papers:
                 out.append({"session": s["session"], "question": s["question"], "papers": papers})
         return out
@@ -503,6 +531,7 @@ def create_app(token: str) -> FastAPI:
         allowed = set()
         if load_config().get("output_dir"):
             allowed.add(Path(load_config()["output_dir"]).expanduser().resolve())
+            allowed.add((Path(load_config()["output_dir"]).expanduser() / "exports").resolve())
         for j in download_jobs.list_jobs(200):
             d = download_jobs.get(j["job"])
             if d.get("output_dir"):

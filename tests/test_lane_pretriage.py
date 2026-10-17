@@ -140,6 +140,7 @@ class TestBatchDefaultLanes:
         import litloop.server as server
 
         cfg = self._cfg(tmp_path)
+        cfg["batch_small_max"] = 0  # lists above it take the lanes (short ones: run_scihub_then_single)
         monkeypatch.setattr(server, "load_config", lambda: cfg)
         canned = [{"doi": f"10.1234/z{i}", "success": True, "file": "x"}
                   for i in range(4)]

@@ -283,6 +283,24 @@ export interface PendingGroup {
   papers: { doi: string; title?: string; year?: number | null; journal?: string | null }[]
 }
 
+/** One screening session in the history page (screening.history). */
+export interface HistoryEntry {
+  session: string
+  question: string
+  mode: string
+  created: string
+  updated: string
+  items: number
+  by_relevance: Record<string, number>
+  selected: { doi?: string; title: string; year?: number | null; journal?: string | null; journal_rank?: string | null }[]
+}
+
+export const historyApi = {
+  list: () => call<HistoryEntry[]>("/api/history"),
+  export: (id: string, format: "bibtex" | "ris" | "doi", which: "selected" | "high" = "selected") =>
+    call<{ file: string; count: number }>(`/api/sessions/${encodeURIComponent(id)}/export`, { format, which }),
+}
+
 export const downloadsApi = {
   list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; pushing: string | null; output_dir: string }>("/api/downloads"),
   pending: () => call<PendingGroup[]>("/api/downloads/pending"),

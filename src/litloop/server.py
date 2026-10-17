@@ -166,7 +166,9 @@ def _batch_download_impl(
     cfg = load_config()
     use_lanes = (
         (lanes if lanes is not None else bool(cfg.get("batch_default_lanes", True)))
-        and len(identifiers) >= 3
+        # Short lists take run_scihub_then_single below (one paper included, so
+        # it gets the school's routes too); lanes start above batch_small_max.
+        and len(identifiers) >= 1
         # Grey-oriented strategies express a lane-ORDER preference that the
         # fast->grey->institutional schedule would invert — keep racing.
         and cfg.get("download_strategy", "fastest") not in ("scihub_only", "grey_only", "scihub_first")
@@ -180,8 +182,14 @@ def _batch_download_impl(
         dropped = [e for e in all_entries if e.unresolved or not e.identifier]
         allow_grey = (scihub_enabled is not False) and grey_allowed(cfg)
         out_dir = output_dir or cfg.get("output_dir") or str(Path.cwd())
-        _log.info(f"Lane scheduling {len(entries)} items: pretriage -> fast HTTP -> grey -> institutional")
-        raw = run_lanes(entries, out_dir, config=cfg, allow_grey=allow_grey)
+        if len(entries) <= int(cfg.get("batch_small_max", 30) or 0):
+            from .pipeline import run_scihub_then_single
+            _log.info(f"Short list ({len(entries)} items): Sci-Hub for all, then a full single download for each miss")
+            raw = run_scihub_then_single(entries, out_dir, config=cfg, allow_grey=allow_grey,
+                                         workers=int(cfg.get("batch_small_workers", 3) or 3))
+        else:
+            _log.info(f"Lane scheduling {len(entries)} items: pretriage -> fast HTTP -> grey -> institutional")
+            raw = run_lanes(entries, out_dir, config=cfg, allow_grey=allow_grey)
         raw += [
             {"doi": (e.raw or "")[:80], "success": False,
              "error": "unrecognized identifier (lane mode)"}

@@ -230,6 +230,30 @@ def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
     return out
 
 
+def history(limit: int = 500) -> list[dict[str, Any]]:
+    """Every screening session for the app's history: what was asked, how far it got, what was kept.
+
+    "selected" lists the final picks (title, year, journal, DOI), newest session first.
+    """
+    out = []
+    records = [p for p in screening_dir().glob("*.json") if p.name.count(".") == 1]
+    for p in sorted(records, reverse=True)[:limit]:
+        try:
+            d = store.read_json(p)
+            sid = d["id"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        items = d.get("items", [])
+        out.append({
+            "session": sid, "question": d.get("question", ""), "mode": d.get("mode", "quick"),
+            "created": d.get("created", ""), "updated": d.get("updated", ""), "items": len(items),
+            "by_relevance": {r: sum(1 for it in items if _rating(it) == r) for r in RELEVANCE},
+            "selected": [{k: it.get(k) for k in ("doi", "title", "year", "journal", "journal_rank")}
+                         for it in items if it.get("decision") == "selected"],
+        })
+    return out
+
+
 _DECISION = {"selected": "✅ 选中", "rejected": "✗ 不要", None: ""}
 
 

@@ -155,10 +155,13 @@ export function DownloadsOverview({ jobs, pending, outputDir, busy, running, onS
                     onClick={() => start(g.papers, g.question || g.session, g.session)}>开始下载</Button>
                 </div>
                 <ul className="space-y-1.5">
-                  {g.papers.map((p) => (
-                    <li key={p.doi} className="text-sm">
-                      <div className="line-clamp-2">{p.title || p.doi}</div>
-                      <div className="text-xs text-muted-foreground">{metaLine(p) || p.doi}</div>
+                  {g.papers.map((p, i) => (
+                    <li key={p.doi} className="flex gap-3 text-sm">
+                      <span className="w-6 shrink-0 pt-px text-right text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+                      <div className="min-w-0">
+                        <div className="line-clamp-2">{p.title || p.doi}</div>
+                        <div className="text-xs text-muted-foreground">{metaLine(p) || p.doi}</div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -333,8 +336,9 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
       </Card>
       <Card>
       <ul className="divide-y">
-        {job.items.map((it) => (
+        {job.items.map((it, i) => (
           <li key={it.doi} className="flex items-start gap-3 px-5 py-3">
+            <span className="w-6 shrink-0 pt-0.5 text-right text-xs text-muted-foreground tabular-nums">{i + 1}</span>
             <span className="mt-0.5"><StatusIcon item={it} running={running} /></span>
             <div className="min-w-0 flex-1">
               <div className="line-clamp-2 text-sm">{it.title}</div>

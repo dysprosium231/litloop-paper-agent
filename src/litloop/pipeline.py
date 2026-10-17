@@ -518,6 +518,70 @@ def grey_allowed(config: dict[str, Any] | None) -> bool:
     return cfg.get("download_strategy", "fastest") != "legal_only"
 
 
+def run_scihub_then_single(
+    entries: list[QueueEntry],
+    output_dir: str | Path,
+    config: dict[str, Any] | None = None,
+    allow_grey: bool = True,
+    workers: int = 3,
+) -> list[dict[str, Any]]:
+    """A short list (up to batch_small_max papers): Sci-Hub for every paper at
+    once, then a full single download for each one it missed.
+
+    Round 1 asks Sci-Hub only (no browser: its ALTCHA gate is solved over
+    HTTP) for all papers in parallel; when the user turned gray sources off
+    there is no round 1. Round 2 runs each remaining paper exactly as a single
+    download does - every source racing, then the school's routes, WebVPN when
+    it is switched on - a few papers at a time; a paper is done the moment one
+    source gets it, nobody waits for a slower one. (The lanes in run_lanes
+    serialize stage by stage, which costs minutes on a dozen papers.)
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from . import progress_reporter as _progress
+    from .sources import download
+
+    config = config or {}
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    ids = [e.identifier for e in entries if e.identifier and not e.unresolved]
+    _progress.start_task("文献下载", total=len(ids))
+    _progress.set_output_dir(str(out))
+    results: dict[str, dict[str, Any]] = {}
+
+    def _one(ident: str, **kw: Any) -> dict[str, Any]:
+        try:
+            r = download(ident, str(out), _batch=True, **kw) or {}
+        except Exception as exc:
+            r = {"success": False, "error": str(exc)}
+        r.setdefault("doi", ident)
+        r.setdefault("identifier", ident)
+        return r
+
+    if ids and allow_grey and grey_allowed(config):
+        _progress.update(phase="Sci-Hub")
+        with ThreadPoolExecutor(max_workers=min(4, len(ids))) as ex:
+            futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False): i for i in ids}
+            for f in as_completed(futs):
+                i, r = futs[f], f.result()
+                if r.get("success"):
+                    results[i] = r
+                _progress.advance(bool(r.get("success")), current=i)  # a miss goes on to round 2
+
+    left = [i for i in ids if i not in results]
+    if left:
+        _progress.update(phase="逐篇下载")
+        use_vpnsci = bool(config.get("vpnsci_enabled") or config.get("ezproxy_enabled"))
+        with ThreadPoolExecutor(max_workers=max(1, min(workers, len(left)))) as ex:
+            futs = {ex.submit(_one, i, _institutional=True, use_vpnsci=use_vpnsci): i for i in left}
+            for f in as_completed(futs):
+                i, r = futs[f], f.result()
+                results[i] = r
+                _progress.advance(bool(r.get("success")), current=i)
+    _progress.finish()
+    return [results[i] for i in ids if i in results]
+
+
 def run_lanes(
     entries: list[QueueEntry],
     output_dir: str | Path,

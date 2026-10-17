@@ -98,6 +98,17 @@ def running() -> str | None:
 
 
 LOCAL = "本机已有"  # the source of a paper found in the save folder, not downloaded again
+_ARXIV_DOI = "10.48550/arxiv."
+
+
+def same_paper(doi: str) -> set[str]:
+    """The keys one paper can go by: an arXiv id and its arXiv DOI are the same paper."""
+    d = canonical_doi(doi or "")
+    if d.startswith(_ARXIV_DOI):
+        return {d, d[len(_ARXIV_DOI):]}
+    if d and not d.startswith("10."):  # a bare arXiv id
+        return {d, _ARXIV_DOI + d}
+    return {d} if d else set()
 
 
 def local_files(dois: list[str] | set[str] | None = None) -> dict[str, str]:
@@ -112,22 +123,21 @@ def local_files(dois: list[str] | set[str] | None = None) -> dict[str, str]:
         idx = json.loads((folder / ".doi_index.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    wanted = {canonical_doi(d) for d in dois} if dois is not None else None
-    out = {}
+    found = {}
     for key, entry in idx.items():
-        doi = canonical_doi(key)
-        if wanted is not None and doi not in wanted:
-            continue
         f = entry.get("file") if isinstance(entry, dict) else entry
         if f and Path(f).is_file():
-            out[doi] = str(f)
-    return out
+            for k in same_paper(key):
+                found[k] = str(f)
+    if dois is None:
+        return found
+    return {canonical_doi(d): found[k] for d in dois for k in same_paper(d) if k in found}
 
 
 def downloaded_dois() -> set[str]:
     """DOIs some job has already got, or whose PDF is already in the save folder:
     they are not offered again."""
-    got = set(local_files())
+    got = {k for d in local_files() for k in same_paper(d)}
     for p in jobs_dir().glob("*.json"):
         try:
             got |= {i["doi"] for i in store.read_json(p).get("items", []) if i.get("status") == "done"}

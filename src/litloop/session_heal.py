@@ -9,6 +9,8 @@ and network-unreachable states never do.
 
 from __future__ import annotations
 
+import threading
+
 from typing import Any
 
 from .log import get_logger
@@ -46,6 +48,9 @@ def ensure_webvpn_session(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_HEAL_LOCK = threading.Lock()
+
+
 def ensure_institutional_sessions(config: dict[str, Any], *, use_vpnsci: bool = True) -> dict[str, Any]:
     """Validate/refresh institutional sessions before a download attempt.
 
@@ -54,5 +59,8 @@ def ensure_institutional_sessions(config: dict[str, Any], *, use_vpnsci: bool = 
     """
     report: dict[str, Any] = {}
     if use_vpnsci and _webvpn_configured(config):
-        report["webvpn"] = ensure_webvpn_session(config)
+        # Several downloads at once may all find the session stale: one of them
+        # refreshes it (a login window at most once), the others then find it fresh.
+        with _HEAL_LOCK:
+            report["webvpn"] = ensure_webvpn_session(config)
     return report

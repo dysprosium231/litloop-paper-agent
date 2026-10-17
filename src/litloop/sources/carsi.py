@@ -238,6 +238,13 @@ class CARSIClient:
                     for _cf_wait in range(12):
                         if is_cloudflare_challenge(page.title() or ""):
                             log.info(f"   [CARSI-Browser] Cloudflare challenge detected, waiting... ({_cf_wait+1}/12)")
+                            try:
+                                from .._publisher_strategies_core import _is_challenge_dead_end
+                                if _is_challenge_dead_end(page.content()):
+                                    log.info("   [CARSI-Browser] the check cannot run in this browser; giving up")
+                                    break
+                            except Exception:
+                                pass
                             time.sleep(5)
                         else:
                             break
