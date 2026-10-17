@@ -249,7 +249,7 @@ export default function App() {
 
   const heading = summary && onlyBatch && summary.current_batch?.length
     ? `第 ${summary.batches.length} 批 · ${summary.current_batch.length} 篇`
-    : `已评 ${record?.items.length ?? 0} 篇`
+    : `已评分 ${record?.items.length ?? 0} 篇`
 
   return (
     <TooltipProvider>

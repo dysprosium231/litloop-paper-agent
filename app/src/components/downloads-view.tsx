@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 export const PENDING = "pending"
 
 const STATE: Record<JobState, string> = {
-  running: "下载中", done: "已完成", cancelled: "已取消", failed: "出错", interrupted: "已中断",
+  running: "进行中", done: "已完成", cancelled: "已取消", failed: "出错", interrupted: "已中断",
 }
 
 /** Jobs, papers waiting to be downloaded and the live report; polls faster while a job runs. */
@@ -65,10 +65,10 @@ export function DownloadsNav({ jobs, pending, current, onPick }: {
           className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-sidebar-accent",
             current === PENDING && "bg-sidebar-accent font-medium")}>
           <InboxIcon className="size-4 shrink-0" />
-          <span className="flex-1">待下载</span>
+          <span className="flex-1">下载队列</span>
           {waiting > 0 && <span className="rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">{waiting}</span>}
         </button>
-        {jobs.length > 0 && <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground">下载记录</div>}
+        {jobs.length > 0 && <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground">历史记录</div>}
         {jobs.map((j) => (
           <button key={j.job} type="button" onClick={() => onPick(j.job)}
             className={cn("flex w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-sidebar-accent",
@@ -76,7 +76,7 @@ export function DownloadsNav({ jobs, pending, current, onPick }: {
             <span className={cn("line-clamp-2 text-sm", current === j.job && "font-medium")}>{j.title}</span>
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {j.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
-              {STATE[j.state]} · {j.done}/{j.total} 篇{j.failed ? ` · 失败 ${j.failed}` : ""} · {j.created.slice(5, 16)}
+              {STATE[j.state]} · {j.done}/{j.total}{j.failed ? ` · 失败 ${j.failed}` : ""} · {j.created.slice(5, 16)}
             </span>
           </button>
         ))}
@@ -114,20 +114,23 @@ export function PendingPane({ pending, busy, onStarted }: {
   const all = pending.flatMap((g) => g.papers)
   return (
     <div className="min-h-0 flex-1 overflow-y-auto scrollable">
-      <Header title="待下载" meta={all.length ? `${all.length} 篇，来自 ${pending.length} 次筛选` : undefined}>
-        {pending.length > 1 && <Button size="sm" disabled={busy} onClick={() => start(all, `${all.length} 篇（${pending.length} 次筛选）`)}>全部下载</Button>}
+      <Header title="下载队列" meta={all.length ? `${all.length} 篇 · ${pending.length} 个检索会话` : undefined}>
+        {pending.length > 1 && <Button size="sm" disabled={busy} onClick={() => start(all, `${pending.length} 个检索会话 · ${all.length} 篇`)}>全部下载</Button>}
       </Header>
       {error && <p className="mx-6 mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-      {busy && <p className="mx-6 mt-4 text-sm text-muted-foreground">正在下载，完成后才能开始新的下载。</p>}
+      {busy && <p className="mx-6 mt-4 text-sm text-muted-foreground">当前有下载任务进行中。</p>}
       {pending.length === 0 && (
-        <p className="px-6 py-10 text-center text-sm text-muted-foreground">在筛选页把文章标为「选中下载」，就会出现在这里。</p>
+        <div className="px-6 py-12 text-center">
+          <p className="text-sm font-medium">暂无待下载文献</p>
+          <p className="mt-1 text-xs text-muted-foreground">筛选中标记为「选中」的文献将显示在此处</p>
+        </div>
       )}
       {pending.map((g) => (
         <section key={g.session} className="border-b px-6 py-4">
           <div className="mb-2 flex items-center justify-between gap-4">
             <h3 className="min-w-0 truncate text-sm font-medium">{g.question || g.session}</h3>
             <Button size="sm" variant={pending.length > 1 ? "outline" : "default"} disabled={busy}
-              onClick={() => start(g.papers, g.question || g.session, g.session)}>下载这 {g.papers.length} 篇</Button>
+              onClick={() => start(g.papers, g.question || g.session, g.session)}>开始下载</Button>
           </div>
           <ul className="space-y-1.5">
             {g.papers.map((p) => (
@@ -144,7 +147,7 @@ export function PendingPane({ pending, busy, onStarted }: {
 }
 
 const ZOTERO: Record<NonNullable<DownloadItem["zotero"]>["status"], string> = {
-  pushing: "正在推送到 Zotero", added: "已加入 Zotero", reused: "Zotero 里已有", no_pdf: "已加入 Zotero，PDF 未附上", failed: "推送 Zotero 失败",
+  pushing: "Zotero：推送中", added: "Zotero：已添加", reused: "Zotero：已存在", no_pdf: "Zotero：附件缺失", failed: "Zotero：推送失败",
 }
 
 /** Push the job's downloaded papers to a Zotero collection (an existing one or a new path). */
@@ -165,29 +168,29 @@ function ZoteroPanel({ job, onPushed }: { job: DownloadJob; onPushed: () => void
     .catch((e) => setError(String(e).replace(/^Error: \d+ /, "").replace(/^\{"detail":"(.*)"\}$/, "$1")))
   if (z?.state === "running") {
     const doneNow = job.items.filter((i) => i.zotero && i.zotero.status !== "pushing").length
-    return <p className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderIcon className="size-3.5 animate-spin" />正在推送到 Zotero「{z.collection}」，{doneNow} 篇已处理</p>
+    return <p className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderIcon className="size-3.5 animate-spin" />正在推送至「{z.collection}」 · 已处理 {doneNow}</p>
   }
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-4 text-sm">
         <span className="min-w-0 truncate text-muted-foreground">
-          {pushed > 0 ? `已推送 ${pushed} 篇到 Zotero「${z?.collection ?? ""}」` : "还没有推送到 Zotero"}
-          {waiting > 0 && pushed > 0 ? `，还有 ${waiting} 篇` : ""}
+          {pushed > 0 ? `已推送至「${z?.collection ?? ""}」 · ${pushed} 篇` : "未推送至 Zotero"}
+          {waiting > 0 && pushed > 0 ? ` · 待推送 ${waiting}` : ""}
         </span>
-        {waiting > 0 && !open && <Button size="sm" variant="outline" onClick={show}>推送到 Zotero</Button>}
+        {waiting > 0 && !open && <Button size="sm" variant="outline" onClick={show}>推送至 Zotero</Button>}
       </div>
       {(z?.state === "failed" || z?.state === "interrupted") && z.error && <p className="text-sm text-destructive">{z.error}</p>}
       {open && (
         <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); push() }}>
-          <Input list="zotero-collections" value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Zotero 分类"
-            placeholder="分类，用 / 分隔子分类" className="flex-1" />
+          <Input list="zotero-collections" value={target} onChange={(e) => setTarget(e.target.value)} aria-label="目标分类"
+            placeholder="目标分类，以 / 分隔层级" className="flex-1" />
           <datalist id="zotero-collections">{collections?.map((c) => <option key={c.key} value={c.path} />)}</datalist>
-          <Button type="submit" size="sm" disabled={!target.trim()}>推送 {waiting} 篇</Button>
+          <Button type="submit" size="sm" disabled={!target.trim()}>推送</Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>取消</Button>
         </form>
       )}
-      {open && collections?.length === 0 && <p className="text-xs text-muted-foreground">读不到 Zotero 的分类：请确认 Zotero 正在运行。仍可直接填写，没有的分类会新建。</p>}
-      {open && !!collections?.length && <p className="text-xs text-muted-foreground">可从已有分类中选，或填新的路径，没有的分类会新建。</p>}
+      {open && collections?.length === 0 && <p className="text-xs text-muted-foreground">无法读取 Zotero 分类，请确认 Zotero 已启动。也可直接输入路径，不存在的分类将自动创建。</p>}
+      {open && !!collections?.length && <p className="text-xs text-muted-foreground">可选择已有分类，或输入新路径（不存在的分类将自动创建）。</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   )
@@ -215,7 +218,7 @@ export function JobPane({ id, live, onChanged, onStarted }: {
   }, [id])
   const act = (f: () => Promise<unknown>) => f().then(onChanged).catch((e) => setError(String(e)))
 
-  if (!job) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "正在读取…"}</div>
+  if (!job) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "加载中…"}</div>
   const done = job.items.filter((i) => i.status === "done").length
   const failed = job.items.filter((i) => i.status === "failed")
   const finished = done + failed.length
@@ -226,8 +229,8 @@ export function JobPane({ id, live, onChanged, onStarted }: {
       <Header title={job.title} meta={`${STATE[job.state]} · ${job.created}${job.finished ? ` → ${job.finished.slice(11)}` : ""}`}>
         {running && <Button size="sm" variant="outline" onClick={() => act(downloadsApi.cancel)}>取消</Button>}
         {!running && missing.length > 0 && (
-          <Button size="sm" variant="outline" onClick={() => act(async () => onStarted((await downloadsApi.start(missing, `重试：${job.title}`, job.session ?? undefined)).job))}>
-            重试未下载的 {missing.length} 篇
+          <Button size="sm" variant="outline" onClick={() => act(async () => onStarted((await downloadsApi.start(missing, `重试 · ${job.title}`, job.session ?? undefined)).job))}>
+            重试未完成项（{missing.length}）
           </Button>
         )}
         {job.output_dir && done > 0 && (
@@ -236,8 +239,8 @@ export function JobPane({ id, live, onChanged, onStarted }: {
       </Header>
       <div className="space-y-3 border-b px-6 py-4">
         <div className="flex items-baseline justify-between text-sm">
-          <span>已下载 {done} 篇{failed.length ? `，失败 ${failed.length} 篇` : ""}，共 {job.items.length} 篇</span>
-          {running && live?.current && <span className="max-w-[50%] truncate text-xs text-muted-foreground">正在处理 {live.current}</span>}
+          <span>已完成 {done}{failed.length ? ` · 失败 ${failed.length}` : ""} · 共 {job.items.length}</span>
+          {running && live?.current && <span className="max-w-[50%] truncate text-xs text-muted-foreground">正在处理：{live.current}</span>}
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${(finished / Math.max(1, job.items.length)) * 100}%` }} />
@@ -246,7 +249,7 @@ export function JobPane({ id, live, onChanged, onStarted }: {
           <p key={i} className="rounded-md bg-warning px-3 py-2 text-sm text-warning-foreground">{a.message}</p>
         ))}
         {job.error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{job.error}</p>}
-        {job.state === "interrupted" && <p className="text-sm text-muted-foreground">app 关闭时这次下载还没完成；可以重试没下载到的文章。</p>}
+        {job.state === "interrupted" && <p className="text-sm text-muted-foreground">任务未完成时应用已退出，可重试未完成项。</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         {done > 0 && <ZoteroPanel job={job} onPushed={onChanged} />}
       </div>
@@ -257,7 +260,7 @@ export function JobPane({ id, live, onChanged, onStarted }: {
             <div className="min-w-0 flex-1">
               <div className="line-clamp-2 text-sm">{it.title}</div>
               <div className="text-xs text-muted-foreground">
-                {[metaLine(it), it.source && it.status === "done" ? `来源 ${it.source}` : null].filter(Boolean).join(" · ") || it.doi}
+                {[metaLine(it), it.source && it.status === "done" ? `来源：${it.source}` : null].filter(Boolean).join(" · ") || it.doi}
               </div>
               {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90">{it.error}</div>}
               {it.zotero && (

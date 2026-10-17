@@ -22,7 +22,7 @@ export function DetailPane({
   onExclude: () => void
 }) {
   if (!paper) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">选一篇文章查看详情</div>
+    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">选择文献以查看详情</div>
   }
   const item = paper.item
   const rel = item ? rating(item) : null
@@ -42,7 +42,7 @@ export function DetailPane({
         </p>
         <section className="space-y-1.5">
           <h2 className="text-xs text-muted-foreground">摘要</h2>
-          <p className="text-sm leading-relaxed">{paper.abstract || "没有找到摘要，只能凭标题判断。"}</p>
+          <p className="text-sm leading-relaxed">{paper.abstract || "暂无摘要，仅依据标题评分。"}</p>
         </section>
         {item && (
           <section className="space-y-1 rounded-lg border bg-muted/40 p-3">
@@ -56,7 +56,7 @@ export function DetailPane({
         {item ? (
           <>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">你的评分</span>
+              <span className="text-xs text-muted-foreground">我的评分</span>
               {item.user_relevance && (
                 <button type="button" onClick={() => onRate(item.relevance)}
                   className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
@@ -64,7 +64,7 @@ export function DetailPane({
                 </button>
               )}
             </div>
-            <div role="group" aria-label="你的评分" className="grid grid-cols-4 gap-2">
+            <div role="group" aria-label="我的评分" className="grid grid-cols-4 gap-2">
               {RELEVANCE.map((r, i) => (
                 <Button key={r} variant="outline" aria-pressed={rel === r} onClick={() => onRate(r)}
                   className={cn("h-11 flex-col gap-0", rel === r && "border-primary bg-primary/10 font-semibold dark:border-primary dark:bg-primary/20")}>
@@ -75,20 +75,20 @@ export function DetailPane({
             </div>
             <div className="flex gap-2">
               <Button className="flex-1" onClick={onSelect}>
-                {item.decision === "selected" ? "取消选中" : "选中下载"}
+                {item.decision === "selected" ? "移出下载" : "加入下载"}
               </Button>
               <Button variant="outline" onClick={onExclude}>{item.decision === "rejected" ? "取消排除" : "排除"}</Button>
             </div>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">Agent 还没评这一篇；评完后这里可以修改评分。</p>
+          <p className="text-sm text-muted-foreground">Agent 尚未评分，评分后可在此修改。</p>
         )}
         {edited > 0 && (
           <p className="rounded-lg border border-warning-foreground/20 bg-warning px-3 py-2 text-xs text-warning-foreground">
             你改了 {edited} 篇的评分。回到对话说“继续”，下一批会按你的评分排序。
           </p>
         )}
-        <p className="text-xs text-muted-foreground">键盘：↑↓ 换篇 · 1–4 评分 · 空格 选中</p>
+        <p className="text-xs text-muted-foreground">快捷键：↑↓ 切换 · 1–4 评分 · 空格 加入下载</p>
       </div>
     </div>
   )

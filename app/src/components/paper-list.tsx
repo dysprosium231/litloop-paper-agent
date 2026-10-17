@@ -45,7 +45,7 @@ export function PaperList({
             <Switch className="shadow-none" checked={onlyBatch} onCheckedChange={onOnlyBatch} />
           </Label>
         </div>
-        <SidebarInput placeholder="查找标题、期刊" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <SidebarInput placeholder="搜索标题或期刊" value={query} onChange={(e) => setQuery(e.target.value)} />
       </SidebarHeader>
       <SidebarContent className="scrollable">
         <SidebarGroup className="px-0">
@@ -62,15 +62,15 @@ export function PaperList({
               >
                 <div className="flex w-full flex-wrap items-center gap-2">
                   <RelevanceBadge rel={r.rel} />
-                  {r.edited && <span className="rounded bg-warning px-1.5 text-xs text-warning-foreground">你改过</span>}
-                  {r.selected && <span className="text-xs text-primary">已选中</span>}
+                  {r.edited && <span className="rounded bg-warning px-1.5 text-xs text-warning-foreground">已修改</span>}
+                  {r.selected && <span className="text-xs text-primary">待下载</span>}
                 </div>
                 <span className="w-full font-medium">{r.title}</span>
                 {r.meta && <span className="w-full text-xs text-muted-foreground">{r.meta}</span>}
                 {r.reason && <span className="w-full text-xs text-muted-foreground">{r.reason}</span>}
               </button>
             ))}
-            {shown.length === 0 && <p className="p-4 text-sm text-muted-foreground">这里还没有文章。</p>}
+            {shown.length === 0 && <p className="p-4 text-sm text-muted-foreground">暂无文献</p>}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

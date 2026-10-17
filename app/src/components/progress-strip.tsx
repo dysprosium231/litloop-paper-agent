@@ -4,9 +4,9 @@ import { cn } from "@/lib/utils"
 const PHASES: [string, string][] = [
   ["keywords", "关键词"],
   ["expand", "扩展候选池"],
-  ["abstracts", "补摘要"],
+  ["abstracts", "补全摘要"],
   ["rank", "排序"],
-  ["batch", "出批"],
+  ["batch", "生成批次"],
 ]
 
 const secs = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} 分 ${Math.round(s % 60)} 秒` : `${Math.round(s)} 秒`)
@@ -35,16 +35,16 @@ export function ProgressStrip({ progress, summary }: { progress: Progress | null
   const elapsed = progress.updated - progress.started
   let eta = ""
   if (now?.total && now.done >= now.total) {
-    eta = "，这一步即将完成"  // counted out, still writing results: "约还要 0 秒" read as stuck
+    eta = " · 即将完成"  // counted out, still writing results: "约还要 0 秒" read as stuck
   } else if (now?.total && now.done > 0) {
     const rate = (progress.updated - now.started) / now.done
-    eta = `，这一步约还要 ${secs(Math.max(1, rate * (now.total - now.done)))}`
+    eta = ` · 预计剩余 ${secs(Math.max(1, rate * (now.total - now.done)))}`
   }
   return (
     <div className="space-y-2 border-b px-6 py-3">
       <div className="flex items-baseline gap-2 text-sm">
-        <span className="font-medium">{progress.event === "start" ? "正在建立候选池" : "正在准备下一批"}</span>
-        <span className="text-xs text-muted-foreground">已用 {secs(elapsed)}{eta}</span>
+        <span className="font-medium">{progress.event === "start" ? "正在构建候选池" : "正在生成下一批"}</span>
+        <span className="text-xs text-muted-foreground">用时 {secs(elapsed)}{eta}</span>
       </div>
       <div className="grid grid-cols-5 gap-1.5">
         {PHASES.map(([id, label]) => {
