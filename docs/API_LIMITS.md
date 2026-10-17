@@ -185,7 +185,7 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
   - LitLoop：连续 3 次检测到封锁页、403 或 429 时自动停止批量任务；被封时可调低并发、加大间隔（见 README）。
 - **机构认证**：
   - WebVPN（`vpnsci_*`）、CARSI（`carsi_*`）、EZProxy（`ezproxy_*`）、OpenAthens；
-  - 限制由学校决定，主要是会话过期；`auto_relogin` 控制是否自动弹出浏览器重新登录；`institutional_order`（默认 `["webvpn_http", "webvpn_browser", "carsi", "ezproxy"]`）控制机构通道尝试顺序。
+  - 限制由学校决定，主要是会话过期；`auto_relogin` 控制是否自动弹出浏览器重新登录；`institutional_order`（默认 `["webvpn_http", "webvpn_browser", "carsi", "ezproxy"]`）控制机构通道尝试顺序；`institutional_step_seconds`（默认 240 秒，自定值）是每条通道的最长用时，超时进入下一条。
 - **网络**：
   - `network_proxy`：所有请求走同一个代理；
   - `host_proxy_url` / `host_proxy_hosts`：只给指定出版商域名走代理，Sci-Hub、LibGen 选代理线路时也走它；机构通道必须绕开代理；
@@ -194,7 +194,7 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
 ## 三、灰色来源
 
 - Sci-Hub、LibGen 等：**默认关闭**（`scihub_enabled`），由用户自己决定是否打开。
-- 相关配置：`scihub_domains`、`scihub_route`、`scihub_speedtest_doi`、`scihub_speedtest_mirrors`、`scihub_speedtest_seconds`、`scihub_round_workers`、`scihub_http_workers`、`host_proxy_url`、`scihub_use_browser`、`use_tor_for_scihub`、`tor_proxy`、`tor_use_bridges`、`flaresolverr_url`。
+- 相关配置：`scihub_domains`、`scihub_skip_from_year`（默认 2024：此年份起发表的不查，新文献 Sci-Hub 基本没有）、`scihub_route`、`scihub_speedtest_doi`、`scihub_speedtest_mirrors`、`scihub_speedtest_seconds`、`scihub_round_workers`、`scihub_http_workers`、`host_proxy_url`、`scihub_use_browser`、`use_tor_for_scihub`、`tor_proxy`、`tor_use_bridges`、`flaresolverr_url`。
 - 没有官方限额；镜像经常失效。
 - 路由与测速：`scihub_route` 支持 `direct`（直连）、`proxy`（通过 `host_proxy_url`）或 `auto`；设为 `auto` 时在批量下载前测试双路由镜像并取最快者（`scihub_speedtest_doi`、`scihub_speedtest_mirrors` 默认 5、`scihub_speedtest_seconds` 默认 40 秒），结果在 `<data dir>/scihub_route.json` 缓存 1 小时。
 - 并发控制：第一轮纯 HTTP 并发文献数 `scihub_round_workers=10` 与镜像请求共享线程数 `scihub_http_workers=12` 均为**自定值（Sci-Hub 没有公开限额）**；2026-10-17 实测 20 篇老文献一轮 137 秒，未见限流。
