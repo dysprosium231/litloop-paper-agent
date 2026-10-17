@@ -2322,6 +2322,24 @@ def _browser_download(
                 close_tab(tab_id, config)
                 return download_pdf_via_browser(pdf_url, output_path, config)
 
+        # SAGE's China platform (sage.cnpereading.com, where a DOI lands from
+        # Chinese networks): the PDF button has no href; the file's path sits in
+        # the page data as /storage/.../<doi with _ for />.pdf (seen 2026-10-17).
+        pdf_url = evaluate_js(tab_id, """
+            (() => {
+                if (!location.hostname.endsWith('cnpereading.com')) return null;
+                const m = document.documentElement.outerHTML.match(/\\/storage\\/[^"'\\\\\\s<>]+?\\.pdf/);
+                return m ? location.origin + m[0] : null;
+            })()
+        """, config)
+        if pdf_url and isinstance(pdf_url, str) and doi.replace("/", "_").lower() in pdf_url.lower():
+            log.info(f"   [{publisher}] page data PDF: {pdf_url[:80]}")
+            progress_reporter.item_stage(doi, f"已在 {publisher} 找到 PDF，正在下载")
+            close_tab(tab_id, config)
+            if _try_http_download(pdf_url, output_path, config):
+                return True
+            return download_pdf_via_browser(pdf_url, output_path, config)
+
         log.info(f"   [{publisher}] no PDF link found on page")
         if not get_last_error()[0]:
             _set_error("no_pdf_found", "try_other_source")

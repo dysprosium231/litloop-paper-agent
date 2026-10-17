@@ -145,3 +145,30 @@ app 发起的下载，每次一个文件，由 app 后台的 `download_jobs.py` 
 - `zotero_target`：附件检查发起的下载会带上它，推送时默认推回这个分类；其他任务为 `null`，推送默认用 `<zotero_collection_root>/<title>`。
 - `zotero`（推送过才有）：`state` 为 `running` → `done` / `failed`，app 中途关闭读出为 `interrupted`；`collection` 是分类路径，`key` 是它在 Zotero 里的键。`items[].zotero.status`：`pushing` → `added`（新建）/ `reused`（库里已有）/ `no_pdf`（条目在了但 PDF 没附上，再推送一次会补附）/ `failed`。推送和下载可以同时进行，同一时间只推送一个任务。
 - “待下载”不单独存文件：取各筛选记录里 `decision` 为 `selected`、且还没有被任何任务下载成功的文章。
+
+### app 发起的检索 `<litloop home>/agent_runs/<run>.json`
+
+app 的「新建检索」把表单拼成一段话（`agent_runner.build_prompt`），从标准输入发给设置里的 Agent 命令（默认 `claude -p`，只允许调用 LitLoop 的工具和技能）。Agent 照常检索、评分，并用 `litloop_screening` / `litloop_deep_search` 保存筛选会话。每次一个文件，由 app 后台的 `agent_runner.py` 写（经 `store` 整份替换）；Agent 的原始输出另存为同名 `.log`。
+
+```json
+{
+  "run": "20261017-194500",
+  "state": "running",
+  "started": "2026-10-17T19:45:00",
+  "finished": null,
+  "question": "SiC 颗粒增强铝基复合材料的界面反应",
+  "mode": "deep",
+  "form": {"question": "…", "criteria": "…", "mode": "deep", "batches": 3, "year_from": 2015, "…": "…"},
+  "prompt": "用 litloop 技能做深度检索：…",
+  "doing": "深度检索：取下一批",
+  "events": [{"t": "19:45:12", "text": "深度检索：开始"}],
+  "session": "20261017-194530-SiC-…",
+  "agent_session": "…",
+  "result": "已保存 …",
+  "error": null
+}
+```
+
+- `state`：`running` → `done` / `failed` / `cancelled`；文件里是 `running`、但后台没有在跑它（app 中途关闭），读出时当作 `interrupted`。同一时间只运行一个。
+- `session`：Agent 保存的筛选会话（从工具返回里取到的最后一个），app 据此打开结果；`agent_session` 是 Agent 自己的对话编号，可用 `claude --resume` 接着聊。
+- `events` 只保留最近 200 条，`doing` 是当前一步，结束后为 `null`。

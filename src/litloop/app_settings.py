@@ -85,6 +85,15 @@ GROUPS: list[dict[str, Any]] = [
         ],
     },
     {
+        "id": "agent", "title": "Agent",
+        "fields": [
+            {"key": "agent_command", "label": "Agent 命令", "type": "text", "placeholder": "claude",
+             "help": "在 app 里发起检索时，把检索要求发给这个 Agent"},
+            {"key": "agent_args", "label": "命令参数", "type": "text",
+             "help": "检索要求从标准输入传入；默认只允许 Agent 调用 LitLoop 的工具"},
+        ],
+    },
+    {
         "id": "zotero", "title": "Zotero", "test": "zotero",
         "fields": [
             {"key": "zotero_mcp_python", "label": "zotero-mcp 的 Python", "type": "path", "pick": "file", "placeholder": "留空自动查找"},

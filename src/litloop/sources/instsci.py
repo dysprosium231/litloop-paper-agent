@@ -336,8 +336,27 @@ def _resolve_doi_url(doi: str) -> str | None:
     return None
 
 
+_TF_BOOK = re.compile(r"taylorfrancis\.com/books/(mono|edit)/", re.I)
+
+
+def _taylorfrancis_book_pdf_url(doi: str, resolved_url: str) -> str | None:
+    """Whole Taylor & Francis / CRC / Routledge books: the PDF comes from one
+    download endpoint. Its link is on authored books' pages but not on edited
+    ones (chapter PDFs only), though the endpoint serves both (checked through
+    WebVPN 2026-10-17). Single chapters are not covered: the same endpoint with
+    chapters/ returned a page, not the PDF."""
+    m = _TF_BOOK.search(resolved_url or "")
+    if not m:
+        return None
+    return (f"https://api.taylorfrancis.com/content/books/{m.group(1).lower()}/download?identifierName=doi"
+            f"&identifierValue={doi}&type=googlepdf")
+
+
 def _construct_publisher_pdf_url(doi: str, resolved_url: str) -> str | None:
     """Try to construct a direct publisher PDF URL from the resolved URL."""
+    tf = _taylorfrancis_book_pdf_url(doi, resolved_url)
+    if tf:
+        return tf
     if _HAS_COMPILED_CORE:
         return _construct_publisher_pdf_url_compiled(doi, resolved_url)
 

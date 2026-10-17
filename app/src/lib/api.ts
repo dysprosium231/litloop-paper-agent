@@ -303,6 +303,44 @@ export const historyApi = {
     call<{ file: string; count: number }>(`/api/sessions/${encodeURIComponent(id)}/export`, { format, which }),
 }
 
+/** The app's search form (agent_runner.build_prompt). */
+export interface SearchForm {
+  question: string
+  criteria: string
+  mode: "quick" | "deep"
+  limit: number
+  batches: number
+  year_from: number | null
+  year_to: number | null
+  max_cas_zone: number | null
+  max_jcr_quartile: number | null
+  exclude_warning: boolean
+  seeds: string
+  seed_collection: string
+}
+
+/** A search the app sent to the agent: agent_runs/<run>.json. */
+export interface SearchRun {
+  run: string
+  state: "running" | "done" | "failed" | "cancelled" | "interrupted"
+  started: string
+  finished?: string
+  question: string
+  mode: string
+  doing: string | null
+  events?: { t: string; text: string }[]
+  session: string | null
+  result: string | null
+  error: string | null
+}
+
+export const searchApi = {
+  start: (form: SearchForm) => call<SearchRun>("/api/searches", form),
+  list: () => call<SearchRun[]>("/api/searches"),
+  get: (run: string) => call<SearchRun>(`/api/searches/${encodeURIComponent(run)}`),
+  cancel: (run: string) => call<{ cancelled: boolean }>(`/api/searches/${encodeURIComponent(run)}/cancel`, {}),
+}
+
 export const downloadsApi = {
   list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; pushing: string | null; output_dir: string }>("/api/downloads"),
   pending: () => call<PendingGroup[]>("/api/downloads/pending"),

@@ -1,5 +1,5 @@
 import * as React from "react"
-import { ChevronDownIcon, HistoryIcon } from "lucide-react"
+import { ChevronDownIcon, HistoryIcon, PlusIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
@@ -11,6 +11,7 @@ import { useZotero, ZoteroPage, type ZoteroView } from "@/components/zotero-view
 import { DetailPane, type Paper } from "@/components/detail-pane"
 import { Onboarding } from "@/components/onboarding"
 import { HistoryPage } from "@/components/history-view"
+import { SearchPage } from "@/components/search-view"
 import { ProgressStrip } from "@/components/progress-strip"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import {
@@ -162,6 +163,8 @@ export default function App() {
   const railExtra = railOpen ? RAIL_OPEN - RAIL_COLLAPSED : 0
   const [section, setSection] = React.useState<Section>("screen")
   const [history, setHistory] = React.useState(false)  // the screening section's history page
+  const [newSearch, setNewSearch] = React.useState(false)  // ... and its new-search page
+  const fullPage = history || newSearch  // screening without its paper list
   // First run: the guide covers the window until it is finished or skipped.
   const [guide, setGuide] = React.useState<{ group: string; intro: string }[] | null>(null)
   React.useEffect(() => {
@@ -317,15 +320,15 @@ export default function App() {
   return (
     <TooltipProvider>
       {/* The header's toggle hides the list; the rail then shows icons only (--sidebar-width-icon). */}
-      <SidebarProvider className="h-svh overflow-hidden" style={{ "--sidebar-width": `${(section === "screen" && !history ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
+      <SidebarProvider className="h-svh overflow-hidden" style={{ "--sidebar-width": `${(section === "screen" && !fullPage ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
         <AppSidebar section={section} onSection={setSection} railOpen={railOpen} onRailOpen={setRailOpen}>
-          {section === "screen" && !history ? (
+          {section === "screen" && !fullPage ? (
             <PaperList rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
               onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
           ) : null}
         </AppSidebar>
         <SidebarInset className="relative min-h-0 min-w-0">
-          {section === "screen" && !history && (
+          {section === "screen" && !fullPage && (
             <ResizeHandle key={section} width={widths[section]} min={WIDTHS[section].min} initial={WIDTHS[section].initial}
               offset={railExtra} onWidth={(w) => setWidth(section, w)} />
           )}
@@ -343,6 +346,13 @@ export default function App() {
           ) : section === "settings" ? (
             <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup} onGuide={openGuide}
               onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
+          ) : newSearch ? (
+            <SearchPage onBack={() => setNewSearch(false)}
+              onOpen={(s) => {
+                api.sessions().then(setSessions).catch(() => {})
+                setSid(s)
+                setNewSearch(false)
+              }} />
           ) : history ? (
             <HistoryPage onBack={() => setHistory(false)}
               onOpen={(s) => { setSid(s); setHistory(false) }}
@@ -377,7 +387,10 @@ export default function App() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setHistory(true)}>
+            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setNewSearch(true)}>
+              <PlusIcon />新建检索
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setHistory(true)}>
               <HistoryIcon />历史
             </Button>
           </header>

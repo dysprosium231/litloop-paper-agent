@@ -146,6 +146,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "batch_small_workers": 1,
     # Desktop app: the first-run guide (app_settings.STEPS) was finished or skipped.
     "onboarding_done": False,
+    # Desktop app: searches started from the app are sent to this agent as a
+    # message (agent_runner.py); the prompt goes on stdin. Claude Code by default:
+    # stream-json lets the app show which tool it is using; only the litloop
+    # tools and skills are allowed, since nobody is there to approve anything.
+    "agent_command": "claude",
+    "agent_args": "-p --output-format stream-json --verbose --allowedTools mcp__litloop Skill Read",
     "translation_provider": "deepseek",
     "deepseek_api_key": "",
     "deepl_api_key": "",

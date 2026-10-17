@@ -525,9 +525,11 @@ def run_scihub_then_single(
     allow_grey: bool = True,
     workers: int = 1,
 ) -> list[dict[str, Any]]:
-    """A short list (up to batch_small_max papers): Sci-Hub for every paper at
-    once, then a full single download for each one it missed.
+    """A short list (up to batch_small_max papers): open-access links, then
+    Sci-Hub for every paper at once, then a full single download for each miss.
 
+    Round 0 is the lanes' HTTP fast lane for papers with a known open-access
+    PDF (or an open-access publisher, or the Elsevier API): seconds, no browser.
     Round 1 asks Sci-Hub only (no browser: its ALTCHA gate is solved over
     HTTP) for all papers in parallel; when the user turned gray sources off
     there is no round 1. Round 2 runs each remaining paper exactly as a single
@@ -550,6 +552,28 @@ def run_scihub_then_single(
     _progress.set_output_dir(str(out))
     results: dict[str, dict[str, Any]] = {}
 
+    _enrich_oa_urls(entries, config)
+    springer_key = str(config.get("springer_api_key", "") or "")
+    fast = [e for e in entries if e.identifier in ids and (
+        e.oa_url or (e.channel if e.channel not in ("", "auto") else predict_channel(e.identifier)) in ("oa", "elsevier")
+        or (springer_key and e.identifier.lower().startswith("10.1007/")))]
+    if fast:
+        _progress.update(phase="开放获取")
+        for e in fast:
+            _progress.item_stage(e.identifier, "正在下载开放获取全文")
+        from .sources import _auto_rename, _update_doi_index
+        for r in _run_fast_lane(fast, out, config, workers=min(8, len(fast)), progress=None):
+            if r.get("success"):
+                # as a single download leaves it: indexed (the app sees it) and renamed
+                try:
+                    _update_doi_index(out, r["doi"], Path(r["file"]), source=r.get("source") or "",
+                                      strategy=config.get("download_strategy", ""), config=config)
+                    _auto_rename(r, r["doi"], config, doi=r["doi"], target_dir=out)
+                except Exception:
+                    pass
+                results[r["doi"]] = r
+                _progress.advance(True, current=r["doi"])
+
     def _one(ident: str, **kw: Any) -> dict[str, Any]:
         try:
             r = download(ident, str(out), _batch=True, **kw) or {}
@@ -559,12 +583,13 @@ def run_scihub_then_single(
         r.setdefault("identifier", ident)
         return r
 
-    if ids and allow_grey and grey_allowed(config):
+    grey_ids = [i for i in ids if i not in results]
+    if grey_ids and allow_grey and grey_allowed(config):
         _progress.update(phase="Sci-Hub")
-        with ThreadPoolExecutor(max_workers=min(4, len(ids))) as ex:
-            for i in ids:
+        with ThreadPoolExecutor(max_workers=min(4, len(grey_ids))) as ex:
+            for i in grey_ids:
                 _progress.item_stage(i, "正在查 Sci-Hub")
-            futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False): i for i in ids}
+            futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False): i for i in grey_ids}
             for f in as_completed(futs):
                 i, r = futs[f], f.result()
                 if r.get("success"):

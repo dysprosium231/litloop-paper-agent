@@ -55,6 +55,22 @@ class Paper(BaseModel):
     journal: str | None = None
 
 
+class NewSearch(BaseModel):
+    """The app's search form; agent_runner.build_prompt turns it into the message."""
+    question: str
+    criteria: str = ""
+    mode: str = "quick"
+    limit: int = 20
+    batches: int = 0
+    year_from: int | None = None
+    year_to: int | None = None
+    max_cas_zone: int | None = None
+    max_jcr_quartile: int | None = None
+    exclude_warning: bool = False
+    seeds: str = ""
+    seed_collection: str = ""
+
+
 class NewDownload(BaseModel):
     papers: list[Paper]
     title: str
@@ -509,6 +525,37 @@ def create_app(token: str) -> FastAPI:
             raise HTTPException(409, "已有下载任务在进行，完成后再开始新的下载") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/searches")
+    def search_start(body: NewSearch) -> dict[str, Any]:
+        from . import agent_runner
+        try:
+            return agent_runner.start(body.model_dump())
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.get("/api/searches")
+    def search_list() -> list[dict[str, Any]]:
+        from . import agent_runner
+        return agent_runner.list_runs()
+
+    @app.get("/api/searches/{run}")
+    def search_get(run: str) -> dict[str, Any]:
+        from . import agent_runner
+        try:
+            d = agent_runner.get(run)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        if not d:
+            raise HTTPException(404, "没有这次检索")
+        return d
+
+    @app.post("/api/searches/{run}/cancel")
+    def search_cancel(run: str) -> dict[str, Any]:
+        from . import agent_runner
+        return {"cancelled": agent_runner.cancel(run)}
 
     @app.post("/api/downloads/cancel")
     def download_cancel() -> dict[str, Any]:

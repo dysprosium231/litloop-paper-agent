@@ -1,4 +1,4 @@
-"""Short lists: Sci-Hub for every paper first, then a full single download for each miss."""
+"""Short lists: open-access links, then Sci-Hub for every paper, then a full single download for each miss."""
 
 import json
 from pathlib import Path
@@ -21,6 +21,7 @@ def calls(monkeypatch):
         return {"success": ident != "10.1/nowhere", "doi": ident, "source": "WebVPN"}
     monkeypatch.setattr(sources, "download", download)
     monkeypatch.setattr(pipeline, "grey_allowed", lambda cfg: True)
+    monkeypatch.setattr(pipeline, "_enrich_oa_urls", lambda entries, cfg: None)  # no network
     return seen
 
 
@@ -54,3 +55,21 @@ def test_batch_tool_routes_short_and_long_lists(monkeypatch, tmp_path: Path):
     server._batch_download_impl(["10.1000/a"], output_dir=str(tmp_path))
     server._batch_download_impl(["10.1000/a", "10.1000/b", "10.1000/c"], output_dir=str(tmp_path))
     assert used == [("short", 1), ("lanes", 3)]
+
+
+def test_open_access_papers_are_fetched_before_scihub(calls, monkeypatch, tmp_path: Path):
+    fast = []
+
+    def lane(entries, out, cfg, **kw):
+        fast.extend(e.identifier for e in entries)
+        pdf = out / "oa.pdf"
+        pdf.write_bytes(b"%PDF-1.4")
+        return [{"success": True, "doi": e.identifier, "file": str(pdf), "source": "oa_url"} for e in entries]
+    monkeypatch.setattr(pipeline, "_run_fast_lane", lane)
+    entries = [QueueEntry(identifier="10.3390/oa"), QueueEntry(identifier="10.1/in-scihub")]
+    results = pipeline.run_scihub_then_single(entries, tmp_path, config={"rename_format": "off"})
+    assert fast == ["10.3390/oa"]                                   # MDPI: an open-access publisher
+    assert [c[0] for c in calls] == ["10.1/in-scihub"]              # Sci-Hub never asked for it
+    assert {r["doi"]: r["source"] for r in results} == {"10.3390/oa": "oa_url", "10.1/in-scihub": "Sci-Hub"}
+    index = json.loads((tmp_path / ".doi_index.json").read_text(encoding="utf-8"))
+    assert "10.3390/oa" in index                                    # the app sees the file
