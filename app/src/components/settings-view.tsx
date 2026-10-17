@@ -6,6 +6,7 @@ import {
   DatabaseIcon,
   DownloadIcon,
   ExternalLinkIcon,
+  FolderOpenIcon,
   GaugeIcon,
   GlobeIcon,
   GraduationCapIcon,
@@ -21,6 +22,15 @@ import { SidebarContent, SidebarHeader, SidebarInput } from "@/components/ui/sid
 import { Switch } from "@/components/ui/switch"
 import { settingsApi, type ProviderUsage, type SettingField, type SettingGroup, type TestResult } from "@/lib/api"
 import { cn } from "@/lib/utils"
+
+// The native chooser exists only inside the app window, not in a browser preview.
+const inApp = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+
+async function choosePath(pick: "dir" | "file", current: string): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog")
+  const got = await open({ directory: pick === "dir", multiple: false, defaultPath: current || undefined })
+  return typeof got === "string" ? got : null
+}
 
 export const QUOTA = "quota"
 
@@ -134,6 +144,13 @@ function Field({ field, onSaved }: { field: SettingField; onSaved: (f: SettingFi
           autoComplete="off" spellCheck={false} value={draft} onChange={(e) => setDraft(e.target.value)}
           placeholder={field.placeholder ?? (field.type === "secret" ? "粘贴新的 Key" : field.type === "email" ? "name@example.edu" : "")}
           autoFocus={field.type === "secret"} />
+        {field.pick && inApp && (
+          <Button type="button" variant="outline" size="icon" className="shrink-0" aria-label={field.pick === "dir" ? "选择文件夹" : "选择文件"}
+            title={field.pick === "dir" ? "选择文件夹" : "选择文件"}
+            onClick={async () => { const p = await choosePath(field.pick!, draft); if (p) { setDraft(p); save(p) } }}>
+            <FolderOpenIcon />
+          </Button>
+        )}
         {(field.type === "secret" || dirty) && <Button type="submit" size="sm" className="h-9">保存</Button>}
         {field.type === "secret" && <Button type="button" variant="ghost" size="sm" className="h-9" onClick={() => setEditing(false)}>取消</Button>}
       </form>
@@ -185,10 +202,11 @@ function Page({ title, action, children }: { title: string; action?: React.React
   )
 }
 
+// Keyed by group id: switching groups starts a fresh pane, so a check still running
+// for the previous group cannot show its results here.
 function GroupPane({ group, onSaved }: { group: SettingGroup; onSaved: (f: SettingField) => void }) {
   const [results, setResults] = React.useState<TestResult[] | null>(null)
   const [testing, setTesting] = React.useState(false)
-  React.useEffect(() => setResults(null), [group.id])
   const test = async () => {
     setTesting(true)
     try {
@@ -282,5 +300,5 @@ export function SettingsPane({ groups, current, onSaved }: { groups: SettingGrou
   if (current === QUOTA) return <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto scrollable"><QuotaPane /></div>
   const group = groups.find((g) => g.id === current)
   if (!group) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">正在读取设置…</div>
-  return <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto scrollable"><GroupPane group={group} onSaved={onSaved} /></div>
+  return <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto scrollable"><GroupPane key={group.id} group={group} onSaved={onSaved} /></div>
 }

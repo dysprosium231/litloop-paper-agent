@@ -59,7 +59,12 @@ fn start_backend() -> (Result<BackendInfo, String>, Option<Child>) {
         Some(port) => (Ok(BackendInfo { port, token }), Some(child)),
         None => {
             let _ = child.kill();
-            (Err(format!("LitLoop 后台（{python}）没有报告端口；请确认已安装 LitLoop，或用 LITLOOP_PYTHON 指定 Python")), None)
+            (
+                Err(format!(
+                    "LitLoop 后台（{python}）没有报告端口；请确认已安装 LitLoop，或用 LITLOOP_PYTHON 指定 Python"
+                )),
+                None,
+            )
         }
     }
 }
@@ -68,8 +73,12 @@ fn start_backend() -> (Result<BackendInfo, String>, Option<Child>) {
 pub fn run() {
     let (info, child) = start_backend();
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(Backend { info, child: Mutex::new(child) })
+        .manage(Backend {
+            info,
+            child: Mutex::new(child),
+        })
         .invoke_handler(tauri::generate_handler![backend])
         .build(tauri::generate_context!())
         .expect("error while building the LitLoop app");

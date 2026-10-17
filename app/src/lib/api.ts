@@ -130,6 +130,8 @@ export interface SettingField {
   key: string
   label: string
   type: "secret" | "text" | "email" | "path" | "bool" | "select"
+  /** For a path: what the chooser next to it picks. */
+  pick?: "dir" | "file"
   value: string | boolean | null
   set: boolean
   source: "file" | "env" | "default"

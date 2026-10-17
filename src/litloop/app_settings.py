@@ -20,7 +20,7 @@ from typing import Any
 
 from . import config as _config
 
-# type: secret | text | email | path | bool | select
+# type: secret | text | email | path | bool | select; a path may say pick: dir | file (the app offers a chooser)
 GROUPS: list[dict[str, Any]] = [
     {
         "id": "sources", "title": "数据源", "test": "sources",
@@ -37,7 +37,7 @@ GROUPS: list[dict[str, Any]] = [
     {
         "id": "downloads", "title": "下载", "test": "downloads",
         "fields": [
-            {"key": "output_dir", "label": "保存位置", "type": "path"},
+            {"key": "output_dir", "label": "保存位置", "type": "path", "pick": "dir"},
             {"key": "auto_rename", "label": "按作者-年份-标题重命名", "type": "bool"},
             {"key": "download_strategy", "label": "来源顺序", "type": "select",
              "options": [["fastest", "谁快用谁"], ["oa_first", "开放获取优先"], ["legal_only", "只用合法来源"],
@@ -68,7 +68,7 @@ GROUPS: list[dict[str, Any]] = [
     {
         "id": "zotero", "title": "Zotero", "test": "zotero",
         "fields": [
-            {"key": "zotero_mcp_python", "label": "zotero-mcp 的 Python", "type": "path", "placeholder": "留空自动查找"},
+            {"key": "zotero_mcp_python", "label": "zotero-mcp 的 Python", "type": "path", "pick": "file", "placeholder": "留空自动查找"},
         ],
     },
 ]

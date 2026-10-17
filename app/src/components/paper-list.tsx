@@ -39,7 +39,7 @@ export function PaperList({
     <>
       <SidebarHeader className="gap-3 border-b p-4">
         <div className="flex w-full items-center justify-between gap-2">
-          <div className="truncate text-base font-medium text-foreground">{heading}</div>
+          <div className="min-w-0 truncate text-base font-medium text-foreground">{heading}</div>
           <Label className="flex shrink-0 items-center gap-2 text-sm">
             <span>只看本批</span>
             <Switch className="shadow-none" checked={onlyBatch} onCheckedChange={onOnlyBatch} />

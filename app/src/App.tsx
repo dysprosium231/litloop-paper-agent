@@ -33,8 +33,9 @@ const short = (q: string) => (q.length > 28 ? q.slice(0, 28) + "…" : q)
 
 // Width of the icon rail plus the paper list, which the user drags; remembered between runs.
 const WIDTH_KEY = "litloop.listWidth"
-const MIN_WIDTH = 300
+const MIN_WIDTH = 360  // keeps the list header (title + 只看本批) whole
 const MAX_WIDTH = 900
+const SETTINGS_WIDTH = 320  // the settings list is short: fixed width, no handle
 
 function useStoredWidth(): [number, (w: number) => void] {
   const [width, setWidth] = React.useState(() => {
@@ -221,7 +222,7 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <SidebarProvider style={{ "--sidebar-width": `${listWidth}px` } as React.CSSProperties}>
+      <SidebarProvider style={{ "--sidebar-width": `${section === "settings" ? SETTINGS_WIDTH : listWidth}px` } as React.CSSProperties}>
         <AppSidebar section={section} onSection={setSection}>
           {section === "settings" ? (
             <SettingsNav groups={groups} current={settingsGroup} onPick={setSettingsGroup} />
@@ -233,7 +234,7 @@ export default function App() {
           )}
         </AppSidebar>
         <SidebarInset className="relative min-h-0 min-w-0">
-          <ResizeHandle width={listWidth} onWidth={setListWidth} />
+          {section !== "settings" && <ResizeHandle width={listWidth} onWidth={setListWidth} />}
           {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           {section === "settings" ? (
             <SettingsPane groups={groups} current={settingsGroup}
