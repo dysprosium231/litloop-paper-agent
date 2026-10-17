@@ -1,8 +1,9 @@
 import * as React from "react"
-import { CheckCircle2Icon, ChevronRightIcon, CircleDashedIcon, FolderOpenIcon, LoaderIcon, XCircleIcon } from "lucide-react"
+import { CheckCircle2Icon, ChevronRightIcon, CircleDashedIcon, FileTextIcon, FolderOpenIcon, LoaderIcon, SkipForwardIcon, XCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, Empty, PageBody, PageHeader, SectionTitle } from "@/components/page"
 import {
   downloadsApi,
@@ -345,7 +346,7 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
       <Card>
       <ul className="divide-y">
         {job.items.map((it, i) => (
-          <li key={it.doi} className="flex items-start gap-3 px-5 py-3">
+          <li key={it.doi} className="group flex items-start gap-3 px-5 py-3">
             <span className="w-6 shrink-0 pt-0.5 text-right text-xs text-muted-foreground tabular-nums">{i + 1}</span>
             <span className="mt-0.5"><StatusIcon item={it} running={running} /></span>
             <div className="min-w-0 flex-1">
@@ -358,6 +359,7 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
                   <LoaderIcon className="size-3 animate-spin" />{it.stage ?? "换渠道重试中"}
                 </div>
               )}
+              {it.status === "done" && it.note && <div className="mt-0.5 text-xs text-muted-foreground">{it.note}</div>}
               {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90" title={it.error}>{it.error_text ?? it.error}</div>}
               {it.zotero && (
                 <div className={cn("mt-0.5 text-xs", it.zotero.status === "failed" ? "text-destructive/90" : it.zotero.status === "no_pdf" ? "text-warning-foreground" : "text-muted-foreground")}
@@ -367,10 +369,10 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
               )}
             </div>
             {it.file && (
-              <Button size="sm" variant="ghost" className="shrink-0" onClick={() => act(() => downloadsApi.open(it.file!))}>打开</Button>
+              <RowAction label="打开 PDF" onClick={() => act(() => downloadsApi.open(it.file!))}><FileTextIcon /></RowAction>
             )}
             {running && it.status === "waiting" && (
-              <Button size="sm" variant="ghost" className="shrink-0 text-muted-foreground" onClick={() => act(() => downloadsApi.skip(it.doi))}>跳过</Button>
+              <RowAction label="跳过这篇" hover onClick={() => act(() => downloadsApi.skip(it.doi))}><SkipForwardIcon /></RowAction>
             )}
           </li>
         ))}
@@ -378,5 +380,23 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
       </Card>
       </PageBody>
     </div>
+  )
+}
+
+/** A small icon button at the end of a paper's row, named by its tooltip; `hover` shows it only on the row's hover. */
+function RowAction({ label, hover, onClick, children }: {
+  label: string; hover?: boolean; onClick: () => void; children: React.ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size="icon-sm" variant="ghost" aria-label={label} onClick={onClick}
+          className={cn("-my-1 shrink-0 text-muted-foreground hover:text-foreground",
+            hover && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100")}>
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   )
 }

@@ -729,6 +729,10 @@ def _launch_persistent_unregistered(
     if backend == BACKEND_CAMOUFOX and proxy is None:
         proxy = _proxy_from_config(config)
     args = _direct_args(backend, proxy, args, config)
+    if backend != BACKEND_CAMOUFOX:
+        # A profile whose browser was killed (the app restarted mid-download)
+        # would greet the user with Chrome's "Restore pages?" bubble.
+        args = [*(args or []), "--hide-crash-restore-bubble"]
     if backend == BACKEND_PATCHRIGHT:
         if humanize:
             logger.debug("browser_backend: humanize not supported by patchright, ignored")

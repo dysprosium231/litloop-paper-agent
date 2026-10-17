@@ -79,3 +79,12 @@ def test_taylorfrancis_book_pdf_url():
 
     url3 = "https://www.taylorfrancis.com/books/9781000477986/chapters/10.1201/9781351109550-8"
     assert litloop.sources.instsci._taylorfrancis_book_pdf_url("10.1201/9781351109550-8", url3) is None
+
+
+def test_a_taylor_francis_chapter_is_fetched_as_its_book():
+    from litloop.sources.instsci import _taylorfrancis_chapter_book
+    landing = ("https://d.buaa.edu.cn/https/77726476706e69737468656265737421e7e056d23331715c711a8fbe995b203cb81e8525f7"
+               "/chapters/mono/10.1201/9781351109550-8/ceramic-materials-arthur-lyons")
+    assert _taylorfrancis_chapter_book("10.1201/9781351109550-8", landing) == ("10.1201/9781351109550", "mono")
+    assert _taylorfrancis_chapter_book("10.1201/9781351109550", landing) is None      # not a chapter DOI
+    assert _taylorfrancis_chapter_book("10.1201/9781351109550-8", "https://example.org/x") is None

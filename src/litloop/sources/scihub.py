@@ -650,7 +650,7 @@ def _http_altcha_download(landing_url: str, domain: str, doi: str, output_path: 
         return ABSENT if gated else None
     log.info(f"   [altcha-http] {domain}: PDF {pdf_url[:80]}")
     from .. import progress_reporter
-    progress_reporter.item_stage(doi, "已在 Sci-Hub 找到，正在下载")
+    progress_reporter.item_stage(doi, "Sci-Hub 有下载链接，正在核对")
     result = download_pdf_from_scihub(pdf_url, output_path, config, f"Sci-Hub({domain})",
                                       cookies=session.cookies, referer=landing_url)
     if result:

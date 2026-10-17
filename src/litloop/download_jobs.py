@@ -233,7 +233,8 @@ def _run(job: str) -> None:
         if doi in wanted:
             ok = bool(r.get("success"))
             _mark(job, doi, status="done" if ok else "failed", retrying=False, stage=None,
-                  source=r.get("source"), file=r.get("file") or None, error=None if ok else r.get("error"))
+                  source=r.get("source"), file=r.get("file") or None, error=None if ok else r.get("error"),
+                  note=r.get("note"))
 
     from . import progress_reporter
     from .sources import _SKIPPED
@@ -260,7 +261,8 @@ def _run(job: str) -> None:
                     r = by_doi.get(it["doi"])
                     if r:
                         it.update(status="done" if r.get("success") else "failed", retrying=False, stage=None, source=r.get("source"),
-                                  file=r.get("file") or None, error=None if r.get("success") else r.get("error"))
+                                  file=r.get("file") or None, error=None if r.get("success") else r.get("error"),
+                                  note=r.get("note") or it.get("note"))
                     elif it["status"] == "waiting" and state == "done":
                         it.update(status="failed", error="cancelled" if _CURRENT["cancelled"] else "no result")
                 data["state"] = "cancelled" if _CURRENT["cancelled"] and state == "done" else state

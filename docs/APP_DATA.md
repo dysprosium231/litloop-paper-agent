@@ -140,6 +140,7 @@ app 发起的下载，每次一个文件，由 app 后台的 `download_jobs.py` 
 ```
 
 - `state`：`running` → `done` / `cancelled` / `failed`（引擎本身出错，原因在 `error`）。文件里仍是 `running`、但当前后台并没有在跑它（app 中途关闭），读出时当作 `interrupted`。
+- `items[].note`：给用户看的说明（如 T&F 章节下载的是整本书、本章所在页码），没有时为空。
 - `items[].status`：`waiting` → `done` / `failed`。引擎每完成一篇就更新一次状态；`source`、`file`、`error` 在整批结束时填入。
 - 同一时间只运行一个任务：引擎的进度报告和取消开关是整个进程共用的。运行中的实时信息（正在处理哪篇、需要用户处理的验证码或登录提示）不存进这个文件，app 通过 `/api/downloads` 读取 `progress_reporter` 的报告。
 - `zotero_target`：附件检查发起的下载会带上它，推送时默认推回这个分类；其他任务为 `null`，推送默认用 `<zotero_collection_root>/<title>`。

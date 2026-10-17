@@ -246,9 +246,12 @@ class CARSIClient:
 
                     # Wait for Cloudflare challenge to resolve (visible stealth browser can pass it)
                     from ..network import is_cloudflare_challenge
-                    for _cf_wait in range(12):
+                    from . import note_user_waiting
+                    for _cf_wait in range(60):  # up to 5 min: the user may have to tick it
                         if is_cloudflare_challenge(page.title() or ""):
-                            log.info(f"   [CARSI-Browser] Cloudflare challenge detected, waiting... ({_cf_wait+1}/12)")
+                            if _cf_wait % 6 == 0:
+                                log.info(f"   [CARSI-Browser] Cloudflare challenge detected, waiting for it or the user... ({_cf_wait * 5}s)")
+                            note_user_waiting("verify")
                             try:
                                 from .._publisher_strategies_core import _is_challenge_dead_end
                                 if _is_challenge_dead_end(page.content()):

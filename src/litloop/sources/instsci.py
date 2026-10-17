@@ -353,6 +353,33 @@ def _taylorfrancis_book_pdf_url(doi: str, resolved_url: str) -> str | None:
             f"&identifierValue={doi}&type=googlepdf")
 
 
+_TF_CHAPTER = re.compile(r"(?:taylorfrancis\.com|/https?/[0-9a-f]{16,})/chapters/(mono|edit)/10\.", re.I)
+_TF_CHAPTER_DOI = re.compile(r"^(10\.\d{4,9}/\d{10,13})-\d+$")
+
+
+def _taylorfrancis_chapter_book(doi: str, landing_url: str) -> tuple[str, str] | None:
+    """A Taylor & Francis chapter (DOI "<book DOI>-<n>"): (book DOI, mono|edit).
+
+    T&F serves no PDF of a single chapter, only of the whole book (checked
+    through WebVPN 2026-10-17), so a chapter is downloaded as its book.
+    """
+    m = _TF_CHAPTER.search(landing_url or "")
+    b = _TF_CHAPTER_DOI.match((doi or "").strip())
+    return (b.group(1), m.group(1).lower()) if m and b else None
+
+
+def _chapter_note(doi: str, config: dict[str, Any]) -> str:
+    """Where the chapter is in the book, for the user: from Crossref's page range."""
+    try:
+        from ..citation import fetch_metadata
+        meta = fetch_metadata(doi, config) or {}
+        page = str(meta.get("page") or "").strip()
+    except Exception:
+        page = ""
+    where = f"，本章在第 {page} 页" if page else ""
+    return f"T&F 只提供整本书的 PDF：下载的是本章所在的整本书{where}"
+
+
 def _construct_publisher_pdf_url(doi: str, resolved_url: str) -> str | None:
     """Try to construct a direct publisher PDF URL from the resolved URL."""
     tf = _taylorfrancis_book_pdf_url(doi, resolved_url)
@@ -1195,6 +1222,17 @@ def _try_instsci_http(doi: str, output_path: Path, config: dict[str, Any]) -> di
             result = _download_pdf_instsci(tf, output_path, config, doi)
             if result:
                 return result
+        chapter = _taylorfrancis_chapter_book(doi, resp.url)
+        if chapter:
+            book_doi, form = chapter
+            for kind in dict.fromkeys((form, "mono", "edit")):  # the chapter's form first
+                url = (f"https://api.taylorfrancis.com/content/books/{kind}/download?identifierName=doi"
+                       f"&identifierValue={book_doi}&type=googlepdf")
+                log.info(f"   [WebVPN] Taylor & Francis chapter: trying its book {book_doi} ({kind})")
+                result = _download_pdf_instsci(url, output_path, config, doi)
+                if result:
+                    result.update(whole_book=True, book_doi=book_doi, note=_chapter_note(doi, config))
+                    return result
 
         # Try _find_pdf_link (more thorough)
         found_pdf = _find_pdf_link(html_str, resp.url)

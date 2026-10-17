@@ -681,17 +681,21 @@ def _visible_browser_download(
                     except Exception:
                         pass
 
-        # Wait for Cloudflare challenge to resolve (visible browser can pass it)
-        for _cf_wait in range(12):
+        # Wait for Cloudflare challenge to resolve (visible browser can pass it).
+        # The user may have to tick it: say so (the app shows a notice, the race
+        # keeps waiting) and give them up to 5 minutes, not one.
+        for _cf_wait in range(60):
             _cf_title = (page.title() or "").lower()
             if any(_sig in _cf_title for _sig in ("just a moment", "attention required", "verify", "security check", "请稍候", "正在验证", "checking", "cloudflare")):
-                log.info(f"   [{publisher}] Cloudflare challenge detected, waiting... ({_cf_wait+1}/12)")
+                if _cf_wait % 6 == 0:
+                    log.info(f"   [{publisher}] Cloudflare challenge detected, waiting for it or the user... ({_cf_wait * 5}s)")
                 try:
                     if _is_challenge_dead_end(page.content()):
                         log.info(f"   [{publisher}] the check cannot run in this browser; giving up on the site")
                         break
                 except Exception:
                     pass
+                _user_waiting("verify")
                 time.sleep(5)
             else:
                 break

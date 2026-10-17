@@ -964,6 +964,14 @@ def _auto_rename(result: dict[str, Any], identifier: str, config: dict[str, Any]
     metadata = fetch_metadata(_doi, config)
     if metadata:
         new_path = rename_pdf(file_path, metadata, doi=_doi, fmt=rename_format(config))
+        if new_path and result.get("whole_book") and "整本书" not in new_path.stem:
+            # A chapter delivered as its whole book says so in its name.
+            tagged = new_path.with_name(f"{new_path.stem}（整本书）{new_path.suffix}")
+            try:
+                new_path.rename(tagged)
+                new_path = tagged
+            except OSError:
+                pass
         if new_path and new_path != file_path:
             result["file"] = str(new_path)
             result["renamed"] = True
