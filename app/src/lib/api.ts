@@ -94,6 +94,20 @@ function getBackend(): Promise<BackendInfo> {
   return backend
 }
 
+/** A failed backend call; ``message`` is the backend's ``detail`` (already user-facing text where it can be). */
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string) { super(message) }
+}
+
+/** Text to show for a failed call: the backend's own words, or a generic sentence (docs/UI_COPY.md section 7). */
+export function errorMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 404 && e.message === "Not Found") return "后台版本与界面不一致，请重启应用"
+    return e.message
+  }
+  return "无法连接后台，请重启应用"
+}
+
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const { port, token } = await getBackend()
   const res = await fetch(`http://127.0.0.1:${port}${path}`, {
@@ -101,7 +115,15 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
     headers: { "X-LitLoop-Token": token, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`)
+  if (!res.ok) {
+    const text = await res.text()
+    let detail = text
+    try {
+      const d = JSON.parse(text).detail
+      if (typeof d === "string") detail = d
+    } catch { /* not JSON: keep the text */ }
+    throw new ApiError(res.status, detail || `HTTP ${res.status}`)
+  }
   return res.json() as Promise<T>
 }
 
@@ -194,7 +216,9 @@ export interface DownloadItem {
   source?: string | null
   file?: string | null
   error?: string | null
-  zotero?: { status: "pushing" | "added" | "reused" | "no_pdf" | "failed"; key?: string | null; error?: string | null } | null
+  /** Shown in the app (docs/UI_COPY.md section 7); the raw error goes in the tooltip. */
+  error_text?: string | null
+  zotero?: { status: "pushing" | "added" | "reused" | "no_pdf" | "failed"; key?: string | null; error?: string | null; error_text?: string | null } | null
 }
 
 export type JobState = "running" | "done" | "cancelled" | "failed" | "interrupted"
@@ -214,8 +238,10 @@ export interface DownloadJobEntry {
 export interface DownloadJob extends Omit<DownloadJobEntry, "total" | "done" | "failed"> {
   output_dir: string
   error?: string | null
+  /** Shown in the app (docs/UI_COPY.md section 7); the raw error goes in the tooltip. */
+  error_text?: string | null
   items: DownloadItem[]
-  zotero?: { state: "running" | "done" | "failed" | "interrupted"; collection: string; error?: string | null } | null
+  zotero?: { state: "running" | "done" | "failed" | "interrupted"; collection: string; error?: string | null; error_text?: string | null } | null
   /** Where a push goes unless another collection is chosen. */
   zotero_default: string
 }
@@ -240,11 +266,11 @@ export interface PendingGroup {
 }
 
 export const downloadsApi = {
-  list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; pushing: string | null }>("/api/downloads"),
+  list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; pushing: string | null; output_dir: string }>("/api/downloads"),
   pending: () => call<PendingGroup[]>("/api/downloads/pending"),
   job: (id: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(id)}`),
-  start: (papers: PendingGroup["papers"], title: string, session?: string) =>
-    call<DownloadJob>("/api/downloads", { papers, title, session: session ?? null }),
+  start: (papers: PendingGroup["papers"], title: string, session?: string, zoteroTarget?: string) =>
+    call<DownloadJob>("/api/downloads", { papers, title, session: session ?? null, zotero_target: zoteroTarget ?? null }),
   cancel: () => call<{ cancelled: boolean }>("/api/downloads/cancel", {}),
   open: (path: string) => call<{ opened: string }>("/api/open", { path }),
   push: (job: string, collection: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(job)}/zotero`, { collection, tags: [] }),
@@ -269,6 +295,8 @@ export interface ZoteroHistoryEntry {
   started?: string
   finished?: string | null
   error?: string | null
+  /** Shown in the app (docs/UI_COPY.md section 7); the raw error goes in the tooltip. */
+  error_text?: string | null
   added: number
   reused: number
   no_pdf: number
@@ -283,6 +311,26 @@ export interface ZoteroOverview {
   pushing: string | null
 }
 
+/** How zotero-mcp writes: local (recommended), web, hybrid (local reads, web writes) or none. */
+export type WriteMode = "local" | "web" | "hybrid" | "none"
+
+export interface ZoteroCheckItem {
+  key: string
+  title: string
+  doi: string
+  year: number | null
+  journal: string | null
+  state: "ok" | "missing" | "empty"
+  empty_attachments: string[]
+  local_pdf: string | null
+}
+
 export const zoteroApi = {
   overview: () => call<ZoteroOverview>("/api/zotero"),
+  writeMode: () => call<{ mode: WriteMode | null; local_supported?: boolean | null }>("/api/zotero/write-mode"),
+  authorize: () => call<{ mode: WriteMode | null; ok: boolean; message?: string | null }>("/api/zotero/authorize", {}),
+  check: (key: string) => call<{ items: ZoteroCheckItem[] }>("/api/zotero/check", { key }),
+  repair: (it: ZoteroCheckItem, attach: boolean) =>
+    call<{ trashed: string[]; attached: boolean }>("/api/zotero/repair",
+      { item_key: it.key, doi: it.doi, trash: it.empty_attachments, attach }),
 }

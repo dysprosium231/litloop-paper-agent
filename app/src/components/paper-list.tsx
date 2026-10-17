@@ -70,7 +70,7 @@ export function PaperList({
                 {r.reason && <span className="w-full text-xs text-muted-foreground">{r.reason}</span>}
               </button>
             ))}
-            {shown.length === 0 && <p className="p-4 text-sm text-muted-foreground">暂无文献</p>}
+            {shown.length === 0 && <p className="p-4 text-sm text-muted-foreground">{query ? "没有匹配的文献" : "暂无文献"}</p>}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

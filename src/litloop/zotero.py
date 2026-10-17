@@ -1,4 +1,9 @@
-"""Zotero integration via PyZotero API."""
+"""Zotero integration through zotero-mcp (github.com/54yyyu/zotero-mcp).
+
+Everything goes through zotero-mcp's own code, run in its interpreter by
+zotero_bridge.py: with local writes authorized it writes to the Zotero app on
+this computer and Zotero syncs. LitLoop has no Zotero web-API code of its own.
+"""
 
 from __future__ import annotations
 
@@ -10,17 +15,6 @@ from typing import Any
 from .log import get_logger
 
 log = get_logger()
-
-
-def _get_zotero_config(config: dict[str, Any]) -> tuple[str, str] | None:
-    """Get Zotero API key and library info from config."""
-    api_key = config.get("zotero_api_key", "")
-    library_type = config.get("zotero_library_type", "user")  # "user" or "group"
-    library_id = config.get("zotero_library_id", "")
-
-    if not api_key:
-        return None
-    return api_key, f"{library_type}s/{library_id}" if library_id else ""
 
 
 _PY_NAMES = ("python.exe", "python") if os.name == "nt" else ("python3", "python")
@@ -176,11 +170,6 @@ def discover_zotero_mcp(config: dict[str, Any]) -> dict[str, Any] | None:
     return found or None
 
 
-def _zotero_mcp_python(config: dict[str, Any]) -> Path | None:
-    found = discover_zotero_mcp(config)
-    return found["python"] if found else None
-
-
 def push_via_zotero_mcp(
     identifier: str,
     pdf_path: Path | None,
@@ -228,6 +217,67 @@ def ensure_collection(path: str, config: dict[str, Any]) -> dict[str, Any]:
     return _run_bridge(found, {"op": "ensure_collection", "path": path}, 120)
 
 
+def collection_dois(collection: str, config: dict[str, Any]) -> dict[str, Any]:
+    """DOIs of the items in a Zotero collection, given by '/'-path or key (read only).
+
+    Returns {"success", "key", "path", "dois", "without_doi"}; items without a DOI
+    (books, theses, web pages) are counted, not returned.
+    """
+    found = discover_zotero_mcp(config)
+    if not found:
+        return {"success": False, "error": "zotero-mcp not found"}
+    cols = _run_bridge(found, {"op": "collections"}, 120)
+    if not cols.get("success"):
+        return cols
+    want = collection.strip().strip("/")
+    hit = next((c for c in cols["collections"] if c["key"] == want or c["path"] == want), None)
+    if hit is None:
+        names = [c for c in cols["collections"] if c["name"] == want]
+        hit = names[0] if len(names) == 1 else None
+    if hit is None:
+        return {"success": False, "error": f"no Zotero collection {collection!r} (give its full path, e.g. A/B)"}
+    r = _run_bridge(found, {"op": "collection_items", "key": hit["key"]}, 120)
+    if not r.get("success"):
+        return r
+    dois = list(dict.fromkeys(i["doi"] for i in r["items"] if i.get("doi")))
+    return {"success": True, "key": hit["key"], "path": hit["path"], "dois": dois,
+            "without_doi": sum(1 for i in r["items"] if not i.get("doi"))}
+
+
+def check_collection(key: str, config: dict[str, Any]) -> dict[str, Any]:
+    """Each item of the collection with its PDF state: ok, missing or empty (read only)."""
+    found = discover_zotero_mcp(config)
+    if not found:
+        return {"success": False, "error": "zotero-mcp not found"}
+    return _run_bridge(found, {"op": "check_collection", "key": key}, 600)
+
+
+def repair_attachment(item_key: str, pdf: Path | None, trash: list[str], config: dict[str, Any]) -> dict[str, Any]:
+    """Move the item's empty attachments to the Zotero Trash, then attach pdf (when given)."""
+    found = discover_zotero_mcp(config)
+    if not found:
+        return {"success": False, "error": "zotero-mcp not found"}
+    req = {"op": "repair", "item_key": item_key, "trash": trash,
+           "file": str(pdf.resolve()) if pdf and pdf.is_file() else ""}
+    return _run_bridge(found, req, int(config.get("zotero_push_timeout", 900)))
+
+
+def write_mode(config: dict[str, Any]) -> dict[str, Any]:
+    """How zotero-mcp writes: local (recommended), web, hybrid (local reads, web writes) or none."""
+    found = discover_zotero_mcp(config)
+    if not found:
+        return {"success": False, "error": "zotero-mcp not found"}
+    return _run_bridge(found, {"op": "write_mode"}, 60)
+
+
+def authorize_local_writes(config: dict[str, Any]) -> dict[str, Any]:
+    """Ask Zotero for local-write permission; Zotero shows a dialog and this waits for the answer."""
+    found = discover_zotero_mcp(config)
+    if not found:
+        return {"success": False, "error": "zotero-mcp not found"}
+    return _run_bridge(found, {"op": "authorize"}, 120)
+
+
 def _run_bridge(found: dict[str, Any], req: dict[str, Any], timeout: int) -> dict[str, Any]:
     """Run zotero_bridge.py with zotero-mcp's interpreter: one JSON request in, one result out."""
     import subprocess
@@ -265,212 +315,3 @@ def _run_bridge(found: dict[str, Any], req: dict[str, Any], timeout: int) -> dic
         return {"success": False, "error": f"zotero-mcp bridge failed (exit {proc.returncode}): {tail}"}
     result["via"] = "zotero-mcp"
     return result
-
-
-def push_to_zotero(
-    doi: str,
-    pdf_path: Path | None,
-    config: dict[str, Any],
-    metadata: dict[str, Any] | None = None,
-    collections: list[str] | None = None,
-    tags: list[str] | None = None,
-) -> dict[str, Any]:
-    """Push a paper and its PDF to Zotero.
-
-    Uses zotero-mcp when ``zotero_mcp_python`` is set; otherwise the Zotero
-    web API with ``zotero_api_key``. Returns dict with success status and
-    zotero_key if successful.
-    """
-    if _zotero_mcp_python(config) is not None:
-        return push_via_zotero_mcp(doi, pdf_path, config, collections, tags)
-
-    import requests
-
-    creds = _get_zotero_config(config)
-    if not creds:
-        return {"success": False, "error": "Zotero API key not configured"}
-
-    api_key, library_path = creds
-    if not library_path:
-        return {"success": False, "error": "Zotero library_id not configured"}
-
-    base_url = f"https://api.zotero.org/{library_path}"
-    headers = {
-        "Zotero-API-Key": api_key,
-        "Content-Type": "application/json",
-    }
-
-    # Build item from metadata or DOI
-    if metadata:
-        item_data = _metadata_to_zotero_item(metadata, doi)
-    else:
-        # Use DOI to create a minimal item
-        item_data = {
-            "itemType": "journalArticle",
-            "DOI": doi,
-            "url": f"https://doi.org/{doi}",
-        }
-
-    # Create item
-    try:
-        resp = requests.post(
-            f"{base_url}/items",
-            headers=headers,
-            json=[item_data],
-            timeout=30,
-        )
-        if resp.status_code not in (200, 201):
-            return {"success": False, "error": f"Zotero API error: {resp.status_code}"}
-
-        result = resp.json()
-        if not (result.get("success") or result.get("successful")):
-            return {"success": False, "error": "No successful items"}
-
-        zotero_key = _created_object_key(result)
-        if not zotero_key:
-            return {"success": False, "error": "No key returned"}
-
-        log.info(f"Zotero: created item {zotero_key}")
-
-        # Upload PDF attachment if available
-        pdf_attached = False
-        if pdf_path and pdf_path.exists():
-            pdf_attached = _upload_attachment(base_url, headers, zotero_key, pdf_path)
-
-        return {"success": True, "zotero_key": zotero_key, "pdf_attached": pdf_attached,
-                "via": "web-api"}
-
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def _metadata_to_zotero_item(msg: dict[str, Any], doi: str) -> dict[str, Any]:
-    """Convert Crossref metadata to Zotero item format."""
-    item: dict[str, Any] = {
-        "itemType": "journalArticle",
-        "DOI": doi,
-        "url": f"https://doi.org/{doi}",
-    }
-
-    # Title
-    titles = msg.get("title", [])
-    if titles:
-        item["title"] = titles[0] if isinstance(titles, list) else titles
-
-    # Authors
-    authors = msg.get("author", [])
-    if authors:
-        creators = []
-        for a in authors:
-            creators.append({
-                "creatorType": "author",
-                "firstName": a.get("given", ""),
-                "lastName": a.get("family", ""),
-            })
-        item["creators"] = creators
-
-    # Journal
-    container = msg.get("container-title", [])
-    if container:
-        item["publicationTitle"] = container[0]
-
-    # Year
-    parts = msg.get("published-print", msg.get("published-online", msg.get("created", {})))
-    date_parts = parts.get("date-parts", [[]]) if isinstance(parts, dict) else [[]]
-    if date_parts and date_parts[0]:
-        item["date"] = str(date_parts[0][0])
-
-    # Volume, Issue, Pages
-    if msg.get("volume"):
-        item["volume"] = str(msg["volume"])
-    if msg.get("issue"):
-        item["issue"] = str(msg["issue"])
-    if msg.get("page"):
-        item["pages"] = msg["page"]
-
-    # Abstract
-    if msg.get("abstract"):
-        import re
-        item["abstractNote"] = re.sub(r"<[^>]+>", "", msg["abstract"]).strip()
-
-    return item
-
-
-def _upload_attachment(
-    base_url: str,
-    headers: dict[str, str],
-    parent_key: str,
-    pdf_path: Path,
-) -> bool:
-    """Upload a PDF as an attachment to a Zotero item."""
-    import requests
-
-    try:
-        # Create attachment item
-        attachment_data = {
-            "itemType": "attachment",
-            "linkMode": "imported",
-            "contentType": "application/pdf",
-            "filename": pdf_path.name,
-            "parentItem": parent_key,
-        }
-
-        resp = requests.post(
-            f"{base_url}/items",
-            headers=headers,
-            json=[attachment_data],
-            timeout=30,
-        )
-        if resp.status_code not in (200, 201):
-            log.warning(f"Zotero: attachment item creation failed: {resp.status_code}")
-            return False
-
-        result = resp.json()
-        att_key = _created_object_key(result)
-        if not att_key:
-            return False
-
-        # Upload the file
-        upload_headers = {
-            "Zotero-API-Key": headers["Zotero-API-Key"],
-            "Content-Type": "application/octet-stream",
-            "If-None-Match": "*",
-        }
-        with pdf_path.open("rb") as f:
-            resp = requests.post(
-                f"{base_url}/items/{att_key}/file",
-                headers=upload_headers,
-                data=f,
-                timeout=120,
-            )
-
-        if resp.status_code in (200, 201, 204):
-            log.info(f"Zotero: uploaded PDF {pdf_path.name}")
-            return True
-        else:
-            log.warning(f"Zotero: file upload failed: {resp.status_code}")
-            return False
-
-    except Exception as e:
-        log.warning(f"Zotero: attachment error: {e}")
-        return False
-
-
-def _created_object_key(result: dict[str, Any]) -> str | None:
-    """Extract the Zotero object key from a write response."""
-    successful = result.get("successful") or result.get("success") or {}
-    if not successful:
-        return None
-
-    saved_object = next(iter(successful.values()))
-    if isinstance(saved_object, str):
-        return saved_object
-    if isinstance(saved_object, dict):
-        key = saved_object.get("key")
-        if isinstance(key, str):
-            return key
-        data = saved_object.get("data", {})
-        if isinstance(data, dict) and isinstance(data.get("key"), str):
-            return data["key"]
-
-    return None

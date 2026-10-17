@@ -46,7 +46,7 @@ export function DetailPane({
         </section>
         {item && (
           <section className="space-y-1 rounded-lg border bg-muted/40 p-3">
-            <h2 className="text-xs text-muted-foreground">Agent 的判断：{item.relevance}</h2>
+            <h2 className="text-xs text-muted-foreground">Agent 的评分：{item.relevance}</h2>
             <p className="text-sm">{item.reason}</p>
           </section>
         )}
@@ -85,7 +85,7 @@ export function DetailPane({
         )}
         {edited > 0 && (
           <p className="rounded-lg border border-warning-foreground/20 bg-warning px-3 py-2 text-xs text-warning-foreground">
-            你改了 {edited} 篇的评分。回到对话说“继续”，下一批会按你的评分排序。
+            你改了 {edited} 篇的评分。回到对话说「继续」，下一批会按你的评分排序。
           </p>
         )}
         <p className="text-xs text-muted-foreground">快捷键：↑↓ 切换 · 1–4 评分 · 空格 加入下载</p>

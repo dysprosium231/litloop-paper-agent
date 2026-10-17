@@ -124,9 +124,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "host_concurrency": {},
     "auto_rename": True,  # older switch; false means rename_format "off"
     "rename_format": "author_year_title_doi",  # see rename.FORMATS
-    "zotero_api_key": "",
-    "zotero_library_type": "user",
-    "zotero_library_id": "",
     # zotero-mcp (github.com/54yyyu/zotero-mcp) route for zotero_push: the
     # Python that has zotero-mcp installed ("" = find it automatically, "off"
     # = use the web API), and an optional script that sets its ZOTERO_* env
@@ -274,7 +271,7 @@ def update_config(key: str, value: str) -> dict[str, Any]:
 SENSITIVE_KEYS = [
     "core_api_key",
     "vpnsci_cookie_file",
-    "zotero_api_key",
+    "zotero_api_key",  # no longer used (Zotero goes through zotero-mcp); old configs still masked
     "zotero_library_id",
     "elsevier_api_key",
     "elsevier_insttoken",

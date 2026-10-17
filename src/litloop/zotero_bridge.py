@@ -12,6 +12,13 @@ Request: {"op", "env_script", ...}
   op "push" (default): {"identifier", "file", "collections", "tags"}
   op "collections":    list every collection as {"key", "name", "parent", "path"}
   op "ensure_collection": {"path": "LitLoop/My topic"} -> key, creating missing levels
+  op "collection_items": {"key"} -> regular items as {"key", "title", "doi", "year"} (no attachment check)
+  op "check_collection": {"key"} -> every regular item with the state of its PDF:
+                       ok, missing (no PDF attachment), empty (attachments hold no file)
+  op "write_mode":     how zotero-mcp would write: local, web, hybrid or none
+  op "authorize":      ask Zotero for local-write permission (a dialog in Zotero; waits for it)
+  op "repair":         {"item_key", "trash": [attachment keys], "file"} -> moves the
+                       empty attachments to the Trash, then attaches file (if given)
 """
 
 from __future__ import annotations
@@ -93,6 +100,70 @@ def _ensure_collection(path: str) -> dict:
     return {"success": True, "key": parent, "path": "/".join(parts), "created": created}
 
 
+def _plain(text) -> str:
+    """Zotero keeps rich-text titles (<sub>2</sub>, &amp;); show them as plain text."""
+    import html
+    return html.unescape(re.sub(r"<[^>]+>", "", text or "")).strip()
+
+
+def _doi_of(data: dict) -> str:
+    doi = (data.get("DOI") or "").strip()
+    if not doi:
+        m = re.search(r"(?im)^DOI:\s*(\S+)", data.get("extra") or "")
+        doi = m.group(1) if m else ""
+    return doi.lower()
+
+
+def _check_collection(key: str) -> dict:
+    """The PDF state of every regular item in the collection (read only)."""
+    from zotero_mcp.client import get_zotero_client
+    zot = get_zotero_client()
+    # One listing holds the items and their child attachments (children carry parentItem).
+    rows = [r.get("data", {}) for r in zot.everything(zot.collection_items(key))]
+    pdfs_of: dict[str, list] = {}
+    for d in rows:
+        if d.get("itemType") == "attachment" and d.get("parentItem") and d.get("contentType") == "application/pdf":
+            pdfs_of.setdefault(d["parentItem"], []).append(d)
+    out = []
+    for d in rows:
+        if d.get("itemType") in ("attachment", "note", "annotation") or d.get("parentItem"):
+            continue
+        pdfs = pdfs_of.get(d["key"], [])
+        if not pdfs:
+            state, empty = "missing", []
+        else:
+            linked = [a for a in pdfs if a.get("linkMode") == "linked_file"]
+            stored = [a for a in pdfs if a.get("linkMode") != "linked_file"]
+            empty = [a["key"] for a in stored if not _has_stored_file(a["key"])]
+            state = "ok" if linked or len(empty) < len(stored) else "empty"
+        year = re.search(r"\d{4}", d.get("date") or "")
+        out.append({"key": d["key"], "title": _plain(d.get("title")), "doi": _doi_of(d),
+                    "year": int(year.group(0)) if year else None,
+                    "journal": _plain(d.get("publicationTitle")) or None, "state": state,
+                    "empty_attachments": empty if state == "empty" else []})
+    return {"success": True, "items": out}
+
+
+def _repair(req: dict) -> dict:
+    """Trash the empty attachments of one item, then attach the local PDF."""
+    from zotero_mcp.cli_standalone import CLIContext
+    from zotero_mcp.tools import write
+    ctx = CLIContext()
+    trashed = []
+    for key in req.get("trash") or []:
+        out = write.delete_item(item_key=key, ctx=ctx)
+        if (out or "").lstrip().startswith("Error"):
+            return {"success": False, "error": out.strip()[:500], "trashed": trashed}
+        trashed.append(key)
+    if not req.get("file"):
+        return {"success": True, "trashed": trashed, "attached": False}
+    att = write.attach_file(item_key=req["item_key"], file_path=req["file"], ctx=ctx)
+    k = _ATT_KEY_RE.search(att)
+    ok = not att.lstrip().startswith("Error") and "FAILED" not in att and bool(k) and _has_stored_file(k.group(1))
+    return {"success": ok, "trashed": trashed, "attached": ok,
+            **({} if ok else {"error": att.strip()[:500]})}
+
+
 def run(req: dict) -> dict:
     _setup(req)
     op = req.get("op") or "push"
@@ -100,6 +171,33 @@ def run(req: dict) -> dict:
         return {"success": True, "collections": _collections()}
     if op == "ensure_collection":
         return _ensure_collection(req.get("path") or "")
+    if op == "write_mode":
+        from zotero_mcp.client import get_write_capabilities
+        caps = get_write_capabilities(probe=True)
+        return {"success": True, "mode": caps.get("mode"), "local_supported": caps.get("server_supports_local_writes")}
+    if op == "authorize":
+        from zotero_mcp.cli_standalone import CLIContext
+        from zotero_mcp.tools.local_auth import authorize_local_writes
+        out = authorize_local_writes(ctx=CLIContext())
+        from zotero_mcp.client import get_write_capabilities
+        mode = get_write_capabilities(probe=True).get("mode")
+        return {"success": mode == "local", "mode": mode, "message": (out or "").strip()[:500]}
+    if op == "collection_items":
+        from zotero_mcp.client import get_zotero_client
+        zot = get_zotero_client()
+        items = []
+        for row in zot.everything(zot.collection_items_top(req["key"])):
+            d = row.get("data", {})
+            if d.get("itemType") in ("attachment", "note", "annotation"):
+                continue
+            year = re.search(r"\d{4}", d.get("date") or "")
+            items.append({"key": d["key"], "title": _plain(d.get("title")), "doi": _doi_of(d),
+                          "year": int(year.group(0)) if year else None})
+        return {"success": True, "items": items}
+    if op == "check_collection":
+        return _check_collection(req["key"])
+    if op == "repair":
+        return _repair(req)
     if op != "push":
         return {"success": False, "error": f"unknown op {op}"}
 

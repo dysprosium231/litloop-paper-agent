@@ -108,8 +108,13 @@ def downloaded_dois() -> set[str]:
     return got
 
 
-def start(papers: list[dict[str, Any]], title: str, session: str | None = None) -> dict[str, Any]:
-    """Create a job for papers ({doi, title, year, journal}) and start it in the background."""
+def start(papers: list[dict[str, Any]], title: str, session: str | None = None,
+          zotero_target: str | None = None) -> dict[str, Any]:
+    """Create a job for papers ({doi, title, year, journal}) and start it in the background.
+
+    zotero_target: the collection a later push goes to by default (the attachment
+    check sets it to the collection being repaired).
+    """
     items, seen = [], set()
     for p in papers:
         doi = canonical_doi(p.get("doi") or "")
@@ -130,7 +135,8 @@ def start(papers: list[dict[str, Any]], title: str, session: str | None = None) 
             job = time.strftime("%Y%m%d-%H%M%S")
         data = {"schema": store.SCHEMA, "job": job, "title": title, "session": session, "state": "running",
                 "created": time.strftime("%Y-%m-%d %H:%M:%S"), "finished": None,
-                "output_dir": str(load_config().get("output_dir") or ""), "error": None, "items": items}
+                "output_dir": str(load_config().get("output_dir") or ""), "error": None, "items": items,
+                "zotero_target": (zotero_target or "").strip().strip("/") or None}
         store.write_json(job_path(job), data, indent=1)
         _CURRENT.update(job=job, cancelled=False)
         threading.Thread(target=_run, args=(job,), name=f"download-{job}", daemon=True).start()
@@ -216,6 +222,27 @@ def pushing() -> str | None:
     return _PUSHING["job"]
 
 
+def find_local_pdf(doi: str) -> Path | None:
+    """A PDF of this DOI on this computer: one a job downloaded, else a file in the
+    download folder whose name carries the DOI (the default file-name format)."""
+    from .config import load_config
+    from .identifiers import safe_filename
+    doi = canonical_doi(doi or "")
+    if not doi:
+        return None
+    for d in _jobs_full():
+        for it in d["items"]:
+            if it["doi"] == doi and it.get("file") and Path(it["file"]).is_file():
+                return Path(it["file"])
+    out = Path(str(load_config().get("output_dir") or ""))
+    tag = safe_filename(doi)
+    if tag and out.is_dir():
+        for p in out.glob("*.pdf"):
+            if tag in p.name.lower():
+                return p
+    return None
+
+
 def _jobs_full(limit: int = 200) -> list[dict[str, Any]]:
     out = []
     for j in list_jobs(limit):
@@ -235,7 +262,8 @@ def zotero_pending() -> list[dict[str, Any]]:
                   and (i.get("zotero") or {}).get("status") not in ("added", "reused")]
         if papers:
             out.append({"job": d["job"], "title": d["title"], "created": d["created"], "papers": papers,
-                        "collection": (d.get("zotero") or {}).get("collection") or default_collection(d["title"])})
+                        "collection": (d.get("zotero") or {}).get("collection") or d.get("zotero_target")
+                        or default_collection(d["title"])})
     return out
 
 
@@ -259,7 +287,7 @@ def push_zotero(job: str, collection: str | None = None, tags: list[str] | None 
             and (i.get("zotero") or {}).get("status") not in ("added", "reused")]
     if not todo:
         raise ValueError("nothing to push: no downloaded paper waits for Zotero")
-    collection = (collection or "").strip().strip("/") or default_collection(data["title"])
+    collection = (collection or "").strip().strip("/") or data.get("zotero_target") or default_collection(data["title"])
     if not _PUSH_LOCK.acquire(blocking=False):
         raise Busy("another Zotero push is still running")
     try:

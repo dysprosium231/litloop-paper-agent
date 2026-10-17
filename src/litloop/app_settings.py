@@ -25,7 +25,7 @@ from .rename import rename_format as _rename_format
 # type: secret | text | email | path | bool | select; a path may say pick: dir | file (the app offers a chooser)
 GROUPS: list[dict[str, Any]] = [
     {
-        "id": "sources", "title": "数据源", "test": "sources",
+        "id": "sources", "title": "检索接口", "test": "sources",
         "fields": [
             {"key": "openalex_api_key", "label": "OpenAlex Key", "type": "secret",
              "link": "https://help.openalex.org/how-to-use-the-api/rate-limits-and-authentication"},
@@ -45,7 +45,8 @@ GROUPS: list[dict[str, Any]] = [
             {"key": "download_strategy", "label": "来源顺序", "type": "select",
              "options": [["fastest", "谁快用谁"], ["oa_first", "开放获取优先"], ["legal_only", "只用合法来源"],
                          ["scihub_first", "Sci-Hub 优先"], ["scihub_only", "只用 Sci-Hub"], ["grey_only", "只用 Sci-Hub、LibGen 等"]]},
-            {"key": "scihub_enabled", "label": "允许 Sci-Hub、LibGen 等来源", "type": "bool", "help": "可能不合规，自行决定", "warn": True},
+            {"key": "scihub_enabled", "label": "允许 Sci-Hub、LibGen 等来源", "type": "bool",
+             "help": "可能违反出版商条款或学校规定，自行判断是否开启", "warn": True},
         ],
     },
     {
@@ -54,9 +55,9 @@ GROUPS: list[dict[str, Any]] = [
             # network_proxy is the campus egress (auth.py skips the school login when it is set),
             # not a personal VPN: filling in Clash's port breaks institutional downloads.
             {"key": "network_proxy", "label": "校园出口代理", "type": "text",
-             "help": "学校提供的校园隧道地址；个人翻墙代理不要填，否则机构下载会失败"},
+             "help": "只填学校提供的代理地址，个人代理软件的端口会导致机构下载失败"},
             {"key": "is_campus_network", "label": "电脑连在校园网上", "type": "bool",
-             "help": "打开后直接按学校 IP 下载，不再登录 WebVPN / CARSI"},
+             "help": "打开后直接按学校 IP 下载，不再登录 WebVPN 或 CARSI"},
         ],
     },
     {
@@ -164,17 +165,17 @@ def test_sources() -> list[dict[str, Any]]:
 
     live = quota.openalex_live()
     if not live or live.get("error"):
-        out.append(_result("OpenAlex", False, f"连不上 OpenAlex：{(live or {}).get('error', '无响应')}"))
+        out.append(_result("OpenAlex", False, f"无法连接 OpenAlex：{(live or {}).get('error', '无响应')}"))
     else:
         left, limit = live.get("credits_remaining"), live.get("credits_limit")
         if live.get("has_key"):
             out.append(_result("OpenAlex", True, f"可用，今日剩余 {left} / {limit} 积分"))
         else:
-            out.append(_result("OpenAlex", None, f"未填 Key，今日剩余 {left} / {limit} 积分"))
+            out.append(_result("OpenAlex", None, f"未填写 Key，今日剩余 {left} / {limit} 积分"))
 
     key = str(cfg.get("elsevier_api_key") or "").strip()
     if not key:
-        out.append(_result("Elsevier", None, "未填"))
+        out.append(_result("Elsevier", None, "未填写"))
     else:
         try:
             r = _get("https://api.elsevier.com/content/abstract/doi/10.1016/j.jeurceramsoc.2008.06.007",
@@ -189,11 +190,11 @@ def test_sources() -> list[dict[str, Any]]:
             else:
                 out.append(_result("Elsevier", False, f"HTTP {r.status_code}"))
         except Exception as exc:
-            out.append(_result("Elsevier", False, f"连不上 Elsevier：{exc}"))
+            out.append(_result("Elsevier", False, f"无法连接 Elsevier：{exc}"))
 
     key = str(cfg.get("springer_meta_api_key") or "").strip()
     if not key:
-        out.append(_result("Springer Nature", None, "未填"))
+        out.append(_result("Springer Nature", None, "未填写"))
     else:
         try:
             r = _get("https://api.springernature.com/meta/v2/json",
@@ -206,18 +207,18 @@ def test_sources() -> list[dict[str, Any]]:
             else:
                 out.append(_result("Springer Nature", False, f"HTTP {r.status_code}"))
         except Exception as exc:
-            out.append(_result("Springer Nature", False, f"连不上 Springer Nature：{exc}"))
+            out.append(_result("Springer Nature", False, f"无法连接 Springer Nature：{exc}"))
 
     email = str(cfg.get("email") or "").strip()
     if not email or email.endswith(".invalid"):
-        out.append(_result("Crossref", None, "未填联系邮箱"))
+        out.append(_result("Crossref", None, "未填写联系邮箱"))
     else:
         try:
             r = _get("https://api.crossref.org/works", params={"rows": 0, "mailto": email})
             out.append(_result("Crossref", r.status_code == 200,
                                "可用" if r.status_code == 200 else f"HTTP {r.status_code}"))
         except Exception as exc:
-            out.append(_result("Crossref", False, f"连不上 Crossref：{exc}"))
+            out.append(_result("Crossref", False, f"无法连接 Crossref：{exc}"))
     return out
 
 
@@ -242,7 +243,7 @@ def test_zotero() -> list[dict[str, Any]]:
     try:
         r = _get("http://127.0.0.1:23119/connector/ping", proxies={"http": None, "https": None})
         if r.status_code == 200:
-            return [_result("Zotero", True, "正在运行")]
+            return [_result("Zotero", True, "运行中")]
         return [_result("Zotero", False, f"HTTP {r.status_code}")]
     except Exception:
         return [_result("Zotero", False, "未运行")]
@@ -260,7 +261,7 @@ def test_network() -> list[dict[str, Any]]:
     out = []
     cfg = _config.load_config()
     if str(cfg.get("network_proxy") or "").strip():
-        out.append(_result("校园出口代理", None, "已填写：LitLoop 会跳过学校登录。只有学校提供的校园隧道才该填在这里。"))
+        out.append(_result("校园出口代理", None, "已填写：LitLoop 会跳过学校登录。只填学校提供的代理地址。"))
     found = proxy_check.detect()
     names, paths = found["direct_processes"], proxy_check.litloop_paths()
     programs = "、".join(found["programs"]) or "代理软件"
@@ -289,10 +290,10 @@ def test_network() -> list[dict[str, Any]]:
                 "steps": ["右键当前订阅，选择「编辑规则」。",
                           "在「前置规则」中添加下方的规则并保存。"],
                 "copy": [{"label": "规则", "lines": [f"PROCESS-NAME,{n},DIRECT" for n in names]}],
-                "note": "若规则未生效，在「扩展配置」中加入 find-process-mode: always。",
+                "note": "如果规则未生效，在「扩展配置」中加入 find-process-mode: always。",
             })
         out.append(_result("代理软件", False,
-                           f"{programs} 正以 TUN 模式运行。学校通道的流量会经由代理出口，无法通过学校的身份认证。",
+                           f"{programs} 正以 TUN 模式运行。学校认证的流量会经由代理出口，无法通过学校的身份认证。",
                            guides=guides))
     return out
 

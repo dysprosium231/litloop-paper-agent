@@ -1,9 +1,9 @@
 import * as React from "react"
-import { CheckCircle2Icon, InboxIcon, LoaderIcon, XCircleIcon } from "lucide-react"
+import { CheckCircle2Icon, FileSearchIcon, InboxIcon, LoaderIcon, XCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar"
-import { downloadsApi, zoteroApi, type ZoteroHistoryEntry, type ZoteroOverview, type ZoteroPendingGroup } from "@/lib/api"
+import { downloadsApi, zoteroApi, type WriteMode, type ZoteroHistoryEntry, type ZoteroOverview, type ZoteroPendingGroup, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 /** Connection, what waits for Zotero and what was pushed; polls faster while a push runs. */
@@ -11,7 +11,7 @@ export function useZotero(active: boolean) {
   const [data, setData] = React.useState<ZoteroOverview | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const refresh = React.useCallback(() => {
-    zoteroApi.overview().then((d) => { setData(d); setError(null) }).catch((e) => setError(String(e)))
+    zoteroApi.overview().then((d) => { setData(d); setError(null) }).catch((e) => setError(errorMessage(e)))
   }, [])
   const pushing = Boolean(data?.pushing)
   React.useEffect(() => {
@@ -20,14 +20,58 @@ export function useZotero(active: boolean) {
     const t = setInterval(refresh, pushing ? 1500 : 5000)
     return () => clearInterval(t)
   }, [active, pushing, refresh])
-  return { data, error, refresh }
+  // The write mode costs a zotero-mcp start; ask once per visit and after authorizing.
+  const [mode, setMode] = React.useState<WriteMode | null | undefined>(undefined)
+  const loadMode = React.useCallback(() => {
+    zoteroApi.writeMode().then((r) => setMode(r.mode)).catch(() => setMode(null))
+  }, [])
+  React.useEffect(() => {
+    if (active && data?.mcp) loadMode()
+  }, [active, data?.mcp, loadMode])
+  return { data, error, refresh, mode, loadMode }
+}
+
+const MODE: Record<WriteMode, string> = {
+  local: "写入方式：本地",
+  hybrid: "写入方式：网页接口（不推荐）",
+  web: "写入方式：网页接口（不推荐）",
+  none: "未授权写入",
+}
+
+/** Write mode line; offers local-write authorization (Zotero asks the user in its own dialog). */
+function WriteModeLine({ mode, running, onDone }: { mode: WriteMode | null | undefined; running: boolean; onDone: () => void }) {
+  const [asking, setAsking] = React.useState(false)
+  const [note, setNote] = React.useState<string | null>(null)
+  if (mode === undefined) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <LoaderIcon className="size-4 animate-spin" />写入方式：检测中…
+      </div>
+    )
+  }
+  const authorize = () => {
+    setAsking(true)
+    setNote("请在 Zotero 弹出的对话框中选择「始终允许」")
+    zoteroApi.authorize().then((r) => setNote(r.ok ? null : r.message ?? "未获得授权，可重新授权")).catch((e) => setNote(errorMessage(e)))
+      .finally(() => { setAsking(false); onDone() })
+  }
+  return (
+    <div className="space-y-1">
+      <Check ok={mode === "local"} yes={MODE.local} no={mode ? MODE[mode] : "写入方式未知"} />
+      {mode !== "local" && running && (
+        <Button size="sm" variant="outline" className="h-7 text-xs" disabled={asking} onClick={authorize}>
+          {asking && <LoaderIcon className="animate-spin" />}授权本地写入
+        </Button>
+      )}
+      {note && <p className="text-xs text-warning-foreground">{note}</p>}
+    </div>
+  )
 }
 
 const outcome = (h: ZoteroHistoryEntry) =>
   [h.added && `新增 ${h.added}`, h.reused && `已存在 ${h.reused}`, h.no_pdf && `附件缺失 ${h.no_pdf}`, h.failed && `失败 ${h.failed}`]
     .filter(Boolean).join(" · ") || "无推送项"
 
-const errorText = (e: unknown) => String(e).replace(/^Error: \d+ /, "").replace(/^\{"detail":"(.*)"\}$/, "$1")
 
 function Check({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   return (
@@ -39,7 +83,14 @@ function Check({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
 }
 
 /** Second column of the Zotero section: connection, the pending queue, past pushes (they open the download job). */
-export function ZoteroNav({ data, onOpenJob }: { data: ZoteroOverview | null; onOpenJob: (job: string) => void }) {
+export type ZoteroView = "queue" | "check"
+
+export function ZoteroNav({ data, mode, onModeChanged, view, onView, onOpenJob }: {
+  data: ZoteroOverview | null; mode: WriteMode | null | undefined; onModeChanged: () => void
+  view: ZoteroView; onView: (v: ZoteroView) => void; onOpenJob: (job: string) => void
+}) {
+  const entry = (v: ZoteroView) => cn("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-sidebar-accent",
+    view === v && "bg-sidebar-accent font-medium")
   const waiting = data?.pending.reduce((n, g) => n + g.papers.length, 0) ?? 0
   return (
     <>
@@ -48,16 +99,21 @@ export function ZoteroNav({ data, onOpenJob }: { data: ZoteroOverview | null; on
         {data && (
           <div className="space-y-1 pt-1 text-xs text-muted-foreground">
             <Check ok={data.running} yes="Zotero 运行中" no="Zotero 未运行" />
-            <Check ok={Boolean(data.mcp)} yes="zotero-mcp 已就绪" no="未找到 zotero-mcp（设置 → Zotero）" />
+            <Check ok={Boolean(data.mcp)} yes="zotero-mcp 已就绪" no="未找到 zotero-mcp（「设置 → Zotero」）" />
+            {data.mcp && <WriteModeLine mode={mode} running={data.running} onDone={onModeChanged} />}
           </div>
         )}
       </SidebarHeader>
       <SidebarContent className="scrollable gap-0.5 p-2">
-        <div className="flex w-full items-center gap-3 rounded-lg bg-sidebar-accent px-3 py-2 text-sm font-medium">
+        <button type="button" className={entry("queue")} onClick={() => onView("queue")}>
           <InboxIcon className="size-4 shrink-0" />
           <span className="flex-1">推送队列</span>
           {waiting > 0 && <span className="rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">{waiting}</span>}
-        </div>
+        </button>
+        <button type="button" className={entry("check")} onClick={() => onView("check")}>
+          <FileSearchIcon className="size-4 shrink-0" />
+          <span className="flex-1">附件检查</span>
+        </button>
         {!!data?.history.length && <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground">历史记录</div>}
         {data?.history.map((h) => (
           <button key={h.job} type="button" onClick={() => onOpenJob(h.job)}
@@ -80,10 +136,10 @@ export function ZoteroPane({ data, error, onChanged, onOpenJob }: {
   data: ZoteroOverview | null; error: string | null; onChanged: () => void; onOpenJob: (job: string) => void
 }) {
   const [failure, setFailure] = React.useState<string | null>(null)
-  if (!data) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "加载中…"}</div>
+  if (!data) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "正在加载…"}</div>
   const push = (g: ZoteroPendingGroup) => {
     setFailure(null)
-    downloadsApi.push(g.job, g.collection).then(onChanged).catch((e) => setFailure(errorText(e)))
+    downloadsApi.push(g.job, g.collection).then(onChanged).catch((e) => setFailure(errorMessage(e)))
   }
   const all = data.pending.reduce((n, g) => n + g.papers.length, 0)
   const blocked = !data.mcp || !data.running || Boolean(data.pushing)

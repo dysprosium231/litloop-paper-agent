@@ -114,7 +114,7 @@ docker compose up -d                                              # MCP 服务�
 | Springer Nature Meta API Key | 推荐 | 补 Springer、Nature、BMC 等文章的摘要（订阅文章也有） | 这些文章的摘要只能靠 Scopus 和 Crossref，缺得多一些 | 在 [dev.springernature.com](https://dev.springernature.com) 免费注册，用 **Meta API** 那个 Key（Open Access API 只覆盖开放获取文章）；`springer_meta_api_key` 或环境变量 `SPRINGER_META_API_KEY`。免费档每天 500 次、每分钟 100 次（[官方说明](https://dev.springernature.com/subscription/)），LitLoop 只用它查 Springer Nature 自家的 DOI。条款规定摘要仅限个人、非商业使用 |
 | 联系邮箱 | 推荐 | 随请求发给 Crossref、OpenAlex、Unpaywall，出问题时它们能联系你 | Crossref 按公共池限速：同时只能 1 个请求，补摘要慢一些 | `litloop_config(key="email", value="你的邮箱")`（同一个邮箱也用于 OpenAlex、Unpaywall）。有邮箱时 Crossref 允许每秒 10 次、同时 3 个（[官方说明](https://crossref.org/blog/announcing-changes-to-rest-api-rate-limits/)） |
 | scansci-find（发现引擎） | 推荐 | 快速检索和深度检索的关键词路线 | 自动退回内置的三源检索，较慢 | 安装时加 `--with-find` |
-| Zotero 桌面版 + zotero-mcp | 可选 | 把文献和 PDF 直接写进本机 Zotero | 只能下载到本地文件夹 | 见下文 [Zotero](#zotero) |
+| Zotero 7 以上 + zotero-mcp（本地写入） | 可选 | 把文献和 PDF 直接写进本机 Zotero | 只能下载到本地文件夹 | 见下文 [Zotero](#zotero)；LitLoop 只通过 zotero-mcp 写 Zotero |
 | 本机 Chrome | 可选 | 需要浏览器的出版商和机构通道 | 这些通道不可用，开放获取和 API 照常 | 正常安装 Chrome 即可，LitLoop 会自动复制一份私有副本 |
 | 学校账号（WebVPN / CARSI / EZProxy） | 可选 | 下载学校订阅的论文 | 只能下开放获取和 API 能拿到的 | 见下文 [下载与机构通道](#下载与机构通道) |
 | Semantic Scholar API Key | 可选 | 多一个检索来源；补摘要更快 | 不影响使用：补摘要时几个来源同时问，它慢也不会拖住别的来源 | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api)，审批较严，不一定能通过；环境变量 `SEMANTIC_SCHOLAR_API_KEY` |
@@ -208,7 +208,7 @@ litloop check                                                     # 检查依赖
 
 **深度检索**（`litloop_deep_search`）
 
-要把一个课题查全时用。Agent 给出问题、4–8 组英文检索词、核心词和几篇种子文章：
+要把一个课题查全时用。Agent 给出问题、4–8 组英文检索词、核心词和几篇种子文章；你在 Zotero 里已经有这个课题的分类时，也可以直接把整个分类当种子（`seed_collection`）：
 1. 每组检索词各取 100 条候选，再找出和种子共同引用较多、且标题或摘要含核心词的文章，合并成候选池。核心词可以写几条，**每条都必须出现**（“并且”）；一条里用 `|` 写同一概念的不同说法，如 `["Al|aluminum|aluminium", "SiC"]`，照顾只写缩写的文章。和普通单词同形的元素符号（如 La、Ce、Er、Eu、In）会匹配到法语、德语等普通单词，开局时会提醒改写全称；
 2. 每次给 Agent 一批（默认 30 篇），Agent 评分后存进筛选记录。第一批按“共同引用 + 检索词匹配”排序；之后由一个轻量模型根据全部评分（相关和不相关的都用）重新排序，这是系统综述筛选常用的持续主动学习；
 3. 评为“高”的文章自动成为新种子，再往外扩展。你给的种子权重最高，避免越滚越偏；
@@ -334,11 +334,11 @@ litloop_login(kind="ezproxy")
 3. Claude Code（`~/.claude.json`、项目 `.mcp.json`）或 Claude Desktop 配置里名字或命令含 `zotero` 的服务器，连同它的环境变量；
 4. PATH 上的 `zotero-mcp`，以及用 `uv tool` 或 pipx 装的 zotero-mcp。
 
-**推荐用本地写入。** Zotero 7 以上开着时，让 zotero-mcp 申请一次本地写入权限：调用 `zotero_authorize_local_writes`，在 Zotero 弹出的对话框里点「始终允许」。之后条目和 PDF 直接写进你电脑上的 Zotero，一篇几秒钟；同步到 Zotero 云端或 WebDAV 交给 Zotero 自己完成。
+**请用本地写入。** Zotero 7 以上开着时，授权一次本地写入：在桌面 app 的 Zotero 页点「授权本地写入」，或在对话里让 Agent 调用 zotero-mcp 的 `zotero_authorize_local_writes`，然后在 Zotero 弹出的对话框里点「始终允许」。之后条目和 PDF 直接写进你电脑上的 Zotero，一篇几秒钟；同步到 Zotero 云端或 WebDAV 交给 Zotero 自己完成。Zotero 页会显示当前的写入方式。
 
-没有授权本地写入时，zotero-mcp 走 Zotero 网络接口（需要 `zotero-mcp setup` 配好 Web API Key），PDF 直接传到 WebDAV。从国内上传大文件到境外的 WebDAV 又慢又容易中断，所以不推荐。
+没有授权本地写入时，zotero-mcp 会改走 Zotero 网页接口（需要 `zotero-mcp setup` 配好 Web API Key），PDF 直接传到 WebDAV。从国内上传大文件到境外的 WebDAV 又慢又容易中断，不推荐。
 
-都找不到 zotero-mcp 时，会退回 Zotero Web API（`zotero_api_key` + `zotero_library_id`）。这条路只建条目，**不上传 PDF**。
+LitLoop 自己不带 Zotero 网页接口的代码（2026-10 删除了原项目里那一套，它只建条目、不传 PDF）：找不到 zotero-mcp 时，推送会直接提示先安装。
 
 在桌面 app 里，下载记录页可以把这次下载到的文章一起推送到 Zotero：默认放进 `LitLoop/检索问题` 分类，也可以选已有分类或填新路径，没有的分类会自动新建；每篇显示新建、库里已有、PDF 未附上或失败。下载完是否自动推送在「设置 → Zotero」里选，默认手动。
 
@@ -348,7 +348,7 @@ litloop_login(kind="ezproxy")
 
 - **筛选**：本批文章列表，摘要、Agent 的评分和理由；用键盘评分（↑↓ 换篇、1–4 评分、空格选中），你改过的评分覆盖 Agent 的。深度检索运行时，顶部显示各阶段进度和预计剩余时间。
 - **下载**：「待下载」汇总各次筛选里选中、还没下到的文章，一键下载；下载记录里看逐篇结果和失败原因，打开 PDF 或文件夹，重试没下到的。需要你处理的验证码、学校登录会醒目提示。
-- **Zotero**：看 Zotero 和 zotero-mcp 是否就绪；「待推送」列出已下载、还没进 Zotero 的文章，按下载分组一键推送；推送记录可回看每篇的结果。
+- **Zotero**：看 Zotero、zotero-mcp 是否就绪和当前的写入方式（不是本地时可一键授权本地写入）；「推送队列」列出已下载、还没进 Zotero 的文献，按下载分组推送；「附件检查」找出某个分类里缺少或为空的 PDF 附件，确认后用本机的 PDF 重新附加，或加入下载；历史记录可回看每篇的推送结果。
 - **设置**：数据源 Key、下载、网络、学校认证、Zotero，各有检测按钮；接口额度页显示各接口今天的用量。网络检测能识别 v2rayN、Clash 等代理软件是否开了 TUN 模式，并给出直连规则的设置步骤。
 - 浅色和深色主题，跟随系统切换；左侧图标栏可展开显示名称，也可收起只留图标。
 
@@ -437,7 +437,7 @@ ACS 出现 “IP Address Blocked” 时，封禁在出版商那边，代码解�
 
 按计划顺序排列。详细进度和计划见 [TODO.md](TODO.md)，检索部分的设计和验收标准见 [CHARTER.md](CHARTER.md)。
 
-1. **桌面 app**：学校认证的登录流程、Zotero 页（连接状态、待推送、附件体检）、安装包与自动更新；之后在 app 里填表发起检索、确认检索方案，Agent 可以是外部的（Claude Code 等），也可以是 app 内置的（可接 DeepSeek 等模型）。
+1. **桌面 app**：学校认证的登录流程、按界面文案规范统一全部文字、安装包与自动更新；之后在 app 里填表发起检索、确认检索方案，Agent 可以是外部的（Claude Code 等），也可以是 app 内置的（可接 DeepSeek 等模型）。
 2. **系统综述支持**：记录每个数据源的检索量、去重数、纳入和排除的数量及理由，生成 PRISMA 式统计，中断后可以接着做。
 3. **定期追踪**：保存检索式，定期运行，只推送上次之后的新文章。
 4. **分析归纳**：PDF 转 Markdown 已经有了。下一步是从全文抽取要点、做对比表、起草综述，完成整个闭环。

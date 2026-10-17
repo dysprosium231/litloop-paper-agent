@@ -688,6 +688,46 @@ def _ranked(state: dict[str, Any]) -> list[str]:
                   key=lambda k: (-pool[k].get("rank", pool[k].get("score", 0)), -(pool[k].get("cited_by_count") or 0)))
 
 
+def _remaining_estimate(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any] | None:
+    """Roughly how many 高 papers are still unread, from the yield curve.
+
+    The model's scores are not calibrated probabilities (it is trained against a
+    random sample of unread papers), so the estimate comes from what the ratings
+    show instead: fit a geometric decay to the share of 高 per batch (least
+    squares on log share, recent batches weighted more) and sum the batches
+    still ahead, as far as the pool goes. Needs at least three rated batches;
+    a flat or rising curve has no finite tail and gives no total.
+    """
+    batches = [b for b in state["served"] if b]
+    rates, sizes = [], []
+    for b in batches:
+        judged = [k for k in b if k in rated]
+        if len(judged) < max(3, len(b) // 2):
+            continue
+        rates.append(sum(1 for k in judged if rated[k] == "高") / len(judged))
+        sizes.append(len(judged))
+    if len(rates) < 3:
+        return None
+    size = state.get("batch_size") or len(batches[-1])
+    xs = list(range(len(rates)))
+    ys = [math.log(r + 0.02) for r in rates]  # 0.02: a batch without 高 is not log(0)
+    ws = [1 + i for i in xs]
+    sw = sum(ws)
+    mx = sum(w * x for w, x in zip(ws, xs)) / sw
+    my = sum(w * y for w, y in zip(ws, ys)) / sw
+    var = sum(w * (x - mx) ** 2 for w, x in zip(ws, xs))
+    slope = sum(w * (x - mx) * (y - my) for w, x, y in zip(ws, xs, ys)) / var if var else 0.0
+    q = math.exp(slope)
+    last = max(0.0, math.exp(my + slope * (xs[-1] - mx)) - 0.02)
+    seeds = set(state.get("seeds") or [])
+    unread = sum(1 for k in state.get("pool") or {} if k not in rated and k not in seeds)
+    out = {"next_batch": round(last * q * size, 1), "batches": len(rates), "decay": round(q, 2)}
+    if q < 0.95 and unread:
+        ahead = min(unread // max(1, size), 50)
+        out["remaining"] = round(sum(last * q ** j * size for j in range(1, ahead + 1)), 1)
+    return out
+
+
 def _stop(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any]:
     """Suggest stopping at the cap, or once the yield of 高 has fallen off.
 
@@ -696,25 +736,37 @@ def _stop(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any]:
     relevant papers have mostly been read. Counting 中 too never fired: the
     neighbouring topics that come up late keep it high.
     """
+    est = _remaining_estimate(state, rated)
     if len(rated) >= state["cap"]:
-        return {"stop_suggested": True, "stop_reason": f"已筛 {len(rated)} 篇，达到上限 {state['cap']}"}
+        return _with_estimate({"stop_suggested": True, "stop_reason": f"已筛 {len(rated)} 篇，达到上限 {state['cap']}"}, est)
     batches = [b for b in state["served"] if b]
     last = batches[-1] if batches else []
     judged = [rated[k] for k in last if k in rated]
     if len(batches) < 2 or not judged or len(judged) < len(last) // 2:
-        return {"stop_suggested": False, "stop_reason": ""}
+        return _with_estimate({"stop_suggested": False, "stop_reason": ""}, est)
     high = sum(1 for r in judged if r == "高")
     rates = [sum(1 for k in b if rated.get(k) == "高") / max(1, sum(1 for k in b if k in rated)) for b in batches[:-1]]
     best = max(rates)
     if best > 0 and high / len(judged) <= best / KNEE_RATIO:
-        return {"stop_suggested": True,
-                "stop_reason": (f"最近一批 {len(judged)} 篇里只有 {high} 篇高相关，不到此前最好一批"
-                                f"（{best:.0%}）的 1/{KNEE_RATIO}，相关文章大多已经读到")}
+        return _with_estimate({"stop_suggested": True,
+                               "stop_reason": (f"最近一批 {len(judged)} 篇里只有 {high} 篇高相关，不到此前最好一批"
+                                               f"（{best:.0%}）的 1/{KNEE_RATIO}，相关文章大多已经读到")}, est)
     useful = sum(1 for r in judged if r in ("高", "中"))
     if useful <= max(1, len(judged) // 15):
-        return {"stop_suggested": True,
-                "stop_reason": f"最近一批 {len(judged)} 篇里只有 {useful} 篇高或中相关，新增已经很少"}
-    return {"stop_suggested": False, "stop_reason": ""}
+        return _with_estimate({"stop_suggested": True,
+                               "stop_reason": f"最近一批 {len(judged)} 篇里只有 {useful} 篇高或中相关，新增已经很少"}, est)
+    return _with_estimate({"stop_suggested": False, "stop_reason": ""}, est)
+
+
+def _with_estimate(stop: dict[str, Any], est: dict[str, Any] | None) -> dict[str, Any]:
+    """Attach the estimate; when stopping is suggested, also say it in the reason."""
+    if est is None:
+        return stop
+    stop["remaining_estimate"] = est
+    if stop["stop_suggested"] and "remaining" in est:
+        stop["stop_reason"] += (f"。按每批高相关比例的下降趋势粗略外推，继续读下去约还能找到 "
+                                f"{est['remaining']:.0f} 篇高相关（下一批约 {est['next_batch']:.0f} 篇）")
+    return stop
 
 
 def _coverage(state: dict[str, Any], rated: dict[str, str], order: list[str]) -> list[dict[str, Any]]:
@@ -754,6 +806,7 @@ def _write_summary(state: dict[str, Any], rated: dict[str, str], stop: dict[str,
                "screened": len(rated), "remaining": remaining, "ranked_by": state.get("ranked_by", "formula"),
                "seeds": len(state["seeds"]), "batches": batches, "rounds": rounds,
                "stop_suggested": stop.get("stop_suggested", False), "stop_reason": stop.get("stop_reason", ""),
+               "remaining_estimate": stop.get("remaining_estimate"),
                "coverage": coverage, "api_warnings": notes, "core_terms": state.get("core_terms", []),
                "queries": state.get("queries", []), "current_batch": batch}
     try:

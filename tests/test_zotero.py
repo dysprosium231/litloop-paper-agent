@@ -3,69 +3,6 @@ from pathlib import Path
 from litloop import zotero
 
 
-class FakeResponse:
-    def __init__(self, status_code=200, payload=None):
-        self.status_code = status_code
-        self._payload = payload or {}
-
-    def json(self):
-        return self._payload
-
-
-def test_push_to_zotero_posts_item_as_raw_json_array(monkeypatch):
-    calls = []
-
-    def fake_post(url, **kwargs):
-        calls.append((url, kwargs))
-        return FakeResponse(payload={"success": {"0": "ITEMKEY"}})
-
-    monkeypatch.setattr("requests.post", fake_post)
-
-    result = zotero.push_to_zotero(
-        doi="10.1234/example",
-        pdf_path=None,
-        config={
-            "zotero_api_key": "test-key",
-            "zotero_library_type": "user",
-            "zotero_library_id": "123456",
-            "zotero_mcp_python": "off",
-        },
-    )
-
-    assert result == {"success": True, "zotero_key": "ITEMKEY", "pdf_attached": False,
-                      "via": "web-api"}
-    assert calls[0][0] == "https://api.zotero.org/users/123456/items"
-    assert isinstance(calls[0][1]["json"], list)
-    assert calls[0][1]["json"][0]["DOI"] == "10.1234/example"
-
-
-def test_upload_attachment_posts_item_as_raw_json_array(monkeypatch, tmp_path):
-    calls = []
-    pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_bytes(b"%PDF-1.4\n")
-
-    def fake_post(url, **kwargs):
-        calls.append((url, kwargs))
-        if url.endswith("/items"):
-            return FakeResponse(payload={"success": {"0": "ATTKEY"}})
-        return FakeResponse(status_code=204)
-
-    monkeypatch.setattr("requests.post", fake_post)
-
-    ok = zotero._upload_attachment(
-        base_url="https://api.zotero.org/users/123456",
-        headers={"Zotero-API-Key": "test-key", "Content-Type": "application/json"},
-        parent_key="PARENTKEY",
-        pdf_path=Path(pdf_path),
-    )
-
-    assert ok is True
-    assert calls[0][0] == "https://api.zotero.org/users/123456/items"
-    assert isinstance(calls[0][1]["json"], list)
-    assert calls[0][1]["json"][0]["parentItem"] == "PARENTKEY"
-    assert calls[1][0] == "https://api.zotero.org/users/123456/items/ATTKEY/file"
-
-
 def _fake_zotero_mcp(tmp_path, monkeypatch, reply_line):
     """A fake zotero-mcp python: records the request, prints reply_line."""
     import sys
@@ -94,9 +31,8 @@ def test_push_uses_zotero_mcp_when_configured(tmp_path, monkeypatch):
     pdf.write_bytes(b"%PDF-1.4\n")
     seen = _fake_zotero_mcp(tmp_path, monkeypatch,
                             '{"success": true, "zotero_key": "ABCD1234", "pdf_attached": true}')
-    monkeypatch.setattr("requests.post", lambda *a, **k: (_ for _ in ()).throw(AssertionError("web api used")))
 
-    result = zotero.push_to_zotero(
+    result = zotero.push_via_zotero_mcp(
         "10.1234/x", pdf, {"zotero_mcp_python": sys.executable},
         collections=["Ceramics"], tags=["litloop"],
     )
@@ -112,7 +48,7 @@ def test_push_uses_zotero_mcp_when_configured(tmp_path, monkeypatch):
 def test_zotero_mcp_bridge_garbage_output_is_an_error(tmp_path, monkeypatch):
     import sys
     _fake_zotero_mcp(tmp_path, monkeypatch, "not json")
-    result = zotero.push_to_zotero("10.1234/x", None, {"zotero_mcp_python": sys.executable})
+    result = zotero.push_via_zotero_mcp("10.1234/x", None, {"zotero_mcp_python": sys.executable})
     assert result["success"] is False
     assert "bridge failed" in result["error"]
 
@@ -258,11 +194,12 @@ def test_discovers_uv_tool_install_and_off_disables(tmp_path, monkeypatch):
     assert zotero.discover_zotero_mcp({})["python"] == py
 
 
-def test_no_zotero_mcp_anywhere_falls_back_to_web_api(tmp_path, monkeypatch):
+def test_no_zotero_mcp_anywhere_returns_error(tmp_path, monkeypatch):
     _isolate_discovery(monkeypatch, tmp_path)
     assert zotero.discover_zotero_mcp({}) is None
-    result = zotero.push_to_zotero("10.1/x", None, {})
-    assert result == {"success": False, "error": "Zotero API key not configured"}
+    result = zotero.push_via_zotero_mcp("10.1/x", None, {})
+    assert result["success"] is False
+    assert "zotero-mcp" in result["error"]
 
 
 def test_zotero_bridge_resolves_localhost_to_ipv4(monkeypatch):

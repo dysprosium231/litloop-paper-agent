@@ -88,11 +88,11 @@ litloop search "关键词" --limit 10 --sort cited_by_count   # 13源引擎,失�
 
 ### 深度检索（要把一个课题查全时）
 
-1. 标准确认后，请用户给 1–3 篇确定相关的种子文章（DOI）；没有时先用 `litloop_search` 找几篇请用户认。
+1. 标准确认后，请用户给 1–3 篇确定相关的种子文章（DOI）；没有时先用 `litloop_search` 找几篇请用户认。如果用户在 Zotero 里已经有这个课题的分类，用 `seed_collection="分类路径"`（如 `"1 陶瓷-金属复合材料/SiC/Al"`，也可以只写唯一的分类名）把其中有 DOI 的文献都当种子，可以和 `seeds` 一起用；返回的 `seed_collection` 报告用了几篇、几篇没有 DOI。分类较大时引用扩展会分几轮完成，额度上限照常生效。
 2. `litloop_deep_search(action="start", question=..., queries=[4–8 组英文检索词], seeds=[DOI], core_terms=[1–3 个核心词], criteria=[...])`，返回第一批（默认 20 篇）和 `session`。**每个关键概念都要照顾缩写、全称、化学式和同义词**：很多文章只写缩写或化学式，或换一种说法。核心词里用 `|` 表示“任意一个”，例如 `Al|aluminum SiC`、`PDC|polymer-derived|preceramic`、`EMW|electromagnetic|microwave`、`MMC|metal-matrix`、`3D-printing|additive-manufacturing`；检索词里也要有用缩写和用全称的各一组。**每条核心词是一个必须出现的概念，多条之间是“并且”**：`["lanthanide|rare-earth|europium|gadolinium", "drug|doxorubicin"]` 表示稀土并且药物；同一概念的不同说法用 `|` 写在同一条里，不要拆成两条。元素符号和普通单词撞车的（La、Ce、Er、Eu、In、As 等，检索不区分大小写）只写全称，开局返回的 `core_term_notes` 会提醒。英美拼写（aluminum/aluminium、fiber/fibre、-ize/-ise 等）由插件自动处理，不用写。**核心词要覆盖整个问题的范围，不要只写其中的重点**：问题是“先驱体陶瓷，尤其 SiBCN”时，核心词写 SiBCN 会把其他 PDC 体系挡在引用扩展之外；应写成 `SiBCN|SiCN|SiOC|polymer-derived|preceramic` 这类覆盖全题的写法，重点留给评分。用户给了必找文章时传 `must_find=[DOI]`，结果的 `coverage` 会报告每篇的状态。
 3. 逐篇判断后用 `litloop_deep_search(action="rate", session=..., ratings=[{"n": 1, "relevance": "高", "reason": "..."}, ...])` 按编号保存，标题和 DOI 由插件补上。**这一批每篇都要评**，返回的 `not_rated` 列出漏评的编号；没评的下一批会再出现。
 4. `litloop_deep_search(action="next", session=...)` 取下一批。评为“高”的文章会自动成为新种子；从第二批起排序由模型根据全部评分学习（`ranked_by="model"`），所以“低 / 不相关”也要如实评。
-5. 返回 `stop_suggested=true` 时，把 `stop_reason` 告诉用户并建议停止；用户要继续就接着 `next`。随时可以用 `action="status"` 看已筛篇数和各相关度数量。
+5. 返回 `stop_suggested=true` 时，把 `stop_reason` 告诉用户并建议停止；用户要继续就接着 `next`。返回里的 `remaining_estimate` 是按每批高相关比例的下降趋势粗略外推的剩余数（`remaining` 约还有几篇高、`next_batch` 下一批约几篇），一并告诉用户供决定，但说明这是粗略估计；比例还在上升时没有 `remaining`，说明课题还没读到尽头。随时可以用 `action="status"` 看已筛篇数和各相关度数量。
 6. 筛完后按上面第 5、6 步呈现和让用户选择。跨了多批之后编号会变，**decide 时优先传 DOI**。
 
 ## 场景 → 工具链(常见意图直接对号入座)

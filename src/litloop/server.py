@@ -393,6 +393,7 @@ def litloop_deep_search(
     queries: list[str] | None = None,
     seeds: list[str] | None = None,
     core_terms: list[str] | None = None,
+    seed_collection: str | None = None,
     criteria: list[str] | None = None,
     must_find: list[str] | None = None,
     year_from: int | None = None,
@@ -401,13 +402,24 @@ def litloop_deep_search(
     session: str | None = None,
     ratings: list[dict] | None = None,
 ) -> str:
-    """Deep search: start (question, 4-8 queries, seed DOIs, core_terms), rate (ratings=[{n, relevance, reason}]), next, status."""
+    """Deep search: start (question, 4-8 queries, seed DOIs and/or a Zotero seed_collection, core_terms), rate (ratings=[{n, relevance, reason}]), next, status."""
     from . import deep_search
     try:
         if action == "start":
+            from_zotero = None
+            if seed_collection:
+                # The papers the user already keeps on the topic: seeds (and positives).
+                from .zotero import collection_dois
+                got = collection_dois(seed_collection, load_config())
+                if not got.get("success"):
+                    return json.dumps({"error": f"seed_collection: {got.get('error')}"}, ensure_ascii=False)
+                seeds = list(dict.fromkeys([*(seeds or []), *got["dois"]]))
+                from_zotero = {"path": got["path"], "seeds": len(got["dois"]), "without_doi": got["without_doi"]}
             out = deep_search.start(question, queries or [], seeds or [], core_terms or [],
                                     criteria=criteria, must_find=must_find, year_from=year_from,
                                     year_to=year_to, batch_size=max(5, min(batch_size, 60)))
+            if from_zotero:
+                out["seed_collection"] = from_zotero
         elif action in ("next", "status", "rate"):
             if not session:
                 return json.dumps({"error": "session is required"})
@@ -951,7 +963,7 @@ def litloop_zotero_push(
         tags: tags
     """
     from .identifiers import normalize_doi
-    from .zotero import push_to_zotero
+    from .zotero import push_via_zotero_mcp
     config = load_config()
 
     # Check if paper is in cache
@@ -962,14 +974,7 @@ def litloop_zotero_push(
     doi = cached.get("doi", normalize_doi(identifier))
     pdf_path = Path(cached.get("file", "")) if cached.get("file") else None
 
-    from .zotero import _zotero_mcp_python
-    metadata = None
-    if _zotero_mcp_python(config) is None:
-        # Web API route builds the item itself from Crossref metadata.
-        from .citation import fetch_metadata
-        metadata = fetch_metadata(doi, config)
-
-    result = push_to_zotero(doi, pdf_path, config, metadata, collections, tags)
+    result = push_via_zotero_mcp(doi, pdf_path, config, collections, tags)
     return json.dumps(result, ensure_ascii=False)
 
 

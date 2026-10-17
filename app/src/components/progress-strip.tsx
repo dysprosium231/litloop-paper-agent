@@ -9,7 +9,14 @@ const PHASES: [string, string][] = [
   ["batch", "生成批次"],
 ]
 
-const secs = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} 分 ${Math.round(s % 60)} 秒` : `${Math.round(s)} 秒`)
+const secs = (s: number) => {
+  if (s >= 60) {
+    const m = Math.floor(s / 60)
+    const rem = Math.round(s % 60)
+    return rem > 0 ? `${m} 分 ${rem} 秒` : `${m} 分`
+  }
+  return `${Math.max(1, Math.round(s))} 秒`
+}
 
 /** What the running round is doing, or a one-line overview when nothing runs. */
 export function ProgressStrip({ progress, summary }: { progress: Progress | null; summary: Summary | null }) {
@@ -19,7 +26,7 @@ export function ProgressStrip({ progress, summary }: { progress: Progress | null
     const highs = summary.batches.map((b) => (b.rated ? b.高 / b.rated : 0))
     return (
       <div className="flex items-center gap-4 border-b px-6 py-2.5 text-xs text-muted-foreground">
-        <span>候选池 {summary.pool.toLocaleString()} 篇 · 已评 {summary.screened} 篇</span>
+        <span>候选池 {summary.pool.toLocaleString()} 篇 · 已评分 {summary.screened.toLocaleString()} 篇</span>
         <span className="flex h-4 items-end gap-0.5" role="img" aria-label="每批高相关比例">
           {highs.map((h, i) => (
             <span key={i} className="w-1.5 rounded-sm bg-primary" style={{ height: `${Math.max(8, h * 100)}%`, opacity: i === highs.length - 1 ? 1 : 0.45 }} />
@@ -58,7 +65,7 @@ export function ProgressStrip({ progress, summary }: { progress: Progress | null
               <div className="flex justify-between text-[11px]">
                 <span className={cn(isNow ? "font-medium text-foreground" : "text-muted-foreground")}>{label}</span>
                 <span className="text-muted-foreground">
-                  {done.has(id) ? secs(done.get(id)!) : isNow && now?.total ? `${now.done} / ${now.total}` : ""}
+                  {done.has(id) ? secs(done.get(id)!) : isNow && now?.total ? `${now.done}/${now.total}` : ""}
                 </span>
               </div>
             </div>

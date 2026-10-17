@@ -83,6 +83,7 @@ with store.update(screening_dir() / f"{session}.json", indent=2) as data:
 | `batches` | 每批：`batch` 序号、`size`、`rated`，以及 `高`、`中`、`低`、`不相关` 各几篇；每批高相关比例由此算 |
 | `rounds` | 每轮：`time`、`event`（`start` / `next`）、`new_seeds`、`pool_added`、`expand_seconds`、`rank_seconds`、`openalex_credits`、`seconds` |
 | `stop_suggested`、`stop_reason` | 停止建议 |
+| `remaining_estimate` | 按每批“高”的比例下降趋势粗略外推：`next_batch`（下一批约几篇高）、`remaining`（继续读下去约还有几篇高；比例不降时没有此项）、`batches`（用了几批）、`decay`（每批比例的衰减系数）；不足三批评分时为 `null` |
 | `coverage` | 必找文章：`doi`、`status`（`screened` 已评，带 `relevance`；`seed` 已是种子；`in_pool` 在候选池，带当前排名 `rank`；`not_found` 没找到） |
 | `api_warnings` | 额度、限流提醒（英文短句） |
 | `core_terms`、`queries` | 本次的核心词、检索词 |
@@ -139,5 +140,6 @@ app 发起的下载，每次一个文件，由 app 后台的 `download_jobs.py` 
 - `state`：`running` → `done` / `cancelled` / `failed`（引擎本身出错，原因在 `error`）。文件里仍是 `running`、但当前后台并没有在跑它（app 中途关闭），读出时当作 `interrupted`。
 - `items[].status`：`waiting` → `done` / `failed`。引擎每完成一篇就更新一次状态；`source`、`file`、`error` 在整批结束时填入。
 - 同一时间只运行一个任务：引擎的进度报告和取消开关是整个进程共用的。运行中的实时信息（正在处理哪篇、需要用户处理的验证码或登录提示）不存进这个文件，app 通过 `/api/downloads` 读取 `progress_reporter` 的报告。
+- `zotero_target`：附件检查发起的下载会带上它，推送时默认推回这个分类；其他任务为 `null`，推送默认用 `<zotero_collection_root>/<title>`。
 - `zotero`（推送过才有）：`state` 为 `running` → `done` / `failed`，app 中途关闭读出为 `interrupted`；`collection` 是分类路径，`key` 是它在 Zotero 里的键。`items[].zotero.status`：`pushing` → `added`（新建）/ `reused`（库里已有）/ `no_pdf`（条目在了但 PDF 没附上，再推送一次会补附）/ `failed`。推送和下载可以同时进行，同一时间只推送一个任务。
 - “待下载”不单独存文件：取各筛选记录里 `decision` 为 `selected`、且还没有被任何任务下载成功的文章。

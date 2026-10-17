@@ -5,7 +5,8 @@ import { AppSidebar, RAIL_COLLAPSED, RAIL_OPEN, type Section } from "@/component
 import { PaperList, type PaperRow } from "@/components/paper-list"
 import { SettingsNav, SettingsPane } from "@/components/settings-view"
 import { DownloadsNav, JobPane, PENDING, PendingPane, useDownloads } from "@/components/downloads-view"
-import { useZotero, ZoteroNav, ZoteroPane } from "@/components/zotero-view"
+import { useZotero, ZoteroNav, ZoteroPane, type ZoteroView } from "@/components/zotero-view"
+import { ZoteroCheckPane } from "@/components/zotero-check"
 import { DetailPane, type Paper } from "@/components/detail-pane"
 import { ProgressStrip } from "@/components/progress-strip"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
@@ -29,36 +30,47 @@ import {
   type Summary,
   settingsApi,
   type SettingGroup,
+  errorMessage,
 } from "@/lib/api"
 
 const short = (q: string) => (q.length > 28 ? q.slice(0, 28) + "…" : q)
 
-// Width of the collapsed icon rail plus the paper list, which the user drags; remembered
-// between runs. An open rail adds RAIL_OPEN - RAIL_COLLAPSED on top, so the list keeps its width.
-const WIDTH_KEY = "litloop.listWidth"
-const MIN_WIDTH = 360  // keeps the list header (title + 只看本批) whole
+// Width of the collapsed icon rail plus each section's list, which the user drags; each
+// section keeps its own width between runs. An open rail adds RAIL_OPEN - RAIL_COLLAPSED
+// on top, so the list keeps its width.
+type Resizable = "screen" | "download" | "zotero"
+const WIDTHS: Record<Resizable, { min: number; initial: number }> = {
+  screen: { min: 360, initial: 420 },  // 360 keeps the list header (title + 只看本批) whole
+  download: { min: 260, initial: 320 },
+  zotero: { min: 260, initial: 320 },
+}
 const MAX_WIDTH = 900
 const SETTINGS_WIDTH = 320  // the settings list is short: fixed width, no handle
+const widthKey = (s: Resizable) => (s === "screen" ? "litloop.listWidth" : `litloop.listWidth.${s}`)  // screen keeps its old key
 
-function useStoredWidth(): [number, (w: number) => void] {
-  const [width, setWidth] = React.useState(() => {
+function readWidth(s: Resizable): number {
+  try {
+    const w = Number(localStorage.getItem(widthKey(s)))
+    return w >= WIDTHS[s].min && w <= MAX_WIDTH ? w : WIDTHS[s].initial
+  } catch {
+    return WIDTHS[s].initial
+  }
+}
+
+function useStoredWidths(): [Record<Resizable, number>, (s: Resizable, w: number) => void] {
+  const [widths, setWidths] = React.useState(() => ({
+    screen: readWidth("screen"), download: readWidth("download"), zotero: readWidth("zotero"),
+  }))
+  const set = React.useCallback((s: Resizable, w: number) => {
+    const clamped = Math.round(Math.min(MAX_WIDTH, Math.max(WIDTHS[s].min, w)))
+    setWidths((all) => ({ ...all, [s]: clamped }))
     try {
-      const w = Number(localStorage.getItem(WIDTH_KEY))
-      return w >= MIN_WIDTH && w <= MAX_WIDTH ? w : 420
-    } catch {
-      return 420
-    }
-  })
-  const set = React.useCallback((w: number) => {
-    const clamped = Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w)))
-    setWidth(clamped)
-    try {
-      localStorage.setItem(WIDTH_KEY, String(clamped))
+      localStorage.setItem(widthKey(s), String(clamped))
     } catch {
       /* storage unavailable: the width just isn't remembered */
     }
   }, [])
-  return [width, set]
+  return [widths, set]
 }
 
 const RAIL_KEY = "litloop.railOpen"
@@ -83,7 +95,9 @@ function useRailOpen(): [boolean, (open: boolean) => void] {
 }
 
 /** A draggable line on the list's right edge; arrow keys also move it when focused. */
-function ResizeHandle({ width, offset, onWidth }: { width: number; offset: number; onWidth: (w: number) => void }) {
+function ResizeHandle({ width, min, initial, offset, onWidth }: {
+  width: number; min: number; initial: number; offset: number; onWidth: (w: number) => void
+}) {
   // While dragging, set the CSS variable directly and switch off the sidebar's width
   // transition: going through React state on every move (and the 200 ms transition)
   // made the line lag behind the pointer. The width is stored once, on release.
@@ -94,7 +108,7 @@ function ResizeHandle({ width, offset, onWidth }: { width: number; offset: numbe
     const w0 = width
     let w = w0
     let frame = 0
-    const clamp = (v: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, v))
+    const clamp = (v: number) => Math.min(MAX_WIDTH, Math.max(min, v))
     const move = (ev: PointerEvent) => {
       w = clamp(w0 + ev.clientX - x0)
       cancelAnimationFrame(frame)
@@ -116,11 +130,11 @@ function ResizeHandle({ width, offset, onWidth }: { width: number; offset: numbe
       aria-orientation="vertical"
       aria-label="调节列表宽度"
       aria-valuenow={width}
-      aria-valuemin={MIN_WIDTH}
+      aria-valuemin={min}
       aria-valuemax={MAX_WIDTH}
       tabIndex={0}
       onPointerDown={start}
-      onDoubleClick={() => onWidth(420)}
+      onDoubleClick={() => onWidth(initial)}
       onKeyDown={(e) => {
         if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
           e.stopPropagation()
@@ -142,7 +156,7 @@ export default function App() {
   const [current, setCurrent] = React.useState<string | null>(null)
   const [onlyBatch, setOnlyBatch] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const [listWidth, setListWidth] = useStoredWidth()
+  const [widths, setWidth] = useStoredWidths()
   const [railOpen, setRailOpen] = useRailOpen()
   const railExtra = railOpen ? RAIL_OPEN - RAIL_COLLAPSED : 0
   const [section, setSection] = React.useState<Section>("screen")
@@ -152,16 +166,17 @@ export default function App() {
   const [downloadView, setDownloadView] = React.useState(PENDING)
   const startedJob = (job: string) => { setDownloadView(job); downloads.refresh() }
   const zotero = useZotero(section === "zotero")
+  const [zoteroView, setZoteroView] = React.useState<ZoteroView>("queue")
   const openJob = (job: string) => { setSection("download"); setDownloadView(job) }
   React.useEffect(() => {
-    if (section === "settings") settingsApi.list().then(setGroups).catch((e) => setError(String(e)))
+    if (section === "settings") settingsApi.list().then(setGroups).catch((e) => setError(errorMessage(e)))
   }, [section])
 
   React.useEffect(() => {
     api.sessions().then((s) => {
       setSessions(s)
       setSid((cur) => cur ?? s[0]?.session ?? null)
-    }).catch((e) => setError(String(e)))
+    }).catch((e) => setError(errorMessage(e)))
   }, [])
 
   const reload = React.useCallback(() => {
@@ -170,7 +185,7 @@ export default function App() {
       setRecord(record)
       setSummary(summary)
       setError(null)
-    }).catch((e) => setError(String(e)))
+    }).catch((e) => setError(errorMessage(e)))
   }, [sid])
   React.useEffect(reload, [reload])
 
@@ -214,17 +229,17 @@ export default function App() {
 
   const rate = React.useCallback((rel: (typeof RELEVANCE)[number]) => {
     if (!sid || !paper?.item) return
-    api.rate(sid, paper, rel === paper.item.relevance ? null : rel).then(reload).catch((e) => setError(String(e)))
+    api.rate(sid, paper, rel === paper.item.relevance ? null : rel).then(reload).catch((e) => setError(errorMessage(e)))
   }, [sid, paper, reload])
   const toggleSelect = React.useCallback(() => {
     if (!sid || !paper?.item) return
     api.decide(sid, paper, paper.item.decision === "selected" ? null : "selected").then(reload)
-      .catch((e) => setError(String(e)))
+      .catch((e) => setError(errorMessage(e)))
   }, [sid, paper, reload])
   const exclude = React.useCallback(() => {
     if (!sid || !paper?.item) return
     api.decide(sid, paper, paper.item.decision === "rejected" ? null : "rejected").then(reload)
-      .catch((e) => setError(String(e)))
+      .catch((e) => setError(errorMessage(e)))
   }, [sid, paper, reload])
 
   // Keyboard: ↑↓ move, 1-4 rate, space select. Not while typing in a field.
@@ -254,7 +269,7 @@ export default function App() {
   return (
     <TooltipProvider>
       {/* The header's toggle hides the list; the rail then shows icons only (--sidebar-width-icon). */}
-      <SidebarProvider style={{ "--sidebar-width": `${(section === "settings" ? SETTINGS_WIDTH : listWidth) + railExtra}px` } as React.CSSProperties}>
+      <SidebarProvider style={{ "--sidebar-width": `${(section === "settings" ? SETTINGS_WIDTH : widths[section]) + railExtra}px` } as React.CSSProperties}>
         <AppSidebar section={section} onSection={setSection} railOpen={railOpen} onRailOpen={setRailOpen}>
           {section === "settings" ? (
             <SettingsNav groups={groups} current={settingsGroup} onPick={setSettingsGroup} />
@@ -262,16 +277,21 @@ export default function App() {
             <PaperList rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
               onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
           ) : section === "download" ? (
-            <DownloadsNav jobs={downloads.jobs} pending={downloads.pending} current={downloadView} onPick={setDownloadView} />
+            <DownloadsNav jobs={downloads.jobs} pending={downloads.pending} outputDir={downloads.outputDir} current={downloadView} onPick={setDownloadView} />
           ) : (
-            <ZoteroNav data={zotero.data} onOpenJob={openJob} />
+            <ZoteroNav data={zotero.data} mode={zotero.mode} onModeChanged={zotero.loadMode} view={zoteroView} onView={setZoteroView} onOpenJob={openJob} />
           )}
         </AppSidebar>
         <SidebarInset className="relative min-h-0 min-w-0">
-          {section !== "settings" && <ResizeHandle width={listWidth} offset={railExtra} onWidth={setListWidth} />}
+          {section !== "settings" && (
+            <ResizeHandle key={section} width={widths[section]} min={WIDTHS[section].min} initial={WIDTHS[section].initial}
+              offset={railExtra} onWidth={(w) => setWidth(section, w)} />
+          )}
           {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           {section === "zotero" ? (
-            <ZoteroPane data={zotero.data} error={zotero.error} onChanged={zotero.refresh} onOpenJob={openJob} />
+            zoteroView === "check"
+              ? <ZoteroCheckPane running={Boolean(zotero.data?.running)} onStarted={openJob} />
+              : <ZoteroPane data={zotero.data} error={zotero.error} onChanged={zotero.refresh} onOpenJob={openJob} />
           ) : section === "download" ? (
             downloadView === PENDING
               ? <PendingPane pending={downloads.pending} busy={Boolean(downloads.running)} onStarted={startedJob} />
@@ -290,7 +310,7 @@ export default function App() {
                 <BreadcrumbItem>
                   <DropdownMenu>
                     <DropdownMenuTrigger className="flex items-center gap-1 rounded-md px-1 outline-none hover:bg-accent">
-                      <BreadcrumbPage>{record ? short(record.question) : "选择会话"}</BreadcrumbPage>
+                      <BreadcrumbPage>{record ? short(record.question) : "选择检索会话"}</BreadcrumbPage>
                       <ChevronDownIcon className="size-3.5 text-muted-foreground" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="max-w-md">
@@ -299,7 +319,7 @@ export default function App() {
                           <div className="flex min-w-0 flex-col">
                             <span className="truncate">{s.question || s.session}</span>
                             <span className="text-xs text-muted-foreground">
-                              {s.deep ? "深度检索" : "快速检索"} · 已评 {s.items} · {s.updated}
+                              {s.deep ? "深度检索" : "快速检索"} · 已评分 {s.items} · {s.updated}
                             </span>
                           </div>
                         </DropdownMenuItem>

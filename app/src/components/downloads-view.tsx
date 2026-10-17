@@ -13,13 +13,14 @@ import {
   type LiveDownload,
   type PendingGroup,
   type ZoteroCollection,
+  errorMessage,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 export const PENDING = "pending"
 
 const STATE: Record<JobState, string> = {
-  running: "进行中", done: "已完成", cancelled: "已取消", failed: "出错", interrupted: "已中断",
+  running: "进行中", done: "已完成", cancelled: "已取消", failed: "失败", interrupted: "已中断",
 }
 
 /** Jobs, papers waiting to be downloaded and the live report; polls faster while a job runs. */
@@ -28,6 +29,7 @@ export function useDownloads(active: boolean) {
   const [running, setRunning] = React.useState<string | null>(null)
   const [live, setLive] = React.useState<LiveDownload | null>(null)
   const [pending, setPending] = React.useState<PendingGroup[]>([])
+  const [outputDir, setOutputDir] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const refresh = React.useCallback(async () => {
     try {
@@ -35,10 +37,11 @@ export function useDownloads(active: boolean) {
       setJobs(l.jobs)
       setRunning(l.running)
       setLive(l.live)
+      setOutputDir(l.output_dir)
       setPending(p)
       setError(null)
     } catch (e) {
-      setError(String(e))
+      setError(errorMessage(e))
     }
   }, [])
   React.useEffect(() => {
@@ -47,18 +50,45 @@ export function useDownloads(active: boolean) {
     const t = setInterval(refresh, running ? 1500 : 5000)
     return () => clearInterval(t)
   }, [active, running, refresh])
-  return { jobs, running, live, pending, error, refresh }
+  return { jobs, running, live, pending, outputDir, error, refresh }
 }
 
 /** Second column of the download section: what waits, then the jobs, newest first. */
-export function DownloadsNav({ jobs, pending, current, onPick }: {
-  jobs: DownloadJobEntry[]; pending: PendingGroup[]; current: string; onPick: (id: string) => void
+type Filter = "all" | "failed" | "unfinished"
+const FILTERS: { id: Filter; label: string; keep: (j: DownloadJobEntry) => boolean }[] = [
+  { id: "all", label: "全部", keep: () => true },
+  { id: "failed", label: "有失败", keep: (j) => j.failed > 0 },
+  { id: "unfinished", label: "未完成", keep: (j) => j.state !== "done" },
+]
+
+export function DownloadsNav({ jobs, pending, outputDir, current, onPick }: {
+  jobs: DownloadJobEntry[]; pending: PendingGroup[]; outputDir: string; current: string; onPick: (id: string) => void
 }) {
   const waiting = pending.reduce((n, g) => n + g.papers.length, 0)
+  const [filter, setFilter] = React.useState<Filter>("all")
+  const [openError, setOpenError] = React.useState<string | null>(null)
+  const done = jobs.reduce((n, j) => n + j.done, 0)
+  const failed = jobs.reduce((n, j) => n + j.failed, 0)
+  const shown = jobs.filter(FILTERS.find((f) => f.id === filter)!.keep)
+  const openFolder = () => {
+    setOpenError(null)
+    downloadsApi.open(outputDir).catch((e) => setOpenError(errorMessage(e)))
+  }
   return (
     <>
-      <SidebarHeader className="border-b p-4">
+      <SidebarHeader className="gap-2 border-b p-4">
         <div className="text-base font-medium text-foreground">下载</div>
+        <div className="text-xs text-muted-foreground">
+          已下载 {done} 篇{failed ? ` · 失败 ${failed} 篇` : ""}
+        </div>
+        {outputDir && (
+          <button type="button" onClick={openFolder} title={outputDir}
+            className="flex min-w-0 items-center gap-1.5 text-left text-xs text-muted-foreground hover:text-foreground">
+            <FolderOpenIcon className="size-3.5 shrink-0" />
+            <span className="truncate">{outputDir}</span>
+          </button>
+        )}
+        {openError && <p className="text-xs text-destructive">{openError}</p>}
       </SidebarHeader>
       <SidebarContent className="scrollable gap-0.5 p-2">
         <button type="button" onClick={() => onPick(PENDING)}
@@ -68,8 +98,20 @@ export function DownloadsNav({ jobs, pending, current, onPick }: {
           <span className="flex-1">下载队列</span>
           {waiting > 0 && <span className="rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">{waiting}</span>}
         </button>
-        {jobs.length > 0 && <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground">历史记录</div>}
-        {jobs.map((j) => (
+        {jobs.length > 0 && (
+          <div className="flex items-center gap-1 px-3 pt-4 pb-1">
+            <span className="flex-1 text-xs text-muted-foreground">历史记录</span>
+            {FILTERS.map((f) => (
+              <button key={f.id} type="button" onClick={() => setFilter(f.id)}
+                className={cn("rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground",
+                  filter === f.id && "bg-sidebar-accent font-medium text-foreground")}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {jobs.length > 0 && shown.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">无符合条件的记录</p>}
+        {shown.map((j) => (
           <button key={j.job} type="button" onClick={() => onPick(j.job)}
             className={cn("flex w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-sidebar-accent",
               current === j.job && "bg-sidebar-accent")}>
@@ -108,7 +150,7 @@ export function PendingPane({ pending, busy, onStarted }: {
     try {
       onStarted((await downloadsApi.start(papers, title, session)).job)
     } catch (e) {
-      setError(String(e).replace(/^Error: \d+ /, "").replace(/^\{"detail":"(.*)"\}$/, "$1"))
+      setError(errorMessage(e))
     }
   }
   const all = pending.flatMap((g) => g.papers)
@@ -122,7 +164,7 @@ export function PendingPane({ pending, busy, onStarted }: {
       {pending.length === 0 && (
         <div className="px-6 py-12 text-center">
           <p className="text-sm font-medium">暂无待下载文献</p>
-          <p className="mt-1 text-xs text-muted-foreground">筛选中标记为「选中」的文献将显示在此处</p>
+          <p className="mt-1 text-xs text-muted-foreground">在筛选中加入下载的文献将显示在此处</p>
         </div>
       )}
       {pending.map((g) => (
@@ -165,21 +207,21 @@ function ZoteroPanel({ job, onPushed }: { job: DownloadJob; onPushed: () => void
     downloadsApi.collections().then(setCollections).catch(() => setCollections([]))
   }
   const push = () => downloadsApi.push(job.job, target).then(() => { setOpen(false); onPushed() })
-    .catch((e) => setError(String(e).replace(/^Error: \d+ /, "").replace(/^\{"detail":"(.*)"\}$/, "$1")))
+    .catch((e) => setError(errorMessage(e)))
   if (z?.state === "running") {
     const doneNow = job.items.filter((i) => i.zotero && i.zotero.status !== "pushing").length
-    return <p className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderIcon className="size-3.5 animate-spin" />正在推送至「{z.collection}」 · 已处理 {doneNow}</p>
+    return <p className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderIcon className="size-3.5 animate-spin" />正在推送到「{z.collection}」 · 已处理 {doneNow}</p>
   }
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-4 text-sm">
         <span className="min-w-0 truncate text-muted-foreground">
-          {pushed > 0 ? `已推送至「${z?.collection ?? ""}」 · ${pushed} 篇` : "未推送至 Zotero"}
+          {pushed > 0 ? `已推送到「${z?.collection ?? ""}」 · ${pushed} 篇` : "未推送到 Zotero"}
           {waiting > 0 && pushed > 0 ? ` · 待推送 ${waiting}` : ""}
         </span>
-        {waiting > 0 && !open && <Button size="sm" variant="outline" onClick={show}>推送至 Zotero</Button>}
+        {waiting > 0 && !open && <Button size="sm" variant="outline" onClick={show}>推送到 Zotero</Button>}
       </div>
-      {(z?.state === "failed" || z?.state === "interrupted") && z.error && <p className="text-sm text-destructive">{z.error}</p>}
+      {(z?.state === "failed" || z?.state === "interrupted") && z.error && <p className="text-sm text-destructive" title={z.error}>{z.error_text ?? z.error}</p>}
       {open && (
         <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); push() }}>
           <Input list="zotero-collections" value={target} onChange={(e) => setTarget(e.target.value)} aria-label="目标分类"
@@ -189,8 +231,8 @@ function ZoteroPanel({ job, onPushed }: { job: DownloadJob; onPushed: () => void
           <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>取消</Button>
         </form>
       )}
-      {open && collections?.length === 0 && <p className="text-xs text-muted-foreground">无法读取 Zotero 分类，请确认 Zotero 已启动。也可直接输入路径，不存在的分类将自动创建。</p>}
-      {open && !!collections?.length && <p className="text-xs text-muted-foreground">可选择已有分类，或输入新路径（不存在的分类将自动创建）。</p>}
+      {open && collections?.length === 0 && <p className="text-xs text-muted-foreground">无法读取 Zotero 分类：Zotero 未运行。启动 Zotero 后重试，或直接输入分类路径（不存在的分类会自动创建）。</p>}
+      {open && !!collections?.length && <p className="text-xs text-muted-foreground">可选择已有分类，或输入新路径（不存在的分类会自动创建）。</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   )
@@ -211,14 +253,14 @@ export function JobPane({ id, live, onChanged, onStarted }: {
   const running = job?.state === "running"
   React.useEffect(() => {
     let alive = true
-    const load = () => downloadsApi.job(id).then((j) => { if (alive) { setJob(j); setError(null) } }).catch((e) => alive && setError(String(e)))
+    const load = () => downloadsApi.job(id).then((j) => { if (alive) { setJob(j); setError(null) } }).catch((e) => alive && setError(errorMessage(e)))
     load()
     const t = setInterval(load, 1500)
     return () => { alive = false; clearInterval(t) }
   }, [id])
-  const act = (f: () => Promise<unknown>) => f().then(onChanged).catch((e) => setError(String(e)))
+  const act = (f: () => Promise<unknown>) => f().then(onChanged).catch((e) => setError(errorMessage(e)))
 
-  if (!job) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "加载中…"}</div>
+  if (!job) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{error ?? "正在加载…"}</div>
   const done = job.items.filter((i) => i.status === "done").length
   const failed = job.items.filter((i) => i.status === "failed")
   const finished = done + failed.length
@@ -226,8 +268,8 @@ export function JobPane({ id, live, onChanged, onStarted }: {
   const attention = running ? Object.values(live?.attention ?? {}) : []
   return (
     <div className="min-h-0 flex-1 overflow-y-auto scrollable">
-      <Header title={job.title} meta={`${STATE[job.state]} · ${job.created}${job.finished ? ` → ${job.finished.slice(11)}` : ""}`}>
-        {running && <Button size="sm" variant="outline" onClick={() => act(downloadsApi.cancel)}>取消</Button>}
+      <Header title={job.title} meta={`${STATE[job.state]} · ${job.created}${job.finished ? `–${job.finished.slice(11)}` : ""}`}>
+        {running && <Button size="sm" variant="outline" onClick={() => act(downloadsApi.cancel)}>取消下载</Button>}
         {!running && missing.length > 0 && (
           <Button size="sm" variant="outline" onClick={() => act(async () => onStarted((await downloadsApi.start(missing, `重试 · ${job.title}`, job.session ?? undefined)).job))}>
             重试未完成项（{missing.length}）
@@ -248,8 +290,8 @@ export function JobPane({ id, live, onChanged, onStarted }: {
         {attention.map((a, i) => (
           <p key={i} className="rounded-md bg-warning px-3 py-2 text-sm text-warning-foreground">{a.message}</p>
         ))}
-        {job.error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{job.error}</p>}
-        {job.state === "interrupted" && <p className="text-sm text-muted-foreground">任务未完成时应用已退出，可重试未完成项。</p>}
+        {job.error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" title={job.error}>{job.error_text ?? job.error}</p>}
+        {job.state === "interrupted" && <p className="text-sm text-muted-foreground">下载任务未完成时应用已退出，可重试未完成项。</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         {done > 0 && <ZoteroPanel job={job} onPushed={onChanged} />}
       </div>
@@ -262,11 +304,11 @@ export function JobPane({ id, live, onChanged, onStarted }: {
               <div className="text-xs text-muted-foreground">
                 {[metaLine(it), it.source && it.status === "done" ? `来源：${it.source}` : null].filter(Boolean).join(" · ") || it.doi}
               </div>
-              {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90">{it.error}</div>}
+              {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90" title={it.error}>{it.error_text ?? it.error}</div>}
               {it.zotero && (
                 <div className={cn("mt-0.5 text-xs", it.zotero.status === "failed" ? "text-destructive/90" : it.zotero.status === "no_pdf" ? "text-warning-foreground" : "text-muted-foreground")}
                   title={it.zotero.error ?? undefined}>
-                  {ZOTERO[it.zotero.status]}{it.zotero.status === "failed" && it.zotero.error ? `：${it.zotero.error.slice(0, 120)}` : ""}
+                  {ZOTERO[it.zotero.status]}{it.zotero.status === "failed" && it.zotero.error ? `：${it.zotero.error_text ?? it.zotero.error}` : ""}
                 </div>
               )}
             </div>

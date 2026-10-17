@@ -203,7 +203,7 @@ def test_busy_raises_and_api_returns_409(client, fake_batch):
         "title": "Third Job",
     })
     assert resp.status_code == 409
-    assert "已有下载在进行" in resp.json()["detail"]
+    assert "已有下载任务在进行" in resp.json()["detail"]
 
     # Unblock and verify completion
     fake_batch.block_event.set()
@@ -436,7 +436,9 @@ def test_api_downloads_endpoints(client):
     # List when empty
     resp = client.get("/api/downloads")
     assert resp.status_code == 200
-    assert resp.json() == {"jobs": [], "running": None, "live": None, "pushing": None}
+    body = resp.json()
+    assert body.pop("output_dir").endswith("papers")  # the configured save folder
+    assert body == {"jobs": [], "running": None, "live": None, "pushing": None}
 
 
 def test_job_failure_on_engine_exception(fake_batch):
@@ -646,7 +648,7 @@ def test_push_zotero_busy_raises_and_api_409(client, monkeypatch, tmp_path):
     # API returns 409
     resp = client.post(f"/api/downloads/{job_id}/zotero", json={})
     assert resp.status_code == 409
-    assert "已有推送在进行" in resp.json()["detail"]
+    assert "已有推送任务在进行" in resp.json()["detail"]
 
     block_event.set()
     wait_push(job_id)
@@ -806,13 +808,13 @@ def test_api_zotero_collections_endpoint(client, monkeypatch):
                         lambda cfg: {"success": False, "error": "zotero-mcp not installed"})
     resp_fail = client.get("/api/zotero/collections")
     assert resp_fail.status_code == 503
-    assert resp_fail.json()["detail"] == "zotero-mcp not installed"
+    assert resp_fail.json()["detail"] == "无法读取分类：未找到 zotero-mcp。在「设置 → Zotero」中填写它的 Python 路径。"
 
     # Failure without error message
     monkeypatch.setattr(zotero, "zotero_collections", lambda cfg: {"success": False})
     resp_fail2 = client.get("/api/zotero/collections")
     assert resp_fail2.status_code == 503
-    assert resp_fail2.json()["detail"] == "Zotero is not reachable"
+    assert resp_fail2.json()["detail"] == "无法读取分类：Zotero 没有响应。确认 Zotero 已启动后重试。"
 
 
 def test_zotero_pending():
@@ -1159,5 +1161,198 @@ def test_api_zotero_overview(client, monkeypatch):
     assert data2["pushing"] is None
     assert data2["pending"] == download_jobs.zotero_pending()
     assert data2["history"] == download_jobs.zotero_history()
+
+
+def test_find_local_pdf(tmp_path):
+    """find_local_pdf prefers job item file first, else output_dir *.pdf matching safe_filename(doi), else None."""
+    papers_dir = tmp_path / "papers"
+    papers_dir.mkdir(parents=True, exist_ok=True)
+    job_file = papers_dir / "job_doc.pdf"
+    job_file.write_bytes(b"%PDF-1.4 job")
+
+    job_data = {
+        "schema": store.SCHEMA,
+        "job": "20261017-180000",
+        "title": "Find PDF Job",
+        "session": None,
+        "state": "done",
+        "created": "2026-10-17 18:00:00",
+        "finished": "2026-10-17 18:05:00",
+        "output_dir": str(papers_dir),
+        "error": None,
+        "items": [
+            {"doi": "10.1000/in-job", "title": "In Job", "year": 2024, "journal": "Nature",
+             "status": "done", "source": "unpaywall", "file": str(job_file), "error": None},
+        ],
+    }
+    store.write_json(download_jobs.job_path("20261017-180000"), job_data)
+
+    fallback_file = papers_dir / "2024_10.1000_in-output-dir_paper.pdf"
+    fallback_file.write_bytes(b"%PDF-1.4 fallback")
+
+    # 1. Job item file takes priority even if another matching file exists in output_dir
+    competing_file = papers_dir / "10.1000_in-job.pdf"
+    competing_file.write_bytes(b"%PDF-1.4 competing")
+    assert download_jobs.find_local_pdf("10.1000/in-job") == job_file
+
+    # 2. Paper not in job items falls back to output_dir *.pdf matching safe_filename(doi)
+    assert download_jobs.find_local_pdf("10.1000/in-output-dir") == fallback_file
+
+    # 3. Nonexistent paper returns None
+    assert download_jobs.find_local_pdf("10.1000/nonexistent") is None
+    assert download_jobs.find_local_pdf("") is None
+
+
+def test_start_zotero_target_stored_and_used(fake_batch, monkeypatch):
+    """start(..., zotero_target=...) is stored and used as push default and in zotero_pending."""
+    papers = [{"doi": "10.1000/target-paper", "title": "Target Paper"}]
+    job_info = download_jobs.start(papers, title="Target Job", zotero_target="  /Custom/Target/  ")
+    job_id = job_info["job"]
+    assert job_info["zotero_target"] == "Custom/Target"
+
+    data = wait_job(job_id)
+    assert data["zotero_target"] == "Custom/Target"
+
+    # In zotero_pending, collection uses zotero_target
+    pending = download_jobs.zotero_pending()
+    job_pending = next(p for p in pending if p["job"] == job_id)
+    assert job_pending["collection"] == "Custom/Target"
+
+    # Push without explicit collection uses zotero_target as default
+    ensured_cols = []
+    monkeypatch.setattr(zotero, "ensure_collection",
+                        lambda col, cfg: ensured_cols.append(col) or {"success": True, "key": "COL_TGT", "path": col})
+    monkeypatch.setattr(zotero, "push_via_zotero_mcp",
+                        lambda *a, **k: {"success": True, "zotero_key": "ZK_TGT", "pdf_attached": True})
+
+    download_jobs.push_zotero(job_id)
+    push_data = wait_push(job_id)
+    assert push_data["zotero"]["collection"] == "Custom/Target"
+    assert ensured_cols == ["Custom/Target"]
+
+
+def test_api_zotero_check(client, monkeypatch, tmp_path):
+    """POST /api/zotero/check returns 400 on bad key, 503 on failure, and fills local_pdf only for non-ok items."""
+    # 400 bad key
+    assert client.post("/api/zotero/check", json={"key": "bad!key"}).status_code == 400
+    assert client.post("/api/zotero/check", json={"key": "SHORT"}).status_code == 400
+
+    # 503 on failure
+    monkeypatch.setattr(zotero, "check_collection",
+                        lambda key, cfg: {"success": False, "error": "Zotero bridge down"})
+    resp_fail = client.post("/api/zotero/check", json={"key": "COL12345"})
+    assert resp_fail.status_code == 503
+    assert resp_fail.json()["detail"] == "无法检查附件：出现意外错误"
+
+    # local_pdf filled only for non-ok items
+    pdf_path = tmp_path / "found.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(download_jobs, "find_local_pdf", lambda doi: pdf_path)
+
+    items = [
+        {"key": "ITEM0001", "doi": "10.1000/ok", "title": "OK Item", "state": "ok"},
+        {"key": "ITEM0002", "doi": "10.1000/missing", "title": "Missing Item", "state": "missing"},
+        {"key": "ITEM0003", "doi": "10.1000/empty", "title": "Empty Item", "state": "empty"},
+    ]
+    monkeypatch.setattr(zotero, "check_collection",
+                        lambda key, cfg: {"success": True, "items": [dict(i) for i in items]})
+
+    resp_ok = client.post("/api/zotero/check", json={"key": "COL12345"})
+    assert resp_ok.status_code == 200
+    res_items = {it["key"]: it for it in resp_ok.json()["items"]}
+    assert res_items["ITEM0001"]["local_pdf"] is None
+    assert res_items["ITEM0002"]["local_pdf"] == str(pdf_path)
+    assert res_items["ITEM0003"]["local_pdf"] == str(pdf_path)
+
+
+def test_api_zotero_repair(client, monkeypatch, tmp_path):
+    """POST /api/zotero/repair validates keys, 404s when attaching without local PDF,
+    never uses a client path, 502s on failure, and only trashes when attach is false."""
+    # 400 bad keys
+    assert client.post("/api/zotero/repair", json={"item_key": "bad_item", "trash": []}).status_code == 400
+    assert client.post("/api/zotero/repair", json={"item_key": "ITEM1234", "trash": ["bad_trash!"]}).status_code == 400
+
+    # 404 when attach is true and no local PDF found
+    monkeypatch.setattr(download_jobs, "find_local_pdf", lambda doi: None)
+    resp_404 = client.post("/api/zotero/repair", json={
+        "item_key": "ITEM1234", "doi": "10.1000/no-pdf", "trash": ["ATT12345"], "attach": True,
+    })
+    assert resp_404.status_code == 404
+    assert resp_404.json()["detail"] == "无法重新附加：本机没有此文献的 PDF。先下载此文献。"
+
+    # Never uses a client path; uses find_local_pdf
+    pdf_path = tmp_path / "valid.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(download_jobs, "find_local_pdf", lambda doi: pdf_path)
+
+    repair_calls = []
+
+    def fake_repair(item_key, pdf, trash, cfg):
+        repair_calls.append((item_key, pdf, trash))
+        return {"success": True, "trashed": trash, "attached": pdf is not None}
+
+    monkeypatch.setattr(zotero, "repair_attachment", fake_repair)
+
+    resp_repair = client.post("/api/zotero/repair", json={
+        "item_key": "ITEM1234", "doi": "10.1000/has-pdf", "trash": ["ATT12345"],
+        "attach": True, "path": "C:/client/injected/path.pdf",
+    })
+    assert resp_repair.status_code == 200
+    assert repair_calls[0] == ("ITEM1234", pdf_path, ["ATT12345"])
+
+    # 502 on failure
+    monkeypatch.setattr(zotero, "repair_attachment",
+                        lambda *a, **kw: {"success": False, "error": "Zotero delete failed"})
+    resp_502 = client.post("/api/zotero/repair", json={
+        "item_key": "ITEM1234", "doi": "10.1000/has-pdf", "trash": ["ATT12345"], "attach": True,
+    })
+    assert resp_502.status_code == 502
+    assert resp_502.json()["detail"] == "无法重新附加：出现意外错误"
+
+    # Attach false: only trashes, never passes a pdf to repair_attachment
+    repair_calls.clear()
+    monkeypatch.setattr(zotero, "repair_attachment", fake_repair)
+    resp_trash_only = client.post("/api/zotero/repair", json={
+        "item_key": "ITEM1234", "trash": ["ATT12345"], "attach": False,
+    })
+    assert resp_trash_only.status_code == 200
+    assert repair_calls[0] == ("ITEM1234", None, ["ATT12345"])
+
+
+def test_api_zotero_write_mode_and_authorize(client, monkeypatch):
+    """GET /api/zotero/write-mode and POST /api/zotero/authorize reflect zotero responses."""
+    from litloop import app_server
+    app_server._WRITE_MODE.clear()
+    # write-mode success
+    monkeypatch.setattr(zotero, "write_mode",
+                        lambda cfg: {"success": True, "mode": "local", "local_supported": True})
+    resp_wm = client.get("/api/zotero/write-mode")
+    assert resp_wm.status_code == 200
+    assert resp_wm.json() == {"mode": "local", "local_supported": True}
+
+    # the answer is kept: no second zotero-mcp start until the user authorizes
+    monkeypatch.setattr(zotero, "write_mode", lambda cfg: {"success": False})
+    assert client.get("/api/zotero/write-mode").json()["mode"] == "local"
+    app_server._WRITE_MODE.clear()
+
+    # write-mode failure
+    resp_wm_fail = client.get("/api/zotero/write-mode")
+    assert resp_wm_fail.status_code == 200
+    assert resp_wm_fail.json() == {"mode": None, "local_supported": None}
+
+    # authorize success
+    monkeypatch.setattr(zotero, "authorize_local_writes",
+                        lambda cfg: {"success": True, "mode": "local", "message": "Access granted"})
+    resp_auth = client.post("/api/zotero/authorize")
+    assert resp_auth.status_code == 200
+    assert resp_auth.json() == {"mode": "local", "ok": True, "message": "Access granted"}
+
+    # authorize failure
+    monkeypatch.setattr(zotero, "authorize_local_writes",
+                        lambda cfg: {"success": False, "mode": "none", "error": "User denied"})
+    resp_auth_fail = client.post("/api/zotero/authorize")
+    assert resp_auth_fail.status_code == 200
+    assert resp_auth_fail.json() == {"mode": "none", "ok": False, "message": "无法授权：Zotero 未允许本地写入。重新授权，并在 Zotero 弹出的窗口中选择允许。"}
+
 
 

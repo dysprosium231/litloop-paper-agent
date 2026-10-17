@@ -59,6 +59,18 @@ class NewDownload(BaseModel):
     papers: list[Paper]
     title: str
     session: str | None = None
+    zotero_target: str | None = None
+
+
+class ZoteroCheck(BaseModel):
+    key: str
+
+
+class ZoteroRepair(BaseModel):
+    item_key: str
+    doi: str | None = None
+    trash: list[str] = []
+    attach: bool = True  # False: only move the empty attachments to the Trash
 
 
 class ZoteroPush(BaseModel):
@@ -74,6 +86,21 @@ class Decision(BaseModel):
     doi: str | None = None
     title: str | None = None
     decision: str | None = None  # "selected", "rejected" or None
+
+
+_WRITE_MODE: dict[str, Any] = {}  # zotero-mcp's write mode, cached until the user authorizes
+
+
+def _explain(d: dict[str, Any] | None, action: str = "下载", full: bool = False) -> None:
+    """Add ``error_text`` (docs/UI_COPY.md section 7) next to a raw ``error``; the raw text stays for the tooltip."""
+    from . import error_text
+    if d and d.get("error"):
+        d["error_text"] = error_text.message(d["error"], action) if full else error_text.reason(d["error"])
+
+
+def _fail(status: int, raw: str | None, action: str, fallback: str) -> HTTPException:
+    from . import error_text
+    return HTTPException(status, error_text.message(raw or fallback, action))
 
 
 def _record_path(session: str):
@@ -189,9 +216,10 @@ def create_app(token: str) -> FastAPI:
     @app.get("/api/downloads")
     def downloads() -> dict[str, Any]:
         from . import download_jobs, progress_reporter
+        from .config import load_config
         live = progress_reporter.read_state() if download_jobs.running() else None
         return {"jobs": download_jobs.list_jobs(), "running": download_jobs.running(), "live": live,
-                "pushing": download_jobs.pushing()}
+                "pushing": download_jobs.pushing(), "output_dir": str(load_config().get("output_dir") or "")}
 
     @app.get("/api/downloads/pending")
     def downloads_pending() -> list[dict[str, Any]]:
@@ -223,6 +251,11 @@ def create_app(token: str) -> FastAPI:
         except FileNotFoundError as exc:
             raise HTTPException(404, f"no job {job}") from exc
         d["zotero_default"] = download_jobs.default_collection(d["title"])
+        _explain(d, full=True)
+        _explain(d.get("zotero"), "推送", full=True)
+        for it in d.get("items") or []:
+            _explain(it)
+            _explain(it.get("zotero"), "推送")
         return d
 
     @app.post("/api/downloads/{job}/zotero")
@@ -235,7 +268,7 @@ def create_app(token: str) -> FastAPI:
         except FileNotFoundError as exc:
             raise HTTPException(404, f"no job {job}") from exc
         except download_jobs.Busy as exc:
-            raise HTTPException(409, "已有推送在进行") from exc
+            raise HTTPException(409, "已有推送任务在进行，完成后再开始新的推送") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
@@ -253,9 +286,69 @@ def create_app(token: str) -> FastAPI:
         except requests.RequestException:
             running = False
         found = discover_zotero_mcp(load_config())
+        history = download_jobs.zotero_history()
+        for h in history:
+            _explain(h, "推送", full=True)
         return {"running": running, "mcp": found["python"] if found else None,
-                "pending": download_jobs.zotero_pending(), "history": download_jobs.zotero_history(),
+                "pending": download_jobs.zotero_pending(), "history": history,
                 "pushing": download_jobs.pushing()}
+
+    @app.get("/api/zotero/write-mode")
+    def zotero_write_mode() -> dict[str, Any]:
+        from .config import load_config
+        from .zotero import write_mode
+        # Asking costs a zotero-mcp start (2-3 s) and the mode only changes when the
+        # user authorizes, so the first good answer is kept until then.
+        if "mode" not in _WRITE_MODE:
+            r = write_mode(load_config())
+            if not r.get("success"):
+                return {"mode": None, "local_supported": None}
+            _WRITE_MODE.update(mode=r.get("mode"), local_supported=r.get("local_supported"))
+        return dict(_WRITE_MODE)
+
+    @app.post("/api/zotero/authorize")
+    def zotero_authorize() -> dict[str, Any]:
+        """Zotero asks the user (a dialog in the Zotero app); the answer decides the mode."""
+        from .config import load_config
+        from .zotero import authorize_local_writes
+        r = authorize_local_writes(load_config())
+        _WRITE_MODE.clear()
+        from . import error_text
+        ok = bool(r.get("success"))
+        return {"mode": r.get("mode"), "ok": ok,
+                "message": r.get("message") if ok else error_text.message(r.get("error") or r.get("message"), "授权")}
+
+    @app.post("/api/zotero/check")
+    def zotero_check(body: ZoteroCheck) -> dict[str, Any]:
+        """The PDF state of every item in a collection, and for problem items a local PDF if one exists."""
+        from . import download_jobs
+        from .config import load_config
+        from .zotero import check_collection
+        if not re.fullmatch(r"[A-Z0-9]{8}", body.key):
+            raise HTTPException(400, "bad collection key")
+        r = check_collection(body.key, load_config())
+        if not r.get("success"):
+            raise _fail(503, r.get("error"), "检查附件", "Zotero is not reachable")
+        for it in r["items"]:
+            pdf = download_jobs.find_local_pdf(it["doi"]) if it["state"] != "ok" and it["doi"] else None
+            it["local_pdf"] = str(pdf) if pdf else None
+        return {"items": r["items"]}
+
+    @app.post("/api/zotero/repair")
+    def zotero_repair(body: ZoteroRepair) -> dict[str, Any]:
+        """Repair one item: trash its empty attachments, attach the local PDF found for its DOI."""
+        from . import download_jobs
+        from .config import load_config
+        from .zotero import repair_attachment
+        if not re.fullmatch(r"[A-Z0-9]{8}", body.item_key) or any(not re.fullmatch(r"[A-Z0-9]{8}", k) for k in body.trash):
+            raise HTTPException(400, "bad item key")
+        pdf = download_jobs.find_local_pdf(body.doi or "") if body.attach else None  # never a path from the client
+        if body.attach and not pdf:
+            raise _fail(404, "no local PDF", "重新附加", "")
+        r = repair_attachment(body.item_key, pdf, body.trash, load_config())
+        if not r.get("success"):
+            raise _fail(502, r.get("error"), "重新附加", "repair did not complete")
+        return r
 
     @app.get("/api/zotero/collections")
     def zotero_collections() -> list[dict[str, Any]]:
@@ -264,16 +357,17 @@ def create_app(token: str) -> FastAPI:
         from .zotero import zotero_collections as read
         r = read(load_config())
         if not r.get("success"):
-            raise HTTPException(503, r.get("error") or "Zotero is not reachable")
+            raise _fail(503, r.get("error"), "读取分类", "Zotero is not reachable")
         return r["collections"]
 
     @app.post("/api/downloads")
     def download_start(body: NewDownload) -> dict[str, Any]:
         from . import download_jobs
         try:
-            return download_jobs.start([p.model_dump() for p in body.papers], body.title, body.session)
+            return download_jobs.start([p.model_dump() for p in body.papers], body.title, body.session,
+                                       body.zotero_target)
         except download_jobs.Busy as exc:
-            raise HTTPException(409, "已有下载在进行") from exc
+            raise HTTPException(409, "已有下载任务在进行，完成后再开始新的下载") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
@@ -286,14 +380,18 @@ def create_app(token: str) -> FastAPI:
     def open_path(body: OpenPath) -> dict[str, Any]:
         """Open a downloaded PDF or a job's folder with the system's default program.
 
-        Only paths a download job recorded (its files and output folder) are
-        opened, never an arbitrary path: opening runs whatever handles it.
+        Only paths a download job recorded (its files and output folder) and
+        the configured save folder are opened, never an arbitrary path:
+        opening runs whatever handles it.
         """
         from pathlib import Path
 
         from . import download_jobs
+        from .config import load_config
         target = Path(body.path).resolve()
         allowed = set()
+        if load_config().get("output_dir"):
+            allowed.add(Path(load_config()["output_dir"]).expanduser().resolve())
         for j in download_jobs.list_jobs(200):
             d = download_jobs.get(j["job"])
             if d.get("output_dir"):

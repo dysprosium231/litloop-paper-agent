@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SidebarContent, SidebarHeader, SidebarInput } from "@/components/ui/sidebar"
 import { Switch } from "@/components/ui/switch"
-import { settingsApi, type ProviderUsage, type SettingField, type SettingGroup, type TestResult } from "@/lib/api"
+import { settingsApi, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 // The native chooser exists only inside the app window, not in a browser preview.
@@ -94,7 +94,7 @@ function Row({ title, note, children, wide }: { title: React.ReactNode; note?: R
   )
 }
 
-/** One setting. Switches and choices save at once; text saves on Enter or 保存. */
+/** One setting. Switches and choices save at once; text saves on Enter or the save button. */
 function Field({ field, onSaved }: { field: SettingField; onSaved: (f: SettingField) => void }) {
   const [editing, setEditing] = React.useState(false)
   const [draft, setDraft] = React.useState(field.type === "secret" ? "" : String(field.value ?? ""))
@@ -109,7 +109,7 @@ function Field({ field, onSaved }: { field: SettingField; onSaved: (f: SettingFi
       setEditing(false)
       setTimeout(() => setState("idle"), 1500)
     } catch (e) {
-      setState(String(e).replace(/^Error: \d+ /, ""))
+      setState(errorMessage(e))
     }
   }
   const id = `setting-${field.key}`
@@ -152,7 +152,7 @@ function Field({ field, onSaved }: { field: SettingField; onSaved: (f: SettingFi
                 const p = await choosePath(field.pick!, draft)
                 if (p) { setDraft(p); save(p) }
               } catch (e) {
-                setState(`无法打开选择窗口：${String(e)}`)  // e.g. a window built before the dialog plugin
+                setState("无法打开选择窗口，请重启应用")  // e.g. a window built before the dialog plugin
               }
             }}>
             <FolderOpenIcon />
@@ -219,7 +219,7 @@ function GroupPane({ group, onSaved }: { group: SettingGroup; onSaved: (f: Setti
     try {
       setResults((await settingsApi.test(group.test!)).results)
     } catch (e) {
-      setResults([{ name: "检测", ok: false, detail: String(e) }])
+      setResults([{ name: "检测", ok: false, detail: errorMessage(e) }])
     } finally {
       setTesting(false)
     }
@@ -292,9 +292,9 @@ function QuotaPane() {
       )}
       {usage && Object.entries(usage).map(([name, u]) => (
         <Row key={name} title={PROVIDERS[name] ?? name}
-          note={`今日请求 ${u.requests_today}` + (u.throttled_today ? ` · 被限流 ${u.throttled_today} 次` : "") + (u.resets_at ? ` · 重置 ${u.resets_at}` : "")}>
+          note={`今日请求 ${u.requests_today} 次` + (u.throttled_today ? ` · 被限流 ${u.throttled_today} 次` : "") + (u.resets_at ? ` · 重置 ${u.resets_at}` : "")}>
           <span className="text-sm tabular-nums text-muted-foreground">
-            {u.remaining == null ? "—" : `剩余 ${u.remaining.toLocaleString()} / ${u.limit?.toLocaleString() ?? "?"}`}
+            {u.remaining == null ? "—" : (u.limit != null ? `剩余 ${u.remaining.toLocaleString()} / ${u.limit.toLocaleString()}` : `剩余 ${u.remaining.toLocaleString()}`)}
           </span>
         </Row>
       ))}

@@ -54,7 +54,7 @@ litloop 是一个 MCP 服务器，提供 **20 个高层工具**，覆盖学术�
 | 工具 | 功能 | 关键参数 |
 |------|------|----------|
 | `litloop_find` | ScanSci Find 引擎：`action=plan\|estimate\|smoke\|calibrate` 系统综述搜索协议 | `action`、`query`、`domain`、`depth`、`sample_size` |
-| `litloop_deep_search` | 深度迭代检索与主动学习筛选：`action=start\|rate\|next\|status` | `action`（start/rate/next/status）、`question`、`queries`、`seeds`、`core_terms`、`criteria`、`must_find`、`session`、`ratings`、`batch_size` |
+| `litloop_deep_search` | 深度迭代检索与主动学习筛选：`action=start\|rate\|next\|status` | `action`（start/rate/next/status）、`question`、`queries`、`seeds`、`seed_collection`、`core_terms`、`criteria`、`must_find`、`session`、`ratings`、`batch_size` |
 | `litloop_prepare_queue` | 准备下载队列：`action=verify\|resolve_oa\|build\|full` | `candidates_json`、`query`、`limit` |
 | `litloop_search` | 关键词/作者搜索（OpenAlex），带摘要、期刊分区、撤稿标记 | `query`/`author`/`author_id`、`limit`、`year_from`、`year_to`、`sort`（cited/date）、`max_cas_zone`、`max_cas_sub_zone`、`max_jcr_quartile`、`exclude_warning`、`exclude_retracted` |
 | `litloop_screening` | 保存筛选记录、记录用户选择 | `action`=save/decide/list/show、`question`、`criteria`、`items`、`session`、`selected`、`out_file` |
@@ -100,7 +100,7 @@ litloop 是一个 MCP 服务器，提供 **20 个高层工具**，覆盖学术�
 用于需要系统性查全某一课题的场景（共同引用扩展 + 持续主动学习）：
 
 ```
-1. 准备种子：确认 1–3 篇已知相关种子文章 DOI（没有时先用 litloop_search 寻找并请用户确认）。
+1. 准备种子：确认 1–3 篇已知相关种子文章 DOI（没有时先用 litloop_search 寻找并请用户确认）。如果用户在 Zotero 里已经有这个课题的分类，用 `seed_collection="分类路径"`（如 `"1 陶瓷-金属复合材料/SiC/Al"`，也可以只写唯一的分类名）把其中有 DOI 的文献都当种子，可以和 `seeds` 一起用；返回的 `seed_collection` 报告用了几篇、几篇没有 DOI。分类较大时引用扩展会分几轮完成，额度上限照常生效。
 2. 发起检索：litloop_deep_search(action="start", question=..., queries=[4–8 组英文检索词], seeds=[DOI], core_terms=[1–3 个核心词], criteria=[...])
    → 返回首批候选（默认 20 篇）与 session。
    - 检索词与核心词需覆盖缩写、全称与同义词，核心词中用 "|" 分隔同义词（如 "Al|aluminum SiC"）。
@@ -112,7 +112,7 @@ litloop 是一个 MCP 服务器，提供 **20 个高层工具**，覆盖学术�
 4. 获取下批：litloop_deep_search(action="next", session=...)
    - 评为“高”的文章自动滚雪球扩展为新种子，排序模型根据全部评分持续学习重排。
    - 随时可用 litloop_deep_search(action="status", session=...) 查看筛选进度。
-   - 当返回 stop_suggested=true 时向用户展示 stop_reason 并建议结束；用户同意后用 litloop_screening 记录选择并按需下载。
+   - 当返回 stop_suggested=true 时向用户展示 stop_reason 并建议结束（返回里的 `remaining_estimate` 是按每批高相关比例的下降趋势粗略外推的剩余数（`remaining` 约还有几篇高、`next_batch` 下一批约几篇），一并告诉用户供决定，但说明这是粗略估计；比例还在上升时没有 `remaining`，说明课题还没读到尽头。）；用户同意后用 litloop_screening 记录选择并按需下载。
 ```
 
 ### 流程 3：论文列表全文下载

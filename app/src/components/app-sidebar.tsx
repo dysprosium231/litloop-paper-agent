@@ -81,7 +81,7 @@ export function AppSidebar({
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip={{ children: "展开", hidden: railOpen }} onClick={() => onRailOpen(!railOpen)}
+              <SidebarMenuButton tooltip={{ children: railOpen ? "收起侧栏" : "展开侧栏", hidden: railOpen }} onClick={() => onRailOpen(!railOpen)}
                 className="h-9 gap-3 px-2.5 text-muted-foreground" aria-label={railOpen ? "收起侧栏" : "展开侧栏"}>
                 <ToggleIcon />
                 <span className={railOpen ? "truncate" : "sr-only"}>收起</span>
