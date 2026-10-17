@@ -73,3 +73,19 @@ def test_open_access_papers_are_fetched_before_scihub(calls, monkeypatch, tmp_pa
     assert {r["doi"]: r["source"] for r in results} == {"10.3390/oa": "oa_url", "10.1/in-scihub": "Sci-Hub"}
     index = json.loads((tmp_path / ".doi_index.json").read_text(encoding="utf-8"))
     assert "10.3390/oa" in index                                    # the app sees the file
+
+
+def test_cancel_stops_the_papers_not_yet_started(calls, monkeypatch, tmp_path: Path):
+    import litloop.sources as sources
+    real = sources.download
+
+    def download(ident, out, **kw):
+        r = real(ident, out, **kw)
+        if ident == "10.1/subscription" and kw.get("strategy") is None:
+            sources.cancel_downloads()  # the user cancels while this paper downloads
+        return r
+    monkeypatch.setattr(sources, "download", download)
+    entries = [QueueEntry(identifier=d) for d in ("10.1/subscription", "10.1/nowhere")]
+    results = pipeline.run_scihub_then_single(entries, tmp_path, config={}, allow_grey=False)
+    assert [c[0] for c in calls] == ["10.1/subscription"]           # the next paper never started
+    assert {r["doi"]: r.get("error_type") for r in results}["10.1/nowhere"] == "cancelled"

@@ -542,9 +542,11 @@ def run_scihub_then_single(
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     from . import progress_reporter as _progress
+    from . import sources as _sources
     from .sources import download
 
     config = config or {}
+    gen0 = _sources._CANCEL_GEN[0]  # cancel_downloads() bumps it: papers not yet started stop too
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     ids = [e.identifier for e in entries if e.identifier and not e.unresolved]
@@ -575,6 +577,9 @@ def run_scihub_then_single(
                 _progress.advance(True, current=r["doi"])
 
     def _one(ident: str, **kw: Any) -> dict[str, Any]:
+        if _sources._CANCEL_GEN[0] != gen0:
+            return {"success": False, "doi": ident, "identifier": ident, "error": "cancelled by user",
+                    "error_type": "cancelled"}
         try:
             r = download(ident, str(out), _batch=True, **kw) or {}
         except Exception as exc:
