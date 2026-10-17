@@ -23,19 +23,20 @@ const secs = (s: number) => {
 }
 
 /**
- * Share of 高 in each batch, newest on the right. Each bar answers hover over its
+ * Share of 高 in each batch, newest on the right, scaled to the best batch. Each bar answers hover over its
  * whole column (full height, gaps included), and the note shows at once.
  */
 function BatchBars({ batches, highs }: { batches: Summary["batches"]; highs: number[] }) {
   const [hover, setHover] = React.useState<number | null>(null)
   const b = hover === null ? null : batches[hover]
+  const top = Math.max(...highs)  // the best batch fills the height; the % next to it stays the real share
   return (
     <span className="relative flex shrink-0 items-center gap-2" onMouseLeave={() => setHover(null)}>
       <span className="flex h-7 items-stretch" role="img" aria-label="每批高相关比例">
         {batches.map((_, i) => (
           <span key={i} className="flex cursor-default items-end px-0.5" onMouseEnter={() => setHover(i)}>
             <span className={cn("w-2.5 rounded-sm bg-primary", hover === i && "ring-2 ring-primary/30")}
-              style={{ height: `${Math.max(8, highs[i] * 100)}%`, opacity: hover === i || i === highs.length - 1 ? 1 : 0.45 }} />
+              style={{ height: `${top > 0 ? Math.max(8, (highs[i] / top) * 100) : 8}%`, opacity: hover === i || i === highs.length - 1 ? 1 : 0.45 }} />
           </span>
         ))}
       </span>
