@@ -156,6 +156,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Sci-Hub and LibGen through host_proxy_url (the user's proxy) instead of
     # the school's exit; direct when that proxy's port is closed.
     "scihub_via_proxy": False,
+    # A short list's first round: papers asked of Sci-Hub at once (HTTP only),
+    # and the workers their mirror requests share. More papers at once risks
+    # Sci-Hub's per-IP rate limit.
+    "scihub_round_workers": 6,
+    "scihub_http_workers": 12,
     "race_grace_seconds": 15,
     "race_grace_browser_seconds": 180,
     "batch_small_max": 30,

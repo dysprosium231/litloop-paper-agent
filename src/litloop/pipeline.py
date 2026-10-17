@@ -594,7 +594,7 @@ def run_scihub_then_single(
     grey_ids = [i for i in ids if i not in results]
     if grey_ids and allow_grey and grey_allowed(config):
         _progress.update(phase="Sci-Hub")
-        with ThreadPoolExecutor(max_workers=min(4, len(grey_ids))) as ex:
+        with ThreadPoolExecutor(max_workers=min(int(config.get("scihub_round_workers", 6) or 6), len(grey_ids))) as ex:
             for i in grey_ids:
                 _progress.item_stage(i, "正在查 Sci-Hub")
             # Over HTTP only: no browser, so these really run side by side; a

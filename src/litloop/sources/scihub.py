@@ -70,8 +70,21 @@ _RACE_POOL: ThreadPoolExecutor | None = None
 _RACE_POOL_LOCK = threading.Lock()
 
 
+_HTTP_POOL: ThreadPoolExecutor | None = None
+
+
 def _race_pool(config: dict[str, Any]) -> ThreadPoolExecutor:
-    global _RACE_POOL
+    """Workers for the mirror race. With browsers, few (scihub_browser_workers:
+    each may hold a window). Over HTTP only, plenty (scihub_http_workers):
+    4 papers x 3 mirrors queued behind 3 workers, and losers still holding them,
+    made a short list's first round take minutes (2026-10-17)."""
+    global _RACE_POOL, _HTTP_POOL
+    if not config.get("scihub_use_browser", True):
+        with _RACE_POOL_LOCK:
+            if _HTTP_POOL is None:
+                workers = max(1, int(config.get("scihub_http_workers", 12) or 12))
+                _HTTP_POOL = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="scihub-http")
+            return _HTTP_POOL
     with _RACE_POOL_LOCK:
         if _RACE_POOL is None:
             workers = max(1, int(config.get("scihub_browser_workers", 3) or 3))
