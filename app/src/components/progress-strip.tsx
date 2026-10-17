@@ -1,6 +1,7 @@
 import * as React from "react"
 import { TriangleAlertIcon } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import type { Progress, Summary } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -19,6 +20,35 @@ const secs = (s: number) => {
     return rem > 0 ? `${m} 分 ${rem} 秒` : `${m} 分`
   }
   return `${Math.max(1, Math.round(s))} 秒`
+}
+
+/**
+ * Share of 高 in each batch, newest on the right. Each bar answers hover over its
+ * whole column (full height, gaps included), and the note shows at once.
+ */
+function BatchBars({ batches, highs }: { batches: Summary["batches"]; highs: number[] }) {
+  const [hover, setHover] = React.useState<number | null>(null)
+  const b = hover === null ? null : batches[hover]
+  return (
+    <span className="relative flex shrink-0 items-center gap-2" onMouseLeave={() => setHover(null)}>
+      <span className="flex h-7 items-stretch" role="img" aria-label="每批高相关比例">
+        {batches.map((_, i) => (
+          <span key={i} className="flex cursor-default items-end px-0.5" onMouseEnter={() => setHover(i)}>
+            <span className={cn("w-2.5 rounded-sm bg-primary", hover === i && "ring-2 ring-primary/30")}
+              style={{ height: `${Math.max(8, highs[i] * 100)}%`, opacity: hover === i || i === highs.length - 1 ? 1 : 0.45 }} />
+          </span>
+        ))}
+      </span>
+      <span className="font-medium text-foreground tabular-nums" onMouseEnter={() => setHover(null)}>
+        {Math.round(highs[highs.length - 1] * 100)}%
+      </span>
+      {b && (
+        <span className="pointer-events-none absolute top-full left-0 z-50 mt-2 w-max rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md">
+          第 {b.batch} 批：高 {b.高} / 已评 {b.rated}（{Math.round(highs[hover!] * 100)}%）
+        </span>
+      )}
+    </span>
+  )
 }
 
 /** A button that opens a small panel under it; outside click or Esc closes it. */
@@ -51,7 +81,9 @@ function Pop({ label, aria, className, children }: {
 }
 
 /** What the running round is doing, or a one-line overview when nothing runs. */
-export function ProgressStrip({ progress, summary }: { progress: Progress | null; summary: Summary | null }) {
+export function ProgressStrip({ progress, summary, onContinue }: {
+  progress: Progress | null; summary: Summary | null; onContinue: () => void
+}) {
   const running = progress?.state === "running"
   if (!running) {
     if (!summary) return null
@@ -61,17 +93,7 @@ export function ProgressStrip({ progress, summary }: { progress: Progress | null
         <span className="shrink-0 whitespace-nowrap tabular-nums" title={`候选池 ${summary.pool.toLocaleString()} 篇，已评分 ${summary.screened.toLocaleString()} 篇`}>
           已评 <span className="font-medium text-foreground">{summary.screened.toLocaleString()}</span> / {summary.pool.toLocaleString()}
         </span>
-        {highs.length > 0 && (
-          <span className="flex shrink-0 items-center gap-2" title="每批高相关比例：每一批中评为高的比例，最右是最近一批；越来越低说明相关文献快找完了">
-            <span className="flex h-6 items-end gap-1" role="img" aria-label="每批高相关比例">
-              {summary.batches.map((b, i) => (
-                <span key={i} title={`第 ${b.batch} 批：高 ${b.高} / 已评 ${b.rated}`}
-                  className="w-2.5 rounded-sm bg-primary" style={{ height: `${Math.max(8, highs[i] * 100)}%`, opacity: i === highs.length - 1 ? 1 : 0.45 }} />
-              ))}
-            </span>
-            <span className="font-medium text-foreground tabular-nums">{Math.round(highs[highs.length - 1] * 100)}%</span>
-          </span>
-        )}
+        {highs.length > 0 && <BatchBars batches={summary.batches} highs={highs} />}
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {summary.stop_suggested && (
             <Pop label="建议停止" className="rounded bg-warning px-2 py-0.5 text-warning-foreground hover:brightness-95">
@@ -88,6 +110,10 @@ export function ProgressStrip({ progress, summary }: { progress: Progress | null
                 {summary.api_warnings.map((w) => <li key={w}>{w}</li>)}
               </ul>
             </Pop>
+          )}
+          {summary.current_batch && (
+            <Button size="sm" onClick={onContinue}
+              title="按目前全部评分（包括你改过的）重新排序，生成下一批；不经过 Agent">继续检索</Button>
           )}
         </span>
       </div>

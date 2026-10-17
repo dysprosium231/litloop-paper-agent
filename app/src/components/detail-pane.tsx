@@ -17,7 +17,6 @@ export type Paper = (BatchPaper | Item) & { item: Item | null }
  */
 export function DetailPane({
   paper,
-  edited,
   onRate,
   onSelect,
   onExclude,
@@ -25,7 +24,6 @@ export function DetailPane({
   onTranslate,
 }: {
   paper: Paper | null
-  edited: number
   onRate: (rel: Relevance) => void
   onSelect: () => void
   onExclude: () => void
@@ -100,17 +98,18 @@ export function DetailPane({
           </section>
         </Card>
 
-        {item && (
+        {item?.reason ? (
           <Card className="space-y-1.5 px-6 py-4">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">Agent 的评分 <RelevanceBadge rel={item.relevance} /></div>
             <p className="text-sm leading-relaxed">{item.reason}</p>
           </Card>
+        ) : (
+          <Card className="px-6 py-4 text-sm text-muted-foreground">Agent 尚未评分。可以先自己评分，回到对话后 Agent 会补上它的评分。</Card>
         )}
 
         <div className="flex-1" />
         <Card className="sticky bottom-4 space-y-3 px-5 py-4 shadow-sm">
-          {item ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <span className="text-xs text-muted-foreground">我的评分</span>
               <div role="group" aria-label="我的评分" className="inline-flex rounded-lg bg-muted p-0.5">
                 {RELEVANCE.map((r, i) => (
@@ -121,27 +120,19 @@ export function DetailPane({
                   </button>
                 ))}
               </div>
-              {item.user_relevance && (
+              {item?.reason && item.user_relevance && (
                 <button type="button" onClick={() => onRate(item.relevance)}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                   <RotateCcwIcon className="size-3" />恢复 Agent 的评分
                 </button>
               )}
               <div className="ml-auto flex gap-2">
-                <Button variant="outline" onClick={onExclude}>{item.decision === "rejected" ? "取消排除" : "排除"}</Button>
-                <Button className="min-w-28" variant={item.decision === "selected" ? "outline" : "default"} onClick={onSelect}>
-                  {item.decision === "selected" ? "移出下载" : "加入下载"}
+                <Button variant="outline" disabled={!item} onClick={onExclude}>{item?.decision === "rejected" ? "取消排除" : "排除"}</Button>
+                <Button className="min-w-28" disabled={!item} variant={item?.decision === "selected" ? "outline" : "default"} onClick={onSelect}>
+                  {item?.decision === "selected" ? "移出下载" : "加入下载"}
                 </Button>
               </div>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Agent 尚未评分，评分后可在此修改。</p>
-          )}
-          {edited > 0 && (
-            <p className="rounded-lg border border-warning-foreground/20 bg-warning px-3 py-2 text-xs text-warning-foreground">
-              你改了 {edited} 篇的评分。回到对话说「继续」，下一批会按你的评分排序。
-            </p>
-          )}
           <p className="text-xs text-muted-foreground">快捷键：↑↓ 切换 · 1–4 评分 · 空格 加入下载</p>
         </Card>
       </div>

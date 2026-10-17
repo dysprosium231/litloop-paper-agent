@@ -63,7 +63,7 @@ tool routing or configuration guidance.
 3. 逐篇判断后用 `litloop_deep_search(action="rate", session=..., ratings=[{"n": 1, "relevance": "高", "reason": "..."}, ...])` 按编号保存，标题和 DOI 由插件补上。**这一批每篇都要评**，返回的 `not_rated` 列出漏评的编号；没评的下一批会再出现。
    只有在设置里把翻译服务选为 Agent 时，`rate` 的返回才会要求翻译：`next_step` 写明哪些评分要附 `abstract_zh`（中文摘要），漏掉的列在 `untranslated` 里，用 `litloop_screening(action="translate", session=..., items=[{"doi": ..., "abstract_zh": ...}])` 补上。没有要求时不要翻译（默认由 app 调用 DeepSeek / DeepL 翻译，不耗对话额度）。
 4. `litloop_deep_search(action="next", session=...)` 取下一批。评为“高”的文章会自动成为新种子；从第二批起排序由模型根据全部评分学习（`ranked_by="model"`），所以“低 / 不相关”也要如实评。
-5. 返回 `stop_suggested=true` 时，把 `stop_reason` 告诉用户并建议停止；用户要继续就接着 `next`。返回里的 `remaining_estimate` 是按每批高相关比例的下降趋势粗略外推的剩余数（`remaining` 约还有几篇高、`next_batch` 下一批约几篇），一并告诉用户供决定，但说明这是粗略估计；比例还在上升时没有 `remaining`，说明课题还没读到尽头。随时可以用 `action="status"` 看已筛篇数和各相关度数量。
+5. 返回 `stop_suggested=true` 时，把 `stop_reason` 告诉用户并建议停止；用户要继续就接着 `next`。用户也可能在桌面 app 里自己评分并点「继续检索」生成了新的一批：**回到对话接着检索时先 `action="status"`**，返回里有 `unrated` 就按其中的编号用 `rate` 评完（用户在 app 里给的评分会保留），再 `next`。返回里的 `remaining_estimate` 是按每批高相关比例的下降趋势粗略外推的剩余数（`remaining` 约还有几篇高、`next_batch` 下一批约几篇），一并告诉用户供决定，但说明这是粗略估计；比例还在上升时没有 `remaining`，说明课题还没读到尽头。随时可以用 `action="status"` 看已筛篇数和各相关度数量。
 6. 筛完后按上面第 5、6 步呈现和让用户选择。跨了多批之后编号会变，**decide 时优先传 DOI**。
 
 ## Operating boundaries

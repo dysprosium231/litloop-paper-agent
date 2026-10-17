@@ -134,12 +134,13 @@ export const api = {
   session: (id: string) => call<{ record: SessionRecord; summary: Summary | null }>(`/api/sessions/${encodeURIComponent(id)}`),
   progress: (id: string) => call<Progress | null>(`/api/sessions/${encodeURIComponent(id)}/progress`),
   rate: (id: string, paper: { doi?: string; title: string }, relevance: Relevance | null) =>
-    call<{ item: Item; edited: number }>(`/api/sessions/${encodeURIComponent(id)}/rating`,
+    call<{ item: Item | null; edited: number }>(`/api/sessions/${encodeURIComponent(id)}/rating`,
       { doi: paper.doi ?? null, title: paper.title, relevance }),
   decide: (id: string, paper: { doi?: string; title: string }, decision: Item["decision"]) =>
     call<{ item: Item }>(`/api/sessions/${encodeURIComponent(id)}/decision`,
       { doi: paper.doi ?? null, title: paper.title, decision }),
   translation: () => call<TranslationInfo>("/api/translation"),
+  next: (id: string) => call<{ started: boolean }>(`/api/sessions/${encodeURIComponent(id)}/next`, {}),
   translate: (id: string, paper: { doi?: string; title: string }) =>
     call<{ abstract_zh: string }>(`/api/sessions/${encodeURIComponent(id)}/translate`, { doi: paper.doi ?? null, title: paper.title }),
 }

@@ -118,6 +118,27 @@ def _record_path(session: str):
     return p
 
 
+def _ensure_item(session: str, doi: str | None, title: str | None, relevance: str | None) -> None:
+    """A paper of the latest batch the agent has not rated yet: the user's rating creates its item
+    (no reason: the agent's rating, when it comes, fills that in and the user's stays)."""
+    if relevance is None:
+        return
+    record = store.read_json(_record_path(session))
+    try:
+        _find(record["items"], doi, title)
+        return
+    except HTTPException:
+        pass
+    from . import deep_search
+    try:
+        paper = deep_search.batch_paper(session, doi, title)
+    except FileNotFoundError:
+        paper = None
+    if not paper:
+        raise HTTPException(404, "no such paper in this session")
+    screening.save("", [{**paper, "relevance": relevance, "reason": ""}], session=session, mode="deep")
+
+
 def _find(items: list[dict[str, Any]], doi: str | None, title: str | None) -> dict[str, Any]:
     key = screening._key({"doi": doi, "title": title})
     for it in items:
@@ -170,14 +191,42 @@ def create_app(token: str) -> FastAPI:
     def rate(session: str, body: Rating) -> dict[str, Any]:
         if body.relevance is not None and body.relevance not in screening.RELEVANCE:
             raise HTTPException(400, f"relevance must be one of {screening.RELEVANCE} or null")
+        _ensure_item(session, body.doi, body.title, body.relevance)
         with store.update(_record_path(session), indent=2) as data:
             item = _find(data["items"], body.doi, body.title)
-            if body.relevance is None or body.relevance == item["relevance"]:
+            if not item.get("reason"):  # rated by the user only: theirs is the only rating
+                if body.relevance is None:
+                    data["items"].remove(item)
+                    return {"item": None, "edited": sum(1 for it in data["items"] if it.get("user_relevance"))}
+                item["relevance"] = item["user_relevance"] = body.relevance
+            elif body.relevance is None or body.relevance == item["relevance"]:
                 item.pop("user_relevance", None)
             else:
                 item["user_relevance"] = body.relevance
             edited = sum(1 for it in data["items"] if it.get("user_relevance"))
         return {"item": item, "edited": edited}
+
+    @app.post("/api/sessions/{session}/next")
+    def next_round(session: str) -> dict[str, Any]:
+        """The app's continue button: serve the next batch here, without the agent (it rates the rest when it is back)."""
+        import threading
+        import time
+
+        from . import deep_search
+        _record_path(session)
+        if not deep_search._pool_path(session).exists():
+            raise HTTPException(400, "无法继续检索：这不是深度检索会话。")
+        p = store.read_progress(session)
+        if p and p.get("state") == "running" and time.time() - float(p.get("updated") or 0) < 300:
+            raise HTTPException(409, "正在生成下一批，完成后再继续。")
+
+        def run() -> None:
+            try:
+                deep_search.next_batch(session, force=True)
+            except Exception:  # the progress file says it failed; the app shows that
+                pass
+        threading.Thread(target=run, name=f"next-{session}", daemon=True).start()
+        return {"started": True}
 
     @app.get("/api/translation")
     def translation() -> dict[str, Any]:

@@ -586,11 +586,15 @@ def _start(session: str, t0: float, question: str, queries: list[str], seeds: li
     return out
 
 
-def next_batch(session: str) -> dict[str, Any]:
-    """Fold the agent's latest ratings back in (高 papers become seeds) and serve the next batch."""
+def next_batch(session: str, force: bool = False) -> dict[str, Any]:
+    """Fold the latest ratings back in (高 papers become seeds) and serve the next batch.
+
+    force: serve a batch even when stopping is suggested (the user chose to go on;
+    the app's 继续检索 button).
+    """
     _run.progress = store.Progress(session, "next")
     try:
-        out = _next_round(session)
+        out = _next_round(session, force)
     except BaseException:
         _run.progress.finish("failed")
         raise
@@ -600,7 +604,7 @@ def next_batch(session: str) -> dict[str, Any]:
     return out
 
 
-def _next_round(session: str) -> dict[str, Any]:
+def _next_round(session: str, force: bool = False) -> dict[str, Any]:
     from . import quota
     t0 = time.time()
     credits0 = quota.spent("openalex")
@@ -616,7 +620,7 @@ def _next_round(session: str) -> dict[str, Any]:
            "pool_added": added, "expand_seconds": round(t1 - t0, 1)}
     state["rounds"].append(rnd)
     _save(state)
-    out = _next_batch(state, rated)
+    out = _next_batch(state, rated, force)
     rnd["rank_seconds"] = round(time.time() - t1, 1)  # abstracts, model, journal ranks
     rnd["openalex_credits"] = quota.spent("openalex") - credits0
     rnd["api_budget"] = {k: {f: v.get(f) for f in ("remaining", "limit", "resets_at")}
@@ -665,12 +669,40 @@ def rate(session: str, ratings: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def status(session: str) -> dict[str, Any]:
+    """Counts, coverage, the stop rule, and the latest batch's papers nobody has rated:
+    the app can serve a batch itself (继续检索), so the agent may come back to one."""
     state = _load(session)
     rated = _ratings(state)
     order = _ranked(state)
-    return {"session": session, "pool": len(state["pool"]), "screened": len(rated),
-            "by_relevance": {r: sum(1 for v in rated.values() if v == r) for r in screening.RELEVANCE},
-            "seeds": len(state["seeds"]), "coverage": _coverage(state, rated, order), **_stop(state, rated)}
+    agent = _agent_rated(state)
+    unrated = [{"n": n, **{f: b.get(f) for f in _BATCH_FIELDS}}
+               for n, b in enumerate(state.get("last_batch") or [], 1) if _batch_key(b) not in agent]
+    out = {"session": session, "pool": len(state["pool"]), "screened": len(rated),
+           "by_relevance": {r: sum(1 for v in rated.values() if v == r) for r in screening.RELEVANCE},
+           "seeds": len(state["seeds"]), "coverage": _coverage(state, rated, order), **_stop(state, rated)}
+    if unrated:
+        out["unrated"] = unrated
+        out["next_step"] = ("rate these papers of the latest batch by their n (action='rate'; "
+                            "a rating the user already gave in the app stays), then action='next'")
+    return out
+
+
+def _agent_rated(state: dict[str, Any]) -> set[str]:
+    """Screening keys of the papers the agent itself rated (the app's own ratings have no reason)."""
+    return {screening._key(it) for it in screening.load(state["session"])["items"] if it.get("reason")}
+
+
+def _batch_key(b: dict[str, Any]) -> str:
+    return screening._key({"doi": b.get("doi"), "title": b.get("title")})
+
+
+def batch_paper(session: str, doi: str | None, title: str | None) -> dict[str, Any] | None:
+    """A paper of the latest batch, as the batch showed it (for a rating the user gives first)."""
+    key = screening._key({"doi": doi, "title": title})
+    for b in _load(session).get("last_batch") or []:
+        if _batch_key(b) == key:
+            return {f: b.get(f) for f in _BATCH_FIELDS}
+    return None
 
 
 # --------------------------------------------------------------------------- helpers
@@ -821,12 +853,13 @@ def _write_summary(state: dict[str, Any], rated: dict[str, str], stop: dict[str,
         logger.warning("deep search: could not write the session summary (%s)", exc)
 
 
-def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> dict[str, Any]:
+def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None, force: bool = False) -> dict[str, Any]:
     from .abstracts import clean_abstract, fill_abstracts
     from .search import _add_journal_rank, _flag_retractions
     rated = rated if rated is not None else _ratings(state)
     stop = _stop(state, rated)
-    if not stop["stop_suggested"]:
+    go_on = force or not stop["stop_suggested"]
+    if go_on:
         if _prefill_abstracts(state, rated):
             _score(state)
         _phase("rank")
@@ -836,7 +869,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
     fresh = [k for k in order if k not in served_before]
     # Unrated papers from earlier batches come back first: the agent may have skipped some.
     pending = [k for k in order if k in served_before]
-    picked = (pending + fresh)[: state["batch_size"]] if not stop["stop_suggested"] else []
+    picked = (pending + fresh)[: state["batch_size"]] if go_on else []
     items = [dict(state["pool"][k]) for k in picked]
     if items:
         _phase("batch", len(items))

@@ -233,7 +233,6 @@ export default function App() {
   }))
   const idx = Math.max(0, papers.findIndex((p) => paperKey(p) === current))
   const paper = papers[idx] ?? null
-  const edited = (record?.items ?? []).filter((it) => it.user_relevance).length
 
   React.useEffect(() => {
     if (papers.length && !papers.some((p) => paperKey(p) === current)) setCurrent(paperKey(papers[0]))
@@ -250,10 +249,16 @@ export default function App() {
     reload()
   }, [sid, paper, reload])
 
+  // A paper the agent has not rated yet (a batch the app served) can be rated first by the user.
   const rate = React.useCallback((rel: (typeof RELEVANCE)[number]) => {
-    if (!sid || !paper?.item) return
-    api.rate(sid, paper, rel === paper.item.relevance ? null : rel).then(reload).catch((e) => setError(errorMessage(e)))
+    if (!sid || !paper) return
+    const same = paper.item && rel === (paper.item.reason ? paper.item.relevance : rating(paper.item))
+    api.rate(sid, paper, same ? null : rel).then(reload).catch((e) => setError(errorMessage(e)))
   }, [sid, paper, reload])
+  const continueSearch = React.useCallback(() => {
+    if (!sid) return
+    api.next(sid).then(() => api.progress(sid)).then(setProgress).catch((e) => setError(errorMessage(e)))
+  }, [sid])
   const toggleSelect = React.useCallback(() => {
     if (!sid || !paper?.item) return
     api.decide(sid, paper, paper.item.decision === "selected" ? null : "selected").then(reload)
@@ -348,8 +353,8 @@ export default function App() {
               </BreadcrumbList>
             </Breadcrumb>
           </header>
-          <ProgressStrip progress={progress} summary={summary} />
-          <DetailPane paper={paper} edited={edited} onRate={rate} onSelect={toggleSelect} onExclude={exclude}
+          <ProgressStrip progress={progress} summary={summary} onContinue={continueSearch} />
+          <DetailPane paper={paper} onRate={rate} onSelect={toggleSelect} onExclude={exclude}
             translation={translation} onTranslate={translateAbstract} />
           </>)}
         </SidebarInset>
