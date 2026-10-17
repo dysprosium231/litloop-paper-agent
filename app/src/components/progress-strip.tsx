@@ -1,3 +1,4 @@
+import * as React from "react"
 import { TriangleAlertIcon } from "lucide-react"
 
 import type { Progress, Summary } from "@/lib/api"
@@ -20,6 +21,35 @@ const secs = (s: number) => {
   return `${Math.max(1, Math.round(s))} 秒`
 }
 
+/** A button that opens a small panel under it; outside click or Esc closes it. */
+function Pop({ label, aria, className, children }: {
+  label: React.ReactNode; aria?: string; className?: string; children: React.ReactNode
+}) {
+  const [open, setOpen] = React.useState(false)
+  const root = React.useRef<HTMLSpanElement>(null)
+  React.useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false) }
+    document.addEventListener("mousedown", close)
+    document.addEventListener("keydown", esc)
+    return () => {
+      document.removeEventListener("mousedown", close)
+      document.removeEventListener("keydown", esc)
+    }
+  }, [open])
+  return (
+    <span ref={root} className="relative">
+      <button type="button" aria-label={aria} aria-expanded={open} onClick={() => setOpen((o) => !o)} className={className}>{label}</button>
+      {open && (
+        <div className="absolute top-full right-0 z-50 mt-2 w-80 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-md">
+          {children}
+        </div>
+      )}
+    </span>
+  )
+}
+
 /** What the running round is doing, or a one-line overview when nothing runs. */
 export function ProgressStrip({ progress, summary }: { progress: Progress | null; summary: Summary | null }) {
   const running = progress?.state === "running"
@@ -27,27 +57,39 @@ export function ProgressStrip({ progress, summary }: { progress: Progress | null
     if (!summary) return null
     const highs = summary.batches.map((b) => (b.rated ? b.高 / b.rated : 0))
     return (
-      <div className="flex min-h-13 min-w-0 items-center gap-x-6 gap-y-1.5 overflow-hidden border-b px-6 py-3 text-sm text-muted-foreground">
-        <span className="shrink-0 whitespace-nowrap">候选池 {summary.pool.toLocaleString()} 篇 · 已评分 {summary.screened.toLocaleString()} 篇</span>
-        <span className="flex shrink-0 items-center gap-2" title="每一批中评为高的比例，最右是最近一批；越来越低说明相关文献快找完了">
-          <span className="whitespace-nowrap">每批高相关比例</span>
-          <span className="flex h-6 items-end gap-1" role="img" aria-label="每批高相关比例">
-            {summary.batches.map((b, i) => (
-              <span key={i} title={`第 ${b.batch} 批：高 ${b.高} / 已评 ${b.rated}`}
-                className="w-2.5 rounded-sm bg-primary" style={{ height: `${Math.max(8, highs[i] * 100)}%`, opacity: i === highs.length - 1 ? 1 : 0.45 }} />
-            ))}
-          </span>
-          {highs.length > 0 && <span className="font-medium text-foreground tabular-nums">{Math.round(highs[highs.length - 1] * 100)}%</span>}
+      <div className="flex min-h-13 min-w-0 items-center gap-5 border-b px-6 py-3 text-sm text-muted-foreground">
+        <span className="shrink-0 whitespace-nowrap tabular-nums" title={`候选池 ${summary.pool.toLocaleString()} 篇，已评分 ${summary.screened.toLocaleString()} 篇`}>
+          已评 <span className="font-medium text-foreground">{summary.screened.toLocaleString()}</span> / {summary.pool.toLocaleString()}
         </span>
-        {summary.stop_suggested && (
-          <span className="min-w-0 truncate rounded bg-warning px-2 py-0.5 text-warning-foreground" title={summary.stop_reason}>建议停止：{summary.stop_reason}</span>
-        )}
-        {!!summary.api_warnings?.length && (
-          <span className="ml-auto flex min-w-0 items-center gap-1.5 text-warning-foreground" title={summary.api_warnings.join("\n")}>
-            <TriangleAlertIcon className="size-4 shrink-0" />
-            <span className="truncate">{summary.api_warnings[0]}{summary.api_warnings.length > 1 ? `，另有 ${summary.api_warnings.length - 1} 条` : ""}</span>
+        {highs.length > 0 && (
+          <span className="flex shrink-0 items-center gap-2" title="每批高相关比例：每一批中评为高的比例，最右是最近一批；越来越低说明相关文献快找完了">
+            <span className="flex h-6 items-end gap-1" role="img" aria-label="每批高相关比例">
+              {summary.batches.map((b, i) => (
+                <span key={i} title={`第 ${b.batch} 批：高 ${b.高} / 已评 ${b.rated}`}
+                  className="w-2.5 rounded-sm bg-primary" style={{ height: `${Math.max(8, highs[i] * 100)}%`, opacity: i === highs.length - 1 ? 1 : 0.45 }} />
+              ))}
+            </span>
+            <span className="font-medium text-foreground tabular-nums">{Math.round(highs[highs.length - 1] * 100)}%</span>
           </span>
         )}
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          {summary.stop_suggested && (
+            <Pop label="建议停止" className="rounded bg-warning px-2 py-0.5 text-warning-foreground hover:brightness-95">
+              <p className="font-medium">建议停止</p>
+              <p className="mt-1 text-muted-foreground">{summary.stop_reason}</p>
+            </Pop>
+          )}
+          {!!summary.api_warnings?.length && (
+            <Pop label={<><TriangleAlertIcon className="size-4" /><span className="tabular-nums">{summary.api_warnings.length}</span></>}
+              aria={`接口提醒 ${summary.api_warnings.length} 条`}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-warning-foreground hover:bg-warning">
+              <p className="font-medium">接口提醒</p>
+              <ul className="mt-1 space-y-1 text-muted-foreground">
+                {summary.api_warnings.map((w) => <li key={w}>{w}</li>)}
+              </ul>
+            </Pop>
+          )}
+        </span>
       </div>
     )
   }

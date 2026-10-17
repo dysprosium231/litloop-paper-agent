@@ -292,7 +292,7 @@ export default function App() {
   return (
     <TooltipProvider>
       {/* The header's toggle hides the list; the rail then shows icons only (--sidebar-width-icon). */}
-      <SidebarProvider style={{ "--sidebar-width": `${(section === "screen" ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
+      <SidebarProvider className="h-svh overflow-hidden" style={{ "--sidebar-width": `${(section === "screen" ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
         <AppSidebar section={section} onSection={setSection} railOpen={railOpen} onRailOpen={setRailOpen}>
           {section === "screen" ? (
             <PaperList rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
