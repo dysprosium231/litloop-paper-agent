@@ -361,11 +361,13 @@ EGRESS_SAMPLE_DOI = "10.1016/j.ceramint.2024.08.002"
 
 
 def _egress_checks(cfg: dict[str, Any]) -> list[dict[str, Any]]:
-    """Where LitLoop's own traffic leaves this computer, and whether a publisher accepts it.
+    """Where LitLoop's own traffic leaves this computer, and whether the Elsevier
+    API serves full text to this key from here.
 
-    Being on campus is not enough: campuses with an education-network and a
-    commercial exit send most traffic out the commercial one, which publishers
-    do not know as the school.
+    The API's 403 "Requestor configuration settings insufficient" is about the
+    key's full-text configuration, not proof that publishers refuse this exit:
+    on 2026-10-17 ScienceDirect recognized the same exit as the school's and the
+    browser route downloaded the paper. So a refusal is a notice, not a failure.
     """
     import requests
     out = []
@@ -379,20 +381,20 @@ def _egress_checks(cfg: dict[str, Any]) -> list[dict[str, Any]]:
         out.append(_result("出口 IP", None, "无法查询出口 IP"))
     key = str(cfg.get("elsevier_api_key") or "").strip()
     if not key:
-        out.append(_result("出版商权限", None, "未填写 Elsevier Key，无法检测出版商是否认可当前出口"))
+        out.append(_result("Elsevier 全文接口", None, "未填写 Elsevier Key"))
         return out
     from .elsevier_check import ENTITLED, NOT_ENTITLED, _head_probe
     proxy = str(cfg.get("network_proxy") or "").strip()
     code, verdict = _head_probe(EGRESS_SAMPLE_DOI, key, {"http": proxy, "https": proxy} if proxy else None)
     if verdict.startswith(ENTITLED):
-        out.append(_result("出版商权限", True, "出版商认可当前出口，可直接下载学校订阅的全文"))
+        out.append(_result("Elsevier 全文接口", True, "可用：ScienceDirect 的订阅全文可直接通过接口下载"))
     elif verdict.startswith(NOT_ENTITLED):
-        out.append(_result("出版商权限", False,
-                           "出版商不认可当前出口：出口 IP 不在学校登记的范围内（校园网若有教育网和运营商两个出口，"
-                           "访问出版商可能走了运营商线路）。下载订阅论文需要在「设置 → 学校认证」中使用 WebVPN 或 CARSI，"
-                           "或填写学校提供的校园出口代理"))
+        out.append(_result("Elsevier 全文接口", None,
+                           "这个 Key 没有全文权限，ScienceDirect 的论文改由浏览器打开官网下载。"
+                           "这不代表出口不被学校认可；要判断出口，可在不开代理时用浏览器打开 ScienceDirect "
+                           "的订阅论文，看页面上是否显示学校名称"))
     else:
-        out.append(_result("出版商权限", None, f"无法判断（Elsevier 返回 {code or '无响应'}）"))
+        out.append(_result("Elsevier 全文接口", None, f"无法判断（Elsevier 返回 {code or '无响应'}）"))
     return out
 
 

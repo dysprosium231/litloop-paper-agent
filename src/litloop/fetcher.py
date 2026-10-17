@@ -266,23 +266,14 @@ class PaperFetcher:
             if _check("carsi_html", carsi_paper):
                 return carsi_paper
 
-        # Steps 5-6 open the publisher's own site. When a publisher has already
-        # refused this exit as not the school's (egress.py) and this is not the
-        # campus network, they can only be refused again: go to WebVPN.
-        from . import egress
-        off_school = egress.refused() and not self.config.get("is_campus_network")
-        if off_school:
-            _record_attempt("publisher_pdf", "skipped", reason="exit_not_institutional")
-            logger.info("   [Institutional] this exit is not the school's: skipping the publisher's site, using WebVPN")
-
         # Step 5: Try direct publisher PDF URL construction
-        if doi and not paper.pdf_path and not off_school:
+        if doi and not paper.pdf_path:
             pdf_paper = self._try_publisher_pdf(doi, url, paper)
             if _check("publisher_pdf", pdf_paper):
                 return pdf_paper
 
         # Step 6: Try browser-based PDF download
-        if doi and not paper.pdf_path and not off_school:
+        if doi and not paper.pdf_path:
             browser_paper = self._try_browser_pdf_download(doi, url, paper)
             if _check("browser_pdf", browser_paper):
                 return browser_paper
