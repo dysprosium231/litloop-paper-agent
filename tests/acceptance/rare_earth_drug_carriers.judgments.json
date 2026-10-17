@@ -1,6 +1,6 @@
 {
  "set": "rare_earth_drug_carriers",
- "note": "Agent ratings from the 2026-10-16 MCP run (80 papers, rules of the set: amorphous rare-earth carrier 高, crystalline 中, rare earth only for imaging = borderline, rated 低). Used by scripts/eval_deep_search.py.",
+ "note": "Agent ratings, rules of the set: amorphous rare-earth carrier 高, crystalline 中, rare earth only for imaging or no drug loading = borderline, rated 低; reviews and papers without rare earths 不相关. 80 from the 2026-10-16 MCP run, 102 added 2026-10-17 while replaying with scripts/eval_deep_search.py --stop-on-unjudged. Key \"\" is a record without DOI.",
  "judgments": {
   "10.1002/anie.202116983": {
    "relevance": "高",
@@ -401,6 +401,517 @@
    "relevance": "低",
    "reason": "硅酸钙蛋白缓释，无稀土",
    "title": "Mesoporous calcium silicate for controlled release of bovine serum albumin protein"
+  },
+  "10.1021/acsomega.8b01217": {
+   "relevance": "低",
+   "reason": "核苷酸/镧系配位纳米粒子，用于DNA吸附与传感，无载药",
+   "title": "Continuously Tunable Nucleotide/Lanthanide Coordination Nanoparticles for DNA Adsorption and Sensing"
+  },
+  "10.2217/nnm-2021-0214": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Application of Lanthanide-Doped Upconversion Nanoparticles for Cancer Treatment: A Review"
+  },
+  "10.1021/acs.chemrev.5b00125": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Nanomedicine Applications of Hybrid Nanomaterials Built from Metal–Ligand Coordination Bonds: Nanoscale Metal–Organic Frameworks and Nanoscale Coordination Polymers"
+  },
+  "10.1039/c2cs35259a": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Targeting and delivery of platinum-based anticancer drugs"
+  },
+  "10.1002/anie.200803387": {
+   "relevance": "不相关",
+   "reason": "综述（Highlight）",
+   "title": "Modular Synthesis of Functional Nanoscale Coordination Polymers"
+  },
+  "10.1021/ja8058843": {
+   "relevance": "高",
+   "reason": "核苷酸-镧系自组装无定形纳米粒子，可包裹客体分子，MRI",
+   "title": "Nanoparticles of Adaptive Supramolecular Networks Self-Assembled from Nucleotides and Lanthanide Ions"
+  },
+  "10.1016/j.biomaterials.2011.12.013": {
+   "relevance": "低",
+   "reason": "聚合物胶束载DOX，Gd只作造影，边缘",
+   "title": "Multifunctional pH-Disintegrable micellar nanoparticles of asymmetrically functionalized β-cyclodextrin-Based star copolymer covalently conjugated with doxorubicin and DOTA-Gd moieties"
+  },
+  "10.1016/j.biomaterials.2014.12.034": {
+   "relevance": "低",
+   "reason": "Eu/Gd掺杂介孔二氧化硅载药，稀土只作成像，边缘",
+   "title": "Preparation and identification of multifunctional mesoporous silica nanoparticles for in vitro and in vivo dual-mode imaging, theranostics, and targeted tracking"
+  },
+  "10.1002/adfm.200901539": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Integrated Multifunctional Nanosystems for Medical Diagnosis and Treatment"
+  },
+  "10.7150/thno.27828": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Dendrimer- and copolymer-based nanoparticles for magnetic resonance cancer theranostics"
+  },
+  "10.1002/jbm.b.70063": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Rare‐Earth Doped Hydroxyapatite Nanoparticles for Biomedical Applications: A Comprehensive Review From Bone Regeneration to Cancer Theranostics"
+  },
+  "10.1142/s1793984410000250": {
+   "relevance": "低",
+   "reason": "聚合物修饰Gd纳米粒子，MRI为主，载药不明确",
+   "title": "POLYMER-MODIFIED GADOLINIUM NANOPARTICLES FOR TARGETED MAGNETIC RESONANCE IMAGING AND THERAPY"
+  },
+  "10.1021/acs.chemrev.5b00597": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "The Next Generation of Platinum Drugs: Targeted Pt(II) Agents, Nanoparticle Delivery, and Pt(IV) Prodrugs"
+  },
+  "10.1002/advs.201500437": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Lanthanide‐Doped Upconversion Nanoparticles: Emerging Intelligent Light‐Activated Drug Delivery Systems"
+  },
+  "10.1016/j.pmatsci.2020.100743": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "MOF materials as therapeutic agents, drug carriers, imaging agents and biosensors in cancer biomedicine: Recent advances and perspectives"
+  },
+  "10.1016/j.ccr.2016.01.001": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Nanostructured materials functionalized with metal complexes: In search of alternatives for administering anticancer metallodrugs"
+  },
+  "10.1039/c001012j": {
+   "relevance": "低",
+   "reason": "核苷酸-镧系网络包裹量子点，无载药",
+   "title": "Selective inclusion of anionic quantum dots in coordination network shells of nucleotides and lanthanide ions"
+  },
+  "10.1016/j.talanta.2011.12.024": {
+   "relevance": "低",
+   "reason": "核苷酸-镧系配位纳米粒子用于氰化物检测，无载药",
+   "title": "Self-assembled coordination nanoparticles from nucleotides and lanthanide ions with doped-boronic acid-fluorescein for detection of cyanide in the presence of Cu2+ in water"
+  },
+  "10.1038/ncomms5182": {
+   "relevance": "不相关",
+   "reason": "锌双膦酸盐配位聚合物载药，无稀土",
+   "title": "Self-assembled nanoscale coordination polymers with trigger release properties for effective anticancer therapy"
+  },
+  "10.1021/am501949t": {
+   "relevance": "低",
+   "reason": "核苷酸-镧系纳米粒子做分子逻辑门，无载药",
+   "title": "“Plug and Play” Logic Gates Based on Fluorescence Switching Regulated by Self-Assembly of Nucleotide and Lanthanide Ions"
+  },
+  "10.1016/j.ccr.2015.02.007": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Supramolecular self-assembly of nucleotide–metal coordination complexes: From simple molecules to nanomaterials"
+  },
+  "10.1016/j.colsurfb.2015.08.015": {
+   "relevance": "不相关",
+   "reason": "ACP/HA/PLA纤维，无稀土",
+   "title": "Amorphous calcium phosphate, hydroxyapatite and poly( d , l -lactic acid) composite nanofibers: Electrospinning preparation, mineralization and in vivo bone defect repair"
+  },
+  "10.1002/anie.200904124": {
+   "relevance": "低",
+   "reason": "核苷酸-镧系纳米粒子包裹染料，无生物医学载药",
+   "title": "Confining Molecules within Aqueous Coordination Nanoparticles by Adaptive Molecular Self‐Assembly"
+  },
+  "10.1016/j.matdes.2022.111008": {
+   "relevance": "低",
+   "reason": "Eu掺杂磷酸钙纳米点，仅荧光成像，无载药",
+   "title": "Polyacrylic acid complexes to mineralize ultrasmall europium-doped calcium phosphate nanodots for fluorescent bioimaging"
+  },
+  "10.1039/c4tb01862a": {
+   "relevance": "不相关",
+   "reason": "无定形磷酸钙空心微球载药，无稀土",
+   "title": "Porous hollow microspheres of amorphous calcium phosphate: soybean lecithin templated microwave-assisted hydrothermal synthesis and application in drug delivery"
+  },
+  "10.1039/c3tb00026e": {
+   "relevance": "不相关",
+   "reason": "铁配位聚合物载药，无稀土",
+   "title": "A new type of pH-responsive coordination polymer sphere as a vehicle for targeted anticancer drug delivery and sustained release"
+  },
+  "10.1002/asia.201500667": {
+   "relevance": "不相关",
+   "reason": "无定形磷酸钙介孔微球载药，无稀土",
+   "title": "Microwave‐Assisted Hydrothermal Rapid Synthesis of Amorphous Calcium Phosphate Mesoporous Microspheres Using Adenosine 5′‐Diphosphate and Application in pH‐Responsive Drug Delivery"
+  },
+  "10.1016/j.biomaterials.2017.09.007": {
+   "relevance": "不相关",
+   "reason": "铪配位聚合物载药，铪不是稀土",
+   "title": "Light-controlled drug release from singlet-oxygen sensitive nanoscale coordination polymers enabling cancer combination therapy"
+  },
+  "10.1021/acsabm.4c01779": {
+   "relevance": "低",
+   "reason": "Eu掺杂硅酸钙镁荧光粉，仅生物成像，无载药",
+   "title": "Investigation to Understand the Role of Phase Variation in Red Emitting Eu3+-Doped Calcium Magnesium Silicate Phosphor for In Vitro Bioimaging"
+  },
+  "10.1016/j.colsurfb.2020.111337": {
+   "relevance": "低",
+   "reason": "Eu掺杂磷酸钙用于肌酐检测，无载药",
+   "title": "Highly stable luminescent europium-doped calcium phosphate nanoparticles for creatinine quantification"
+  },
+  "10.1080/17425247.2016.1214566": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Calcium silicate-based drug delivery systems"
+  },
+  "10.1016/j.ceramint.2026.08.003": {
+   "relevance": "中",
+   "reason": "Eu/Gd共掺硅取代羟基磷灰石载布洛芬/酮洛芬，晶态",
+   "title": "The role of molecular interactions in the release kinetics of ibuprofen and ketoprofen immobilized into a silicate-substituted hydroxyapatite-based matrix"
+  },
+  "10.3390/nano8110961": {
+   "relevance": "高",
+   "reason": "含Eu介孔生物玻璃纳米球载DOX，非晶",
+   "title": "Design and Evaluation of Europium Containing Mesoporous Bioactive Glass Nanospheres: Doxorubicin Release Kinetics and Inhibitory Effect on Osteosarcoma MG 63 Cells"
+  },
+  "10.1088/0957-4484/27/22/225102": {
+   "relevance": "不相关",
+   "reason": "介孔生物玻璃载药，无稀土",
+   "title": "Biodegradable mesoporous bioactive glass nanospheres for drug delivery and bone tissue regeneration"
+  },
+  "10.1021/nn304369m": {
+   "relevance": "中",
+   "reason": "Eu掺杂Gd2O2S空心纳米胶囊载DOX，pH释放，晶态",
+   "title": "Monitoring pH-Triggered Drug Release from Radioluminescent Nanocapsules with X-ray Excited Optical Luminescence"
+  },
+  "10.1016/j.actbio.2013.05.033": {
+   "relevance": "低",
+   "reason": "Eu掺杂磷酸钙纳米晶须，仅成像",
+   "title": "A microwave-assisted solution combustion synthesis to produce europium-doped calcium phosphate nanowhiskers for bioimaging applications"
+  },
+  "10.19113/sdufenbed.811362": {
+   "relevance": "低",
+   "reason": "La2O3掺杂硅酸钙，仅制备表征，无载药",
+   "title": "Lanthanum Oxide Doped Calcium Silicates Particles: Preparation and Characterization"
+  },
+  "10.1002/chem.201000007": {
+   "relevance": "低",
+   "reason": "核苷酸-Tb纳米粒子发光，无载药",
+   "title": "Switching On Luminescence in Nucleotide/Lanthanide Coordination Nanoparticles via Synergistic Interactions with a Cofactor Ligand"
+  },
+  "10.1016/j.jconrel.2015.01.026": {
+   "relevance": "不相关",
+   "reason": "锌基配位聚合物载药，无稀土",
+   "title": "Self-assembled nanoscale coordination polymers carrying oxaliplatin and gemcitabine for synergistic combination therapy of pancreatic cancer"
+  },
+  "10.1016/j.matchemphys.2024.129179": {
+   "relevance": "低",
+   "reason": "含Eu介孔生物玻璃，研究网络结构与矿化，无载药",
+   "title": "Influence of glass composition on the network structure and mineralization of europium containing mesoporous bioactive glass nanoparticles"
+  },
+  "10.1016/j.micromeso.2007.04.041": {
+   "relevance": "不相关",
+   "reason": "介孔生物玻璃载药，无稀土",
+   "title": "Mesoporous bioactive glasses for controlled drug release"
+  },
+  "10.1016/j.apsusc.2017.05.078": {
+   "relevance": "不相关",
+   "reason": "介孔生物玻璃载DOX，无稀土",
+   "title": "Research on the biological activity and doxorubicin release behavior in vitro of mesoporous bioactive SiO2-CaO-P2O5 glass nanospheres"
+  },
+  "10.1007/s10853-021-06203-7": {
+   "relevance": "低",
+   "reason": "Er/Tb掺杂生物玻璃发光，无载药",
+   "title": "Structural and luminescent properties of Er3+ and Tb3+-doped sol–gel-based bioactive glass powders and electrospun nanofibers"
+  },
+  "10.1021/acsami.6b03100": {
+   "relevance": "低",
+   "reason": "含Eu介孔生物玻璃支架促成骨，无载药",
+   "title": "Europium-Containing Mesoporous Bioactive Glass Scaffolds for Stimulating in Vitro and in Vivo Osteogenesis"
+  },
+  "10.1039/c3tb20275e": {
+   "relevance": "不相关",
+   "reason": "介孔生物玻璃载DOX，摘要未提稀土",
+   "title": "Functional mesoporous bioactive glass nanospheres: synthesis, high loading efficiency, controllable delivery of doxorubicin and inhibitory effect on bone cancer cells"
+  },
+  "10.1002/jbm.b.33273": {
+   "relevance": "不相关",
+   "reason": "Ag掺杂生物玻璃，无稀土",
+   "title": "Control of Ag nanoparticle distribution influencing bioactive and antibacterial properties of Ag-doped mesoporous bioactive glass particles prepared by spray pyrolysis"
+  },
+  "10.1016/j.jnoncrysol.2019.119471": {
+   "relevance": "不相关",
+   "reason": "生物玻璃载环丙沙星，无稀土",
+   "title": "Optimization of ciprofloxacin release kinetics of novel Nano-bioactive glasses: Effect of glass modifier content on drug loading and release mechanism"
+  },
+  "10.1021/ic0622959": {
+   "relevance": "低",
+   "reason": "YVO4:Eu荧光层+SBA-15载药，稀土只作发光，边缘",
+   "title": "Luminescence Functionalization of SBA-15 by YVO4:Eu3+ as a Novel Drug Delivery System"
+  },
+  "10.1007/s10904-022-02373-2": {
+   "relevance": "高",
+   "reason": "Er2O3/Tb2O3生物玻璃载药释放，非晶",
+   "title": "Evaluation of In Vitro Bioactivity, Cytotoxicity, and Drug Release Behavior of Er2O3 and Tb2O3-Containing Bioactive Glass Particles and Nanofibers"
+  },
+  "10.1002/adma.200901656": {
+   "relevance": "不相关",
+   "reason": "生物玻璃纤维载药，无稀土",
+   "title": "Preparation, Bioactivity, and Drug Release of Hierarchical Nanoporous Bioactive Glass Ultrathin Fibers"
+  },
+  "10.1016/j.actbio.2023.07.014": {
+   "relevance": "中",
+   "reason": "Er/Yb上转换介孔生物玻璃，监测矿化与药物释放，载药为次",
+   "title": "Erbium-ytterbium containing upconversion mesoporous bioactive glass microspheres for tissue engineering: luminescence monitoring of biomineralization and drug release"
+  },
+  "10.1016/j.jconrel.2014.04.026": {
+   "relevance": "不相关",
+   "reason": "多功能介孔生物玻璃，摘要未提稀土",
+   "title": "Multifunctional mesoporous bioactive glasses for effective delivery of therapeutic ions and drug/growth factors"
+  },
+  "10.2139/ssrn.4656646": {
+   "relevance": "低",
+   "reason": "含Eu介孔生物玻璃网络结构（预印本），无载药",
+   "title": "Influence of Glass Composition on the Network Structure and Bioactivity of Europium Containing Mesoporous Bioactive Glass Nanoparticles"
+  },
+  "10.1016/j.micromeso.2013.06.014": {
+   "relevance": "高",
+   "reason": "含Ce介孔生物玻璃载姜黄素释放，非晶",
+   "title": "Curcumin release from cerium, gallium and zinc containing mesoporous bioactive glasses"
+  },
+  "10.1016/j.msec.2016.05.019": {
+   "relevance": "高",
+   "reason": "Sm/介孔生物玻璃/海藻酸微球载DOX",
+   "title": "A doxorubicin delivery system: Samarium/mesoporous bioactive glass/alginate composite microspheres"
+  },
+  "10.1039/c5tb01158b": {
+   "relevance": "中",
+   "reason": "CaTiO3:Nd纳米纤维载药释放，晶态",
+   "title": "Near-infrared luminescent CaTiO 3 :Nd 3+ nanofibers with tunable and trackable drug release kinetics"
+  },
+  "10.3390/app132312637": {
+   "relevance": "低",
+   "reason": "Ag/Ce掺杂生物玻璃抗菌，无载药",
+   "title": "Antibacterial and In Vitro Bioactivity Studies of Silver-Doped, Cerium-Doped, and Silver–Cerium Co-Doped 80S Mesoporous Bioactive Glass Particles via Spray Pyrolysis"
+  },
+  "10.1016/j.jconrel.2005.11.002": {
+   "relevance": "不相关",
+   "reason": "介孔生物玻璃载庆大霉素，无稀土",
+   "title": "Well-ordered mesoporous bioactive glasses (MBG): A promising bioactive drug delivery system"
+  },
+  "10.1016/j.ijleo.2023.171458": {
+   "relevance": "低",
+   "reason": "Eu/Gd/Yb掺杂生物玻璃用于氧传感，无载药",
+   "title": "Modulation of optical oxygen sensitivity of H2(TPP) by using Eu3+, Gd3+ and Yb3+ ions doped silicate-based bioactive glass powders immersed in simulated body fluid"
+  },
+  "10.1016/j.biomaterials.2006.01.043": {
+   "relevance": "不相关",
+   "reason": "介孔生物玻璃生物活性，无稀土",
+   "title": "The in-vitro bioactivity of mesoporous bioactive glasses"
+  },
+  "10.1016/j.micromeso.2008.05.016": {
+   "relevance": "低",
+   "reason": "CaWO4:Ln荧光层+MCM-41载药，稀土只作发光，边缘",
+   "title": "Fabrication, characterization of spherical CaWO4:Ln @MCM-41(Ln=Eu3+, Dy3+, Sm3+, Er3+) composites and their applications as drug release systems"
+  },
+  "10.1002/ejic.201000110": {
+   "relevance": "低",
+   "reason": "CaWO4:Tb+介孔二氧化硅载溶菌酶，稀土只作发光，边缘",
+   "title": "Luminescent CaWO4:Tb3+‐Loaded Mesoporous Silica Composites for the Immobilization and Release of Lysozyme"
+  },
+  "10.1016/j.jcis.2020.06.122": {
+   "relevance": "不相关",
+   "reason": "Se掺杂介孔生物玻璃，无稀土",
+   "title": "Design and evaluation a kind of functional biomaterial for bone tissue engineering: Selenium/mesoporous bioactive glass nanospheres"
+  },
+  "10.1039/c5cc05461c": {
+   "relevance": "低",
+   "reason": "Eu-Pt分子配合物光释放顺铂，非纳米载体",
+   "title": "Real-time in situ monitoring via europium emission of the photo-release of antitumor cisplatin from a Eu–Pt complex"
+  },
+  "10.1016/j.colsurfb.2017.09.051": {
+   "relevance": "高",
+   "reason": "Tb掺杂介孔生物玻璃纳米球载药，非晶",
+   "title": "Sol-gel derived terbium-containing mesoporous bioactive glasses nanospheres: In vitro hydroxyapatite formation and drug delivery"
+  },
+  "10.1557/s43578-021-00461-6": {
+   "relevance": "低",
+   "reason": "Eu/Gd/Yb生物玻璃发光性质，无载药",
+   "title": "Effects of Eu3+, Gd3+ and Yb3+ substitution on the structural, photoluminescence, and decay properties of silicate-based bioactive glass powders"
+  },
+  "10.1016/j.jnoncrysol.2017.08.034": {
+   "relevance": "高",
+   "reason": "La掺杂磷酸盐玻璃纳米粒子载药，非晶（目标）",
+   "title": "Evaluation of solubility and cytotoxicity of lanthanum-doped phosphate glasses nanoparticles for drug delivery applications"
+  },
+  "10.1016/b978-0-08-102196-5.00004-5": {
+   "relevance": "不相关",
+   "reason": "书章综述",
+   "title": "Mesoporous Bioactive Glasses: Fabrication, Structure, Drug Delivery Property, and Therapeutic Potential"
+  },
+  "10.1007/s41779-024-01089-5": {
+   "relevance": "高",
+   "reason": "Yb掺杂生物玻璃载5-FU，非晶",
+   "title": "Evaluation of the in vitro cytotoxicity and drug delivery of ytterbium (III)-doped versatile bioactive glasses for cancer treatment"
+  },
+  "10.1016/j.ceramint.2025.02.309": {
+   "relevance": "低",
+   "reason": "Tb掺杂介孔生物玻璃，仅成像与生物活性",
+   "title": "Biological activity and imaging potential of Tb3+-Activated silico-gallate mesoporous bioactive glasses analyzed via photoluminescence spectroscopy"
+  },
+  "10.1016/j.actbio.2012.09.024": {
+   "relevance": "低",
+   "reason": "含Ce/Ga/Zn介孔生物玻璃支架，无载药",
+   "title": "Mesoporous bioactive scaffolds prepared with cerium-, gallium- and zinc-containing glasses"
+  },
+  "10.1016/j.bioadv.2024.213782": {
+   "relevance": "高",
+   "reason": "含Eu/Gd/Yb磁性荧光生物玻璃载索拉非尼释放，非晶",
+   "title": "In vitro cytotoxicity of magnetic-fluorescent bioactive glasses on SaOS-2, MC3T3-E1, BJ fibroblast cells, their hemolytic activity, and sorafenib release behavior"
+  },
+  "10.1016/j.actbio.2011.05.033": {
+   "relevance": "低",
+   "reason": "Ce/Ga/Zn取代介孔生物玻璃结构，无载药",
+   "title": "Substitutions of cerium, gallium and zinc in ordered mesoporous bioactive glasses"
+  },
+  "": {
+   "relevance": "低",
+   "reason": "含Eu发光生物玻璃（无DOI的重复记录），无载药",
+   "title": "Synthesis and characterization of europium-containing luminescent bioactive glasses and evaluation of in vitro bioactivity and cytotoxicity"
+  },
+  "10.1007/s10971-013-3209-0": {
+   "relevance": "低",
+   "reason": "含Eu发光生物玻璃，无载药",
+   "title": "Synthesis and characterization of europium-containing luminescent bioactive glasses and evaluation of in vitro bioactivity and cytotoxicity"
+  },
+  "10.1016/j.ceramint.2015.11.024": {
+   "relevance": "不相关",
+   "reason": "Se介孔生物玻璃载药，无稀土",
+   "title": "Selenium – containing mesoporous bioactive glass particles: Physicochemical and drug delivery properties"
+  },
+  "10.1016/j.actbio.2018.06.036": {
+   "relevance": "不相关",
+   "reason": "Ga介孔生物玻璃，无稀土",
+   "title": "The response of pre-osteoblasts and osteoclasts to gallium containing mesoporous bioactive glasses"
+  },
+  "10.1016/j.ceramint.2013.01.094": {
+   "relevance": "不相关",
+   "reason": "Fe介孔生物玻璃载药，无稀土",
+   "title": "The effect of iron incorporation on the in vitro bioactivity and drug release of mesoporous bioactive glasses"
+  },
+  "10.1155/2015/839207": {
+   "relevance": "不相关",
+   "reason": "生物玻璃纳米粒子载5-FU，无稀土",
+   "title": "Bioactive Glass Nanoparticles as a New Delivery System for Sustained 5‐Fluorouracil Release: Characterization and Evaluation of Drug Release Mechanism"
+  },
+  "10.1039/c6ra06829d": {
+   "relevance": "不相关",
+   "reason": "Cu介孔玻璃载药，无稀土",
+   "title": "Combined and individual doxorubicin/vancomycin drug loading, release kinetics and apatite formation for the CaO–CuO–P 2 O 5 –SiO 2 –B 2 O 3 mesoporous glasses"
+  },
+  "10.1007/s10856-016-5711-8": {
+   "relevance": "不相关",
+   "reason": "V/Mo磷酸盐玻璃载药，无稀土",
+   "title": "Dissolution and drug release profiles of phosphate glasses doped with high valency oxides"
+  },
+  "10.3390/ijms232213918": {
+   "relevance": "不相关",
+   "reason": "Zn介孔生物玻璃，无稀土",
+   "title": "In Vitro and In Vivo Response of Zinc-Containing Mesoporous Bioactive Glasses in a Sheep Animal Model"
+  },
+  "10.1007/s10856-019-6220-3": {
+   "relevance": "高",
+   "reason": "Ce掺杂纳米生物玻璃载药释放，非晶",
+   "title": "In vitro drug release behavior of Ce-doped nano-bioactive glass carriers under oxidative stress"
+  },
+  "10.1111/ijac.13317": {
+   "relevance": "低",
+   "reason": "含Gd/Yb生物玻璃溶解与毒性，无载药",
+   "title": "Dissolution, bioactivity behavior, and cytotoxicity of rare earth‐containing bioactive glasses (RE = Gd, Yb)"
+  },
+  "10.1016/j.msec.2020.111595": {
+   "relevance": "低",
+   "reason": "含Ho生物玻璃用于近距离放疗，无载药",
+   "title": "Sol-gel-derived 58S bioactive glass containing holmium aiming brachytherapy applications: A dissolution, bioactivity, and cytotoxicity study"
+  },
+  "10.1016/j.jallcom.2023.169153": {
+   "relevance": "高",
+   "reason": "Dy/Eu掺杂生物玻璃载5-FU，非晶",
+   "title": "Investigation of the structural, photoluminescence properties, bioactivity and 5-fluorouracil delivery behavior of Dy3+ and Dy:Eu3+-doped bioactive glasses"
+  },
+  "10.1039/c9ra01133a": {
+   "relevance": "不相关",
+   "reason": "Mg介孔生物玻璃载药，无稀土",
+   "title": "Mesoporous bioactive glass nanoparticles doped with magnesium: drug delivery and acellular in vitro bioactivity"
+  },
+  "10.1016/j.matlet.2021.130891": {
+   "relevance": "不相关",
+   "reason": "Mg生物玻璃/海藻酸微球，无稀土",
+   "title": "Microfluidic-assisted synthesis of Mg-containing bioactive glass nanosphere/alginate microsphere with controllable ion release process"
+  },
+  "10.1016/j.apsusc.2016.03.209": {
+   "relevance": "低",
+   "reason": "含Ce/Ga/Zn介孔生物玻璃涂层，无载药",
+   "title": "Cerium, gallium and zinc containing mesoporous bioactive glass coating deposited on titanium alloy"
+  },
+  "10.1039/c5tb02062j": {
+   "relevance": "不相关",
+   "reason": "Ga介孔生物玻璃止血，无稀土",
+   "title": "Gallium-containing mesoporous bioactive glass with potent hemostatic activity and antibacterial efficacy"
+  },
+  "10.15541/jim20160143": {
+   "relevance": "不相关",
+   "reason": "磷酸钙铝介孔玻璃，无稀土",
+   "title": "Sol-Gel-derived Mesoporous Calcium Aluminum Phosphate Bioactive Glasses with High Surface Area"
+  },
+  "10.1021/acsbiomaterials.1c00414": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Cerium Containing Bioactive Glasses: A Review"
+  },
+  "10.3390/biom11091388": {
+   "relevance": "低",
+   "reason": "Li/Eu共掺磷灰石，细胞实验，无载药",
+   "title": "Multifunctionality of Nanosized Calcium Apatite Dual-Doped with Li+/Eu3+ Ions Related to Cell Culture Studies and Cytotoxicity Evaluation In Vitro"
+  },
+  "10.1201/b13926-2": {
+   "relevance": "不相关",
+   "reason": "书章综述",
+   "title": "Mesoporous Bioactive Glasses for Drug Delivery and Bone Tissue Regeneration"
+  },
+  "10.1021/acsami.7b07769": {
+   "relevance": "不相关",
+   "reason": "Ga介孔生物玻璃/壳聚糖止血，无稀土",
+   "title": "Potency and Cytotoxicity of a Novel Gallium-Containing Mesoporous Bioactive Glass/Chitosan Composite Scaffold as Hemostatic Agents"
+  },
+  "10.1002/advs.202102678": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Mesoporous Bioactive Glasses in Cancer Diagnosis and Therapy: Stimuli‐Responsive, Toxicity, Immunogenicity, and Clinical Translation"
+  },
+  "10.1016/j.mtbio.2021.100121": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Mesoporous bioactive glasses for regenerative medicine"
+  },
+  "10.1016/j.ceramint.2020.01.050": {
+   "relevance": "低",
+   "reason": "Mg/La共掺生物玻璃，无载药",
+   "title": "Synthesis and characterization of magnesium-lanthanum dual doped bioactive glasses"
+  },
+  "10.1039/c6tb01528j": {
+   "relevance": "不相关",
+   "reason": "生物玻璃纳米组装体载抗生素，无稀土",
+   "title": "Tailored smart bioactive glass nanoassembly for dual antibiotic in vitro sustained release against osteomyelitis"
+  },
+  "10.1002/9781119724193.ch11": {
+   "relevance": "不相关",
+   "reason": "书章综述",
+   "title": "Bioactive Glasses as Carriers for the Controlled Release of Therapeutic Species"
+  },
+  "10.1039/c6an00274a": {
+   "relevance": "低",
+   "reason": "ThT掺杂Eu/核苷酸配位聚合物测温，无载药",
+   "title": "A visual and reversible assay for temperature using thioflavin T-doped lanthanide/nucleotide coordination polymers"
+  },
+  "10.1039/d0ra04287k": {
+   "relevance": "不相关",
+   "reason": "综述",
+   "title": "Recent advances and future perspectives of sol–gel derived porous bioactive glasses: a review"
   }
- }
+ },
+ "schema": 1
 }
