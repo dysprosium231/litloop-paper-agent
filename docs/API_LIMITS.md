@@ -114,7 +114,7 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
   - 无 Key：所有未认证用户共用每秒 1000 次，高峰期会进一步限流；
   - 有 Key：每秒 1 次。
   - 超限返回 429。
-  - 批量接口一次最多多少个 ID：**未核对**（接口文档页靠 JavaScript 渲染，没读到）。代码按 500 个分块，沿用以前的写法，待核对。
+  - 批量接口 `POST /paper/batch`（[官方 OpenAPI 描述](https://api.semanticscholar.org/graph/v1/swagger.json)，2026-10-17 核对）：一次最多 500 个 ID，一次最多返回 10 MB、9999 条引用；超出大小返回 400。代码按 500 个分块，符合。
 - **LitLoop 怎么控制**：每秒 1 次、同时 1 个（**自定**，按有 Key 的标准）；补摘要时和其他来源同时问，它慢也不拖住别人。
 
 ### Unpaywall
@@ -169,8 +169,9 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
 ### Europe PMC、DOAJ
 
 - **用途**：查生物医学文献和开放获取期刊。
-- **官方限额**：**未核对**，尚未查阅。
-- **LitLoop 怎么控制**：Europe PMC（`europepmc.org`、`www.ebi.ac.uk`）和 DOAJ 并发 3 个（继承，**非官方**）；同一域名间隔至少 0.5 秒。
+- **DOAJ 官方限额**（[API 文档](https://doaj.org/api/docs)，v4.0.0，2026-10-17 核对）：所有接口每秒 2 次；允许突发，每个用户最多 5 个请求排队，依次处理，只要平均不超过每秒 2 次。文档没写每页最多几条、超限返回什么状态码。
+- **Europe PMC 官方限额**：**未核对**。europepmc.org 的文档页（RestfulWebService、developers、Help）有 Cloudflare 人机验证，自动读取被拒（2026-10-17）。能读到的只有 EMBL-EBI 通用[使用条款](https://www.ebi.ac.uk/about/terms-of-use)（2026-10-14 修订）：没有具体数字，只说用量影响到为他人提供服务时会被封禁，且具体资源可能另有条款。
+- **LitLoop 怎么控制**：Europe PMC（`europepmc.org`、`www.ebi.ac.uk`）和 DOAJ 并发 3 个（继承，**非官方**）；同一域名间隔至少 0.5 秒，DOAJ 因此平均不超过每秒 2 次，在官方限额内（并发 3 个也在 5 个排队之内）。
 
 ## 二、出版商网站与机构通道
 
