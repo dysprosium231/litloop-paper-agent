@@ -186,7 +186,7 @@ def _batch_download_impl(
             from .pipeline import run_scihub_then_single
             _log.info(f"Short list ({len(entries)} items): Sci-Hub for all, then a full single download for each miss")
             raw = run_scihub_then_single(entries, out_dir, config=cfg, allow_grey=allow_grey,
-                                         workers=int(cfg.get("batch_small_workers", 3) or 3))
+                                         workers=int(cfg.get("batch_small_workers", 1) or 1))
         else:
             _log.info(f"Lane scheduling {len(entries)} items: pretriage -> fast HTTP -> grey -> institutional")
             raw = run_lanes(entries, out_dir, config=cfg, allow_grey=allow_grey)

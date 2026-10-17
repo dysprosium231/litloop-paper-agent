@@ -135,11 +135,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Look for new versions of LitLoop, easyseek and zotero-mcp every N days
     # (updates.py; 0 = never). Only a notice in results; nothing is installed.
     "update_check_days": 7,
-    # Batches up to this many papers: Sci-Hub for all first, then a full single
-    # download (school routes included) for each miss, batch_small_workers at a
-    # time (pipeline.run_scihub_then_single). Longer lists use the lanes.
+    # Batches up to this many papers: Sci-Hub for all first (in parallel: plain
+    # HTTP), then a full single download (school routes included) for each miss,
+    # batch_small_workers at a time (pipeline.run_scihub_then_single). Those are
+    # the papers that need the browser, of which there is one
+    # (max_browser_workers): one at a time, so no paper's race clock runs out
+    # while it queues for the browser and each login window is for one paper.
+    # Longer lists use the lanes.
     "batch_small_max": 30,
-    "batch_small_workers": 3,
+    "batch_small_workers": 1,
     # Desktop app: the first-run guide (app_settings.STEPS) was finished or skipped.
     "onboarding_done": False,
     "translation_provider": "deepseek",

@@ -42,6 +42,31 @@ def remove_listener(fn: Any) -> None:
         pass
 
 
+# Listeners told where one paper is now: (identifier, text). The app shows it
+# under the paper ("已在 Sci-Hub 找到，正在下载"); nothing is written to disk here.
+_STAGE_LISTENERS: list[Any] = []
+
+
+def add_stage_listener(fn: Any) -> None:
+    _STAGE_LISTENERS.append(fn)
+
+
+def remove_stage_listener(fn: Any) -> None:
+    try:
+        _STAGE_LISTENERS.remove(fn)
+    except ValueError:
+        pass
+
+
+def item_stage(identifier: str, text: str) -> None:
+    """Say what is happening to one paper; never raises."""
+    for fn in list(_STAGE_LISTENERS):
+        try:
+            fn(identifier, text)
+        except Exception:
+            pass
+
+
 def _progress_dir() -> Path:
     data_dir = Path(os.environ.get("LITLOOP_DATA_DIR", str(Path.home() / ".litloop")))
     return data_dir / "progress"

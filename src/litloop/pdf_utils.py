@@ -53,6 +53,10 @@ def is_plausible_pdf_url(url: str) -> bool:
         return True
     if "format=pdf" in query or "type=pdf" in query:
         return True
+    # A download endpoint asking for a PDF variant: Taylor & Francis books,
+    # /content/books/mono/download?...&type=googlepdf
+    if "/download" in path and "pdf" in query:
+        return True
     if ("hal.science" in host or "archives-ouvertes" in host) and path.endswith("/document"):
         return True
     return False

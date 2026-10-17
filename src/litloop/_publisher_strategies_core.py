@@ -119,11 +119,17 @@ def _resolve_doi_landing(doi: str) -> str:
     return ""
 
 
-def _user_waiting() -> None:
-    """Heartbeat while the user is logging in, so racing does not give up on us."""
+def _user_waiting(what: str = "verify") -> None:
+    """Heartbeat while the user is logging in or passing a check, so racing does
+    not give up on us; the app shows what the user should do."""
     try:
-        from .sources import note_user_waiting
-        note_user_waiting()
+        from .sources import SourceWaived, note_user_waiting
+    except Exception:
+        return
+    try:
+        note_user_waiting(what)
+    except SourceWaived:
+        raise
     except Exception:
         pass
 
@@ -460,7 +466,7 @@ def _wait_login_in_tab(tab_id: str, config: dict[str, Any], publisher: str, idp_
     print("  登录成功后会自动继续下载\n")
 
     for _ in range(100):  # ~5 min
-        _user_waiting()
+        _user_waiting("login")
         try:
             page.wait_for_timeout(3000)
             title = page.title() or ""
@@ -555,7 +561,7 @@ def _visible_institutional_login(
         print("  登录成功后浏览器会自动跳转回文章页面，程序会自动检测\n")
 
         for i in range(100):
-            _user_waiting()
+            _user_waiting("login")
             time.sleep(3)
             try:
                 title = page.title()
@@ -769,7 +775,7 @@ def _visible_browser_download(
         # SSO click never left the article, it is not a login.
         seen_auth = already_on_auth
         for i in range(100):
-            _user_waiting()
+            _user_waiting("login")
             time.sleep(3)
             if not seen_auth and i >= 10:
                 break  # ~30 s and the login page never appeared
@@ -1650,7 +1656,7 @@ def _browser_download_visible(
 
             logged_in = False
             for _ in range(100):
-                _user_waiting()
+                _user_waiting("login")
                 time.sleep(3)
                 try:
                     cur_title = page.title()
@@ -1858,6 +1864,8 @@ def _browser_download(
         return False
 
     log.info(f"   [{publisher}] browser download: {article_url[:80]}")
+    from . import progress_reporter
+    progress_reporter.item_stage(doi, f"正在打开 {publisher} 的页面")
 
     # Create tab to a lightweight page first, inject cookies, then navigate
     # to target. about:blank — a google.com warm-up hard-fails on networks
@@ -1919,6 +1927,7 @@ def _browser_download(
             if _href:
                 from .browser_pdf import capture_pdf_via_cdp
                 log.info(f"   [{publisher}] page PDF link: {_href[:80]}")
+                progress_reporter.item_stage(doi, f"已在 {publisher} 找到 PDF，正在下载")
                 _body = capture_pdf_via_cdp(_page.context, _page, _href)
                 if _body:
                     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2008,6 +2017,7 @@ def _browser_download(
                 if _href:
                     from .browser_pdf import capture_pdf_via_cdp
                     log.info(f"   [{publisher}] page PDF link after challenge: {_href[:80]}")
+                    progress_reporter.item_stage(doi, f"已在 {publisher} 找到 PDF，正在下载")
                     _body = capture_pdf_via_cdp(_page.context, _page, _href)
                     if _body:
                         output_path.parent.mkdir(parents=True, exist_ok=True)

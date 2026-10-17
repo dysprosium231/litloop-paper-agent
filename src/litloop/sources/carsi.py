@@ -352,7 +352,7 @@ class CARSIClient:
                             log.info("   [CARSI-Browser] CAS login required. Please log in...")
                             from . import note_user_waiting
                             for i in range(100):
-                                note_user_waiting()  # keep the race from closing this window mid-login
+                                note_user_waiting("login")  # keep the race from closing this window mid-login
                                 time.sleep(3)
                                 try:
                                     title = page.title()

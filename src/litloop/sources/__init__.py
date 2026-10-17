@@ -241,6 +241,9 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
                 error_type = classify_error(result.get("status_code", 0))
                 record_result(label, False, latency_ms, error_type)
         return result
+    except SourceWaived:
+        log.info(f"   {label}: stopped, the paper is already downloaded")
+        return None
     except Exception as e:
         latency_ms = (time.time() - t0) * 1000
         error_type = classify_error(exception=e)
@@ -933,11 +936,35 @@ _USER_WAIT_FRESH_S = 120.0
 _USER_WAIT_MAX_S = 600.0
 
 
-def note_user_waiting() -> None:
-    """Called by a source on every poll while it waits for the user's login."""
+_WAIT_TEXT = {
+    "login": "请在弹出的浏览器窗口中登录学校账号",
+    "verify": "请在弹出的浏览器窗口中完成人机验证（出现勾选框时点击它）",
+}
+
+
+class SourceWaived(RuntimeError):
+    """Raised in a source's wait-for-the-user loop once its paper is settled."""
+
+
+def note_user_waiting(what: str = "") -> None:
+    """Called by a source on every poll while it waits for the user (a login, a
+    human check). Keeps the race from closing that window, and tells the app:
+    a notice on top of the job page and a line under the paper.
+
+    Raises ``SourceWaived`` when the paper is already done (another source got
+    it): the waiting window must not hold the browser or ask for a login."""
+    if not _source_may_continue():
+        raise SourceWaived("download already finished; stop waiting for the user")
     doi = getattr(_SOURCE_TLS, "doi", None)
     if doi:
         _USER_WAIT[doi] = time.time()
+        try:
+            from .. import progress_reporter as pr
+            text = _WAIT_TEXT.get(what, "请在弹出的浏览器窗口中完成登录或人机验证")
+            pr.set_attention(f"wait:{doi}", f"{text}（{doi}）", current=doi, phase="等待你的操作")
+            pr.item_stage(doi, "等待你在浏览器中操作")
+        except Exception:
+            pass
 
 
 def _user_waiting_for(doi: str) -> bool:
@@ -1054,6 +1081,11 @@ def download(
             return fail(key, "cancelled by user", error_type="cancelled", action="none")
         return result
     finally:
+        try:  # whatever this paper waited on the user for is over now
+            from .. import progress_reporter as _pr
+            _pr.clear_attention(f"wait:{normalize_doi(key) if not is_arxiv_identifier(key) else key}")
+        except Exception:
+            pass
         if prev_gen is None:
             _DL_TLS.gen = None
         with _INFLIGHT_LOCK:
@@ -1252,6 +1284,8 @@ def _download_impl(
         inst_sources = _build_institutional_sources(doi, config, use_vpnsci=use_vpnsci)
         if inst_sources:
             log.info("   Phase 1 failed, trying institutional access...")
+            from .. import progress_reporter
+            progress_reporter.item_stage(doi, "正在走学校通道")
             result = _run_tiers_parallel(
                 [(inst_sources, "Institutional", 30)], doi, target_dir, output_path, config, use_tor, 30,
                 failures=race_failures,
@@ -1722,6 +1756,8 @@ def institutional_download(
     if not inst_sources:
         return None
     log.info(f"   [school route] {doi}")
+    from .. import progress_reporter
+    progress_reporter.item_stage(doi, "正在走学校通道")
     result = _run_tiers_parallel([(inst_sources, "Institutional", 30)], doi, target_dir, output_path,
                                  config, False, 30, failures=[])
     if not result:

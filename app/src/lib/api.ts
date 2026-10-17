@@ -231,6 +231,8 @@ export interface DownloadItem {
   status: "waiting" | "done" | "failed"
   /** A lane did not get it; the next lane is trying (download_jobs). */
   retrying?: boolean
+  /** Where it is now, while the job runs ("已在 Sci-Hub 找到，正在下载"). */
+  stage?: string | null
   source?: string | null
   file?: string | null
   error?: string | null

@@ -1099,6 +1099,8 @@ def try_instsci(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str
         result = _try_instsci_http(doi, output_path, config)
         if result:
             return result
+        log.info("   [WebVPN] No PDF through WebVPN for this paper")
+        return None
 
     log.info("   [WebVPN] No valid session. Use instsci_login or carsi_login tool first.")
     return None
@@ -1257,16 +1259,19 @@ def _download_pdf_instsci(
     doi: str,
 ) -> dict[str, Any] | None:
     if not is_plausible_pdf_url(url):
+        log.info(f"   [WebVPN] Not a PDF link, skipped: {url[:80]}")
         return None
     try:
         _instsci_rate_limit()
         resp = _fetch_via_webvpn(url, config, stream=True)
         if resp.status_code >= 400:
+            log.info(f"   [WebVPN] HTTP {resp.status_code}: {url[:80]}")
             return None
 
         iterator = resp.iter_content(chunk_size=8192)
         first_chunk = next(iterator, b"")
         if not _response_looks_pdf(resp, first_chunk):
+            log.info(f"   [WebVPN] Not a PDF ({resp.headers.get('content-type', '?')}): {url[:80]}")
             return None
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1287,6 +1292,6 @@ def _download_pdf_instsci(
             result["doi"] = doi
             result["identifier"] = doi
             return result
-    except Exception:
-        pass
+    except Exception as e:
+        log.info(f"   [WebVPN] Download failed: {e}")
     return None

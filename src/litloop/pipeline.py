@@ -523,7 +523,7 @@ def run_scihub_then_single(
     output_dir: str | Path,
     config: dict[str, Any] | None = None,
     allow_grey: bool = True,
-    workers: int = 3,
+    workers: int = 1,
 ) -> list[dict[str, Any]]:
     """A short list (up to batch_small_max papers): Sci-Hub for every paper at
     once, then a full single download for each one it missed.
@@ -532,8 +532,9 @@ def run_scihub_then_single(
     HTTP) for all papers in parallel; when the user turned gray sources off
     there is no round 1. Round 2 runs each remaining paper exactly as a single
     download does - every source racing, then the school's routes, WebVPN when
-    it is switched on - a few papers at a time; a paper is done the moment one
-    source gets it, nobody waits for a slower one. (The lanes in run_lanes
+    it is switched on - one paper at a time by default (workers): these papers
+    need the browser, there is one, and a paper queuing for it would run out
+    its race clock while it waits. (The lanes in run_lanes
     serialize stage by stage, which costs minutes on a dozen papers.)
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -561,6 +562,8 @@ def run_scihub_then_single(
     if ids and allow_grey and grey_allowed(config):
         _progress.update(phase="Sci-Hub")
         with ThreadPoolExecutor(max_workers=min(4, len(ids))) as ex:
+            for i in ids:
+                _progress.item_stage(i, "正在查 Sci-Hub")
             futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False): i for i in ids}
             for f in as_completed(futs):
                 i, r = futs[f], f.result()
@@ -573,7 +576,13 @@ def run_scihub_then_single(
         _progress.update(phase="逐篇下载")
         use_vpnsci = bool(config.get("vpnsci_enabled") or config.get("ezproxy_enabled"))
         with ThreadPoolExecutor(max_workers=max(1, min(workers, len(left)))) as ex:
-            futs = {ex.submit(_one, i, _institutional=True, use_vpnsci=use_vpnsci): i for i in left}
+            for i in left:
+                _progress.item_stage(i, "排队中：Sci-Hub 未找到，将逐篇查找")
+
+            def _staged(i: str) -> dict[str, Any]:
+                _progress.item_stage(i, "正在查找全文（各来源同时尝试）")
+                return _one(i, _institutional=True, use_vpnsci=use_vpnsci)
+            futs = {ex.submit(_staged, i): i for i in left}
             for f in as_completed(futs):
                 i, r = futs[f], f.result()
                 results[i] = r

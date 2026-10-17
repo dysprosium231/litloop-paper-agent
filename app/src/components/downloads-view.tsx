@@ -345,7 +345,11 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
               <div className="text-xs text-muted-foreground">
                 {[metaLine(it), it.source && it.status === "done" ? `来源：${it.source}` : null].filter(Boolean).join(" · ") || it.doi}
               </div>
-              {it.status === "waiting" && it.retrying && running && <div className="mt-0.5 text-xs text-muted-foreground">换渠道重试中</div>}
+              {it.status === "waiting" && running && (it.stage || it.retrying) && (
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-primary">
+                  <LoaderIcon className="size-3 animate-spin" />{it.stage ?? "换渠道重试中"}
+                </div>
+              )}
               {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90" title={it.error}>{it.error_text ?? it.error}</div>}
               {it.zotero && (
                 <div className={cn("mt-0.5 text-xs", it.zotero.status === "failed" ? "text-destructive/90" : it.zotero.status === "no_pdf" ? "text-warning-foreground" : "text-muted-foreground")}

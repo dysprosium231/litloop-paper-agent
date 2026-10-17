@@ -218,12 +218,18 @@ def _run(job: str) -> None:
         doi = canonical_doi(current or "")
         if doi in wanted:
             if ok:
-                _mark(job, doi, status="done", retrying=False)
+                _mark(job, doi, status="done", retrying=False, stage=None)
             else:
                 _mark(job, doi, retrying=True)
 
+    def on_stage(current: str, text: str) -> None:
+        doi = canonical_doi(current or "")
+        if doi in wanted:
+            _mark(job, doi, stage=text)
+
     from . import progress_reporter
     progress_reporter.add_listener(on_item)
+    progress_reporter.add_stage_listener(on_stage)
     state, error, results = "done", None, []
     try:
         if dois:
@@ -234,13 +240,14 @@ def _run(job: str) -> None:
         state, error = "failed", f"{type(exc).__name__}: {exc}"
     finally:
         progress_reporter.remove_listener(on_item)
+        progress_reporter.remove_stage_listener(on_stage)
         try:
             with store.update(path, indent=1) as data:
                 by_doi = {canonical_doi(r.get("doi") or r.get("identifier") or ""): r for r in results}
                 for it in data["items"]:
                     r = by_doi.get(it["doi"])
                     if r:
-                        it.update(status="done" if r.get("success") else "failed", retrying=False, source=r.get("source"),
+                        it.update(status="done" if r.get("success") else "failed", retrying=False, stage=None, source=r.get("source"),
                                   file=r.get("file") or None, error=None if r.get("success") else r.get("error"))
                     elif it["status"] == "waiting" and state == "done":
                         it.update(status="failed", error="cancelled" if _CURRENT["cancelled"] else "no result")
