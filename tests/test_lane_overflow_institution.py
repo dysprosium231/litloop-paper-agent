@@ -1,4 +1,4 @@
-"""Papers the fast and grey lanes miss go on to the school's route when there is one."""
+"""Papers the fast and grey lanes miss go through the school's routes, as a single download does."""
 
 from pathlib import Path
 
@@ -10,7 +10,7 @@ from litloop.pipeline import QueueEntry
 
 @pytest.fixture
 def lanes(monkeypatch):
-    asked = {}
+    asked = {"inst": [], "heal": []}
     monkeypatch.setattr(pipeline, "_enrich_oa_urls", lambda *a, **k: None)
     monkeypatch.setattr(pipeline, "_transient_retry", lambda *a, **k: None)
     monkeypatch.setattr(pipeline, "_fetch_si_for_results", lambda *a, **k: None)
@@ -19,43 +19,40 @@ def lanes(monkeypatch):
         {"success": e.identifier == "10.3390/oa.1", "doi": e.identifier, "source": "oa"} for e in entries])
 
     import litloop.sources as sources
-    monkeypatch.setattr(sources, "batch_download", lambda ids, *a, **k: asked.setdefault("grey", list(ids)) and {
+    monkeypatch.setattr(sources, "batch_download", lambda ids, *a, **k: {
         "results": [{"success": False, "doi": d, "identifier": d, "error": "not in library"} for d in ids]})
     monkeypatch.setattr(pipeline, "_normalize_engine_results", lambda raw: raw["results"])
-
-    class Fetcher:
-        def __init__(self, cfg):
-            pass
-
-        def fetch_with_result(self, doi):
-            asked.setdefault("inst", []).append(doi)
-
-            class R:
-                def to_dict(self):
-                    return {"success": True, "doi": doi, "source": "WebVPN"}
-            return R()
-
-        def close(self):
-            pass
-    import litloop.institutional.fetcher as fetcher_mod
-    import litloop.institutional.config_adapter as adapter_mod
-    monkeypatch.setattr(fetcher_mod, "PaperFetcher", Fetcher)
-    monkeypatch.setattr(adapter_mod.ConfigAdapter, "load", classmethod(lambda cls: type("C", (), {"_config": {}})()))
-    return asked
+    return asked, sources
 
 
-ENTRIES = [QueueEntry(identifier="10.1016/sub.1", channel="elsevier"),   # fast lane misses (off the school's IPs)
+ENTRIES = [QueueEntry(identifier="10.1016/sub.1", channel="elsevier"),   # fast lane misses
            QueueEntry(identifier="10.1111/sub.2"),                       # auto -> grey lane misses
            QueueEntry(identifier="10.3390/oa.1", channel="oa")]           # fast lane gets it
 
 
-def test_misses_reach_the_school_route(lanes, tmp_path: Path):
-    results = pipeline.run_lanes(ENTRIES, tmp_path, config={"vpnsci_enabled": True})
-    assert sorted(lanes["inst"]) == ["10.1016/sub.1", "10.1111/sub.2"]  # not the OA one it already has
+def test_misses_go_through_the_school_routes_one_by_one(lanes, monkeypatch, tmp_path: Path):
+    asked, sources = lanes
+
+    def school(doi, out, heal=True):
+        asked["inst"].append(doi)
+        asked["heal"].append(heal)
+        return {"success": True, "doi": doi, "source": "WebVPN"}
+    monkeypatch.setattr(sources, "institutional_download", school)
+    results = pipeline.run_lanes(ENTRIES, tmp_path, config={})
+    assert asked["inst"] == ["10.1016/sub.1", "10.1111/sub.2"]  # not the OA one it already has
+    assert asked["heal"] == [True, False]  # sessions refreshed once
     last = {r["doi"]: r for r in results}
     assert last["10.1016/sub.1"]["source"] == "WebVPN" and last["10.1111/sub.2"]["success"]
 
 
-def test_without_a_school_route_nothing_more_is_tried(lanes, tmp_path: Path):
+def test_no_school_route_stops_after_the_first_answer(lanes, monkeypatch, tmp_path: Path):
+    asked, sources = lanes
+    monkeypatch.setattr(sources, "institutional_download", lambda doi, out, heal=True: asked["inst"].append(doi))
     pipeline.run_lanes(ENTRIES, tmp_path, config={})
-    assert "inst" not in lanes
+    assert asked["inst"] == ["10.1016/sub.1"]  # None: nothing configured, the rest are not asked
+
+
+def test_institution_off_means_off(lanes, monkeypatch, tmp_path: Path):
+    asked, sources = lanes
+    monkeypatch.setattr(sources, "institutional_download", lambda *a, **k: pytest.fail("asked"))
+    pipeline.run_lanes(ENTRIES, tmp_path, config={}, allow_institution=False)

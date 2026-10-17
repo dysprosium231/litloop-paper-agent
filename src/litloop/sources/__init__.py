@@ -1688,6 +1688,51 @@ def _apply_preprint_fallbacks(
                 break
 
 
+def institutional_download(
+    identifier: str,
+    output_dir: str | Path | None = None,
+    *,
+    use_vpnsci: bool = False,
+    heal: bool = True,
+) -> dict[str, Any] | None:
+    """Phase 2 of a single download on its own: the school's routes (WebVPN,
+    CARSI, EZProxy, the InstSci bridge), after refreshing their sessions.
+
+    Batches run it, one paper at a time, for what the faster lanes missed: a
+    single download always had this phase, a batch had none (its grey lane
+    turns it off so ten workers do not open ten login windows). heal=False
+    skips the session refresh for the papers after the first.
+    """
+    config = load_config()
+    if config.get("download_strategy") in ("scihub_only", "grey_only"):
+        return None
+    target_dir = Path(output_dir) if output_dir else Path(config["output_dir"])
+    target_dir.mkdir(parents=True, exist_ok=True)
+    identifier = identifier.strip()
+    doi = normalize_doi(identifier) if not is_arxiv_identifier(identifier) else identifier
+    output_path = target_dir / f"{safe_filename(identifier)}.pdf"
+    if heal:
+        try:
+            from ..session_heal import ensure_institutional_sessions
+            for channel, state in ensure_institutional_sessions(config, use_vpnsci=use_vpnsci).items():
+                log.info(f"   [session-heal] {channel}: {state.get('status')}")
+        except Exception as exc:
+            log.info(f"   [session-heal] skipped: {exc}")
+    inst_sources = _build_institutional_sources(doi, config, use_vpnsci=use_vpnsci)
+    if not inst_sources:
+        return None
+    log.info(f"   [school route] {doi}")
+    result = _run_tiers_parallel([(inst_sources, "Institutional", 30)], doi, target_dir, output_path,
+                                 config, False, 30, failures=[])
+    if not result:
+        return None
+    _update_doi_index(target_dir, doi, Path(result.get("file", "")), source=result.get("source") or "",
+                      strategy=config.get("download_strategy", ""), config=config)
+    _auto_rename(result, identifier, config, doi=doi, target_dir=target_dir)
+    cache_set(identifier, result, config)
+    return result
+
+
 def batch_download(
     identifiers: list[str],
     output_dir: str | Path | None = None,

@@ -583,16 +583,28 @@ def run_lanes(
         )
         results += _normalize_engine_results(raw)
 
-    # What the faster lanes did not get goes on to the institutional cascade
-    # (WebVPN / CARSI / EZProxy, or the campus network), when the user has one:
-    # without this a subscription paper that missed the API and the grey
-    # sources never reached the school's route at all.
-    if allow_institution and institution_configured(config):
+    # What the faster lanes did not get goes through the school's routes, as in
+    # a single download (sources.institutional_download: session refresh, then
+    # WebVPN / CARSI / EZProxy), one paper at a time so a login opens once.
+    # Without this a batch never reached the school at all.
+    if allow_institution:
+        from .sources import institutional_download
         got = {str(r.get("doi") or "").strip().lower() for r in results if r.get("success")}
-        for e in entries:
-            if (e.identifier and not e.unresolved and e.identifier.lower() not in got
-                    and e.identifier not in inst and (e.channel or predict_channel(e.identifier)) != "oa"):
-                inst.append(e.identifier)
+        left = [e.identifier for e in entries
+                if e.identifier and not e.unresolved and e.identifier.lower() not in got
+                and e.identifier not in inst and (e.channel or predict_channel(e.identifier)) != "oa"]
+        if left:
+            _progress.update(phase="学校通道")
+        for i, doi in enumerate(left):
+            try:
+                r = institutional_download(doi, out, heal=(i == 0))
+            except Exception as exc:
+                r = {"success": False, "doi": doi, "error": f"school route: {exc}"}
+            if r is None:
+                break  # no school route configured: the rest would get the same answer
+            r.setdefault("doi", doi)
+            _progress.advance(bool(r.get("success")), current=doi)
+            results.append(r)
 
     if inst and allow_institution:
         from .institutional.config_adapter import ConfigAdapter

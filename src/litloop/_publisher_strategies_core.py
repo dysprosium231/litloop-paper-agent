@@ -1851,17 +1851,6 @@ def _browser_download(
         _set_error("browser_unavailable", "start_browser")
         return False
 
-    # A publisher already said this exit is not the school's: its site will not
-    # serve the subscription PDF either (and may stop the browser at a check).
-    # With a school route set up, the paper goes there instead.
-    from . import egress
-    from .pipeline import institution_configured
-    if egress.refused() and institution_configured(config) and not config.get("is_campus_network"):
-        log.info(f"   [{publisher}] skipping the publisher's site: this exit is not the school's; "
-                 "the school route (WebVPN / CARSI) takes it")
-        _set_error("not_entitled_egress", "use_institution")
-        return False
-
     log.info(f"   [{publisher}] browser download: {article_url[:80]}")
 
     # Create tab to a lightweight page first, inject cookies, then navigate
