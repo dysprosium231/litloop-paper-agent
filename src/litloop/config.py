@@ -175,6 +175,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "scihub_http_workers": 12,
     "race_grace_seconds": 15,
     "race_grace_browser_seconds": 180,
+    # A school route (institutional_order) with no result after this long has its
+    # browsers closed and the next route runs; a login the user is doing extends it.
+    "institutional_step_seconds": 240,
     "batch_small_max": 30,
     "batch_small_workers": 1,
     # Desktop app: the first-run guide (app_settings.STEPS) was finished or skipped.

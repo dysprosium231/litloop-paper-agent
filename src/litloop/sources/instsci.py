@@ -865,6 +865,17 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
         _auth_url_signals = list(_stoks) + ["/do/off/ui/auth"]
 
         log.info(f"   [WebVPN-Browser] Page title: '{title}' URL: {url_now[:80]}")
+        # The publisher sent the browser out of WebVPN to its own institution
+        # login (2026-10-17: ScienceDirect via WebVPN -> auth.elsevier.com ->
+        # the school's IdP -> the ScienceDirect home page, over the direct line,
+        # never back to the article). That is the publisher-site route, not
+        # WebVPN; it is tried in phase 1.
+        _school = (urllib.parse.urlparse(base).hostname or "").split(".", 1)[-1]  # d.buaa.edu.cn -> buaa.edu.cn
+        _host_now = urllib.parse.urlparse(url_now).hostname or ""
+        if _host_now and _school and not _host_now.endswith(_school) and not any(
+                t in url_now for t in _auth_url_signals if t):
+            log.info(f"   [WebVPN-Browser] Left WebVPN for {_host_now}; giving up this route")
+            return None
         if "登录" in title or "身份" in title or "二次认证" in title or "CAS" in title or any(t in url_now for t in _auth_url_signals):
             print(f"  检测到登录页面，请完成登录...")
             # Wait up to 5 minutes, checking title every 3 seconds

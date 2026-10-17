@@ -497,7 +497,12 @@ def _run_institutional_sequence(steps: list[tuple[Any, str]], doi: str, target_d
             return None
         progress_reporter.item_stage(doi, f"正在走学校通道：{_STEP_TEXT.get(label, label)}")
         src_output = target_dir / f"{safe_filename(doi)}_{label}.pdf"
-        result = _try_source(fn, doi, src_output, config, label)
+        done = threading.Event()
+        threading.Thread(target=_step_watchdog, args=(doi, label, done, config), daemon=True).start()
+        try:
+            result = _try_source(fn, doi, src_output, config, label)
+        finally:
+            done.set()
         if result and result.get("success"):
             final_path = Path(result.get("file", ""))
             if final_path != output_path and final_path.exists():
@@ -514,6 +519,26 @@ def _run_institutional_sequence(steps: list[tuple[Any, str]], doi: str, target_d
             src_output.unlink(missing_ok=True)
     log.info(f"   [timing] school routes: {time.time() - t_seq:.1f}s, none had it")
     return None
+
+
+def _step_watchdog(doi: str, label: str, done: threading.Event, config: dict[str, Any]) -> None:
+    """End a school route that has gone quiet: after institutional_step_seconds
+    without a result (a login the user is doing keeps it alive), kill the
+    browsers it opened, so its blocked browser calls fail and the next route
+    runs. 2026-10-17: a WebVPN browser step hung over 10 minutes on a page
+    that never finished loading, with no timeout of its own firing."""
+    from ..browser_backend import close_browsers_since
+    limit = float(config.get("institutional_step_seconds", 240) or 240)
+    since = time.perf_counter()  # close_browsers_since's clock
+    deadline = time.time() + limit
+    while not done.wait(5):
+        if _user_waiting_for(doi):
+            deadline = max(deadline, time.time() + 60)  # the user is at it: give them time
+            continue
+        if time.time() >= deadline:
+            n = close_browsers_since(since)
+            log.info(f"   [timing] {label}: nothing after {limit:.0f}s; closed {n} browser(s), next route")
+            return
 
 
 _STEP_TEXT = {"WebVPN-HTTP": "WebVPN 直接下载", "WebVPN": "WebVPN 浏览器", "CARSI": "CARSI", "EZProxy": "EZProxy"}
