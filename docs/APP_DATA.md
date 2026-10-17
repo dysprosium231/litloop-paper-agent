@@ -56,6 +56,7 @@
 ```
 
 - `relevance`、`reason`：Agent 的评分和理由，取值 `高`、`中`、`低`、`不相关`。
+- `abstract_zh`：中文摘要（可选）。翻译服务为 DeepSeek / DeepL 时由 **app 写**（用户打开文献时翻译一次，见 `translate.py`）；为 Agent 时由 Agent 在评分时写，或用 `litloop_screening(action="translate")` 补。重新评分不会抹掉它。
 - `user_relevance`：**app 写**。用户改过的评分，覆盖 Agent 的（排序、停止判断都用它）；Agent 再评同一篇时不会抹掉它。没改过就没有这个字段。
 - `decision`：**app 写**（或 Agent 按用户的话写）。`selected`（选中下载）、`rejected`（排除）或 `null`。
 - `n`：条目按相关度排序后的编号，每次保存会重排；app 定位条目用 `doi`，没有 DOI 的用标题。

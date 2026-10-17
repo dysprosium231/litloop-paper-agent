@@ -292,7 +292,7 @@ def litloop_screening(
     rejected: list[str] | None = None,
     out_file: str | None = None,
 ) -> str:
-    """Screening record: save (items: doi,title,relevance 高/中/低/不相关,reason), decide (selected nos/DOIs), list, show."""
+    """Screening record: save (items: doi,title,relevance 高/中/低/不相关,reason), decide (selected nos/DOIs), translate (items: doi,abstract_zh), list, show."""
     from . import screening
     try:
         if action == "save":
@@ -303,13 +303,17 @@ def litloop_screening(
                 return json.dumps({"error": "session is required"})
             return json.dumps(screening.decide(session, selected or [], rejected, out_file),
                               ensure_ascii=False)
+        if action == "translate":
+            if not session:
+                return json.dumps({"error": "session is required"})
+            return json.dumps(screening.translate(session, items or []), ensure_ascii=False)
         if action == "list":
             return json.dumps({"sessions": screening.list_sessions()}, ensure_ascii=False)
         if action == "show":
             if not session:
                 return json.dumps({"error": "session is required"})
             return json.dumps(screening.load(session), ensure_ascii=False)
-        return json.dumps({"error": f"unknown action {action!r}; use save|decide|list|show"})
+        return json.dumps({"error": f"unknown action {action!r}; use save|decide|translate|list|show"})
     except (ValueError, FileNotFoundError) as exc:
         return json.dumps({"error": str(exc)}, ensure_ascii=False)
 

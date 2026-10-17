@@ -15,6 +15,8 @@ export interface Item {
   cited_by_count?: number
   abstract?: string
   abstract_missing?: boolean
+  /** Chinese abstract (translate.py, or the agent). */
+  abstract_zh?: string
   retracted?: boolean | null
   concern?: boolean | null
   relevance: Relevance
@@ -137,6 +139,16 @@ export const api = {
   decide: (id: string, paper: { doi?: string; title: string }, decision: Item["decision"]) =>
     call<{ item: Item }>(`/api/sessions/${encodeURIComponent(id)}/decision`,
       { doi: paper.doi ?? null, title: paper.title, decision }),
+  translation: () => call<TranslationInfo>("/api/translation"),
+  translate: (id: string, paper: { doi?: string; title: string }) =>
+    call<{ abstract_zh: string }>(`/api/sessions/${encodeURIComponent(id)}/translate`, { doi: paper.doi ?? null, title: paper.title }),
+}
+
+/** Who translates abstracts, which ratings without asking, and whether the app can (a key is set). */
+export interface TranslationInfo {
+  provider: "deepseek" | "deepl" | "agent"
+  auto: Relevance[]
+  ready: boolean
 }
 
 /** The rating that counts: the user's, if they changed it, else the agent's. */

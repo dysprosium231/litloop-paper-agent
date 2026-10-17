@@ -36,7 +36,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from . import screening, store
+from . import screening, store, translate
 from .config import load_config
 from .identifiers import canonical_doi
 from .log import get_logger
@@ -647,15 +647,21 @@ def rate(session: str, ratings: list[dict[str, Any]]) -> dict[str, Any]:
             continue
         b = batch[n - 1]
         items.append({**{f: b.get(f) for f in _BATCH_FIELDS},
-                      "relevance": rel, "reason": str(r.get("reason") or rel)})
+                      "relevance": rel, "reason": str(r.get("reason") or rel), "abstract_zh": r.get("abstract_zh")})
     if bad:
         raise ValueError(f"nothing saved: invalid entries {bad[:3]}; n is 1-{len(batch)}, "
                          f"relevance one of {'/'.join(screening.RELEVANCE)}")
     saved = screening.save("", items, session=session, mode="deep")
     done = {int(r["n"]) for r in ratings}
-    return {"session": session, "saved": len(items), "total": saved["total"], "by_relevance": saved["by_relevance"],
-            "not_rated": [i for i in range(1, len(batch) + 1) if i not in done],
-            "next_step": "action='next'" if len(done) == len(batch) else "rate the papers in not_rated, then action='next'"}
+    out = {"session": session, "saved": len(items), "total": saved["total"], "by_relevance": saved["by_relevance"],
+           "not_rated": [i for i in range(1, len(batch) + 1) if i not in done],
+           "next_step": "action='next'" if len(done) == len(batch) else "rate the papers in not_rated, then action='next'"}
+    left = screening.untranslated(session)
+    if left:  # the app shows these abstracts in Chinese
+        out["untranslated"] = left
+        out["next_step"] = ("translate their abstracts into Chinese: litloop_screening(action='translate', session=..., "
+                            "items=[{doi, abstract_zh}]); then " + out["next_step"])
+    return out
 
 
 def status(session: str) -> dict[str, Any]:
@@ -872,6 +878,8 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None) -> d
             "api_warnings": notes,
             "remaining": len(order) - len(picked), "ranked_by": state.get("ranked_by", "formula"), "batch": batch,
             "coverage": coverage, **stop,
-            "next_step": ("rate every paper: action='rate', session=..., ratings=[{n, relevance, reason}], "
-                          "then action='next'") if batch else
+            "next_step": ("rate every paper: action='rate', session=..., ratings=[{n, relevance, reason}"
+                          + (f", abstract_zh (Chinese abstract) for {'/'.join(screening.translate_wanted())}"
+                             if screening.translate_wanted() and not translate.by_api() else "")
+                          + "], then action='next'") if batch else
                          "stop: show the user the screening session and let them choose"}

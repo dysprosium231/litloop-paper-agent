@@ -70,6 +70,21 @@ GROUPS: list[dict[str, Any]] = [
         ],
     },
     {
+        "id": "screening", "title": "筛选", "test": "screening",
+        "fields": [
+            {"key": "abstract_translation", "label": "自动翻译摘要", "type": "select",
+             "options": [["高", "评为高的文献"], ["高中", "评为高、中的文献"], ["all", "全部文献"], ["off", "不自动翻译"]],
+             "help": "打开范围内的文献时翻译成中文，译文会保存；范围外的文献可在详情页手动翻译"},
+            {"key": "translation_provider", "label": "翻译服务", "type": "select",
+             "options": [["deepseek", "DeepSeek"], ["deepl", "DeepL"], ["agent", "Agent（评分时翻译）"]],
+             "help": "DeepSeek 处理专业术语较好；选 Agent 不需要 Key，但会消耗对话额度"},
+            {"key": "deepseek_api_key", "label": "DeepSeek Key", "type": "secret",
+             "link": "https://platform.deepseek.com/api_keys"},
+            {"key": "deepl_api_key", "label": "DeepL Key", "type": "secret",
+             "link": "https://www.deepl.com/your-account/keys", "help": "免费版 Key 以 :fx 结尾"},
+        ],
+    },
+    {
         "id": "zotero", "title": "Zotero", "test": "zotero",
         "fields": [
             {"key": "zotero_mcp_python", "label": "zotero-mcp 的 Python", "type": "path", "pick": "file", "placeholder": "留空自动查找"},
@@ -298,7 +313,25 @@ def test_network() -> list[dict[str, Any]]:
     return out
 
 
-TESTS = {"sources": test_sources, "downloads": test_downloads, "network": test_network, "zotero": test_zotero}
+def test_screening() -> list[dict[str, Any]]:
+    """Translate one sentence with the chosen service."""
+    from . import translate
+    config = load_config()
+    name = translate.provider(config)
+    label = {"deepseek": "DeepSeek", "deepl": "DeepL", "agent": "Agent"}[name]
+    if name == "agent":
+        return [_result("翻译服务", None, "由 Agent 在评分时翻译，无需检测")]
+    if not str(config.get(f"{name}_api_key") or "").strip():
+        return [_result(label, None, "未填写 Key")]
+    try:
+        out = translate.translate_text("Amorphous calcium phosphate nanoparticles release doxorubicin at pH 5.5.", config)
+    except translate.TranslationError as exc:
+        return [_result(label, False, str(exc))]
+    return [_result(label, True, f"可用。示例译文：{out}")]
+
+
+TESTS = {"sources": test_sources, "downloads": test_downloads, "network": test_network, "zotero": test_zotero,
+         "screening": test_screening}
 
 
 def run_test(group: str) -> dict[str, Any]:

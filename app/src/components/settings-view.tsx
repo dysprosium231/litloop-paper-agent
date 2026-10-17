@@ -10,6 +10,7 @@ import {
   GaugeIcon,
   GlobeIcon,
   GraduationCapIcon,
+  LanguagesIcon,
   LoaderIcon,
   SearchIcon,
   XCircleIcon,
@@ -36,13 +37,13 @@ export const QUOTA = "quota"
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   sources: DatabaseIcon, downloads: DownloadIcon, network: GlobeIcon, school: GraduationCapIcon,
-  zotero: BookMarkedIcon, [QUOTA]: GaugeIcon,
+  zotero: BookMarkedIcon, screening: LanguagesIcon, [QUOTA]: GaugeIcon,
 }
 
 // Groups of the settings list; ids the backend adds later fall into the last one.
 const SECTIONS: { title: string; ids: string[] }[] = [
-  { title: "检索与下载", ids: ["sources", "downloads", QUOTA] },
-  { title: "连接", ids: ["network", "school", "zotero"] },
+  { title: "检索与筛选", ids: ["sources", "screening", QUOTA] },
+  { title: "下载与连接", ids: ["downloads", "network", "school", "zotero"] },
 ]
 
 // One line under each page title.
@@ -52,6 +53,7 @@ const ABOUT: Record<string, string> = {
   network: "代理和校园网的访问方式。",
   school: "通过学校认证下载订阅期刊。",
   zotero: "推送到 Zotero 的方式和默认分类。",
+  screening: "摘要翻译的范围和翻译服务。",
   [QUOTA]: "各检索接口今日的用量和剩余额度。",
 }
 

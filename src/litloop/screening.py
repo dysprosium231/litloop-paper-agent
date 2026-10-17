@@ -104,6 +104,8 @@ def _save(sid: str, existing: bool, question: str, items: list[dict[str, Any]], 
             item["abstract"] = str(item["abstract"])[:ABSTRACT_CHARS]
         if isinstance(item.get("authors"), list):
             item["authors"] = item["authors"][:3]
+        if raw.get("abstract_zh"):
+            item["abstract_zh"] = str(raw["abstract_zh"]).strip()[:ABSTRACT_CHARS]
         item["relevance"] = _norm_relevance(raw.get("relevance"))
         item["reason"] = str(raw.get("reason") or "").strip()
         old = by_key.get(_key(item))
@@ -124,6 +126,45 @@ def _save(sid: str, existing: bool, question: str, items: list[dict[str, Any]], 
             "by_relevance": {r: sum(1 for it in data["items"] if it["relevance"] == r) for r in RELEVANCE},
             "numbering": [_brief(it) for it in data["items"]],
             **paths}
+
+
+def translate_wanted(config: dict[str, Any] | None = None) -> list[str]:
+    """The ratings whose abstract is translated without asking (config abstract_translation)."""
+    from .config import load_config
+    value = str((config or load_config()).get("abstract_translation", "高") or "off")
+    if value == "all":
+        return list(RELEVANCE)
+    return [r for r in RELEVANCE if r in value]
+
+
+def untranslated(session: str, config: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Items the agent should still translate: only when the agent is the translator
+    (translation_provider "agent"), rated in translate_wanted, with an abstract."""
+    from . import translate as _translate
+    if _translate.by_api(config):
+        return []
+    wanted = translate_wanted(config)
+    return [_brief(it) for it in load(session)["items"]
+            if _rating(it) in wanted and it.get("abstract") and not it.get("abstract_zh")]
+
+
+def translate(session: str, items: list[dict[str, Any]]) -> dict[str, Any]:
+    """Store the agent's Chinese abstracts: items=[{doi or n, abstract_zh}]. Ratings stay as they are."""
+    with store.lock(_path(session)):  # the app may be writing the user's picks
+        data = load(session)
+        by_doi = {str(it.get("doi") or "").lower(): it for it in data["items"] if it.get("doi")}
+        by_n = {it.get("n"): it for it in data["items"]}
+        saved, missing = 0, []
+        for raw in items or []:
+            target = by_doi.get(str(raw.get("doi") or "").lower()) or by_n.get(raw.get("n"))
+            text = str(raw.get("abstract_zh") or "").strip()
+            if not target or not text:
+                missing.append(raw.get("doi") or raw.get("n"))
+                continue
+            target["abstract_zh"] = text[:ABSTRACT_CHARS]
+            saved += 1
+        _write(data)
+    return {"session": session, "saved": saved, "not_found": missing, "left": untranslated(session)}
 
 
 def _brief(it: dict[str, Any]) -> dict[str, Any]:

@@ -124,13 +124,20 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "host_concurrency": {},
     "auto_rename": True,  # older switch; false means rename_format "off"
     "rename_format": "author_year_title_doi",  # see rename.FORMATS
-    # zotero-mcp (github.com/54yyyu/zotero-mcp) route for zotero_push: the
-    # Python that has zotero-mcp installed ("" = find it automatically, "off"
-    # = use the web API), and an optional script that sets its ZOTERO_* env
-    # vars (its serve call must be under __main__).
     # Fetch abstracts missing from search results (Semantic Scholar, then
     # Scopus with elsevier_api_key, then Crossref) so screening reads them.
     "search_fill_abstracts": True,
+    # Chinese abstracts in the app (translate.py): which ratings are translated
+    # without asking ("高", "高中", "all", "off"), and by whom: "deepseek" /
+    # "deepl" (the app, when the paper is opened; needs the key) or "agent"
+    # (the agent, when it rates: costs conversation tokens).
+    "abstract_translation": "高",
+    "translation_provider": "deepseek",
+    "deepseek_api_key": "",
+    "deepl_api_key": "",
+    # zotero-mcp (github.com/54yyyu/zotero-mcp), the only route to Zotero: the
+    # Python that has it installed ("" = find it automatically), and an optional
+    # script that sets its ZOTERO_* env vars (its serve call must be under __main__).
     "zotero_mcp_python": "",
     "zotero_mcp_env_script": "",
     "zotero_push_timeout": 900,

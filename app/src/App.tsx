@@ -30,6 +30,7 @@ import {
   settingsApi,
   type SettingGroup,
   errorMessage,
+  type TranslationInfo,
 } from "@/lib/api"
 
 const short = (q: string) => (q.length > 28 ? q.slice(0, 28) + "…" : q)
@@ -223,6 +224,17 @@ export default function App() {
     if (papers.length && !papers.some((p) => paperKey(p) === current)) setCurrent(paperKey(papers[0]))
   }, [papers, current])
 
+  // Read again on each return to screening: the settings page may have changed it.
+  const [translation, setTranslation] = React.useState<TranslationInfo | null>(null)
+  React.useEffect(() => {
+    if (section === "screen") api.translation().then(setTranslation).catch(() => setTranslation(null))
+  }, [section])
+  const translateAbstract = React.useCallback(async () => {
+    if (!sid || !paper) return
+    await api.translate(sid, paper)
+    reload()
+  }, [sid, paper, reload])
+
   const rate = React.useCallback((rel: (typeof RELEVANCE)[number]) => {
     if (!sid || !paper?.item) return
     api.rate(sid, paper, rel === paper.item.relevance ? null : rel).then(reload).catch((e) => setError(errorMessage(e)))
@@ -322,7 +334,8 @@ export default function App() {
             </Breadcrumb>
           </header>
           <ProgressStrip progress={progress} summary={summary} />
-          <DetailPane paper={paper} edited={edited} onRate={rate} onSelect={toggleSelect} onExclude={exclude} />
+          <DetailPane paper={paper} edited={edited} onRate={rate} onSelect={toggleSelect} onExclude={exclude}
+            translation={translation} onTranslate={translateAbstract} />
           </>)}
         </SidebarInset>
       </SidebarProvider>

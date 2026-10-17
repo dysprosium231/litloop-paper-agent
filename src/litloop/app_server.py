@@ -82,6 +82,11 @@ class OpenPath(BaseModel):
     path: str
 
 
+class Translate(BaseModel):
+    doi: str | None = None
+    title: str | None = None
+
+
 class Decision(BaseModel):
     doi: str | None = None
     title: str | None = None
@@ -172,6 +177,33 @@ def create_app(token: str) -> FastAPI:
                 item["user_relevance"] = body.relevance
             edited = sum(1 for it in data["items"] if it.get("user_relevance"))
         return {"item": item, "edited": edited}
+
+    @app.get("/api/translation")
+    def translation() -> dict[str, Any]:
+        """What the detail pane needs: who translates, which ratings without asking, whether it can."""
+        from . import translate
+        from .config import load_config
+        config = load_config()
+        name = translate.provider(config)
+        return {"provider": name, "auto": screening.translate_wanted(config),
+                "ready": name != "agent" and bool(str(config.get(f"{name}_api_key") or "").strip())}
+
+    @app.post("/api/sessions/{session}/translate")
+    def translate_abstract(session: str, body: Translate) -> dict[str, Any]:
+        """Translate one paper's abstract with DeepSeek / DeepL and keep it in the record."""
+        from . import translate
+        item = _find(store.read_json(_record_path(session))["items"], body.doi, body.title)
+        if item.get("abstract_zh"):
+            return {"abstract_zh": item["abstract_zh"]}
+        if not item.get("abstract"):
+            raise HTTPException(400, "无法翻译：此文献没有摘要")
+        try:
+            text = translate.translate_text(item["abstract"])
+        except translate.TranslationError as exc:
+            raise HTTPException(502, f"无法翻译：{exc}。") from exc
+        with store.update(_record_path(session), indent=2) as data:  # the network call ran outside the lock
+            _find(data["items"], body.doi, body.title)["abstract_zh"] = text[:screening.ABSTRACT_CHARS]
+        return {"abstract_zh": text}
 
     @app.post("/api/sessions/{session}/decision")
     def decide(session: str, body: Decision) -> dict[str, Any]:
