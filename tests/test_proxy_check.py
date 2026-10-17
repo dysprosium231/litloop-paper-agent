@@ -36,6 +36,7 @@ def test_nothing_running():
 def test_network_check_gives_direct_rules_for_tun_mode(monkeypatch, tmp_path):
     from litloop import app_settings, config
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.json")
+    monkeypatch.setattr(app_settings, "_egress_checks", lambda cfg: [])  # no network in tests
     monkeypatch.setattr(proxy_check, "detect", lambda: {
         "mode": "tun", "programs": ["Clash Verge"], "tun": ["Meta"], "system_proxy": None,
         "direct_processes": ["python.exe", "litloop-chrome.exe"]})
@@ -50,8 +51,27 @@ def test_network_check_gives_direct_rules_for_tun_mode(monkeypatch, tmp_path):
 def test_network_check_system_proxy_is_fine(monkeypatch, tmp_path):
     from litloop import app_settings, config
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.json")
+    monkeypatch.setattr(app_settings, "_egress_checks", lambda cfg: [])  # no network in tests
     monkeypatch.setattr(proxy_check, "detect", lambda: {
         "mode": "system", "programs": ["v2rayN"], "tun": [], "system_proxy": "127.0.0.1:10808",
         "direct_processes": ["python.exe"]})
     (r,) = app_settings.test_network()
     assert r["ok"] is True and "guides" not in r
+
+
+def test_egress_checks_report_the_exit_and_the_publishers_answer(monkeypatch):
+    import requests
+
+    from litloop import app_settings, elsevier_check
+
+    class Resp:
+        def json(self):
+            return {"ip": "219.143.23.107", "city": "Beijing", "country": "CN", "org": "AS4847 China Networks"}
+    monkeypatch.setattr(requests.Session, "get", lambda self, url, **kw: Resp())
+    monkeypatch.setattr(elsevier_check, "_head_probe", lambda doi, key, proxies: (403, elsevier_check.NOT_ENTITLED))
+    ip, right = app_settings._egress_checks({"elsevier_api_key": "k"})
+    assert "219.143.23.107" in ip["detail"] and "AS4847" in ip["detail"]
+    assert right["ok"] is False and "WebVPN" in right["detail"]
+    monkeypatch.setattr(elsevier_check, "_head_probe", lambda doi, key, proxies: (200, elsevier_check.ENTITLED))
+    assert app_settings._egress_checks({"elsevier_api_key": "k"})[1]["ok"] is True
+    assert app_settings._egress_checks({})[1]["ok"] is None  # no key: cannot tell
