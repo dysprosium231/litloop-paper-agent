@@ -7,6 +7,7 @@ import { SettingsPage } from "@/components/settings-view"
 import { DownloadsOverview, JobPane, OVERVIEW, useDownloads } from "@/components/downloads-view"
 import { useZotero, ZoteroPage, type ZoteroView } from "@/components/zotero-view"
 import { DetailPane, type Paper } from "@/components/detail-pane"
+import { Onboarding } from "@/components/onboarding"
 import { ProgressStrip } from "@/components/progress-strip"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import {
@@ -157,6 +158,14 @@ export default function App() {
   const [railOpen, setRailOpen] = useRailOpen()
   const railExtra = railOpen ? RAIL_OPEN - RAIL_COLLAPSED : 0
   const [section, setSection] = React.useState<Section>("screen")
+  // First run: the guide covers the window until it is finished or skipped.
+  const [guide, setGuide] = React.useState<{ group: string; intro: string }[] | null>(null)
+  React.useEffect(() => {
+    settingsApi.onboarding().then((o) => { if (!o.done) setGuide(o.steps) }).catch(() => {})
+  }, [])
+  const openGuide = React.useCallback(() => {
+    settingsApi.onboarding().then((o) => setGuide(o.steps)).catch((e) => setError(errorMessage(e)))
+  }, [])
   // Only screening has a list column: switching sections changes the sidebar
   // width, and its transition (meant for collapsing) would slide. Skip it here.
   React.useLayoutEffect(() => {
@@ -294,6 +303,13 @@ export default function App() {
     ? `第 ${summary.batches.length} 批 · ${summary.current_batch.length} 篇`
     : `已评分 ${record?.items.length ?? 0} 篇`
 
+  if (guide) {
+    return <Onboarding steps={guide} onDone={() => {
+      setGuide(null)
+      if (section === "settings") settingsApi.list().then(setGroups).catch(() => {})
+    }} />
+  }
+
   return (
     <TooltipProvider>
       {/* The header's toggle hides the list; the rail then shows icons only (--sidebar-width-icon). */}
@@ -320,7 +336,7 @@ export default function App() {
               : <JobPane key={downloadView} id={downloadView} live={downloads.live} onChanged={downloads.refresh} onStarted={startedJob}
                   onBack={() => setDownloadView(OVERVIEW)} />
           ) : section === "settings" ? (
-            <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup}
+            <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup} onGuide={openGuide}
               onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
           ) : (<>
           <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-background px-4 py-3">

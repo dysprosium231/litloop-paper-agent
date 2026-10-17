@@ -97,6 +97,37 @@ GROUPS: list[dict[str, Any]] = [
 
 _FIELDS = {f["key"]: f for g in GROUPS for f in g["fields"]}
 
+# The first-run guide: settings groups in the order a new user needs them, each
+# with why it matters. Every step can be checked on the spot or skipped.
+STEPS = [
+    {"group": "sources", "intro": "检索和补摘要靠这些接口。OpenAlex Key 免费，没有时每天的检索额度很少；"
+                                  "Elsevier Key 用于 ScienceDirect 全文和 Scopus 摘要，对深度检索影响很大。"
+                                  "联系邮箱只发给 Crossref、OpenAlex、Unpaywall，它们要求填写。"},
+    {"group": "screening", "intro": "筛选时可把摘要翻译成中文。填 DeepSeek 或 DeepL 的 Key 后由 app 翻译，不占用对话额度；也可以以后再设置。"},
+    {"group": "downloads", "intro": "PDF 保存在哪里、文件怎么命名。Sci-Hub、LibGen 等来源可能违反出版商条款或学校规定，默认不使用，是否开启由你决定。"},
+    {"group": "network", "intro": "开着代理软件时，机构下载需要绕开代理，否则学校认不出你。点检测查看当前网络和需要的设置。"},
+    {"group": "school", "intro": "下载学校订阅的期刊需要学校认证。填写学校代号并选择认证方式；不在校园网时会弹出浏览器让你登录一次。"},
+    {"group": "zotero", "intro": "下载的文献可推送到 Zotero。需要 Zotero 7 以上和 zotero-mcp；推荐授权本地写入，速度最快。"},
+]
+_CONFIGURED = ("openalex_api_key", "elsevier_api_key", "springer_meta_api_key")
+
+
+def onboarding() -> dict[str, Any]:
+    """Whether the first-run guide still has to show, and its steps.
+
+    Someone who already set a key or their e-mail (by hand or through an agent)
+    has set LitLoop up: the guide stays away for them too.
+    """
+    cfg = _config.load_config()
+    done = bool(cfg.get("onboarding_done")) or any(str(cfg.get(k) or "").strip() for k in _CONFIGURED) \
+        or str(cfg.get("email") or "") not in ("", _config.DEFAULT_CONFIG["email"])
+    return {"done": done, "steps": STEPS}
+
+
+def finish_onboarding(done: bool = True) -> dict[str, Any]:
+    _config.update_config("onboarding_done", "true" if done else "false")
+    return {"done": done}
+
 
 def mask(value: str) -> str:
     """First and last four characters of a secret, the rest hidden."""

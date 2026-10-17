@@ -213,6 +213,8 @@ export interface ProviderUsage {
 export const settingsApi = {
   list: () => call<SettingGroup[]>("/api/settings"),
   save: (key: string, value: unknown) => call<SettingField>("/api/settings", { key, value }),
+  onboarding: () => call<{ done: boolean; steps: { group: string; intro: string }[] }>("/api/onboarding"),
+  finishOnboarding: () => call<{ done: boolean }>("/api/onboarding", { done: true }),
   test: (group: string) => call<{ results: TestResult[]; seconds: number }>(`/api/settings/test/${group}`, {}),
   updates: () => call<{ name: string; installed: string; latest: string; how: string }[]>("/api/updates"),
   quota: () => call<Record<string, ProviderUsage>>("/api/quota"),

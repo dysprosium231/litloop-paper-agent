@@ -220,13 +220,15 @@ function CopyLine({ text }: { text: string }) {
   )
 }
 
-function Page({ id, title, action, children }: { id: string; title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Page({ id, title, intro, action, children }: {
+  id: string; title: string; intro?: string; action?: React.ReactNode; children: React.ReactNode
+}) {
   return (
     <PageBody>
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-semibold">{title}</h2>
-          {ABOUT[id] && <p className="mt-1 text-[13px] text-muted-foreground">{ABOUT[id]}</p>}
+          {(intro || ABOUT[id]) && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{intro || ABOUT[id]}</p>}
         </div>
         {action}
       </div>
@@ -237,7 +239,8 @@ function Page({ id, title, action, children }: { id: string; title: string; acti
 
 // Keyed by group id: switching groups starts a fresh pane, so a check still running
 // for the previous group cannot show its results here.
-function GroupPane({ group, onSaved }: { group: SettingGroup; onSaved: (f: SettingField) => void }) {
+/** One settings group: its fields, and its check when it has one. The first-run guide shows these too. */
+export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intro?: string; onSaved: (f: SettingField) => void }) {
   const [results, setResults] = React.useState<TestResult[] | null>(null)
   const [testing, setTesting] = React.useState(false)
   const test = async () => {
@@ -256,7 +259,7 @@ function GroupPane({ group, onSaved }: { group: SettingGroup; onSaved: (f: Setti
     </Button>
   )
   return (
-    <Page id={group.id} title={group.title} action={action}>
+    <Page id={group.id} title={group.title} intro={intro} action={action}>
       {results && (
         <Card className="space-y-2 p-5">
           {results.map((r) => (
@@ -337,8 +340,9 @@ function QuotaPane() {
 }
 
 /** The settings section: header, the list of groups, and the chosen group. */
-export function SettingsPage({ groups, current, onPick, onSaved }: {
+export function SettingsPage({ groups, current, onPick, onSaved, onGuide }: {
   groups: SettingGroup[]; current: string; onPick: (id: string) => void; onSaved: (f: SettingField) => void
+  onGuide: () => void
 }) {
   const group = groups.find((g) => g.id === current)
   // The weekly version check (updates.py); nothing is installed from here.
@@ -346,7 +350,9 @@ export function SettingsPage({ groups, current, onPick, onSaved }: {
   React.useEffect(() => { settingsApi.updates().then(setUpdates).catch(() => {}) }, [])
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader title="设置" />
+      <PageHeader title="设置">
+        <Button variant="outline" size="sm" onClick={onGuide}>重新运行引导</Button>
+      </PageHeader>
       {updates.length > 0 && (
         <div className="space-y-0.5 border-b bg-primary/5 px-8 py-2.5 text-sm">
           {updates.map((u) => (

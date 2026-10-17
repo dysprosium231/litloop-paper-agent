@@ -170,7 +170,7 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
 
 - **用途**：查生物医学文献和开放获取期刊。
 - **DOAJ 官方限额**（[API 文档](https://doaj.org/api/docs)，v4.0.0，2026-10-17 核对）：所有接口每秒 2 次；允许突发，每个用户最多 5 个请求排队，依次处理，只要平均不超过每秒 2 次。文档没写每页最多几条、超限返回什么状态码。
-- **Europe PMC 官方限额**：**未核对**。europepmc.org 的文档页（RestfulWebService、developers、Help）有 Cloudflare 人机验证，自动读取被拒（2026-10-17）。能读到的只有 EMBL-EBI 通用[使用条款](https://www.ebi.ac.uk/about/terms-of-use)（2026-10-14 修订）：没有具体数字，只说用量影响到为他人提供服务时会被封禁，且具体资源可能另有条款。
+- **Europe PMC 官方限额**：**官方没有公布数字**。[RESTful Web Service 页](https://europepmc.org/RestfulWebService)（2026-10-17 用户代为读取，该站有人机验证，自动读取被拒）只写了用法、排序、返回格式和隐私说明，没有请求频率、并发、每页条数或每日上限；细节在其 Web Service Reference Guide（PDF，未读）。EMBL-EBI 通用[使用条款](https://www.ebi.ac.uk/about/terms-of-use)（2026-10-14 修订）也没有数字，只说用量影响到为他人提供服务时会被封禁。
 - **LitLoop 怎么控制**：Europe PMC（`europepmc.org`、`www.ebi.ac.uk`）和 DOAJ 并发 3 个（继承，**非官方**）；同一域名间隔至少 0.5 秒，DOAJ 因此平均不超过每秒 2 次，在官方限额内（并发 3 个也在 5 个排队之内）。
 
 ## 二、出版商网站与机构通道

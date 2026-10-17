@@ -82,6 +82,10 @@ class OpenPath(BaseModel):
     path: str
 
 
+class Onboarding(BaseModel):
+    done: bool = True
+
+
 class Translate(BaseModel):
     doi: str | None = None
     title: str | None = None
@@ -299,6 +303,17 @@ def create_app(token: str) -> FastAPI:
             raise HTTPException(400, str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.get("/api/onboarding")
+    def onboarding() -> dict[str, Any]:
+        from . import app_settings
+        return app_settings.onboarding()
+
+    @app.post("/api/onboarding")
+    def onboarding_done(body: Onboarding) -> dict[str, Any]:
+        """done=true: finished or skipped; done=false: show the guide again (settings page)."""
+        from . import app_settings
+        return app_settings.finish_onboarding(body.done)
 
     @app.post("/api/settings/test/{group}")
     def settings_test(group: str) -> dict[str, Any]:
