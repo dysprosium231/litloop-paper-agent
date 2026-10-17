@@ -67,7 +67,7 @@ export function DetailPane({
             <div role="group" aria-label="你的评分" className="grid grid-cols-4 gap-2">
               {RELEVANCE.map((r, i) => (
                 <Button key={r} variant="outline" aria-pressed={rel === r} onClick={() => onRate(r)}
-                  className={cn("h-11 flex-col gap-0", rel === r && "border-primary bg-primary/10 font-semibold")}>
+                  className={cn("h-11 flex-col gap-0", rel === r && "border-primary bg-primary/10 font-semibold dark:border-primary dark:bg-primary/20")}>
                   <span className="text-[11px] text-muted-foreground">{i + 1}</span>
                   <span>{r}</span>
                 </Button>
