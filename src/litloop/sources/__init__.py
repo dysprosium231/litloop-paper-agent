@@ -1406,6 +1406,8 @@ def _download_impl(
                     return result
 
     log.info(f"LitLoop - {identifier}")
+    if _cancelled():  # skipped or cancelled while the metadata lookup ran
+        return fail(identifier, "skipped by user" if getattr(_DL_TLS, "key", None) in _SKIPPED else "cancelled by user")
 
     if is_arxiv_identifier(identifier):
         log.info("   [L0] arXiv direct")
