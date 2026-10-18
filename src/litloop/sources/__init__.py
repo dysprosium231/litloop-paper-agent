@@ -36,6 +36,7 @@ from .europepmc import try_europepmc, try_pmc
 from .libgen import try_libgen
 from .oa_discovery import try_doaj
 from .openalex import try_openalex_oa, try_openalex_content_api
+from . import attempt as _attempt
 from .publishers import get_publisher_fast_sources
 from .scibban import try_scibban
 from .scihub import try_scihub
@@ -187,7 +188,8 @@ def _try_source(
 ) -> dict[str, Any] | None:
     from .scoring import record_result, classify_error, get_user_advice
     t0 = time.time()
-    _SOURCE_TLS.doi = normalize_doi(doi) if not is_arxiv_identifier(doi) else doi
+    key = normalize_doi(doi) if not is_arxiv_identifier(doi) else doi
+    _SOURCE_TLS.doi = key
     result = None
     try:
         result = _try_source_inner(source_fn, doi, output_path, config, label, use_tor, t0,
@@ -197,6 +199,9 @@ def _try_source(
         _SOURCE_TLS.doi = None
         ok = bool(result and result.get("success"))
         log.info(f"   [timing] {label}: {time.time() - t0:.1f}s, {'PDF' if ok else 'no PDF'}")
+        att = _attempt.get(key)
+        if att is not None:
+            att.add_step("school" if label in _STEP_TEXT else "free", label, time.time() - t0, result)
     if settled:
         # Late finisher of an already-returned download: its copy is a duplicate.
         if output_path.exists():
@@ -548,7 +553,7 @@ def _step_watchdog(doi: str, label: str, done: threading.Event, config: dict[str
             deadline = max(deadline, time.time() + 60)  # the user is at it: give them time
             continue
         if time.time() >= deadline:
-            n = close_browsers_since(since)
+            n = close_browsers_since(since, owner=doi)
             log.info(f"   [timing] {label}: nothing after {limit:.0f}s; closed {n} browser(s), next route")
             return
 
@@ -1100,6 +1105,9 @@ def note_user_waiting(what: str = "") -> None:
     doi = getattr(_SOURCE_TLS, "doi", None)
     if doi:
         _USER_WAIT[doi] = time.time()
+        att = _attempt.get(doi)
+        if att is not None:
+            att.user_wait_at = time.time()
         try:
             from .. import progress_reporter as pr
             text = _WAIT_TEXT.get(what, "请在弹出的浏览器窗口中完成登录或人机验证")
@@ -1149,7 +1157,7 @@ def skip_download(identifier: str) -> bool:
         from .. import progress_reporter as _pr
         _pr.clear_attention(f"wait:{key}")
         from ..browser_backend import close_browsers_since
-        close_browsers_since(0.0)  # papers download one at a time: these windows are its own
+        close_browsers_since(0.0, owner=key)  # its own windows only
     except Exception as exc:
         log.info(f"   Skip: browser cleanup skipped: {exc}")
     log.info(f"   Skipped by the user: {key}")
@@ -1240,6 +1248,7 @@ def download(
     prev_gen = getattr(_DL_TLS, "gen", None)
     if prev_gen is None:  # nested calls (batch phase 2) keep the batch's generation
         _DL_TLS.gen = _CANCEL_GEN[0]
+    _attempt.begin(key, _DL_TLS.gen)
     try:
         result = _download_impl(
             identifier,
@@ -1271,18 +1280,17 @@ def download(
         with _INFLIGHT_LOCK:
             _INFLIGHT.discard(key)
             _SETTLED.add(key)
-            idle = not _INFLIGHT
+        _attempt.end(key)
         # Racing returns on the first success but waived sources keep their
-        # browser windows open. Close what this download launched — only when
-        # no other download is in flight, so we never kill a concurrent one.
-        if idle:
-            try:
-                from ..browser_backend import close_browsers_since
-                n = close_browsers_since(t0)
-                if n:
-                    log.info(f"   Closed {n} browser(s) left open by this download")
-            except Exception as exc:
-                log.info(f"   Browser cleanup skipped: {exc}")
+        # browser windows open. Close what this download launched (its own
+        # browsers only, so a concurrent download keeps its windows).
+        try:
+            from ..browser_backend import close_browsers_since
+            n = close_browsers_since(t0, owner=key)
+            if n:
+                log.info(f"   Closed {n} browser(s) left open by this download")
+        except Exception as exc:
+            log.info(f"   Browser cleanup skipped: {exc}")
 
 
 def _download_impl(
@@ -1474,16 +1482,13 @@ def _download_impl(
         # the browser slot: on 2026-10-18 a stuck publisher-site lane held it
         # for 16 minutes and the WebVPN step queued 697 s behind it. Phase 1 is
         # over, so close what it opened before the school routes need a browser.
-        with _INFLIGHT_LOCK:
-            alone = len(_INFLIGHT) <= 1
-        if alone:
-            try:
-                from ..browser_backend import close_browsers_since
-                n = close_browsers_since(p_phase)
-                if n:
-                    log.info(f"   Closed {n} browser(s) phase 1 left open")
-            except Exception as exc:
-                log.info(f"   Phase 1 browser cleanup skipped: {exc}")
+        try:
+            from ..browser_backend import close_browsers_since
+            n = close_browsers_since(p_phase, owner=getattr(_DL_TLS, "key", None) or doi)
+            if n:
+                log.info(f"   Closed {n} browser(s) phase 1 left open")
+        except Exception as exc:
+            log.info(f"   Phase 1 browser cleanup skipped: {exc}")
         # Session self-healing: validate and refresh institutional sessions
         # before racing them (WebVPN only; CARSI self-heals inside login()).
         t_heal = time.time()
@@ -2245,5 +2250,7 @@ def _close_batch_browsers(t0: float, identifiers: list[str]) -> None:
 try:
     from .. import browser_backend as _bb
     _bb.LAUNCH_GUARD = _source_may_continue
+    # A browser belongs to the paper the launching thread works for.
+    _bb.OWNER = lambda: getattr(_SOURCE_TLS, "doi", None) or getattr(_DL_TLS, "key", None)
 except Exception:
     pass

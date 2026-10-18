@@ -810,7 +810,7 @@ def browser_info(config: dict[str, Any] | None = None) -> dict[str, Any]:
 import threading as _threading
 import time as _time
 
-_LAUNCHED: list[tuple[float, Any]] = []
+_LAUNCHED: list[tuple[float, Any, str | None]] = []  # (launched at, browser, owner)
 
 
 def _guard_dead_driver() -> None:
@@ -855,9 +855,22 @@ _guard_dead_driver()
 _LAUNCHED_LOCK = _threading.Lock()
 
 
+# Set by the download orchestrator: returns the paper (DOI key) the calling
+# thread works for, so a paper's skip, end or watchdog closes only its own
+# browsers, not another paper's.
+OWNER: Any = None
+
+
+def _owner() -> str | None:
+    try:
+        return OWNER() if OWNER is not None else None
+    except Exception:
+        return None
+
+
 def _remember(obj: Any) -> Any:
     with _LAUNCHED_LOCK:
-        _LAUNCHED.append((_time.perf_counter(), obj))
+        _LAUNCHED.append((_time.perf_counter(), obj, _owner()))
     return obj
 
 
@@ -900,8 +913,9 @@ def _driver_killed(bound_close: Any) -> bool:
     return bool(conn is not None and getattr(conn, "_litloop_killed", False))
 
 
-def close_browsers_since(t0: float) -> int:
-    """Force-close every browser launched at or after ``time.perf_counter()`` value ``t0``.
+def close_browsers_since(t0: float = 0.0, owner: str | None = None) -> int:
+    """Force-close every browser launched at or after ``time.perf_counter()`` value ``t0``
+    (only those launched for ``owner``, a paper's DOI key, when it is given).
 
     Sync-API objects are bound to the thread that created them, so they cannot
     be closed from here; kill the driver process tree instead. The owning
@@ -910,9 +924,12 @@ def close_browsers_since(t0: float) -> int:
     """
     from .browser_engine import _tree_kill
 
+    def hit(ts: float, who: str | None) -> bool:
+        return ts >= t0 and (owner is None or who == owner)
+
     with _LAUNCHED_LOCK:
-        targets = [obj for ts, obj in _LAUNCHED if ts >= t0]
-        _LAUNCHED[:] = [(ts, obj) for ts, obj in _LAUNCHED if ts < t0]
+        targets = [obj for ts, obj, who in _LAUNCHED if hit(ts, who)]
+        _LAUNCHED[:] = [e for e in _LAUNCHED if not hit(e[0], e[2])]
     closed = 0
     for obj in targets:
         conn = _connection_of(obj)

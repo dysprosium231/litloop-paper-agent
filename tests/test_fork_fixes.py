@@ -262,7 +262,7 @@ def test_plugin_logger_does_not_duplicate_to_root():
 
 @pytest.fixture
 def no_browser_kill(monkeypatch):
-    monkeypatch.setattr(bb, "close_browsers_since", lambda t0: 0)
+    monkeypatch.setattr(bb, "close_browsers_since", lambda t0=0.0, owner=None: 0)
 
 
 def test_cancel_marks_running_download_cancelled(monkeypatch, no_browser_kill):

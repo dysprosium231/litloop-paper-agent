@@ -10,7 +10,7 @@ import litloop.sources as src
 
 def test_quiet_step_closes_its_browsers(monkeypatch):
     closed = []
-    monkeypatch.setattr(bb, "close_browsers_since", lambda t0: closed.append(t0) or 1)
+    monkeypatch.setattr(bb, "close_browsers_since", lambda t0, owner=None: closed.append(t0) or 1)
     monkeypatch.setattr(src, "_user_waiting_for", lambda doi: False)
     monkeypatch.setattr(threading.Event, "wait", lambda self, t=None: self.is_set())  # no 5 s sleeps
     done = threading.Event()
@@ -20,7 +20,7 @@ def test_quiet_step_closes_its_browsers(monkeypatch):
 
 def test_step_that_finishes_closes_nothing(monkeypatch):
     closed = []
-    monkeypatch.setattr(bb, "close_browsers_since", lambda t0: closed.append(t0) or 1)
+    monkeypatch.setattr(bb, "close_browsers_since", lambda t0, owner=None: closed.append(t0) or 1)
     done = threading.Event()
     done.set()
     src._step_watchdog("10.1/x", "WebVPN", done, {"institutional_step_seconds": 240})
@@ -29,7 +29,7 @@ def test_step_that_finishes_closes_nothing(monkeypatch):
 
 def test_user_login_extends_the_step(monkeypatch):
     closed = []
-    monkeypatch.setattr(bb, "close_browsers_since", lambda t0: closed.append(t0) or 1)
+    monkeypatch.setattr(bb, "close_browsers_since", lambda t0, owner=None: closed.append(t0) or 1)
     calls = {"n": 0}
 
     def waiting(doi):

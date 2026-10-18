@@ -103,3 +103,42 @@ def test_browser_error_does_not_leak_between_papers(tmp_path):
     worker.start()
     worker.join()
     assert seen == [""], f"a fresh source saw another paper's error: {seen}"
+
+
+def test_a_paper_closes_only_its_own_browsers(monkeypatch):
+    from types import SimpleNamespace
+    import litloop.browser_backend as bb
+    import litloop.browser_engine as be
+    killed = []
+    monkeypatch.setattr(be, "_tree_kill", lambda proc: killed.append(proc))
+    monkeypatch.setattr(bb, "_LAUNCHED", [])
+    owner = {"v": "10.9999/a"}
+    monkeypatch.setattr(bb, "OWNER", lambda: owner["v"])
+
+    def fake(proc):
+        return SimpleNamespace(_impl_obj=SimpleNamespace(
+            _connection=SimpleNamespace(_transport=SimpleNamespace(_proc=proc))))
+
+    bb._remember(fake("a"))
+    owner["v"] = "10.9999/b"
+    bb._remember(fake("b"))
+    assert bb.close_browsers_since(0.0, owner="10.9999/a") == 1
+    assert killed == ["a"]
+
+
+def test_steps_are_recorded(monkeypatch, tmp_path):
+    from litloop.sources import attempt
+    seen = {}
+    real_end = attempt.end
+
+    def end(key):
+        att = real_end(key)
+        seen["steps"] = list(att.steps) if att else None
+        return att
+
+    monkeypatch.setattr(attempt, "end", end)
+    monkeypatch.setattr(src, "_build_free_sources", lambda doi, config: [(_writer(), "Crossref")])
+    r = src.download("10.9999/invariant.steps", str(tmp_path), _institutional=False)
+    assert r.get("success")
+    assert seen["steps"] and seen["steps"][0]["source"] == "Crossref"
+    assert {"route", "seconds", "ok"} <= set(seen["steps"][0])
