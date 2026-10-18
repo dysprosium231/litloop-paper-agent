@@ -56,6 +56,11 @@ def end(key: str) -> DownloadAttempt | None:
         return _ACTIVE.pop(key, None)
 
 
+def active_keys() -> list[str]:
+    with _LOCK:
+        return list(_ACTIVE)
+
+
 def get(key: str | None) -> DownloadAttempt | None:
     if not key:
         return None

@@ -1064,7 +1064,7 @@ def _auto_rename(result: dict[str, Any], identifier: str, config: dict[str, Any]
 # timeout while the server is still racing sources) used to start a second,
 # parallel browser task for the same paper — the "infinite popup" experience.
 _INFLIGHT_LOCK = threading.Lock()
-_INFLIGHT: set[str] = set()
+# The papers in flight are the DownloadAttempts registered in sources.attempt.
 
 # DOIs whose download() has returned. Racing returns on the first success while
 # other sources keep running ("waived"); those late finishers check this set to
@@ -1075,7 +1075,6 @@ _SOURCE_TLS = threading.local()
 # Heartbeats from sources that are waiting for the user to log in, by DOI.
 # The race must not give up (and open the next phase's window) while the user
 # is in the middle of a login.
-_USER_WAIT: dict[str, float] = {}
 # Heartbeats stop the moment the login succeeds, but the source still has to
 # reopen the article and capture the PDF: keep waiting this long after the
 # last heartbeat so the race doesn't open the next phase's window meanwhile.
@@ -1104,7 +1103,6 @@ def note_user_waiting(what: str = "") -> None:
         raise SourceWaived("download already finished; stop waiting for the user")
     doi = getattr(_SOURCE_TLS, "doi", None)
     if doi:
-        _USER_WAIT[doi] = time.time()
         att = _attempt.get(doi)
         if att is not None:
             att.user_wait_at = time.time()
@@ -1119,7 +1117,8 @@ def note_user_waiting(what: str = "") -> None:
 
 def _user_waiting_for(doi: str) -> bool:
     key = normalize_doi(doi) if not is_arxiv_identifier(doi) else doi
-    return time.time() - _USER_WAIT.get(key, 0.0) < _USER_WAIT_FRESH_S
+    att = _attempt.get(key)
+    return att is not None and time.time() - att.user_wait_at < _USER_WAIT_FRESH_S
 
 
 # Cooperative cancellation. cancel_downloads() bumps the generation; every
@@ -1134,10 +1133,13 @@ _SKIPPED: set[str] = set()
 
 
 def _cancelled() -> bool:
-    gen = getattr(_DL_TLS, "gen", None)
+    """This thread's paper was cancelled (its job's generation moved on) or skipped."""
+    key = getattr(_DL_TLS, "key", None)
+    att = _attempt.get(key)
+    gen = att.gen if att is not None else getattr(_DL_TLS, "gen", None)
     if gen is not None and gen != _CANCEL_GEN[0]:
         return True
-    return getattr(_DL_TLS, "key", None) in _SKIPPED
+    return key in _SKIPPED
 
 
 def skip_download(identifier: str) -> bool:
@@ -1149,7 +1151,7 @@ def skip_download(identifier: str) -> bool:
         key = normalize_doi(key)
     with _INFLIGHT_LOCK:
         _SKIPPED.add(key)
-        if key not in _INFLIGHT:
+        if _attempt.get(key) is None:
             log.info(f"   Will skip when its turn comes: {key}")
             return True
         _SETTLED.add(key)  # its sources stop waiting, launch nothing, drop late results
@@ -1168,7 +1170,7 @@ def cancel_downloads() -> dict[str, Any]:
     """Cancel every download in flight: stop waiting, drop late results, close windows."""
     with _INFLIGHT_LOCK:
         _CANCEL_GEN[0] += 1
-        keys = sorted(_INFLIGHT)
+        keys = sorted(_attempt.active_keys())
         _SETTLED.update(keys)  # sources still running drop results, launch nothing
     closed = 0
     try:
@@ -1228,8 +1230,9 @@ def download(
     key = identifier.strip()
     if not is_arxiv_identifier(key):
         key = normalize_doi(key)
+    gen = getattr(_DL_TLS, "gen", None)
     with _INFLIGHT_LOCK:
-        if key in _INFLIGHT:
+        if _attempt.get(key) is not None:
             log.info(f"   Single-flight: download already in progress for {key}")
             return fail(
                 key,
@@ -1240,7 +1243,7 @@ def download(
             )
         if key in _SKIPPED:  # the user skipped it (kept until the next job starts)
             return fail(key, "skipped by user", error_type="skipped", action="none")
-        _INFLIGHT.add(key)
+        _attempt.begin(key, gen if gen is not None else _CANCEL_GEN[0])
         _SETTLED.discard(key)
     t0 = time.perf_counter()  # same clock as browser_backend._remember
     prev_key = getattr(_DL_TLS, "key", None)
@@ -1248,7 +1251,6 @@ def download(
     prev_gen = getattr(_DL_TLS, "gen", None)
     if prev_gen is None:  # nested calls (batch phase 2) keep the batch's generation
         _DL_TLS.gen = _CANCEL_GEN[0]
-    _attempt.begin(key, _DL_TLS.gen)
     try:
         result = _download_impl(
             identifier,
@@ -1278,9 +1280,8 @@ def download(
         if prev_gen is None:
             _DL_TLS.gen = None
         with _INFLIGHT_LOCK:
-            _INFLIGHT.discard(key)
+            _attempt.end(key)
             _SETTLED.add(key)
-        _attempt.end(key)
         # Racing returns on the first success but waived sources keep their
         # browser windows open. Close what this download launched (its own
         # browsers only, so a concurrent download keeps its windows).
@@ -2235,7 +2236,7 @@ def _close_batch_browsers(t0: float, identifiers: list[str]) -> None:
     keys = {normalize_doi(i) if not is_arxiv_identifier(i) else i for i in identifiers}
     with _INFLIGHT_LOCK:
         _SETTLED.update(keys)
-        foreign = _INFLIGHT - keys
+        foreign = set(_attempt.active_keys()) - keys
     if foreign:
         log.info(f"Batch cleanup skipped: {len(foreign)} unrelated download(s) in flight")
         return
