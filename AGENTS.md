@@ -11,8 +11,10 @@
 
 ## 提交前
 
-- 运行全部测试：`python -m pytest -q`。
-- 运行 `python scripts/check_release_consistency.py`。
+- 每次都运行 `python scripts/check_release_consistency.py`。
+- 只改文档（TODO、README、`docs/` 等）时不用跑 pytest。
+- 改代码时，改的过程中只跑相关的测试文件；几项小改动攒成一次提交，提交前运行一次全部测试：`python -m pytest -q`。
+- 改了 `app/` 的界面，在 `app/` 里运行 `npm run build` 和 `npm run lint:copy`。
 - MCP 工具描述不超过 200 个字符（Python 3.13 以前的版本会把文档字符串的缩进也算进去）。
 
 ## 测试集
