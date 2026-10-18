@@ -289,7 +289,7 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
     try:
         from .discovery import find_cli_available, search as discovery_search, to_legacy_results
         if not find_cli_available():
-            return search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort)
+            return _tidy(search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort), query, sort)
         with tempfile.TemporaryDirectory(prefix="scansci_find_") as tmp:
             payload = discovery_search(
                 query, tmp, depth="quick", limit=max(pool * 2, 30),
@@ -298,8 +298,8 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
             results = to_legacy_results(payload.get("candidates") or [], limit=pool * 3)
         logger.info("search: discovery engine returned %d results", len(results))
     except Exception as exc:  # noqa: BLE001 - degrade gracefully to 3-source search
-        logger.warning("search: discovery engine failed (%s), falling back to 3-source", exc)
-        return search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort)
+        logger.warning("search: discovery engine failed (%s), falling back to the built-in search", exc)
+        return _tidy(search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort), query, sort)
 
     if sort == "cited_by_count":
         # The relevance pool holds only the top ~30 matches; the field's most
@@ -310,6 +310,14 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
                 seen.add(extra["doi"].lower())
                 extra["_matched"] = True  # OpenAlex matched it in title/abstract
                 results.append(extra)
+    return _tidy(results, query, sort)
+
+
+def _tidy(results: list[dict[str, Any]], query: str, sort: str | None) -> list[dict[str, Any]]:
+    """Drop junk titles, rank by how well each matches the query, merge duplicate
+    titles. Both the discovery engine and the built-in fallback go through it:
+    the fallback used to skip it (code review, 2026-10-18), so users without the
+    engine got unranked, undeduplicated results."""
     results = _dedupe_titles(_match_tier(_drop_junk_titles(results), query))
     # Sorting by citations or date happens within a match tier, so a famous
     # but weakly matching paper does not jump ahead of the on-topic ones.
