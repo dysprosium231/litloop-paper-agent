@@ -30,3 +30,38 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+
+  app:
+    # The desktop app: TypeScript types, the UI copy rules (docs/UI_COPY.md) and
+    # the Rust shell. Windows, as the app's users are; it needs no extra system
+    # libraries there for cargo check.
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Type check and build the UI
+        run: npm run build
+
+      - name: UI copy rules
+        run: npm run lint:copy
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      - name: Check the Rust shell
+        run: cargo check --manifest-path src-tauri/Cargo.toml
