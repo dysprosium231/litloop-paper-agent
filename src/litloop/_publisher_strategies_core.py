@@ -34,6 +34,16 @@ log = get_logger()
 _ERR_TLS = threading.local()
 _LAST_ANY_ERROR = ["", ""]
 
+# Page titles of human checks (Cloudflare and the like), lower case.
+_CHALLENGE_TITLES = ("just a moment", "attention required", "verify", "security check",
+                     "请稍候", "正在验证", "checking", "cloudflare")
+
+# DOIs whose publisher site was logged into with the school's identity and
+# still gave no full text: the school does not subscribe, and the school routes
+# (WebVPN, CARSI) end at the same publisher with the same identity
+# (2026-10-18: a Springer chapter, 3 minutes and a WebVPN login for nothing).
+LOGIN_NO_ACCESS: set[str] = set()
+
 # Global lock to prevent multiple visible browser windows in parallel racing
 _visible_browser_lock = threading.Lock()
 _visible_browser_active = False
@@ -686,7 +696,7 @@ def _visible_browser_download(
         # keeps waiting) and give them up to 5 minutes, not one.
         for _cf_wait in range(60):
             _cf_title = (page.title() or "").lower()
-            if any(_sig in _cf_title for _sig in ("just a moment", "attention required", "verify", "security check", "请稍候", "正在验证", "checking", "cloudflare")):
+            if any(_sig in _cf_title for _sig in _CHALLENGE_TITLES):
                 if _cf_wait % 6 == 0:
                     log.info(f"   [{publisher}] Cloudflare challenge detected, waiting for it or the user... ({_cf_wait * 5}s)")
                 try:
@@ -710,8 +720,26 @@ def _visible_browser_download(
         log.info(f"   [{publisher}] page: '{title[:40]}' {url[:60]}")
 
         def _page_pdf_via_cdp() -> dict[str, Any] | None:
-            """Open the page's own PDF link in the browser and read the body via CDP."""
-            href = find_page_pdf_link(page, doi=doi)
+            """Open the page's own PDF link in the browser and read the body via CDP.
+
+            The "View PDF" button appears only once the page's scripts have
+            checked access (2026-10-18, ScienceDirect: after the 15 s look, so
+            the lane went to an SSO login it did not need). Wait for the page's
+            requests to settle, look for 20 s, and reload once before giving up."""
+            href = None
+            for attempt in range(2):
+                try:
+                    page.wait_for_load_state("networkidle", timeout=10000)
+                except Exception:
+                    pass
+                href = find_page_pdf_link(page, max_wait_s=20.0 if attempt == 0 else 10.0, doi=doi)
+                if href or attempt:
+                    break
+                log.info(f"   [{publisher}] no PDF link yet; reloading the page once")
+                try:
+                    page.reload(wait_until="domcontentloaded", timeout=30000)
+                except Exception:
+                    pass
             if not href:
                 return None
             log.info(f"   [{publisher}] page PDF link: {href[:80]}")
@@ -801,9 +829,20 @@ def _visible_browser_download(
         # SSO click never left the article, it is not a login.
         seen_auth = already_on_auth
         for i in range(100):
-            _user_waiting("login", context)
+            # A human check on the way to the login (2026-10-18: Wiley's
+            # Cloudflare page after the SSO click) is the user's to pass: say
+            # "verify", not "login", and keep waiting while it is shown.
+            challenge = False
+            for ctx_page in context.pages:
+                try:
+                    if any(s in (ctx_page.title() or "").lower() for s in _CHALLENGE_TITLES):
+                        challenge = True
+                        break
+                except Exception:
+                    pass
+            _user_waiting("verify" if challenge else "login", None if challenge else context)
             time.sleep(3)
-            if not seen_auth and i >= 10:
+            if not seen_auth and i >= 10 and not challenge:
                 break  # ~30 s and the login page never appeared
             # Check ALL pages in context — SSO may happen in any tab
             any_auth = False
@@ -909,6 +948,9 @@ def _visible_browser_download(
                     return success(doi, output_path, f"{publisher}(Visible)")
 
         log.info(f"   [{publisher}] visible browser download failed")
+        if login_ok:
+            LOGIN_NO_ACCESS.add((doi or "").strip().lower())
+            _set_error("not_entitled", "no_subscription")
         return None
 
 
@@ -1895,7 +1937,8 @@ def _browser_download(
     from . import progress_reporter
     # The generic lane does not know the publisher ("Unknown"): say 出版商官网.
     _known = publisher not in ("", "Unknown")
-    _found_text = f"已在 {publisher} 找到 PDF，正在下载" if _known else "已在出版商官网找到 PDF，正在下载"
+    # A link is not yet a PDF: the site may still refuse it (2026-10-18).
+    _found_text = f"在 {publisher} 找到 PDF 链接，正在打开" if _known else "在出版商官网找到 PDF 链接，正在打开"
     progress_reporter.item_stage(doi, f"正在打开 {publisher} 的页面" if _known else "正在打开出版商官网")
 
     # Create tab to a lightweight page first, inject cookies, then navigate
@@ -2064,6 +2107,7 @@ def _browser_download(
         # Check for paywall AFTER challenge resolution
         if pdf_refused:
             log.info(f"   [{publisher}] PDF refused — no access with the current session")
+            progress_reporter.item_stage(doi, f"{publisher if _known else '出版商官网'}拒绝了 PDF（当前没有权限），正在尝试登录")
         if pdf_refused or _detect_paywall(html):
             log.info(f"   [{publisher}] paywall detected — trying institutional login...")
             if _try_institutional_login(tab_id, config, publisher):
@@ -2421,6 +2465,11 @@ def _browser_download_with_fallback(
     # Paywall/navigate failure → try visible browser with SSO login
     elif err_type in ("paywall", "navigate_failed", "cloudflare_blocked") and config.get("carsi_idp_name"):
         log.info(f"   [{publisher}] headless failed ({err_type}), trying visible browser fallback...")
+        try:
+            from . import progress_reporter as _pr
+            _pr.item_stage(doi, f"正在打开 {publisher} 的可见窗口" if publisher not in ("", "Unknown") else "正在打开出版商官网的可见窗口")
+        except Exception:
+            pass
         try:
             vbd_result = _visible_browser_download(doi, article_url, output_path, config, publisher)
             if vbd_result:

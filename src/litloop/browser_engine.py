@@ -744,7 +744,9 @@ def download_pdf_via_browser(
         # Extract DOI from URL for pdfdirect construction
         doi_from_url = None
         path = parsed.path
-        for prefix in ["/doi/", "/doi/pdf/", "/doi/pdfdirect/", "/doi/epdf/", "/articles/"]:
+        # Longest first: "/doi/" also matches "/doi/pdfdirect/10.1111/x", which
+        # made "pdfdirect/10.1111/x" the DOI (2026-10-18, Wiley 403 x3).
+        for prefix in ["/doi/pdfdirect/", "/doi/pdf/", "/doi/epdf/", "/doi/", "/articles/"]:
             if prefix in path:
                 doi_from_url = path.split(prefix)[-1].split("?")[0].split("#")[0]
                 break

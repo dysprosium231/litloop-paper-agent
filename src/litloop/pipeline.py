@@ -229,6 +229,9 @@ _MDPI_SLUGS = {
     "applbiosci": "appliedbiosciences",
     "app": "applsci", "educsci": "education", "tourhosp": "tourismhosp",
     "d": "diversity", "a": "algorithms", "dj": "dentistry",
+    # 2026-10-18, HTTP probe: 10.3390/ma17071608 -> materials-17-01608.pdf,
+    # 10.3390/nano8110961 -> nanomaterials-08-00961.pdf (the short form 404s).
+    "ma": "materials", "nano": "nanomaterials",
 }
 
 

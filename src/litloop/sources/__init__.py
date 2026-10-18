@@ -1426,6 +1426,7 @@ def _download_impl(
 
     # Phase 1: Free sources (OA + grey) — parallel race
     t_phase = time.time()
+    p_phase = time.perf_counter()  # close_browsers_since's clock
     free_sources = _build_free_sources(doi, config)
     log.info(f"   [timing] phase 1 sources built: {time.time() - t_phase:.1f}s")
     if free_sources:
@@ -1454,7 +1455,27 @@ def _download_impl(
 
     # Phase 2: Institutional access — only when Phase 1 failed
     # Skip institutional fallback for grey_only/scihub_only strategy
+    from .._publisher_strategies_core import LOGIN_NO_ACCESS
+    if doi.lower() in LOGIN_NO_ACCESS and not config.get("school_routes_after_publisher_login", False):
+        LOGIN_NO_ACCESS.discard(doi.lower())
+        log.info("   Logged into the publisher as the school and still no full text: skipping the school routes")
+        return fail(identifier, "the school does not subscribe: logged into the publisher with the school's identity, still no full text",
+                    error_type="not_entitled", action="no_subscription")
     if _institutional and config.get("download_strategy") not in ("scihub_only", "grey_only") and not _cancelled():
+        # Phase 1's lanes that are still at work (waived) keep their browsers and
+        # the browser slot: on 2026-10-18 a stuck publisher-site lane held it
+        # for 16 minutes and the WebVPN step queued 697 s behind it. Phase 1 is
+        # over, so close what it opened before the school routes need a browser.
+        with _INFLIGHT_LOCK:
+            alone = len(_INFLIGHT) <= 1
+        if alone:
+            try:
+                from ..browser_backend import close_browsers_since
+                n = close_browsers_since(p_phase)
+                if n:
+                    log.info(f"   Closed {n} browser(s) phase 1 left open")
+            except Exception as exc:
+                log.info(f"   Phase 1 browser cleanup skipped: {exc}")
         # Session self-healing: validate and refresh institutional sessions
         # before racing them (WebVPN only; CARSI self-heals inside login()).
         t_heal = time.time()

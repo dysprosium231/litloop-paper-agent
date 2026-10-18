@@ -178,6 +178,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # A school route (institutional_order) with no result after this long has its
     # browsers closed and the next route runs; a login the user is doing extends it.
     "institutional_step_seconds": 240,
+    # After a login to the publisher site with the school's identity still gives
+    # no full text, the school routes (WebVPN, CARSI, EZProxy) are skipped: they
+    # reach the same publisher as the same school. True tries them anyway.
+    "school_routes_after_publisher_login": False,
     "batch_small_max": 30,
     "batch_small_workers": 1,
     # Desktop app: the first-run guide (app_settings.STEPS) was finished or skipped.

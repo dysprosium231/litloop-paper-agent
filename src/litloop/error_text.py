@@ -19,6 +19,8 @@ import re
 _RULES: list[tuple[str, str, str]] = [
     (r"\bcancel", "已取消", ""),
     (r"skipped by user", "已跳过", "可在任务结束后重试未完成项"),
+    (r"the school does not subscribe", "学校没有订阅：已用学校身份登录出版商网站，仍没有全文",
+     "学校通道最终也到同一出版商，已跳过；可找图书馆文献传递"),
     (r"NOT_ENTITLED", "学校未订阅此期刊，或当前不在校园网", "连接校园网或在「设置 → 学校认证」中登录后重试"),
     (r"No valid session|session (expired|invalid)|login required|需要机构登录",
      "学校认证已过期或未登录", "在「设置 → 学校认证」中重新登录"),
