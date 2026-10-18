@@ -240,7 +240,18 @@ export interface DownloadItem {
   error?: string | null
   /** Shown in the app (docs/UI_COPY.md section 7); the raw error goes in the tooltip. */
   error_text?: string | null
+  /** The ways it was tried (quick API misses left out), see docs/APP_DATA.md. */
+  attempts?: DownloadStep[] | null
   zotero?: { status: "pushing" | "added" | "reused" | "no_pdf" | "failed"; key?: string | null; error?: string | null; error_text?: string | null } | null
+}
+
+export interface DownloadStep {
+  source: string
+  route: "free" | "school" | null
+  seconds: number
+  ok: boolean
+  /** Why it failed, in plain words. */
+  why?: string | null
 }
 
 export type JobState = "running" | "done" | "cancelled" | "failed" | "interrupted"

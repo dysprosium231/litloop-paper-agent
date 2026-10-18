@@ -1265,10 +1265,14 @@ def download(
             _batch=_batch,
             _scihub_http_only=_scihub_http_only,
         )
+        att = _attempt.get(key)
+        steps = list(att.steps) if att is not None else []
         if key in _SKIPPED and not result.get("success"):
-            return fail(key, "skipped by user", error_type="skipped", action="none")
+            return {**fail(key, "skipped by user", error_type="skipped", action="none"), "attempts": steps}
         if _cancelled() and not result.get("success"):
-            return fail(key, "cancelled by user", error_type="cancelled", action="none")
+            return {**fail(key, "cancelled by user", error_type="cancelled", action="none"), "attempts": steps}
+        if steps and isinstance(result, dict):
+            result.setdefault("attempts", steps)  # which ways were tried, how long, why they failed
         return result
     finally:
         _DL_TLS.key = prev_key

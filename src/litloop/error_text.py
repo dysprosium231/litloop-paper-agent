@@ -58,6 +58,47 @@ def _match(raw: str) -> tuple[str, str] | None:
     return None
 
 
+# Which failure explains a paper best, when several ways failed (most telling first).
+_FAILURE_ORDER = ("not_entitled", "login_abandoned", "cloudflare_blocked", "navigate_failed",
+                  "timeout", "paywall", "not_found")
+
+
+def pick_failure(result: dict | None) -> str | None:
+    """The raw reason to show for a failed download: the result's own reason when it
+    is a known one (skipped, cancelled, not subscribed...), else the most telling of
+    the ways it tried (``result["attempts"]``)."""
+    if not result or result.get("success"):
+        return None
+    own = result.get("error") or result.get("reason")
+    hit = _match(str(own)) if own else None
+    # "All sources failed" says nothing the attempts cannot say better.
+    if own and ((hit is not None and hit[0] != "所有来源都没有找到 PDF")
+                or result.get("error_type") in ("skipped", "cancelled")):
+        return str(own)
+    failed = [s for s in result.get("attempts") or [] if not s.get("ok") and s.get("reason")]
+    for kind in _FAILURE_ORDER:
+        for s in failed:
+            if s.get("error_type") == kind:
+                return str(s["reason"])
+    for s in failed:
+        if _match(str(s["reason"])) is not None:
+            return str(s["reason"])
+    return str(own) if own else None
+
+
+def steps_for_app(attempts: list | None) -> list[dict] | None:
+    """The ways a paper was tried, for the app's download page: the ones that
+    took time or opened a site (quick API misses are left out), with the reason
+    in plain words."""
+    out = []
+    for s in attempts or []:
+        src = str(s.get("source") or "")
+        if s.get("ok") or s.get("route") == "school" or "Browser" in src or float(s.get("seconds") or 0) >= 1:
+            out.append({"source": src, "route": s.get("route"), "seconds": s.get("seconds"), "ok": bool(s.get("ok")),
+                        "why": None if s.get("ok") else reason(s.get("reason")) if s.get("reason") else None})
+    return out or None
+
+
 def reason(raw: str | None) -> str | None:
     """Short reason for a status line, e.g. '学校未订阅此期刊，或当前不在校园网'."""
     if not raw:

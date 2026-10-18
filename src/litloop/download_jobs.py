@@ -232,9 +232,10 @@ def _run(job: str) -> None:
         doi = canonical_doi(current or "")
         if doi in wanted:
             ok = bool(r.get("success"))
+            from . import error_text
             _mark(job, doi, status="done" if ok else "failed", retrying=False, stage=None,
-                  source=r.get("source"), file=r.get("file") or None, error=None if ok else r.get("error"),
-                  note=r.get("note"))
+                  source=r.get("source"), file=r.get("file") or None, error=error_text.pick_failure(r),
+                  note=r.get("note"), attempts=error_text.steps_for_app(r.get("attempts")))
 
     from . import progress_reporter
     from .sources import _SKIPPED
@@ -263,9 +264,12 @@ def _run(job: str) -> None:
                 for it in data["items"]:
                     r = by_doi.get(it["doi"])
                     if r:
+                        from . import error_text
                         it.update(status="done" if r.get("success") else "failed", retrying=False, stage=None, source=r.get("source"),
-                                  file=r.get("file") or None, error=None if r.get("success") else r.get("error"),
-                                  note=r.get("note") or it.get("note"))
+                                  file=r.get("file") or None,
+                                  error=error_text.pick_failure(r) if r.get("attempts") else (None if r.get("success") else it.get("error") or r.get("error")),
+                                  note=r.get("note") or it.get("note"),
+                                  attempts=error_text.steps_for_app(r.get("attempts")) or it.get("attempts"))
                     elif it["status"] == "waiting" and state == "done":
                         it.update(status="failed", error="cancelled" if _CURRENT["cancelled"] else "no result")
                 data["state"] = "cancelled" if _CURRENT["cancelled"] and state == "done" else state

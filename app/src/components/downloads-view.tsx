@@ -10,6 +10,7 @@ import {
   type DownloadItem,
   type DownloadJob,
   type DownloadJobEntry,
+  type DownloadStep,
   type JobState,
   type LiveDownload,
   type PendingGroup,
@@ -361,6 +362,7 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
               )}
               {it.status === "done" && it.note && <div className="mt-0.5 text-xs text-muted-foreground">{it.note}</div>}
               {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90" title={it.error}>{it.error_text ?? it.error}</div>}
+              {it.status === "failed" && it.attempts && it.attempts.length > 0 && <Attempts steps={it.attempts} />}
               {it.zotero && (
                 <div className={cn("mt-0.5 text-xs", it.zotero.status === "failed" ? "text-destructive/90" : it.zotero.status === "no_pdf" ? "text-warning-foreground" : "text-muted-foreground")}
                   title={it.zotero.error ?? undefined}>
@@ -398,5 +400,39 @@ function RowAction({ label, hover, onClick, children }: {
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
+  )
+}
+
+
+/** What a source is called in the app ("ElsevierBrowser" -> "Elsevier 官网"). */
+function stepName(source: string): string {
+  const named: Record<string, string> = {
+    "WebVPN-HTTP": "WebVPN 直接下载", WebVPN: "WebVPN 浏览器", CARSI: "CARSI", EZProxy: "EZProxy",
+    GenericBrowser: "出版商官网", "Sci-Hub": "Sci-Hub", OpenAlexContent: "OpenAlex 全文", LibGen: "LibGen",
+  }
+  if (named[source]) return named[source]
+  const m = /^(.+)Browser$/.exec(source)
+  return m ? `${m[1]} 官网` : source
+}
+
+/** A failed paper's route: which ways were tried, how long each took, why it failed. */
+function Attempts({ steps }: { steps: DownloadStep[] }) {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <div className="mt-0.5 text-xs">
+      <button type="button" className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground" onClick={() => setOpen((v) => !v)}>
+        <ChevronRightIcon className={cn("size-3 transition-transform", open && "rotate-90")} />
+        尝试经过（{steps.length} 步）
+      </button>
+      {open && (
+        <ol className="mt-1 space-y-0.5 border-l pl-3 text-muted-foreground">
+          {steps.map((s, i) => (
+            <li key={i}>
+              {s.route === "school" ? "学校通道 · " : ""}{stepName(s.source)} · {Math.round(s.seconds)} 秒 · {s.ok ? "成功" : s.why ?? "没拿到"}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   )
 }
