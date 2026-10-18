@@ -3,6 +3,17 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-18：代码评审改进（第一轮，DeepSeek 通读代码）
+
+TODO 里各项只留一句；这里是做法和验证。复核意见见下方「复核 1–3」。
+
+- [x] **常量漂移 + README 检索源表述**（2026-10-18 完成）（评审 13、7，2026-10-18 已派 Antigravity）：User-Agent 统一为 `network.user_agent()`，版本取 `__version__`；删掉 `main.py` 里写死的 `D:\Projects\active\scansci-find`；发布检查扫写死的用户路径和散落的 UA；README 的“三个数据源”改成实际（有 OpenAlex Key 只用 OpenAlex，没 Key 用 Crossref，Semantic Scholar 要环境变量）。（提交 c14c745）
+- [x] **降级检索质量断层**（评审 2；2026-10-18 完成：整理步骤抽成 `search._tidy`，引擎缺失和引擎出错两条退路都经过它；`tests/test_search_fallback_tidy.py` 在旧代码上失败、新代码上通过）：没装发现引擎或引擎出错时 `search_papers` 只按 DOI 去重，不分相关档、不去离题标题、不按标题去重。把后处理抽成一个函数，两条路径都过；验收：固定 10 组查询离线比对有无引擎时前 10 条的档位分布。（提交 493fd4e）
+- [x] **下载状态显式化**（评审 3，最该提前；2026-10-18 用户同意设计，分四步：① 先写测试锁住四条规则；② 引入 `DownloadAttempt` 与登记表，旧全局变量改为从它读取；③ 取消、跳过、等用户、浏览器归属改用它，删旧全局变量；④ 每篇带 `attempts` 与 `error_text`，app 下载页失败行可展开。不在范围：放开一次一个任务。① 已完成：`tests/test_download_invariants.py`——跳过 5 秒内停下（含登录检查中）、结束后的晚到结果丢弃、取消不影响之后的下载、一篇的浏览器错误不带到另一篇；顺带修：开始下载前查元数据（联网，最长约 10 秒）期间被跳过的，查完即返回，不再进第一阶段。② 已完成：`sources/attempt.py` 的 `DownloadAttempt`（取消代号、等用户心跳、每个来源的步骤记录：路线、来源、秒数、结果、失败类型和原因）与登记表；浏览器登记时记下所属文献（`browser_backend.OWNER`），跳过、结束、第一阶段收尾、看门狗都只关这一篇自己的浏览器，去掉“只有一篇在下才关”的判断。③ 已完成：在途集合 `_INFLIGHT` 和心跳表 `_USER_WAIT` 删除，改读登记表里的 `DownloadAttempt`；`_cancelled()` 按这篇自己记下的取消代号判断。保留三样且各有其职：`_SETTLED`（下载返回之后，晚到的来源仍要知道这篇已结束）、`_SKIPPED`（还没开始就被跳过的文献，任务开始时清空）、`_CANCEL_GEN`（任务级的取消代号）。④ 已完成：每篇结果带 `attempts`（每个来源的路线、秒数、结果、失败原因）；下载任务每篇记 `attempts`（去掉不到 1 秒的接口查询）和最说明问题的失败原因（`error_text.pick_failure`：没有订阅 > 学校登录未完成 > 人机验证 > 打不开 > 超时 > 付费墙 > 没找到，不再是笼统的“所有来源都失败”）；app 下载页失败行下有「尝试经过」可展开。待用真实失败验收（学校没订、超时、人机验证各一））：`_CANCEL_GEN`、`_SKIPPED`、`_SETTLED`、`_USER_WAIT`、`_SOURCE_TLS` 是进程级 / 线程局部的隐式状态，`download_jobs` 因此只能一次一个任务。不重写引擎，收进 `DownloadAttempt`（doi、代、取消标志、浏览器归属），全局只留注册表；把“成功后不再开浏览器、晚到结果丢弃、取消后新任务不受影响”写成测试。昨晚两个 bug（取消后任务仍是 running；上一篇的错误跑到下一篇）都出在这里。下载实测告一段落后做。（提交 3c4f4e6、e247927、3ec69de、58acdbe）
+- [x] **CI 加前端和 Rust 检查**（评审 10；2026-10-18：CI 新增 `app` 任务（Windows）：`npm ci`、`npm run build`（含 tsc）、`npm run lint:copy`、`cargo check`；本地 cargo check 通过。ruff 未加）：现在只跑 pytest；加 `npm ci && npx tsc --noEmit` 和 `cargo check`，可选 ruff（只查不格式化），先不上 mypy。（提交 789a4dd）
+- [x] **app 与后端类型对齐**（评审 9；2026-10-18：`Summary` 补 9 个字段；`tests/test_app_types.py` 用后端实际写出的深度检索摘要对比 `api.ts` 的字段，缺了就失败。重启后补跑全量测试 756 个通过，GitHub CI 的新 app 任务与 9 组 Python 测试均通过）：`app/src/lib/api.ts` 的 `Summary` 缺 `remaining_estimate`、`coverage`、`ranked_by`、`rounds`；从 Python 响应模型生成 JSON Schema → TS 类型，CI 比对，和 APP_DATA.md / `SCHEMA` 版本一起兜住。（提交 7ee60c4）
+- [x] **app→Agent 协议**（评审 11；2026-10-18：会话 ID 只从 `litloop_screening` / `litloop_deep_search` 的结果里取，先按 JSON 解析（按 tool_use_id 对上工具名）；`agent_idle_minutes`（15 分钟）没有输出就停止并记为失败；`_CANCELLED` 在结束时清理；内部字段不写进记录文件）：`agent_runner` 用正则从 `tool_result` 抓 session、依赖 stream-json 形状、无超时、`_CANCELLED` 不清理；改为 `litloop_screening(save)` 返回机器可读的 `session`，加无输出心跳超时，退出时清理。（提交 b542c71）
+
 ## 2026-10-18：复核 1–3、8——失败原因说清、不串到别的文献、“学校没有订阅”判得准
 
 DeepSeek Harness 复核评审修改时指出、已复现：
@@ -160,7 +171,6 @@ DeepSeek Harness 复核评审修改时指出、已复现：
     - 某个车道失败时页面立即标“失败”，后面的车道其实还在试：现在只标“换渠道重试中”，以引擎最后的汇总为准；
     - 保存目录里已有的 PDF（`.doi_index.json` 有记录且文件在）不再进下载队列，新任务里直接标“本机已有”、不交给引擎（这次 4 篇白跑了 Elsevier API、Sci-Hub、浏览器一圈，JAC 还多存了一份）；
     - 「正在处理」显示两遍，改为显示一次、显示标题。
-  - [ ] 批量引擎：浏览器下载超过竞速时限后“迟到的成功”没算进车道结果，冷却重试又下了一遍（ceramint.2024.08.002）。
   - [x] 第二次实测（2026-10-17，「下载测试 · 典型场景」：MDPI、Elsevier、Wiley、ACS、Springer、arXiv、本机已有、不存在的 DOI；用户在校内）发现：
     - 用户在校内，但出版商不认：v2rayN TUN 已按进程设直连，LitLoop 的出口是北京的运营商线路（219.143.23.107，AS4847），不是教育网，Elsevier 全文权限 403。网络检测原来只看 TUN 有没有开，现在加了「出口 IP」和「出版商权限」（用一篇 Elsevier 订阅论文查全文权限，只读权限不下正文），不认时指向 WebVPN / CARSI 或校园出口代理。
     - Wiley 走浏览器直接打开官网，Cloudflare 判定自动浏览器“扩展或网络配置不兼容”拦下（不做绕过）。
@@ -169,8 +179,6 @@ DeepSeek Harness 复核评审修改时指出、已复现：
   - [x] 批量下载从不走学校通道（2026-10-17 查明）：按 DOI 前缀预判时没有出版商会被分到机构通道，快速通道失败只溢出到灰色来源、灰色来源失败就停了，所以 WebVPN / CARSI 在批量下载里从没用上（之前看到的“浏览器下载”是直接开出版商官网）。修复：配置了学校认证或在校园网时，前两道都没拿到的文献（开放获取的除外）继续进机构通道。测试 `tests/test_lane_overflow_institution.py`；待真实实测。
   - [x] 第三次实测（2026-10-17）：Wiley 在灰色来源竞速里由“官网浏览器”打开，Cloudflare 判定不兼容（无可点的验证框），每篇等满 150 秒、整道车道停住，轮不到学校通道。修复：Elsevier API 答复“出口不在学校登记范围”后记一小时（`egress.py`），配置了学校认证时跳过出版商官网浏览器、交给学校通道；“不兼容”这种无法通过的验证页立即放弃，不再等。测试 `tests/test_egress_skip.py`。
   - [x] 第四次实测（2026-10-17）：已走到学校通道，但通道内部先直接拼出版商 PDF 地址、再开浏览器访问官网，WebVPN 排最后；出口不被认可时前两步只会被拒（ScienceDirect CPE00001，浏览器出口 106.39.42.165，与 Python 的 219.143.23.107 不同，都是北京运营商线路）。修复：出口被拒且不在校园网时，学校通道跳过这两步，CARSI 之后直接 WebVPN。另见：批次编号沿用了上次被中断的批次（“Resuming batch … 1 already completed”），下载任务应各用各的批次。
-  - [ ] 下载慢：开始前用 Crossref / doi.org 验证 DOI（不存在的 DOI 跑完了所有车道）；车道不必等整批走完；Sci-Hub 镜像找到 PDF 但传输慢时被 45 秒窗口判失败；arXiv 进度用编号汇报、下载任务对不上 DOI。
-  - [ ] 学校认证实测（选学校、弹窗登录、试下载一篇订阅论文）：这次没走到机构通道，需要专门测。
 - [x] 文件名格式可选（2026-10-17，用户要求）：`rename_format` 七种——作者年份_标题_DOI（默认，与以前相同）、作者年份_标题、作者 - 年份 - 完整标题（Zotero 式，保留中文和重音）、年份_作者_标题、完整标题、DOI、保持原名；旧的 `auto_rename: false` 等于保持原名，app 里选了格式会把它置回 true。去掉 Windows 禁用字符；判断已下载时仍核对 PDF 里的 DOI，换格式不会误认。测试 `tests/test_rename_formats.py`（Antigravity）。
 - [x] 左侧图标栏（2026-10-17，用户要求）：可展开（168px，图标加名称）或收起（只留图标），记住状态；图标栏变宽时列表宽度不变；顶栏隐藏列表时图标栏只留图标。
 - [x] 开发窗口重启脚本 `app/scripts/dev-restart.ps1`（2026-10-17，用户嫌后台任务挂太久）：结束旧窗口、后台和本项目的 Vite（按命令行找，netstat 状态名是本地化的），等端口空出来再单独启动 `tauri dev`，约 8 秒返回。另修文件夹按钮没反应：当时开着的是加插件之前的旧窗口；按钮出错时现在会显示原因。

@@ -201,7 +201,7 @@ def _batch_download_impl(
             "unique": len(all_entries),
             "succeeded": succeeded,
             "failed": len(raw) - succeeded,
-            "results": raw,
+            "results": _without_attempts(raw),
             "failed_dois": [r.get("doi") or r.get("identifier", "")
                             for r in raw if not r.get("success")],
             "batch_id": batch_id or "lanes",
@@ -228,7 +228,16 @@ def _batch_download_impl(
             "登录后关闭浏览器，然后重新批量下载。"
         )
 
+    if isinstance(result.get("results"), list):
+        result["results"] = _without_attempts(result["results"])
     return json.dumps(result, ensure_ascii=False)
+
+
+def _without_attempts(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """A batch's results for the agent, without each paper's ``attempts`` (every way
+    tried, with timings: about 20 KB for 30 papers that the agent does not use;
+    the app reads them from the job file). Single downloads keep theirs."""
+    return [{k: v for k, v in r.items() if k != "attempts"} if isinstance(r, dict) else r for r in results]
 
 
 @mcp_app.tool()

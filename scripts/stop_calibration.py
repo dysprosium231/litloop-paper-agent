@@ -6,8 +6,13 @@ existed, a replay over its served batches) and compare what it said with how
 many 高 papers were still found after that point.
 
 "Found after" only counts what was read later, so for a session that stopped
-early it is a lower bound. Nothing here changes a session; the rule is not
-tuned until there are a dozen or so stop points (TODO.md, review item 13).
+early it is a lower bound; a rating the user changed afterwards can also skew
+it. A replay ranks nothing again and uses the pool as it was saved at the end,
+which is larger than at the time, so its estimates run high: use replayed
+points for when the rule fires, logged ones for the estimate.
+
+Nothing here changes a session; the rule is not tuned until there are a dozen
+or so stop points (TODO.md, review item 13).
 
     python scripts/stop_calibration.py            # every session
     python scripts/stop_calibration.py --since 20261017 --all-points
@@ -53,8 +58,8 @@ def main() -> None:
         rated = ds._ratings(state)
         final = sum(1 for r in rated.values() if r == "高")
         checks = state.get("stop_checks") or replay(state, rated)
-        source = "logged" if state.get("stop_checks") else "replayed"
-        rows = [c | {"after": final - c["high"]} for c in checks]
+        source = "logged" if state.get("stop_checks") else "replayed (estimates run high)"
+        rows = [c | {"after": max(0, final - c["high"]), "source": source} for c in checks]
         shown = rows if args.all_points else [r for r in rows if r["rule"]]
         if not shown:
             continue
@@ -68,11 +73,13 @@ def main() -> None:
         late = [r for r in stops if r["after"] > 0]
         print(f"  still found 高 afterwards: {len(late)} of {len(stops)}; "
               f"average found after: {sum(r['after'] for r in stops) / len(stops):.1f}")
-        with_est = [r for r in stops if r["estimate"] is not None]
+        with_est = [r for r in stops if r["estimate"] is not None and r["source"] == "logged"]
         if with_est:
             bias = sum(r["estimate"] - r["after"] for r in with_est) / len(with_est)
             print(f"  estimate minus found after, average over {len(with_est)}: {bias:+.1f} "
                   "(found after is a lower bound when the session stopped there)")
+        elif any(r["estimate"] is not None for r in stops):
+            print("  estimates: only replayed points so far, which run high; not compared")
 
 
 if __name__ == "__main__":

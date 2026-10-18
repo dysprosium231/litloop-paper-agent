@@ -828,7 +828,8 @@ def _stop(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any]:
     """
     est = _remaining_estimate(state, rated)
     if len(rated) >= state["cap"]:
-        return _with_estimate({"stop_suggested": True, "stop_reason": f"已筛 {len(rated)} 篇，达到上限 {state['cap']}"}, est)
+        return _with_estimate({"stop_suggested": True, "stop_rule": "cap",
+                               "stop_reason": f"已筛 {len(rated)} 篇，达到上限 {state['cap']}"}, est)
     batches = [b for b in state["served"] if b]
     last = batches[-1] if batches else []
     judged = [rated[k] for k in last if k in rated]
@@ -838,21 +839,19 @@ def _stop(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any]:
     rates = [sum(1 for k in b if rated.get(k) == "高") / max(1, sum(1 for k in b if k in rated)) for b in batches[:-1]]
     best = max(rates)
     if best > 0 and high / len(judged) <= best / KNEE_RATIO:
-        return _with_estimate({"stop_suggested": True,
+        return _with_estimate({"stop_suggested": True, "stop_rule": "knee",
                                "stop_reason": (f"最近一批 {len(judged)} 篇里只有 {high} 篇高相关，不到此前最好一批"
                                                f"（{best:.0%}）的 1/{KNEE_RATIO}，相关文章大多已经读到")}, est)
     useful = sum(1 for r in judged if r in ("高", "中"))
     if useful <= max(1, len(judged) // 15):
-        return _with_estimate({"stop_suggested": True,
+        return _with_estimate({"stop_suggested": True, "stop_rule": "few_useful",
                                "stop_reason": f"最近一批 {len(judged)} 篇里只有 {useful} 篇高或中相关，新增已经很少"}, est)
     return _with_estimate({"stop_suggested": False, "stop_reason": ""}, est)
 
 
 def _stop_rule(stop: dict[str, Any]) -> str:
-    reason = stop.get("stop_reason") or ""
-    if not stop.get("stop_suggested"):
-        return ""
-    return "cap" if "达到上限" in reason else "knee" if f"1/{KNEE_RATIO}" in reason else "few_useful"
+    """Which rule suggested stopping ("" when none): ``stop_rule`` as _stop sets it."""
+    return str(stop.get("stop_rule") or "") if stop.get("stop_suggested") else ""
 
 
 def _log_stop(state: dict[str, Any], rated: dict[str, str], stop: dict[str, Any]) -> None:

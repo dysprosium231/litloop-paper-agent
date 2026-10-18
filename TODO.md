@@ -19,6 +19,8 @@
 - [~] app 里发起检索（2026-10-17 用户定：app 把表单发给 Agent，就像对话一样）：「筛选」页右上「新建检索」，表单含问题、纳入标准、快速 / 深度与规模、年份、中科院分区 / JCR / 预警期刊、种子 DOI 与 Zotero 分类；`agent_runner.py` 用 `claude -p --output-format stream-json` 从标准输入发出，只允许 LitLoop 工具和技能；页面显示 Agent 当前在调用什么，结束后「查看结果」打开它保存的筛选会话；Agent 命令和参数在设置「Agent」里可改。已在浏览器里走通“发起 → 失败提示”（本机 `claude` 命令行登录已过期，提示用户登录）；真实检索待用户登录 `claude` 后测。
 
 **还没做的（从 2026-10-17 的计划里留下）**
+- [ ] 批量引擎：浏览器下载超过竞速时限后“迟到的成功”没算进车道结果，冷却重试又下了一遍（ceramint.2024.08.002）。（2026-10-18 从 DECISIONS 移回）
+- [ ] 下载慢：开始前用 Crossref / doi.org 验证 DOI（不存在的 DOI 跑完了所有车道）；车道不必等整批走完；Sci-Hub 镜像找到 PDF 但传输慢时被 45 秒窗口判失败；arXiv 进度用编号汇报、下载任务对不上 DOI。（2026-10-18 从 DECISIONS 移回）
 - [ ] 大清单（>30 篇）：先摸底分组（开放获取 / Sci-Hub 有 / 需学校权限，后者按出版商细分），app 里分成几个队列，每个队列写明怎么下，用户逐个队列点下载。
 - [ ] 可视化 app 1 期继续：学校认证（选学校、弹窗登录、试下载一篇订阅论文）；之后深度链接、完成通知、安装包与自动更新（见待办池 12）。
 - [ ] 阶段 2 剩余：速度（每轮 30–55 秒主要花在补摘要上，先从这里下手：扩展与补摘要并行、OpenAlex 按参考文献缓存）；深度检索 → 批量下载 → 按分类推送 Zotero 走通一次。
@@ -28,15 +30,15 @@
 
 **代码评审改进（2026-10-18，DeepSeek 通读代码后的评审；用户同意按下面顺序穿插进行，主线下载实测不中断）**
 已抽查属实：2（降级检索不分档）、7（实际只有一个检索源）、13（写死路径、User-Agent 四种版本）、1（两套 publisher_batch，3079 / 2460 行）。
-1. [x] **常量漂移 + README 检索源表述**（2026-10-18 完成）（评审 13、7，2026-10-18 已派 Antigravity）：User-Agent 统一为 `network.user_agent()`，版本取 `__version__`；删掉 `main.py` 里写死的 `D:\Projects\active\scansci-find`；发布检查扫写死的用户路径和散落的 UA；README 的“三个数据源”改成实际（有 OpenAlex Key 只用 OpenAlex，没 Key 用 Crossref，Semantic Scholar 要环境变量）。
-2. [x] **降级检索质量断层**（评审 2；2026-10-18 完成：整理步骤抽成 `search._tidy`，引擎缺失和引擎出错两条退路都经过它；`tests/test_search_fallback_tidy.py` 在旧代码上失败、新代码上通过）：没装发现引擎或引擎出错时 `search_papers` 只按 DOI 去重，不分相关档、不去离题标题、不按标题去重。把后处理抽成一个函数，两条路径都过；验收：固定 10 组查询离线比对有无引擎时前 10 条的档位分布。
-3. [x] **下载状态显式化**（评审 3，最该提前；2026-10-18 用户同意设计，分四步：① 先写测试锁住四条规则；② 引入 `DownloadAttempt` 与登记表，旧全局变量改为从它读取；③ 取消、跳过、等用户、浏览器归属改用它，删旧全局变量；④ 每篇带 `attempts` 与 `error_text`，app 下载页失败行可展开。不在范围：放开一次一个任务。① 已完成：`tests/test_download_invariants.py`——跳过 5 秒内停下（含登录检查中）、结束后的晚到结果丢弃、取消不影响之后的下载、一篇的浏览器错误不带到另一篇；顺带修：开始下载前查元数据（联网，最长约 10 秒）期间被跳过的，查完即返回，不再进第一阶段。② 已完成：`sources/attempt.py` 的 `DownloadAttempt`（取消代号、等用户心跳、每个来源的步骤记录：路线、来源、秒数、结果、失败类型和原因）与登记表；浏览器登记时记下所属文献（`browser_backend.OWNER`），跳过、结束、第一阶段收尾、看门狗都只关这一篇自己的浏览器，去掉“只有一篇在下才关”的判断。③ 已完成：在途集合 `_INFLIGHT` 和心跳表 `_USER_WAIT` 删除，改读登记表里的 `DownloadAttempt`；`_cancelled()` 按这篇自己记下的取消代号判断。保留三样且各有其职：`_SETTLED`（下载返回之后，晚到的来源仍要知道这篇已结束）、`_SKIPPED`（还没开始就被跳过的文献，任务开始时清空）、`_CANCEL_GEN`（任务级的取消代号）。④ 已完成：每篇结果带 `attempts`（每个来源的路线、秒数、结果、失败原因）；下载任务每篇记 `attempts`（去掉不到 1 秒的接口查询）和最说明问题的失败原因（`error_text.pick_failure`：没有订阅 > 学校登录未完成 > 人机验证 > 打不开 > 超时 > 付费墙 > 没找到，不再是笼统的“所有来源都失败”）；app 下载页失败行下有「尝试经过」可展开。待用真实失败验收（学校没订、超时、人机验证各一））：`_CANCEL_GEN`、`_SKIPPED`、`_SETTLED`、`_USER_WAIT`、`_SOURCE_TLS` 是进程级 / 线程局部的隐式状态，`download_jobs` 因此只能一次一个任务。不重写引擎，收进 `DownloadAttempt`（doi、代、取消标志、浏览器归属），全局只留注册表；把“成功后不再开浏览器、晚到结果丢弃、取消后新任务不受影响”写成测试。昨晚两个 bug（取消后任务仍是 running；上一篇的错误跑到下一篇）都出在这里。下载实测告一段落后做。
+1. [x] **常量漂移 + README 检索源表述**（评审 13、7）：User-Agent 只剩一处、发布检查查写死路径。详见 DECISIONS「代码评审改进（第一轮）」。
+2. [x] **降级检索质量断层**（评审 2）：两条退路都经过 `search._tidy`。详见 DECISIONS「代码评审改进（第一轮）」。
+3. [x] **下载状态显式化**（评审 3）：每篇一个 `DownloadAttempt`，浏览器归属到文献。详见 DECISIONS「代码评审改进（第一轮）」。
 4. [~] **失败原因让用户看得到**（评审 4；随 3 的第④步实现，待真实失败验收）：浏览器和学校通道的失败常只剩一行日志；每个来源为什么失败统一到 `error_text.py` 分类，写进下载任务的 `items[].error_text`，app 详情页说清“哪条路、为什么、下一步”。借下载实测的失败样本验收（无权限、超时、验证码各一）。和 3 一起做。
-5. [x] **CI 加前端和 Rust 检查**（评审 10；2026-10-18：CI 新增 `app` 任务（Windows）：`npm ci`、`npm run build`（含 tsc）、`npm run lint:copy`、`cargo check`；本地 cargo check 通过。ruff 未加）：现在只跑 pytest；加 `npm ci && npx tsc --noEmit` 和 `cargo check`，可选 ruff（只查不格式化），先不上 mypy。
-6. [x] **app 与后端类型对齐**（评审 9；2026-10-18：`Summary` 补 9 个字段；`tests/test_app_types.py` 用后端实际写出的深度检索摘要对比 `api.ts` 的字段，缺了就失败。重启后补跑全量测试 756 个通过，GitHub CI 的新 app 任务与 9 组 Python 测试均通过）：`app/src/lib/api.ts` 的 `Summary` 缺 `remaining_estimate`、`coverage`、`ranked_by`、`rounds`；从 Python 响应模型生成 JSON Schema → TS 类型，CI 比对，和 APP_DATA.md / `SCHEMA` 版本一起兜住。
+5. [x] **CI 加前端和 Rust 检查**（评审 10）。详见 DECISIONS「代码评审改进（第一轮）」。
+6. [x] **app 与后端类型对齐**（评审 9）。详见 DECISIONS「代码评审改进（第一轮）」。
 7. [ ] **合并两套出版商下载模块**（评审 1）：`publisher_batch.py` 与 `institutional/publisher_batch.py`、两份 `publisher_profiles.py`，调用交叉；以根目录为唯一实现，把 `institutional/` 独有的学校登录判断、等待用户逻辑并进来，分两次提交（先合并行为 + 测试，再删文件）。不能直接删 `institutional/`，两边各有独有修复。验收：全部测试 + 真实单篇、批量各下一次，`test_checkout_sync` 不报漂移。
 8. [x] **排序增量计算**（评审 6；2026-10-18 完成，结论见 DECISIONS「排序增量计算」：每轮 30–55 秒的大头是补摘要，排序本身只有几秒；检索词命中和分词改为按文章缓存）：`deep_search._score` / `_features` 每轮全池重算分词、拼写归一、TF-IDF，池子 1800–7400 篇时排序 30–55 秒；缓存进 pool state 只算增量。验收：回放耗时降一半、找到目标的曲线不变。
-9. [x] **app→Agent 协议**（评审 11；2026-10-18：会话 ID 只从 `litloop_screening` / `litloop_deep_search` 的结果里取，先按 JSON 解析（按 tool_use_id 对上工具名）；`agent_idle_minutes`（15 分钟）没有输出就停止并记为失败；`_CANCELLED` 在结束时清理；内部字段不写进记录文件）：`agent_runner` 用正则从 `tool_result` 抓 session、依赖 stream-json 形状、无超时、`_CANCELLED` 不清理；改为 `litloop_screening(save)` 返回机器可读的 `session`，加无输出心跳超时，退出时清理。
+9. [x] **app→Agent 协议**（评审 11）：会话 ID 只认会话工具，空闲停止。详见 DECISIONS「代码评审改进（第一轮）」。
 10. [~] **补测试空洞**（评审 14；2026-10-18 第一批完成（Antigravity，已审）：`test_schools`、`test_resolver`、`test_session_broker`、`test_pdf_ownership` 共 44 个纯函数测试，不联网、不读本机设置；其余模块待补）：`schools`、`resolver`、`session_broker`、`publisher_access`、`publisher_pdf_router`、`session_store` 等约 20 个模块测试里没出现；先补四个纯函数级的：学校列表解析、标题→DOI、会话状态机、PDF 归属校验。
 11. [ ] **类别多的课题建池**（评审 5）：稀土测试集漏的 7 篇里 3 篇不在候选池，是建池问题不是排序问题；离线对比“每个子方向单写检索词”和“按类别配额出批”，看读到第 60 篇找到几篇目标。
 12. [ ] **安装包与自动更新**（评审 12）：`tauri.conf.json` 的 updater 为空；按 CHARTER 定的 PyInstaller sidecar + 安装包 + 自动更新做，不换方案。
@@ -56,9 +58,9 @@
 8. [x] **失败原因测试**（2026-10-18，随 1 完成）：用 `fail(...)` 调用点的真实字符串做参数化测试（随 1 一起）。
 9. [x] **类型对齐测试只查 `Summary`**（2026-10-18，Antigravity，已审：加 `DownloadItem`、`DownloadStep`、`SessionRecord`，`SessionRecord` 补 4 个字段）：加 `DownloadItem`、`DownloadStep`、`SessionRecord`；正则不依赖两空格缩进。
 10. [x] **源码卫生检查没进 CI**（2026-10-18，Antigravity，已审：规则在 `_source_hygiene.py`，脚本和测试共用；CI 跑发布检查）：CI 的 test 任务加 `check_release_consistency.py`；UA、写死路径的规则抽成一处，脚本和测试共用，给路径规则补测试。
-11. [ ] **TODO 分家不彻底**：DECISIONS 里还有 3 条没做的（批量引擎迟到的成功、下载前验证 DOI 等、学校认证实测）要移回 TODO；评审 1/2/3/5/9/10/15 补 DECISIONS 记录，TODO 里压成一句加链接（第 3 项一行 1186 字）。
-12. [ ] **停止规则记录**：`_stop` 直接返回 `rule`，不靠中文文案反推；回放用的是最终候选池，估计偏大，输出里注明；“之后找到”在用户改评分时会失真，注明下限。
-13. [ ] **MCP 批量结果带 `attempts`**：30 篇约多 20 KB，Agent 用不上；MCP 返回前去掉，app 的任务文件保留。
+11. [x] **TODO 分家不彻底**（2026-10-18 完成：3 条没做的移回 TODO；第一轮评审已完成的 6 项在 TODO 里各留一句，详细移到 DECISIONS）：DECISIONS 里还有 3 条没做的（批量引擎迟到的成功、下载前验证 DOI 等、学校认证实测）要移回 TODO；评审 1/2/3/5/9/10/15 补 DECISIONS 记录，TODO 里压成一句加链接（第 3 项一行 1186 字）。
+12. [x] **停止规则记录**（2026-10-18 完成：`_stop` 返回 `stop_rule`；回放的估计偏大，汇总时只比记录下来的；“之后找到”不为负）：`_stop` 直接返回 `rule`，不靠中文文案反推；回放用的是最终候选池，估计偏大，输出里注明；“之后找到”在用户改评分时会失真，注明下限。
+13. [x] **MCP 批量结果带 `attempts`**（2026-10-18 完成：`server._without_attempts`，单篇下载照旧带）：30 篇约多 20 KB，Agent 用不上；MCP 返回前去掉，app 的任务文件保留。
 14. [x] **app→Agent 边角**（2026-10-18，Antigravity，已审）：`tool_use_id` 对不上时退回“最近一次 tool_use 是会话工具”；`agent_idle_minutes` 设 0 被当成 15，定为 0 = 关闭并写进文档。
 
 
