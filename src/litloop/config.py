@@ -196,6 +196,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # stream-json lets the app show which tool it is using; only the litloop
     # tools and skills are allowed, since nobody is there to approve anything.
     "agent_command": "claude",
+    # An agent run that prints nothing for this long is stopped (it hung or
+    # waits on a prompt nobody sees). A deep-search batch takes ~1-3 minutes.
+    "agent_idle_minutes": 15,
     "agent_args": "-p --output-format stream-json --verbose --allowedTools mcp__litloop Skill Read",
     "translation_provider": "deepseek",
     "deepseek_api_key": "",

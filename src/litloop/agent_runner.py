@@ -39,6 +39,7 @@ _SESSION_RE = re.compile(r'"session"\s*:\s*"([^"]+)"')
 _LOCK = threading.Lock()
 _PROCS: dict[str, subprocess.Popen] = {}
 _CANCELLED: set[str] = set()
+_SESSION_TOOLS = frozenset({"litloop_screening", "litloop_deep_search"})
 
 
 def runs_dir() -> Path:
@@ -108,7 +109,7 @@ def _command() -> list[str]:
 
 
 def _write(run: str, data: dict[str, Any]) -> None:
-    store.write_json(_path(run), data, indent=1)
+    store.write_json(_path(run), {k: v for k, v in data.items() if not k.startswith("_")}, indent=1)
 
 
 def get(run: str) -> dict[str, Any] | None:
@@ -182,6 +183,8 @@ def _read(data: dict[str, Any], line: str) -> None:
             continue
         if c.get("type") == "tool_use":
             name = str(c.get("name") or "").split("__")[-1]
+            if c.get("id"):
+                data.setdefault("_tools", {})[c["id"]] = name
             action = (c.get("input") or {}).get("action")
             text = _TOOL_TEXT.get(name, f"调用 {name}")
             if name == "litloop_deep_search" and action:
@@ -193,9 +196,9 @@ def _read(data: dict[str, Any], line: str) -> None:
             body = c.get("content")
             body = body if isinstance(body, str) else " ".join(
                 x.get("text", "") for x in body or [] if isinstance(x, dict))
-            m = _SESSION_RE.search(body or "")
-            if m:
-                data["session"] = m.group(1)
+            session = _session_from(data.get("_tools", {}).get(c.get("tool_use_id")), body or "")
+            if session:
+                data["session"] = session
         elif c.get("type") == "text" and kind == "assistant" and c.get("text", "").strip():
             data["doing"] = "Agent 在判断文献"
     if kind == "result":
@@ -209,15 +212,56 @@ def _read(data: dict[str, Any], line: str) -> None:
         data["cost_usd"] = msg.get("total_cost_usd")
 
 
+def _session_from(tool: str | None, body: str) -> str | None:
+    """The screening session a LitLoop tool reported: its JSON "session" field.
+
+    Only litloop_screening and litloop_deep_search name the session the app
+    opens; a session-like string in another tool's output (a web page, a
+    file the agent read) is not it (code review, 2026-10-18)."""
+    if tool not in _SESSION_TOOLS:
+        return None
+    try:
+        obj = json.loads(body)
+    except ValueError:
+        obj = None
+    if isinstance(obj, dict) and isinstance(obj.get("session"), str) and obj["session"]:
+        return obj["session"]
+    m = _SESSION_RE.search(body)  # a result wrapped in text around the JSON
+    return m.group(1) if m else None
+
+
+def _watch_idle(run: str, proc: subprocess.Popen, data: dict[str, Any], seen: list[float]) -> None:
+    """Stop an agent that has printed nothing for agent_idle_minutes (it hung,
+    or waits on a prompt nobody sees); the run would otherwise stay "running"."""
+    limit = float(_config.load_config().get("agent_idle_minutes", 15) or 15) * 60
+    while proc.poll() is None:
+        time.sleep(min(5.0, max(0.2, limit / 4)))
+        if time.time() - seen[0] > limit and proc.poll() is None:
+            data["error"] = f"Agent 超过 {limit / 60:.0f} 分钟没有任何输出，已停止"
+            _kill(proc)
+            return
+
+
+def _kill(proc: subprocess.Popen) -> None:
+    if os.name == "nt":  # the agent's own tool servers go with it
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    else:
+        proc.terminate()
+
+
 def _follow(run: str, proc: subprocess.Popen, prompt: str, data: dict[str, Any]) -> None:
     log = _path(run).with_suffix(".log")
     last = 0.0
+    seen = [time.time()]  # when the agent last printed anything
+    threading.Thread(target=_watch_idle, args=(run, proc, data, seen), daemon=True).start()
     try:
         assert proc.stdin and proc.stdout
         proc.stdin.write(prompt.encode("utf-8"))
         proc.stdin.close()
         with log.open("ab") as fh:
             for raw in proc.stdout:
+                seen[0] = time.time()
                 fh.write(raw)
                 _read(data, raw.decode("utf-8", errors="replace").strip())
                 if time.time() - last > 1.0:
@@ -235,10 +279,12 @@ def _follow(run: str, proc: subprocess.Popen, prompt: str, data: dict[str, Any])
         data.update(state="failed", error=str(e))
     finally:
         data["doing"] = None
+        data.pop("_tools", None)
         data["finished"] = datetime.now().isoformat(timespec="seconds")
         _write(run, data)
         with _LOCK:
             _PROCS.pop(run, None)
+            _CANCELLED.discard(run)
 
 
 def cancel(run: str) -> bool:
@@ -247,9 +293,5 @@ def cancel(run: str) -> bool:
     if not proc or proc.poll() is not None:
         return False
     _CANCELLED.add(run)
-    if os.name == "nt":  # the agent's own tool servers go with it
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    else:
-        proc.terminate()
+    _kill(proc)
     return True

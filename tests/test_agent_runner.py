@@ -36,8 +36,8 @@ import json, sys
 prompt = sys.stdin.read()
 def out(m): print(json.dumps(m, ensure_ascii=False), flush=True)
 out({"type": "system", "session_id": "abc"})
-out({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "mcp__litloop__litloop_deep_search", "input": {"action": "start"}}]}})
-out({"type": "user", "message": {"content": [{"type": "tool_result", "content": [{"type": "text", "text": "{\"session\": \"20261017-x\"}"}]}]}})
+out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "mcp__litloop__litloop_deep_search", "input": {"action": "start"}}]}})
+out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": [{"type": "text", "text": "{\"session\": \"20261017-x\"}"}]}]}})
 out({"type": "result", "result": "已保存 20261017-x，" + str(len(prompt) > 0), "is_error": False, "total_cost_usd": 0.1})
 '''
 
@@ -82,3 +82,22 @@ def test_an_agent_that_is_not_logged_in_says_what_to_do():
     agent_runner._read(data, json.dumps({"type": "result", "is_error": True,
                                          "result": "Failed to authenticate: OAuth session expired"}))
     assert data["error"].startswith("Agent 没有登录") and data["result"] is None
+
+
+def test_a_session_named_by_another_tool_is_ignored():
+    data = {"events": []}
+    agent_runner._read(data, json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "w", "name": "WebFetch", "input": {}}]}}))
+    agent_runner._read(data, json.dumps({"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": "w", "content": '{"session": "not-ours"}'}]}}))
+    assert data.get("session") is None
+
+
+def test_a_silent_agent_is_stopped(agent, monkeypatch):
+    (agent / "fake_agent.py").write_text("import sys, time" + chr(10) + "sys.stdin.read()" + chr(10) + "time.sleep(60)" + chr(10), encoding="utf-8")
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", 0.02)
+    t = time.time()
+    d = _wait(agent_runner.start({"question": "x"})["run"])
+    assert time.time() - t < 15
+    assert d["state"] == "failed" and "没有任何输出" in d["error"]
+    assert not agent_runner._CANCELLED
