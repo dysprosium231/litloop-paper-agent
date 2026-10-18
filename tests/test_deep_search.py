@@ -385,3 +385,15 @@ def test_cached_ranking_matches_a_fresh_one_and_rematches_only_changed_papers(mo
     deep_search._CACHES.pop("cache-test", None)
     deep_search._score(st)
     assert warm == ({k: (r["query_hits"], r["score"]) for k, r in pool.items()}, deep_search._features(st))
+
+
+def test_stop_checks_keep_one_entry_per_number_rated():
+    st = {"pool": {}, "served": []}
+    knee = {"stop_suggested": True, "stop_reason": f"不到此前最好一批（40%）的 1/{deep_search.KNEE_RATIO}",
+            "remaining_estimate": {"remaining": 4.2, "next_batch": 1.0, "decay": 0.7}}
+    deep_search._log_stop(st, {"10.1/a": "高"}, {"stop_suggested": False, "stop_reason": ""})
+    deep_search._log_stop(st, {"10.1/a": "高", "10.1/b": "低"}, {"stop_suggested": False, "stop_reason": ""})
+    deep_search._log_stop(st, {"10.1/a": "高", "10.1/b": "低"}, knee)  # asked again, no new ratings
+    log = st["stop_checks"]
+    assert [c["screened"] for c in log] == [1, 2]
+    assert log[-1]["rule"] == "knee" and log[-1]["estimate"] == 4.2 and log[-1]["high"] == 1

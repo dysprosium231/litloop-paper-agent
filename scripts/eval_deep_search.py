@@ -40,6 +40,8 @@ def main() -> int:
     ap.add_argument("--max", type=int, default=150, help="papers to read before stopping (default 150)")
     ap.add_argument("--batch", type=int, default=30, help="batch size (default 30, as in the recorded runs)")
     ap.add_argument("--stop-on-unjudged", action="store_true", help="stop and list papers with no judgment")
+    ap.add_argument("--past-stop", action="store_true",
+                    help="keep reading after a suggested stop, up to --max (data for scripts/stop_calibration.py)")
     args = ap.parse_args()
 
     acc = json.loads((ROOT / "tests/acceptance" / f"{args.set}.json").read_text(encoding="utf-8"))
@@ -76,10 +78,11 @@ def main() -> int:
               f"pool {out['pool']}  stop={out.get('stop_suggested')}")
         if read >= args.max:
             break
-        out = deep_search.next_batch(session)
+        out = deep_search.next_batch(session, force=args.past_stop)
         if out.get("stop_suggested"):
-            print(f"stop suggested: {out.get('stop_reason')}")
-            break
+            print(f"stop suggested at {read}: {out.get('stop_reason')}")
+            if not args.past_stop or not out.get("batch"):
+                break
     missed = sorted(targets - found)
     status = {c["doi"]: c for c in deep_search.status(session)["coverage"]}
     print("\nread:found " + " ".join(f"{r}:{f}" for r, f in curve))

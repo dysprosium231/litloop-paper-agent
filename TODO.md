@@ -40,7 +40,7 @@
 10. [~] **补测试空洞**（评审 14；2026-10-18 第一批完成（Antigravity，已审）：`test_schools`、`test_resolver`、`test_session_broker`、`test_pdf_ownership` 共 44 个纯函数测试，不联网、不读本机设置；其余模块待补）：`schools`、`resolver`、`session_broker`、`publisher_access`、`publisher_pdf_router`、`session_store` 等约 20 个模块测试里没出现；先补四个纯函数级的：学校列表解析、标题→DOI、会话状态机、PDF 归属校验。
 11. [ ] **类别多的课题建池**（评审 5）：稀土测试集漏的 7 篇里 3 篇不在候选池，是建池问题不是排序问题；离线对比“每个子方向单写检索词”和“按类别配额出批”，看读到第 60 篇找到几篇目标。
 12. [ ] **安装包与自动更新**（评审 12）：`tauri.conf.json` 的 updater 为空；按 CHARTER 定的 PyInstaller sidecar + 安装包 + 自动更新做，不换方案。
-13. [ ] **停止规则校准**（评审 8）：1/6 拐点和 `remaining_estimate` 未验证；先把每次“建议停止”时的估计和之后实际又找到的篇数记下来，攒够十几次再调，现在不改。
+13. [~] **停止规则校准**（评审 8；2026-10-18 开始攒数据：每轮记下规则和估计（`stop_checks`），`scripts/stop_calibration.py` 汇总，评测工具加 `--past-stop` 读过停止点；现有 2 个停止点，见 DECISIONS「停止规则校准」）：1/6 拐点和 `remaining_estimate` 未验证；先把每次“建议停止”时的估计和之后实际又找到的篇数记下来，攒够十几次再调，现在不改。
 - [x] README 改版（2026-10-18 用户定：以桌面 app 为主角）：README 475 → 255 行，写为什么用它、一次完整的流程、app 四个页面、深度检索怎么查全（附验收结果）、下载怎么拿到全文（附 10-18 实测）、安装与启动；详细内容移到 `docs/AGENT.md`、`docs/DOWNLOAD.md`、`docs/CONFIG.md`；四张 2x 截图在 `assets/screenshots/`（筛选用稀土正式检索，设置截网络页，不含邮箱和 Key）。下载、Zotero 两张里的会话名是“下载测试”，用户下次正式下载后可重截。
 14. [x] **TODO 分家**（评审 15；2026-10-18：TODO 338 → 69 行，已完成的实验结论、用户决定和「已完成」一节移到 `docs/DECISIONS.md`，按主题和日期排列；AGENTS.md 同步）：已完成的实验结论和用户决定移到 `docs/DECISIONS.md`（带日期），TODO 只留正在做 / 接下来 / 待办池。
 - 评审建议不做的：不重写下载引擎；不为统一直接删 `institutional/`；不把排序换成大模型打分；没有测试集不调排序参数。

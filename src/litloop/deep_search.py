@@ -830,6 +830,28 @@ def _stop(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any]:
     return _with_estimate({"stop_suggested": False, "stop_reason": ""}, est)
 
 
+def _stop_rule(stop: dict[str, Any]) -> str:
+    reason = stop.get("stop_reason") or ""
+    if not stop.get("stop_suggested"):
+        return ""
+    return "cap" if "达到上限" in reason else "knee" if f"1/{KNEE_RATIO}" in reason else "few_useful"
+
+
+def _log_stop(state: dict[str, Any], rated: dict[str, str], stop: dict[str, Any]) -> None:
+    """Keep what the stop rule and the estimate said at each point, to calibrate them later.
+
+    ``scripts/stop_calibration.py`` compares each entry with how many 高 papers
+    were still found after it. One entry per number of rated papers.
+    """
+    log = state.setdefault("stop_checks", [])
+    if log and log[-1].get("screened") == len(rated):
+        log.pop()  # asked again without new ratings: keep the latest answer
+    est = stop.get("remaining_estimate") or {}
+    log.append({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "screened": len(rated),
+                "high": sum(1 for r in rated.values() if r == "高"), "rule": _stop_rule(stop),
+                "estimate": est.get("remaining"), "next_batch": est.get("next_batch"), "decay": est.get("decay")})
+
+
 def _with_estimate(stop: dict[str, Any], est: dict[str, Any] | None) -> dict[str, Any]:
     """Attach the estimate; when stopping is suggested, also say it in the reason."""
     if est is None:
@@ -892,6 +914,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None, forc
     from .search import _add_journal_rank, _flag_retractions
     rated = rated if rated is not None else _ratings(state)
     stop = _stop(state, rated)
+    _log_stop(state, rated, stop)
     go_on = force or not stop["stop_suggested"]
     if go_on:
         if _prefill_abstracts(state, rated):
