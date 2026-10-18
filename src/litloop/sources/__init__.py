@@ -1467,6 +1467,8 @@ def _download_impl(
         except Exception as exc:
             log.info(f"   [session-heal] skipped: {exc}")
         log.info(f"   [timing] session check: {time.time() - t_heal:.1f}s")
+        if _cancelled():  # skipped or cancelled while the session check waited for a login
+            return fail(identifier, "skipped by user" if getattr(_DL_TLS, "key", None) in _SKIPPED else "cancelled by user")
         inst_sources = _build_institutional_sources(doi, config, use_vpnsci=use_vpnsci)
         if inst_sources:
             log.info("   Phase 1 failed, trying institutional access...")

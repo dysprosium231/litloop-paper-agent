@@ -13,11 +13,12 @@ from typing import Any
 import requests
 
 from .config import load_config
+from .network import user_agent
 
 logger = logging.getLogger(__name__)
 
 _SEARCH_TIMEOUT = 30  # seconds, longer than default because these are public APIs
-_USER_AGENT = "litloop/1.5 (https://github.com/dysprosium231/litloop-paper-agent)"
+_USER_AGENT = user_agent("(https://github.com/dysprosium231/litloop-paper-agent)")
 
 
 class _AcademicSession(requests.Session):

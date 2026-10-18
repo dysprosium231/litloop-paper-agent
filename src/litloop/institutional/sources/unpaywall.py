@@ -8,6 +8,8 @@ from typing import Any
 
 import requests
 
+from ...network import user_agent
+
 logger = logging.getLogger(__name__)
 
 UNPAYWALL_API = "https://api.unpaywall.org/v2"
@@ -33,7 +35,7 @@ def check_oa(doi: str, email: str = "") -> OAResult:
     params = {"email": email or "litloop@example.invalid"}
 
     try:
-        resp = requests.get(url, params=params, timeout=15, headers={"User-Agent": "litloop/1.5"})
+        resp = requests.get(url, params=params, timeout=15, headers={"User-Agent": user_agent()})
         if resp.status_code == 404:
             logger.info("Unpaywall: DOI %s not found", doi)
             return OAResult(doi=doi)

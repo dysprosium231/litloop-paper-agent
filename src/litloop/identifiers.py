@@ -74,12 +74,13 @@ def normalize_doi_unicode(value: str) -> str | None:
 def validate_doi(doi: str) -> tuple[bool, str]:
     """Check if a DOI resolves via doi.org. Returns (valid, resolved_url or error)."""
     import requests
+    from .network import user_agent
     try:
         resp = requests.head(
             f"https://doi.org/{urllib.parse.quote(doi, safe='')}",
             timeout=10,
             allow_redirects=True,
-            headers={"User-Agent": "litloop/1.1"},
+            headers={"User-Agent": user_agent()},
         )
         if resp.status_code == 200:
             return True, resp.url

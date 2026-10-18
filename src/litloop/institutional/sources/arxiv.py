@@ -10,6 +10,7 @@ from typing import Any
 import requests
 
 from ...identifiers import normalize_arxiv_id
+from ...network import user_agent
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def fetch_metadata(arxiv_id: str) -> dict[str, Any] | None:
             ARXIV_API,
             params={"id_list": arxiv_id, "max_results": 1},
             timeout=30,
-            headers={"User-Agent": "litloop/1.5"},
+            headers={"User-Agent": user_agent()},
         )
         resp.raise_for_status()
     except requests.RequestException as e:
@@ -87,7 +88,7 @@ def download_pdf(arxiv_id: str, output_path: str) -> bool:
     """Download arXiv PDF to output_path."""
     url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
     try:
-        resp = requests.get(url, timeout=60, stream=True, headers={"User-Agent": "litloop/1.5"})
+        resp = requests.get(url, timeout=60, stream=True, headers={"User-Agent": user_agent()})
         resp.raise_for_status()
         ct = resp.headers.get("content-type", "").lower()
         if "pdf" not in ct:

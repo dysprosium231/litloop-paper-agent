@@ -207,12 +207,13 @@ def _try_builtin_institutional(
 def _resolve_doi(doi: str) -> str | None:
     """Resolve DOI to publisher landing URL."""
     import requests
+    from litloop.network import user_agent
     try:
         resp = requests.head(
             f"https://doi.org/{doi}",
             allow_redirects=True,
             timeout=15,
-            headers={"User-Agent": "litloop/1.5"},
+            headers={"User-Agent": user_agent()},
         )
         if resp.url and resp.url != f"https://doi.org/{doi}":
             return resp.url

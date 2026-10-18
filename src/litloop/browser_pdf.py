@@ -37,7 +37,9 @@ PAGE_PDF_LINK_JS = """
         if (low.includes('pdfft') || low.includes('/doi/pdf') || low.includes('/pdfdirect/')
             || low.includes('/content/pdf/') || low.includes('/stamp/stamp.jsp')
             // Silverchair platforms (RSC since 2026, OUP): /article-pdf/doi/...pdf
-            || low.includes('/article-pdf/') || low.includes('/content/articlepdf/')) {
+            || low.includes('/article-pdf/') || low.includes('/content/articlepdf/')
+            // SciOpen: /local/article_pdf/10.26599/JAC....pdf
+            || low.includes('/article_pdf/')) {
             let abs;
             try { abs = new URL(href, location.href).href; } catch (e) { continue; }
             if (!want) return abs;

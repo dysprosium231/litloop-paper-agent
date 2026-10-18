@@ -41,7 +41,19 @@ TABLE_SUFFIXES = (".csv", ".xlsx", ".tsv", ".tab")
 CHANNEL_BY_PREFIX = {
     "10.1016": "elsevier",  # Elsevier / ScienceDirect / Cell / Lancet
     "10.3390": "oa",        # MDPI — fully OA; fast lane constructs mdpi-res CDN URLs
+    "10.26599": "oa",       # SciOpen (Tsinghua University Press, e.g. J Adv Ceram) — OA, see sciopen_pdf_url
 }
+
+
+def sciopen_pdf_url(doi: str) -> str:
+    """SciOpen's own PDF address for a 10.26599 DOI (checked 2026-10-18: 206
+    application/pdf). OpenAlex knows it only for some papers; the article page's
+    "PDF" button is not a link the browser lanes recognise."""
+    d = (doi or "").strip()
+    if not d.lower().startswith("10.26599/"):
+        return ""
+    prefix, suffix = d.split("/", 1)
+    return f"https://www.sciopen.com/local/article_pdf/{prefix}/{suffix.upper()}.pdf"
 
 DOI_RE = re.compile(r"\b(10\.\d{4,9}/[^\s\"'<>]+)", re.I)
 
@@ -278,6 +290,9 @@ def _enrich_oa_urls(entries: list[QueueEntry], config: dict[str, Any]) -> None:
     """
     if not config.get("lane_oa_enrich", True):
         return
+    for e in entries:
+        if not e.oa_url and sciopen_pdf_url(e.identifier):
+            e.oa_url = sciopen_pdf_url(e.identifier)
     targets = [
         e for e in entries
         if e.identifier.lower().startswith("10.")

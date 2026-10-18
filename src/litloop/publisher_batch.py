@@ -2582,7 +2582,9 @@ class PublisherBatchDownloader:
         return None, resp.url, None
 
     def _pdf_request_headers(self, url: str, page: Any | None = None) -> dict[str, str]:
-        headers: dict[str, str] = {"User-Agent": "litloop/1.5"}
+        from .network import user_agent
+
+        headers: dict[str, str] = {"User-Agent": user_agent()}
         if page is None:
             return headers
 

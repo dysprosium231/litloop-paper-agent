@@ -905,7 +905,7 @@ def plan_cmd(
     """Build an auditable search protocol without running a search (ScanSci Find)."""
     from .discovery import find_cli_available, plan
     if not find_cli_available():
-        print("Error: scansci-find CLI not available. Install it, e.g.: pip install -e D:\\Projects\\active\\scansci-find")
+        print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
     print(json.dumps(plan(query, domain=domain, depth=depth, question=question,
                           year_from=year_from, year_to=year_to), ensure_ascii=False, indent=2))
@@ -923,7 +923,7 @@ def estimate_cmd(
     """Estimate result volume before spending a full search budget (ScanSci Find)."""
     from .discovery import find_cli_available, estimate
     if not find_cli_available():
-        print("Error: scansci-find CLI not available. Install it, e.g.: pip install -e D:\\Projects\\active\\scansci-find")
+        print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
     print(json.dumps(estimate(query, domain=domain, depth=depth, question=question,
                               year_from=year_from, year_to=year_to), ensure_ascii=False, indent=2))
@@ -938,7 +938,7 @@ def smoke_cmd(
     """Fetch a few records per source and validate the candidate contract (ScanSci Find)."""
     from .discovery import find_cli_available, smoke
     if not find_cli_available():
-        print("Error: scansci-find CLI not available. Install it, e.g.: pip install -e D:\\Projects\\active\\scansci-find")
+        print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
     print(json.dumps(smoke(query, domain=domain, records_per_source=records), ensure_ascii=False, indent=2))
 
@@ -953,7 +953,7 @@ def calibrate_cmd(
     """Run a bounded calibration sample before a high-recall search (ScanSci Find)."""
     from .discovery import find_cli_available, calibrate
     if not find_cli_available():
-        print("Error: scansci-find CLI not available. Install it, e.g.: pip install -e D:\\Projects\\active\\scansci-find")
+        print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
     print(json.dumps(calibrate(query, domain=domain, depth=depth, sample_size=sample_size), ensure_ascii=False, indent=2))
 
@@ -966,7 +966,7 @@ def verify_cmd(
     """Verify DOI/PMID/arXiv identifiers against authoritative APIs (ScanSci Find)."""
     from .discovery import find_cli_available, verify
     if not find_cli_available():
-        print("Error: scansci-find CLI not available. Install it, e.g.: pip install -e D:\\Projects\\active\\scansci-find")
+        print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
     print(json.dumps(verify(input_file, limit=limit), ensure_ascii=False, indent=2))
 
@@ -979,7 +979,7 @@ def resolve_oa_cmd(
     """Resolve DOI open-access locations through Unpaywall (ScanSci Find)."""
     from .discovery import find_cli_available, resolve_oa
     if not find_cli_available():
-        print("Error: scansci-find CLI not available. Install it, e.g.: pip install -e D:\\Projects\\active\\scansci-find")
+        print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
     print(json.dumps(resolve_oa(input_file, limit=limit), ensure_ascii=False, indent=2))
 
@@ -1048,7 +1048,7 @@ def find_cmd(
     """
     from .discovery import build_download_queue, find_cli_available, search
     if not find_cli_available():
-        print("Error: scansci-find CLI not available. Install it, e.g.: pip install -e D:\\Projects\\active\\scansci-find")
+        print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
     payload = search(
         query, out, domain=domain, depth=depth, limit=limit,

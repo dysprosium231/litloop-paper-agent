@@ -23,10 +23,27 @@ try:
 except ImportError:
     HAS_SOCKS = False
 
+def user_agent(extra: str = "") -> str:
+    """Return the LitLoop User-Agent header value."""
+    try:
+        from . import __version__
+    except (ImportError, AttributeError):
+        try:
+            import litloop
+            __version__ = getattr(litloop, "__version__", "1.0")
+        except Exception:
+            __version__ = "1.0"
+    base = f"LitLoop/{__version__}"
+    suffix = extra.strip()
+    if suffix:
+        return f"{base} {suffix}"
+    return base
+
+
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/124.0 Safari/537.36 LitLoop/3"
+    f"Chrome/124.0 Safari/537.36 {user_agent()}"
 )
 
 # Browser UA without the LitLoop suffix: some CDNs (sci.bban.top PDF edge,

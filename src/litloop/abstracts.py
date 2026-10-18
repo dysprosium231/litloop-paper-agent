@@ -70,8 +70,10 @@ def clean_abstract(text: str) -> str:
 
 
 def _session() -> requests.Session:
+    from .network import user_agent
+
     s = requests.Session()
-    s.headers["User-Agent"] = "LitLoop/1.0 (https://github.com/dysprosium231/litloop-paper-agent)"
+    s.headers["User-Agent"] = user_agent("(https://github.com/dysprosium231/litloop-paper-agent)")
     return s
 
 

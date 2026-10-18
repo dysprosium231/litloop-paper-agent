@@ -891,13 +891,15 @@ class PaperFetcher:
         return identifier if identifier.startswith("http") else None
 
     def _resolve_doi(self, doi: str) -> str | None:
+        from .network import user_agent
+
         try:
             resp = request_with_retry(
                 "GET",
                 f"https://doi.org/{doi}",
                 allow_redirects=True,
                 timeout=15,
-                headers={"User-Agent": "litloop/1.5"},
+                headers={"User-Agent": user_agent()},
                 stream=True,
             )
             resp.close()

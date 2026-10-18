@@ -32,3 +32,15 @@ def test_pdfft_link_still_first(page):
 def test_no_pdf_link(page):
     page.set_content('<a href="https://x.test/a">Abstract</a><a href="https://x.test/b">pdfs of other papers</a>')
     assert find_page_pdf_link(page, max_wait_s=1) is None
+
+
+def test_sciopen_pdf_button(page):
+    page.set_content('<a href="https://www.sciopen.com/local/article_pdf/10.26599/JAC.2025.9221068.pdf">PDF (17.7 MB)</a>')
+    assert find_page_pdf_link(page, max_wait_s=1).endswith("JAC.2025.9221068.pdf")
+
+
+def test_sciopen_url_from_doi():
+    from litloop.pipeline import sciopen_pdf_url
+    assert sciopen_pdf_url("10.26599/jac.2025.9221068") == \
+        "https://www.sciopen.com/local/article_pdf/10.26599/JAC.2025.9221068.pdf"
+    assert sciopen_pdf_url("10.1016/j.x.2025.1") == ""

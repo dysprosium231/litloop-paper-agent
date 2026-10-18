@@ -23,7 +23,7 @@ LitLoop 是一个 MCP 服务器加命令行工具，装进 Claude Code、Codex �
 检索 ──► 筛选 ──► 下载 ──► Zotero ──► （分析归纳，规划中）
 ```
 
-- **检索：结果少而准。** 同时查 OpenAlex、Semantic Scholar、Crossref，合并去重，去掉离题结果。可以按真实被引数排序，年份过滤在数据源一侧完成。每条结果带清洗过的完整摘要，并标出撤稿和关注声明。
+- **检索：结果少而准。** 查 OpenAlex（无 Key 时退回 Crossref，配置 Key 后可结合 Semantic Scholar），合并去重，去掉离题结果。可以按真实被引数排序，年份过滤在数据源一侧完成。每条结果带清洗过的完整摘要，并标出撤稿和关注声明。
 - **筛选：AI 给理由，你来拍板。** Agent 读摘要，把每篇评为 高 / 中 / 低 / 不相关，并写一句理由。你选定要哪些，选择记录存在本地，可以直接生成下载队列。
 - **下载：自动选最快的路。** 开放获取直链、预印本、出版商 API、你学校的机构通道同时竞速，先成功的那条胜出。论文默认按 `作者年份_标题前几个词_DOI.pdf` 命名，文件名和论文一一对应；也可以换成 Zotero 式的「作者 - 年份 - 完整标题」等格式。支持 100 多所高校的 WebVPN、CARSI 联邦认证、EZProxy，以及 Elsevier API 快速通道。
 - **归档：直接进 Zotero。** 按 DOI 建条目，库里已有就复用，PDF 直接写进你本机的 Zotero，同步交给 Zotero 自己。
@@ -113,7 +113,7 @@ docker compose up -d                                              # MCP 服务�
 | Elsevier API Key | **强烈推荐** | ScienceDirect 全文下载（需校园网出口）；从 Scopus 补摘要 | Elsevier 期刊多的领域大量文章缺摘要，深度检索只能凭标题排序。PDC 测试集上，26 篇目标里 16 篇的摘要靠它补 | [dev.elsevier.com](https://dev.elsevier.com) 免费申请；`litloop_elsevier_setup`，或 `elsevier_api_key` / 环境变量 `ELSEVIER_API_KEY`。Scopus 摘要每周 10000 次、每秒 9 次；全文下载每周 50000 次、每秒 10 次（[官方额度表](https://dev.elsevier.com/api_key_settings.html)）。一次深度检索补摘要约用几百次 |
 | Springer Nature Meta API Key | 推荐 | 补 Springer、Nature、BMC 等文章的摘要（订阅文章也有） | 这些文章的摘要只能靠 Scopus 和 Crossref，缺得多一些 | 在 [dev.springernature.com](https://dev.springernature.com) 免费注册，用 **Meta API** 那个 Key（Open Access API 只覆盖开放获取文章）；`springer_meta_api_key` 或环境变量 `SPRINGER_META_API_KEY`。免费档每天 500 次、每分钟 100 次（[官方说明](https://dev.springernature.com/subscription/)），LitLoop 只用它查 Springer Nature 自家的 DOI。条款规定摘要仅限个人、非商业使用 |
 | 联系邮箱 | 推荐 | 随请求发给 Crossref、OpenAlex、Unpaywall，出问题时它们能联系你 | Crossref 按公共池限速：同时只能 1 个请求，补摘要慢一些 | `litloop_config(key="email", value="你的邮箱")`（同一个邮箱也用于 OpenAlex、Unpaywall）。有邮箱时 Crossref 允许每秒 10 次、同时 3 个（[官方说明](https://crossref.org/blog/announcing-changes-to-rest-api-rate-limits/)） |
-| scansci-find（发现引擎） | 推荐 | 快速检索和深度检索的关键词路线 | 自动退回内置的三源检索，较慢 | 安装时加 `--with-find` |
+| scansci-find（发现引擎） | 推荐 | 快速检索和深度检索的关键词路线 | 自动退回内置检索，较慢 | 安装时加 `--with-find` |
 | Zotero 7 以上 + zotero-mcp（本地写入） | 可选 | 把文献和 PDF 直接写进本机 Zotero | 只能下载到本地文件夹 | 见下文 [Zotero](#zotero)；LitLoop 只通过 zotero-mcp 写 Zotero |
 | 本机 Chrome | 可选 | 需要浏览器的出版商和机构通道 | 这些通道不可用，开放获取和 API 照常 | 正常安装 Chrome 即可，LitLoop 会自动复制一份私有副本 |
 | 学校账号（WebVPN / CARSI / EZProxy） | 可选 | 下载学校订阅的论文 | 只能下开放获取和 API 能拿到的 | 见下文 [下载与机构通道](#下载与机构通道) |
@@ -433,7 +433,7 @@ ACS 出现 “IP Address Blocked” 时，封禁在出版商那边，代码解�
 
 | 环节 | 状态 |
 |---|---|
-| 检索 | 三个数据源合并去重；过滤离题结果和垃圾记录；预印本并入正式版；补全并清洗摘要；标出撤稿和关注声明；可按被引数或年份排序 |
+| 检索 | 查 OpenAlex（无 Key 退回 Crossref，设 Key 可加 Semantic Scholar）并合并去重；过滤离题结果和垃圾记录；预印本并入正式版；补全并清洗摘要；标出撤稿和关注声明；可按被引数或年份排序 |
 | 筛选 | AI 逐篇给相关度和理由，你按编号挑选，记录存在本地，可直接生成下载队列 |
 | 深度检索 | 多组检索词 + 共同引用扩展建池，分批筛选，按评分持续重新排序，高相关文章自动滚雪球；两个测试集分别找到 17/19、24/26 篇目标 |
 | 下载 | 多来源竞速；Elsevier API、WebVPN、CARSI、EZProxy；文件名带 DOI，不会把一篇论文的 PDF 当成另一篇 |
@@ -442,7 +442,7 @@ ACS 出现 “IP Address Blocked” 时，封禁在出版商那边，代码解�
 
 ### 已知限制
 
-- 一次快速检索约 6–10 秒；数据源目前只有 OpenAlex。
+- 一次快速检索约 6–10 秒；默认查 OpenAlex（无 Key 时退回 Crossref，设 Key 可结合 Semantic Scholar）。
 - 快速检索每组检索词只给前 10–20 条；要查全请用深度检索。
 - 深度检索每出一批约 1 分钟（扩展候选池加补摘要）。
 - 期刊分区和本地撤稿库依赖配套插件 litloop-journal-rank，它还没公开；没装时检索照常可用，只是没有分区信息，撤稿标记改用 OpenAlex 的数据。
