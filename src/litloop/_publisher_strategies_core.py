@@ -65,6 +65,19 @@ def _set_error(error_type: str, action: str = "") -> None:
         _LAST_ANY_ERROR[:] = [error_type, action]
 
 
+def _is_browser_error_page(page: Any) -> bool:
+    """Chrome's own "This site can't be reached" / timeout page, not the site's."""
+    try:
+        url = page.url or ""
+        if url.startswith("chrome-error://"):
+            return True
+        title = (page.title() or "").lower()
+    except Exception:
+        return False
+    return any(s in title for s in ("无法访问此网站", "this site can’t be reached",
+                                    "this site can't be reached", "err_timed_out", "err_connection"))
+
+
 def _clear_error() -> None:
     _set_error("", "")
     _LAST_ANY_ERROR[:] = ["", ""]  # same reporting semantics as the old global
@@ -718,6 +731,10 @@ def _visible_browser_download(
         wait_url_stable(page)
         title, url = wait_page_settled(page)
         log.info(f"   [{publisher}] page: '{title[:40]}' {url[:60]}")
+        if _is_browser_error_page(page):
+            # 2026-10-18: SSRN timed out; the lane waited on it for 16 minutes.
+            log.info(f"   [{publisher}] the site did not load (browser error page); giving up on it")
+            return None
 
         def _page_pdf_via_cdp() -> dict[str, Any] | None:
             """Open the page's own PDF link in the browser and read the body via CDP.
@@ -1988,6 +2005,10 @@ def _browser_download(
         if _page is not None:
             settled_url = wait_url_stable(_page)
             log.info(f"   [{publisher}] page settled at {settled_url[:80]}")
+            if _is_browser_error_page(_page):
+                log.info(f"   [{publisher}] the site did not load (browser error page); giving up on it")
+                _set_error("navigate_failed", "site_unreachable")
+                return False
             # If the page already offers its own PDF link, the session is entitled:
             # take it directly (text-based paywall detection misfires on pages that
             # show "access through your institution" even when access is granted).

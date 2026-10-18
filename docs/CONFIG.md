@@ -34,6 +34,7 @@
 | `race_grace_browser_seconds` | `180` | 多源竞速结束后浏览器通道仍在工作时的迟到等待超时（秒） |
 | `institutional_step_seconds` | `240` | 学校通道每一步最长用时（秒，自定值）；超时关掉这一步的浏览器、走下一条通道，你正在登录时自动顺延 |
 | `school_routes_after_publisher_login` | `false` | 用学校身份登录出版商官网后仍无全文时，是否还走学校通道（WebVPN、CARSI 最终到同一出版商，结果通常相同） |
+| `publisher_site_skip_prefixes` | `["10.1201", "10.4324"]` | 第一阶段不打开出版商官网的 DOI 前缀（默认是 Taylor & Francis 的 CRC、Routledge 图书：官网慢、没有单章 PDF，学校通道能直接下整本书） |
 | `request_delay_min` / `request_delay_max` | `2.0` / `5.0` | 请求间的随机延迟（秒） |
 | `cache_ttl_hours` | `168` | 下载缓存有效期，设 0 表示不缓存 |
 | `abstract_translation` / `translation_provider` | `高` / `deepseek` | 摘要翻译的范围和服务（见 [桌面 app 能做什么](../README.md#桌面-app-能做什么)） |

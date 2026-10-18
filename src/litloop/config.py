@@ -182,6 +182,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # no full text, the school routes (WebVPN, CARSI, EZProxy) are skipped: they
     # reach the same publisher as the same school. True tries them anyway.
     "school_routes_after_publisher_login": False,
+    # DOI prefixes whose publisher site phase 1 does not open (2026-10-18 user
+    # decision): Taylor & Francis books (CRC 10.1201, Routledge 10.4324). The
+    # T&F site answers in about 12 s per request from here and has no chapter
+    # PDFs; WebVPN downloads the whole book directly.
+    "publisher_site_skip_prefixes": ["10.1201", "10.4324"],
     "batch_small_max": 30,
     "batch_small_workers": 1,
     # Desktop app: the first-run guide (app_settings.STEPS) was finished or skipped.

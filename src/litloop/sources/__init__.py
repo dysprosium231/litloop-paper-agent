@@ -397,6 +397,12 @@ def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str
         if get_publisher(doi) not in _OPEN_HOSTS:
             from .publishers import _FN_MAP
             legal_sources.append((_FN_MAP["GenericBrowser"], "GenericBrowser"))
+    # Publishers whose site is not worth phase 1 (publisher_site_skip_prefixes):
+    # the school routes reach the same content faster.
+    skip = tuple(str(p).strip().lower().rstrip("/") + "/" for p in config.get("publisher_site_skip_prefixes") or [] if p)
+    if skip and doi.lower().startswith(skip):
+        legal_sources = [(fn, label) for fn, label in legal_sources if "Browser" not in label]
+        log.info("   Publisher site skipped in phase 1 (publisher_site_skip_prefixes)")
     legal_sources += [(try_doaj, "DOAJ"), (try_crossref_page_scrape, "CrossrefPage")]
     legal_sources += [(try_europepmc, "EuropePMC"), (try_core, "CORE")]
     if not config.get("_batch"):
