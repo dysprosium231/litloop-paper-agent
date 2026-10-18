@@ -51,6 +51,20 @@ export interface Summary {
   stop_reason: string
   api_warnings: string[]
   current_batch: BatchPaper[]
+  /** Deep search only (docs/APP_DATA.md); checked against the backend by tests/test_app_types.py. */
+  mode?: "deep"
+  updated?: string
+  /** "formula" for the first batch, then the model ranking ("model"). */
+  ranked_by?: string
+  seeds?: number
+  rounds?: { time?: string; event?: string; new_seeds?: number; pool_added?: number; expand_seconds?: number;
+    rank_seconds?: number; openalex_credits?: number; seconds?: number }[]
+  /** Extrapolated from each batch's share of 高 (null with too few batches). */
+  remaining_estimate?: { next_batch: number; batches: number; decay: number; remaining?: number } | null
+  /** The must-find list: where each target is. */
+  coverage?: { doi: string; status: "screened" | "seed" | "in_pool" | "not_found"; relevance?: string; rank?: number }[]
+  core_terms?: string[]
+  queries?: string[]
 }
 
 export interface SessionRecord {
