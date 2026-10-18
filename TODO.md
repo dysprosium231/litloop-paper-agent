@@ -69,6 +69,7 @@
 1. [ ] 重测「下载测试 · 新文献（2024–2026，20 篇）」剩下的 17 篇（app 已是最新代码：分段计时、2024 年起不查 Sci-Hub、学校通道看门狗、取消即停）；按 `[timing]` 日志给每段、每篇用时表，再定下一步优化。
 2. [ ] 用计时日志查开放获取一轮 110 秒花在哪（查 OA 链接、Wiley 浏览器兜底），以及 about:blank 久等。
 3. [ ] 待用户答复：T&F 书（10.1201、10.4324）第一阶段是否跳过官网（T&F 从这里每次响应约 12 秒），做成配置列表。
+   - 重测进展（2026-10-17 22:58–23:09，17 篇，用户在第 5 篇取消）：查 OA 链接 2.5 秒、开放获取一轮 19.7 秒（0/2）、Sci-Hub 全部按年份跳过；jmst 18.8 秒、compositesa 38.2 秒、jeurceramsoc 135.3 秒均由 Elsevier 官网浏览器下到；addma.2024.104239 失败 266 秒——用户在三条路上都登录到了带“View PDF”的文章页却没下到。查明并修复（2026-10-18）：① Elsevier 官网浏览器 0.0 秒就放弃、不写日志：新开的竞速线程读到了上一篇留下的全局错误（paywall），跳过了 ScienceDirect；改为每个来源开始前清掉本线程的错误。② WebVPN 浏览器经联合登录到了 WebVPN 外的 ScienceDirect 文章页，没找到 PDF 链接后又去开 WebVPN 包装的 PDF 地址，被弹回首页；改为在 VPN 外就开出版商自己的地址，找链接时也认“View PDF / Download PDF”按钮文字，找不到时把页面上像 PDF 的链接写进日志。`find_page_pdf_link` 里的 `page.wait_for_timeout` 也换成 `time.sleep`。待查：CARSI 搜学校时报“Execution context was destroyed”就整条放弃；取消后任务文件仍是 running（13 篇停在等待中）。
 4. [ ] 之后：大清单分队列；app 里检索实测（用户需重新登录 `claude` 命令行）；Zotero 写入实测；翻译实测。
 
 - [~] app 里发起检索（2026-10-17 用户定：app 把表单发给 Agent，就像对话一样）：「筛选」页右上「新建检索」，表单含问题、纳入标准、快速 / 深度与规模、年份、中科院分区 / JCR / 预警期刊、种子 DOI 与 Zotero 分类；`agent_runner.py` 用 `claude -p --output-format stream-json` 从标准输入发出，只允许 LitLoop 工具和技能；页面显示 Agent 当前在调用什么，结束后「查看结果」打开它保存的筛选会话；Agent 命令和参数在设置「Agent」里可改。已在浏览器里走通“发起 → 失败提示”（本机 `claude` 命令行登录已过期，提示用户登录）；真实检索待用户登录 `claude` 后测。

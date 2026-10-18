@@ -47,7 +47,17 @@ PAGE_PDF_LINK_JS = """
             if (plain.includes(want) || (suffix && plain.includes(suffix))) return abs;
         }
     }
-    return first;
+    if (first) return first;
+    // The button itself: "View PDF" / "Download PDF" whose link carries none
+    // of the patterns above (2026-10-17: ScienceDirect reached outside the
+    // WebVPN showed "View PDF" yet no link was found).
+    for (const a of document.querySelectorAll('a[href]')) {
+        const text = (a.innerText || a.getAttribute('aria-label') || '').trim().toLowerCase();
+        if (/^(view|download|get) pdf\\b|^pdf$|查看 ?pdf|下载 ?pdf/.test(text)) {
+            try { return new URL(a.getAttribute('href'), location.href).href; } catch (e) {}
+        }
+    }
+    return null;
 }
 """
 
@@ -140,10 +150,7 @@ def find_page_pdf_link(page: Any, max_wait_s: float = 15.0, doi: str = "") -> st
                 return href
         except Exception:
             pass
-        try:
-            page.wait_for_timeout(500)
-        except Exception:
-            return None
+        time.sleep(0.5)  # not page.wait_for_timeout: it hangs on a page stuck loading
     return None
 
 

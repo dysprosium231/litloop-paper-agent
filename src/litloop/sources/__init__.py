@@ -223,6 +223,12 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
         if time.time() - t_wait > 1:
             log.info(f"   [timing] {label}: waited {time.time() - t_wait:.1f}s for the browser")
     try:
+        # Each source starts with no browser error of its own: a fresh racing
+        # thread otherwise read the latest error any lane reported, and the
+        # Elsevier browser skipped its ScienceDirect attempt (0.0 s, no log)
+        # because the previous paper had ended on a paywall (2026-10-17).
+        from .._publisher_strategies_core import _set_error
+        _set_error("", "")
         sig = inspect.signature(source_fn)
         if "use_tor" in sig.parameters:
             result = source_fn(doi, output_path, config, use_tor=use_tor)

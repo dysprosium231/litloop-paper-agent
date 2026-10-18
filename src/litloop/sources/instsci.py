@@ -1018,6 +1018,12 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
         # Strategy 0: the article page's own PDF link (carries page-issued tokens),
         # opened by the browser itself and read via CDP
         page_pdf_href = find_page_pdf_link(page, doi=doi)
+        if not page_pdf_href:
+            try:  # what the page offered instead: the next look at a miss starts here
+                links = page.evaluate("Array.from(document.querySelectorAll('a[href]')).filter(a => /pdf/i.test(a.innerText + a.href)).slice(0, 5).map(a => (a.innerText || '').trim().slice(0, 30) + ' -> ' + a.href.slice(0, 90))")
+                log.info(f"   [WebVPN-Browser] No PDF link on the page; PDF-ish links: {links}")
+            except Exception:
+                pass
         if page_pdf_href:
             log.info(f"   [WebVPN-Browser] Page PDF link: {page_pdf_href[:80]}")
             result = _save_bytes(capture_pdf_via_cdp(context, page, page_pdf_href))
@@ -1041,8 +1047,11 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
             if result:
                 return result
 
-            # Fallback: open in browser, read the body via CDP, then expect_download
-            pdf_webvpn = convert_url(pdf_url, base, config)
+            # Fallback: open in browser, read the body via CDP, then expect_download.
+            # Off the VPN (federated login to the publisher itself) the session
+            # is on the publisher, so open its own URL, not the WebVPN one.
+            off_vpn = urllib.parse.urlparse(page_url).netloc not in ("", base_host)
+            pdf_webvpn = pdf_url if off_vpn else convert_url(pdf_url, base, config)
             log.info(f"   [WebVPN-Browser] Trying direct PDF via browser: {pdf_webvpn[:80]}")
             result = _save_bytes(capture_pdf_via_cdp(context, page, pdf_webvpn))
             if result:
