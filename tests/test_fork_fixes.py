@@ -374,7 +374,7 @@ def test_browser_errors_are_per_thread():
 
 
 def test_school_login_hosts_are_not_tsinghua_only():
-    from litloop.institutional.publisher_batch import _is_school_login_host as f
+    from litloop.publisher_batch import _is_school_login_host as f
     assert f("sso.buaa.edu.cn") and f("idp.tsinghua.edu.cn")
     assert not f("ds.carsi.edu.cn") and not f("www.science.org")
 

@@ -127,6 +127,33 @@ class DownloadResult:
         return self.status == "success"
 
 
+_DISCOVERY_HOSTS = ("carsi.edu.cn", "openathens.net", "seamlessaccess.org")
+
+
+def _is_school_login_host(host: str) -> bool:
+    """True on the user's university sign-in pages (CAS/IdP), any school.
+
+    Upstream only recognised Tsinghua's IdP, so at every other school the
+    login loop kept auto-clicking "institutional login" while the user was
+    typing their password. (Ported from institutional/publisher_batch.py.)
+    """
+    host = (host or "").lower()
+    if not host or any(host == d or host.endswith("." + d) for d in _DISCOVERY_HOSTS):
+        return False
+    if host.endswith(".edu.cn") or host.endswith(".edu"):
+        return True
+    return host.split(".", 1)[0] in ("idp", "sso", "cas", "authserver", "passport", "login")
+
+
+def _user_waiting() -> None:
+    """Heartbeat for the racing engine: the user is logging in, don't give up."""
+    try:
+        from .sources import note_user_waiting
+        note_user_waiting()
+    except Exception:
+        pass
+
+
 def safe_name(doi: str) -> str:
     return re.sub(r"[^\w\-.]", "_", doi)
 
@@ -1139,13 +1166,16 @@ class PublisherBatchDownloader:
         last_state = ""
         last_auto_action = ""
         last_auto_action_at = 0.0
+        after_idp = False  # the user has been on the school's sign-in page
         while time.time() < deadline:
             time.sleep(3)
+            _user_waiting()
             marker = f"{self._title(page)} | {getattr(page, 'url', '')[:160]}"
             if marker != last_state:
                 self._event(result, "login_state", marker)
                 last_state = marker
             if self._is_human_login_page(page):
+                after_idp = True
                 continue
             self._dismiss_cookie_banners(page, result)
             self._click_optional_continue(page, result)
@@ -1154,9 +1184,14 @@ class PublisherBatchDownloader:
                     continue
                 self._event(result, "challenge_or_viewer_timeout", self._body_text(page, 500))
                 return False
-            if self._return_to_record_article_if_needed(page, result, result.doi):
+            if self._return_to_record_article_if_needed(page, result, result.doi, after_idp=after_idp):
                 if not self._looks_logged_out(page):
                     return True
+                if after_idp:
+                    # Back on the article after the school's sign-in and still
+                    # logged out: the school has no access to it.
+                    self._event(result, "not_entitled_after_login", getattr(page, "url", ""))
+                    return False
                 continue
             if self._article_access_available(page):
                 return True
@@ -1331,9 +1366,13 @@ class PublisherBatchDownloader:
                     text: textOf(el).slice(0, 180),
                     href: ((el.href || el.getAttribute('href') || '') + '').toLowerCase().slice(0, 240)
                   });
+                  const here = location.href.toLowerCase().split('#')[0];
                   const matches = (el) => {
                     const text = textOf(el);
                     const href = ((el.href || el.getAttribute('href') || el.getAttribute('formaction') || '') + '').toLowerCase();
+                    // In-page anchors ("skip to main content" on Science's own
+                    // ssostart page) point back at this very page: not an entry.
+                    if (href.includes('#') && href.split('#')[0] === here) return false;
                     return exactMarkers.some(marker => text.includes(marker) || href.includes(marker))
                         || markers.some(marker => text.includes(marker) || href.includes(marker))
                         || href.includes('ssostart');
@@ -1499,7 +1538,7 @@ class PublisherBatchDownloader:
     def _is_human_login_page(self, page: Any) -> bool:
         current_url = str(getattr(page, "url", "") or "")
         host = (urlparse(current_url).netloc or "").lower()
-        return host.endswith("id.tsinghua.edu.cn") or host.endswith("idp.tsinghua.edu.cn")
+        return _is_school_login_host(host)
 
     def _open_aps_article_institution_login(self, page: Any, result: DownloadResult | None = None) -> bool:
         if self.profile.name.lower() != "aps":
@@ -1680,12 +1719,7 @@ class PublisherBatchDownloader:
         lower_url = current_url.lower()
         parsed = urlparse(current_url)
         host = (parsed.netloc or "").lower()
-        if (
-            host.endswith("openathens.net")
-            or host.endswith("tsinghua.edu.cn")
-            or "id.tsinghua.edu.cn" in lower_url
-            or "idp.tsinghua.edu.cn" in lower_url
-        ):
+        if host.endswith("openathens.net") or _is_school_login_host(host):
             return False
         if parsed.netloc.endswith("annualreviews.org") and parsed.path.lower().startswith("/session/ext/shib"):
             target_url = parse_qs(parsed.query).get("url", ["/"])[0] or "/"
@@ -1735,7 +1769,7 @@ class PublisherBatchDownloader:
     def _select_institution(self, page: Any, result: DownloadResult) -> bool:
         current_url = str(getattr(page, "url", "") or "")
         host = (urlparse(current_url).netloc or "").lower()
-        if host.endswith("tsinghua.edu.cn"):
+        if _is_school_login_host(host):
             return False
         if not self.institution_query:
             self._event(result, "institution_required", "No subscription institution was configured for publisher login.")
@@ -2683,8 +2717,11 @@ class PublisherBatchDownloader:
     def _is_supplementary_url(self, url: str) -> bool:
         return is_supplementary_url(self.profile, url)
 
-    def _return_to_record_article_if_needed(self, page: Any, result: DownloadResult, doi: str) -> bool:
-        if self.profile.name.lower() != "aps":
+    def _return_to_record_article_if_needed(self, page: Any, result: DownloadResult, doi: str,
+                                            after_idp: bool = False) -> bool:
+        # APS always; any publisher once the user has been through the school's
+        # sign-in (it may land on the publisher's home page, not the article).
+        if self.profile.name.lower() != "aps" and not after_idp:
             return False
         current_url = str(getattr(page, "url", "") or "")
         if not current_url or self._url_matches_record(current_url, doi):
@@ -2875,6 +2912,7 @@ class PublisherBatchDownloader:
     def _event(result: DownloadResult | None, state: str, detail: str = "") -> None:
         if result is not None:
             result.events.append({"state": state, "detail": detail[:500]})
+        logger.info(f"   [Institutional] {state}: {detail[:160]}")
 
     def _write_diagnostic(self, page: Any, result: DownloadResult, run_dir: Path) -> None:
         diag_dir = run_dir / "diagnostics" / safe_name(result.doi)

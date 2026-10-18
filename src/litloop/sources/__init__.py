@@ -1797,8 +1797,8 @@ def _batch_institutional_phase(
     Modifies results_map in-place with successful results.
     """
     try:
-        from ..institutional.publisher_profiles import infer_publisher_profile
-        from ..institutional.publisher_batch import DownloadResult, PaperRecord, PublisherBatchDownloader
+        from ..publisher_profiles import infer_publisher_profile
+        from ..publisher_batch import DownloadResult, PaperRecord, PublisherBatchDownloader
     except ImportError:
         log.info("   [Batch] publisher_batch not available, skipping institutional phase")
         return

@@ -46,7 +46,7 @@ def try_institutional(
         log.info("   [Institutional] No institutional access configured, skipping")
         return None
 
-    from .publisher_profiles import infer_publisher_profile
+    from ..publisher_profiles import infer_publisher_profile
     profile = infer_publisher_profile(doi)
     if profile:
         log.info(f"   [Institutional] Publisher: {profile.name}")
@@ -170,7 +170,7 @@ def _try_builtin_institutional(
         return None
 
     if not profile:
-        from .publisher_profiles import infer_publisher_profile_from_url
+        from ..publisher_profiles import infer_publisher_profile_from_url
         profile = infer_publisher_profile_from_url(resolved_url)
 
     # Step 2: Try CARSI if configured
@@ -308,7 +308,7 @@ def _try_browser_batch_download(
         return None
 
     try:
-        from .publisher_batch import DownloadResult, PaperRecord, PublisherBatchDownloader
+        from ..publisher_batch import DownloadResult, PaperRecord, PublisherBatchDownloader
     except ImportError:
         log.info("   [Institutional] publisher_batch not available")
         return None

@@ -793,8 +793,8 @@ def publisher_batch_cmd(
     print()
 
     # Use the existing publisher batch infrastructure
-    from .institutional.publisher_batch import PaperRecord, PublisherBatchDownloader
-    from .institutional.publisher_profiles import _PROFILE_ALIASES, list_publisher_profiles
+    from .publisher_batch import PaperRecord, PublisherBatchDownloader
+    from .publisher_profiles import _PROFILE_ALIASES, list_publisher_profiles
     from .sources.publishers import get_publisher
 
     key = (publisher or "").strip().lower()
