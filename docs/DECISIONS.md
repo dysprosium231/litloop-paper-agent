@@ -3,6 +3,13 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-18：合并两套出版商下载模块（评审 1）
+
+- 逐个函数比对：根目录 `publisher_batch.py`（3081 行）是较新的一份，多了页面池、IP 封锁检测、Wiley 登录入口、登录 Cookie 交接等；`institutional/` 版（2460 行）独有的是学校登录相关的修复。
+- 并进根目录的 6 处：任意学校的登录页都认作“用户在填”（`_is_school_login_host`，原来只认清华，别的学校会在用户输密码时继续自动点机构登录）；登录等待时报告心跳（`_user_waiting`）；走过学校 IdP 后回到文章页仍未登录，判为没有订阅（`not_entitled_after_login`）；SSO 入口不把页内锚点当入口；ACS 登录页标题认 “Sign In”；Optica 配置。Elsevier 机构入口那段 JS 根目录版更新（只收匹配到的入口），保留根目录版。
+- 所有调用方（单篇下载的出版商兜底、`main.py` 的 publisher-batch、`instsci_bridge`）改用根目录版；`institutional/publisher_batch.py`、`publisher_profiles.py` 改为转发到根目录（`institutional/` 里其他模块仍按相对路径导入它们）；机构配方说明移到根目录 `publisher_profiles.py`。
+- 两边都经 `browser_backend` 登记浏览器，归属与关闭不受影响。测试 `tests/test_publisher_batch_merge.py`。待真实单篇、批量各下一次验收。
+
 ## 2026-10-18：代码评审改进（第一轮，DeepSeek 通读代码）
 
 TODO 里各项只留一句；这里是做法和验证。复核意见见下方「复核 1–3」。

@@ -1,4 +1,21 @@
-"""Publisher profiles for deterministic browser workflows."""
+"""Publisher profiles for deterministic browser workflows.
+
+INSTITUTION RECIPE SYSTEM
+=========================
+Each publisher profile has GENERIC markers that work for ANY institution (auth_url_markers,
+auth_title_markers, sso_text_markers, institution_input_selectors). These are used for
+detecting SSO pages, searching for institutions, and clicking generic UI elements.
+
+Additionally, profiles may have institution_result_selectors — these are Tsinghua-specific
+overrides that supplement the generic text-based selectors. They are ONLY activated when
+the user's configured institution IS Tsinghua University (gated by
+_institution_query_is_tsinghua() in publisher_batch.py).
+
+To add support for another institution's specialized selectors, follow the same pattern:
+1. Add the institution-specific selectors to the profile's institution_result_selectors
+2. Add a gating condition in publisher_batch.py (e.g., _institution_query_is_peking())
+3. The generic text-based selectors will still work for unrecognized institutions
+"""
 
 from __future__ import annotations
 

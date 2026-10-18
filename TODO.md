@@ -36,7 +36,7 @@
 4. [~] **失败原因让用户看得到**（评审 4；随 3 的第④步实现，待真实失败验收）：浏览器和学校通道的失败常只剩一行日志；每个来源为什么失败统一到 `error_text.py` 分类，写进下载任务的 `items[].error_text`，app 详情页说清“哪条路、为什么、下一步”。借下载实测的失败样本验收（无权限、超时、验证码各一）。和 3 一起做。
 5. [x] **CI 加前端和 Rust 检查**（评审 10）。详见 DECISIONS「代码评审改进（第一轮）」。
 6. [x] **app 与后端类型对齐**（评审 9）。详见 DECISIONS「代码评审改进（第一轮）」。
-7. [ ] **合并两套出版商下载模块**（评审 1）：`publisher_batch.py` 与 `institutional/publisher_batch.py`、两份 `publisher_profiles.py`，调用交叉；以根目录为唯一实现，把 `institutional/` 独有的学校登录判断、等待用户逻辑并进来，分两次提交（先合并行为 + 测试，再删文件）。不能直接删 `institutional/`，两边各有独有修复。验收：全部测试 + 真实单篇、批量各下一次，`test_checkout_sync` 不报漂移。
+7. [~] **合并两套出版商下载模块**（评审 1；2026-10-18 代码已合并（93d2245 + 下一提交，见 DECISIONS「合并两套出版商下载模块」），待真实单篇、批量各下一次验收）：`publisher_batch.py` 与 `institutional/publisher_batch.py`、两份 `publisher_profiles.py`，调用交叉；以根目录为唯一实现，把 `institutional/` 独有的学校登录判断、等待用户逻辑并进来，分两次提交（先合并行为 + 测试，再删文件）。不能直接删 `institutional/`，两边各有独有修复。验收：全部测试 + 真实单篇、批量各下一次，`test_checkout_sync` 不报漂移。
 8. [x] **排序增量计算**（评审 6；2026-10-18 完成，结论见 DECISIONS「排序增量计算」：每轮 30–55 秒的大头是补摘要，排序本身只有几秒；检索词命中和分词改为按文章缓存）：`deep_search._score` / `_features` 每轮全池重算分词、拼写归一、TF-IDF，池子 1800–7400 篇时排序 30–55 秒；缓存进 pool state 只算增量。验收：回放耗时降一半、找到目标的曲线不变。
 9. [x] **app→Agent 协议**（评审 11）：会话 ID 只认会话工具，空闲停止。详见 DECISIONS「代码评审改进（第一轮）」。
 10. [~] **补测试空洞**（评审 14；2026-10-18 第一批完成（Antigravity，已审）：`test_schools`、`test_resolver`、`test_session_broker`、`test_pdf_ownership` 共 44 个纯函数测试，不联网、不读本机设置；其余模块待补）：`schools`、`resolver`、`session_broker`、`publisher_access`、`publisher_pdf_router`、`session_store` 等约 20 个模块测试里没出现；先补四个纯函数级的：学校列表解析、标题→DOI、会话状态机、PDF 归属校验。
@@ -71,7 +71,7 @@
 - [ ] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。
 
 ### 代码审查遗留（2026-10-15 外部审查意见，已逐条核实）
-- [ ] **`institutional/` 与根目录两套重复模块**（publisher_batch、publisher_profiles、fetcher 等，都继承自原项目）：根目录版有测试覆盖，但 `sources/__init__.py:1494` 的浏览器兜底下载、`main.py`（fetch、publisher-batch、浏览器配置检查）和 `pipeline.py:582` 实际走 `institutional/`，另有 10 个测试引用它。先比对差异、确认哪套新，再统一，最后做真实下载验证。不能直接删。
+- [~] **`institutional/` 与根目录两套重复模块**（2026-10-18：publisher_batch、publisher_profiles 已合并为根目录一份；`models.py`、`publisher_access.py`、`session_broker.py`、`flaresolverr.py`、`cloakbrowser_compat.py` 的小差异待查）（publisher_batch、publisher_profiles、fetcher 等，都继承自原项目）：根目录版有测试覆盖，但 `sources/__init__.py:1494` 的浏览器兜底下载、`main.py`（fetch、publisher-batch、浏览器配置检查）和 `pipeline.py:582` 实际走 `institutional/`，另有 10 个测试引用它。先比对差异、确认哪套新，再统一，最后做真实下载验证。不能直接删。
   - 初步比对（2026-10-15）：`fetcher.py`、`profile_health.py` 是转发到根目录的薄壳；`http_utils.py`、`publisher_pdf_router.py`、`session_store.py` 两边相同；`carsi_client.py`、`config_adapter.py`、`instsci_bridge.py` 只在 `institutional/`。真正分叉的是 `publisher_batch.py`（根目录 136K 多了页面池、代理槽、Wiley 登录入口等；`institutional/` 107K 却独有 `_is_school_login_host`、`_user_waiting`，可能是学校登录的修复）和 `publisher_profiles.py`（`institutional/` 版多一段机构配方说明），以及 `models.py`、`publisher_access.py`、`session_broker.py`、`flaresolverr.py`、`cloakbrowser_compat.py` 的小差异。统一时要把两边独有的修复合并，不能简单二选一。
 - 不做：拆分 `server.py`、`_publisher_strategies_core.py` 两个大文件（继承自原项目，风险大、收益不直接）。
 
