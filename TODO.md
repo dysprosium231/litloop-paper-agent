@@ -21,7 +21,7 @@
 **还没做的（从 2026-10-17 的计划里留下）**
 - [ ] 大清单（>30 篇）：先摸底分组（开放获取 / Sci-Hub 有 / 需学校权限，后者按出版商细分），app 里分成几个队列，每个队列写明怎么下，用户逐个队列点下载。
 - [ ] 可视化 app 1 期继续：学校认证（选学校、弹窗登录、试下载一篇订阅论文）；之后深度链接、完成通知、安装包与自动更新（见待办池 12）。
-- [ ] 阶段 2 剩余：速度（扩展与补摘要并行、OpenAlex 按参考文献缓存）；深度检索 → 批量下载 → 按分类推送 Zotero 走通一次。
+- [ ] 阶段 2 剩余：速度（每轮 30–55 秒主要花在补摘要上，先从这里下手：扩展与补摘要并行、OpenAlex 按参考文献缓存）；深度检索 → 批量下载 → 按分类推送 Zotero 走通一次。
 - [ ] 类别多、彼此引用少的课题怎么照顾到每一类（见待办池 11）。
 
 ## 待办池
@@ -35,7 +35,7 @@
 5. [x] **CI 加前端和 Rust 检查**（评审 10；2026-10-18：CI 新增 `app` 任务（Windows）：`npm ci`、`npm run build`（含 tsc）、`npm run lint:copy`、`cargo check`；本地 cargo check 通过。ruff 未加）：现在只跑 pytest；加 `npm ci && npx tsc --noEmit` 和 `cargo check`，可选 ruff（只查不格式化），先不上 mypy。
 6. [x] **app 与后端类型对齐**（评审 9；2026-10-18：`Summary` 补 9 个字段；`tests/test_app_types.py` 用后端实际写出的深度检索摘要对比 `api.ts` 的字段，缺了就失败。重启后补跑全量测试 756 个通过，GitHub CI 的新 app 任务与 9 组 Python 测试均通过）：`app/src/lib/api.ts` 的 `Summary` 缺 `remaining_estimate`、`coverage`、`ranked_by`、`rounds`；从 Python 响应模型生成 JSON Schema → TS 类型，CI 比对，和 APP_DATA.md / `SCHEMA` 版本一起兜住。
 7. [ ] **合并两套出版商下载模块**（评审 1）：`publisher_batch.py` 与 `institutional/publisher_batch.py`、两份 `publisher_profiles.py`，调用交叉；以根目录为唯一实现，把 `institutional/` 独有的学校登录判断、等待用户逻辑并进来，分两次提交（先合并行为 + 测试，再删文件）。不能直接删 `institutional/`，两边各有独有修复。验收：全部测试 + 真实单篇、批量各下一次，`test_checkout_sync` 不报漂移。
-8. [ ] **排序增量计算**（评审 6）：`deep_search._score` / `_features` 每轮全池重算分词、拼写归一、TF-IDF，池子 1800–7400 篇时排序 30–55 秒；缓存进 pool state 只算增量。验收：回放耗时降一半、找到目标的曲线不变。
+8. [x] **排序增量计算**（评审 6；2026-10-18 完成，结论见 DECISIONS「排序增量计算」：每轮 30–55 秒的大头是补摘要，排序本身只有几秒；检索词命中和分词改为按文章缓存）：`deep_search._score` / `_features` 每轮全池重算分词、拼写归一、TF-IDF，池子 1800–7400 篇时排序 30–55 秒；缓存进 pool state 只算增量。验收：回放耗时降一半、找到目标的曲线不变。
 9. [x] **app→Agent 协议**（评审 11；2026-10-18：会话 ID 只从 `litloop_screening` / `litloop_deep_search` 的结果里取，先按 JSON 解析（按 tool_use_id 对上工具名）；`agent_idle_minutes`（15 分钟）没有输出就停止并记为失败；`_CANCELLED` 在结束时清理；内部字段不写进记录文件）：`agent_runner` 用正则从 `tool_result` 抓 session、依赖 stream-json 形状、无超时、`_CANCELLED` 不清理；改为 `litloop_screening(save)` 返回机器可读的 `session`，加无输出心跳超时，退出时清理。
 10. [~] **补测试空洞**（评审 14；2026-10-18 第一批完成（Antigravity，已审）：`test_schools`、`test_resolver`、`test_session_broker`、`test_pdf_ownership` 共 44 个纯函数测试，不联网、不读本机设置；其余模块待补）：`schools`、`resolver`、`session_broker`、`publisher_access`、`publisher_pdf_router`、`session_store` 等约 20 个模块测试里没出现；先补四个纯函数级的：学校列表解析、标题→DOI、会话状态机、PDF 归属校验。
 11. [ ] **类别多的课题建池**（评审 5）：稀土测试集漏的 7 篇里 3 篇不在候选池，是建池问题不是排序问题；离线对比“每个子方向单写检索词”和“按类别配额出批”，看读到第 60 篇找到几篇目标。

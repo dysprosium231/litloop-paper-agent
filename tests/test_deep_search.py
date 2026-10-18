@@ -364,3 +364,24 @@ def test_a_round_leaves_a_summary_and_progress_for_the_app(net):
     progress = store.read_progress(out["session"])
     assert progress["state"] == "idle" and progress["event"] == "start"
     assert {"keywords", "expand"} <= {p["name"] for p in progress["phases"]}
+
+
+def test_cached_ranking_matches_a_fresh_one_and_rematches_only_changed_papers(monkeypatch):
+    import litloop.search as search
+    pool = {f"10.1/p{i}": rec(f"10.1/p{i}", f"Pressureless infiltration of SiC by aluminum {i}",
+                              abstract="" if i % 2 else "pressureless infiltration SiC aluminum") for i in range(6)}
+    st = _state(pool, ["10.1/p0"], ["10.1/p0"]) | {"session": "cache-test"}
+    deep_search._CACHES.pop("cache-test", None)
+    deep_search._score(st)
+    deep_search._features(st)
+    matched = []
+    real = search._match_tier
+    monkeypatch.setattr(search, "_match_tier", lambda rows, q: matched.extend(r["_k"] for r in rows) or real(rows, q))
+    pool["10.1/p1"]["abstract"] = "supergravity infiltration of copper"  # a later round filled one abstract in
+    pool["10.1/p9"] = rec("10.1/p9", "A new paper")
+    deep_search._score(st)
+    warm = {k: (r["query_hits"], r["score"]) for k, r in pool.items()}, deep_search._features(st)
+    assert sorted(matched) == ["10.1/p1", "10.1/p9"]
+    deep_search._CACHES.pop("cache-test", None)
+    deep_search._score(st)
+    assert warm == ({k: (r["query_hits"], r["score"]) for k, r in pool.items()}, deep_search._features(st))

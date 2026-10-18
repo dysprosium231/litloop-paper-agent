@@ -333,12 +333,20 @@ def _score(state: dict[str, Any]) -> None:
     seed_refs = set(state["seed_refs"])
     orig_refs = {r for s in _orig_seeds(state) for r in (pool.get(s, {}).get("refs") or [])}
     seed_df = Counter(r for s in state["seeds"] for r in set(pool.get(s, {}).get("refs") or []))
-    hits = {k: 0 for k in pool}
-    for q in state["queries"]:
-        rows = [{"title": r["title"], "abstract": r.get("abstract") or "", "_k": k} for k, r in pool.items()]
+    # Matching every query against every record is most of the cost; a record's
+    # hits only change with its text or the queries, so only new or changed ones are matched.
+    cache = _cache(state)["hits"]
+    queries = tuple(state["queries"])
+    stale = {k: r for k, r in pool.items() if cache.get(k, (None,))[0] != (queries, _text_sig(r))}
+    fresh = {k: 0 for k in stale}
+    for q in queries:
+        rows = [{"title": r["title"], "abstract": r.get("abstract") or "", "_k": k} for k, r in stale.items()]
         for row in _match_tier(rows, q):
             if row["_tier"] == 0:
-                hits[row["_k"]] += 1
+                fresh[row["_k"]] += 1
+    for k, n in fresh.items():
+        cache[k] = ((queries, _text_sig(stale[k])), n)
+    hits = {k: cache[k][1] for k in pool}
     for k, r in pool.items():
         shared = [ref for ref in (r.get("refs") or []) if ref in seed_refs]
         r["coupling"] = len(shared)
@@ -346,6 +354,25 @@ def _score(state: dict[str, Any]) -> None:
         r["query_hits"] = hits[k]
         r["score"] = r["anchored"] + QUERY_WEIGHT * r["query_hits"]
         r["rank"] = r["score"]
+
+
+_CACHES: dict[str, dict[str, dict]] = {}  # session -> per-record results that depend only on the record's text
+_CACHES_LOCK = threading.Lock()
+
+
+def _cache(state: dict[str, Any]) -> dict[str, dict]:
+    """In memory only: a restarted server simply recomputes. Keeps the latest few sessions."""
+    session = str(state.get("session") or "")
+    with _CACHES_LOCK:
+        c = _CACHES.pop(session, None) or {"hits": {}, "tokens": {}}
+        _CACHES[session] = c  # most recent last
+        while len(_CACHES) > 4:
+            _CACHES.pop(next(iter(_CACHES)))
+        return c
+
+
+def _text_sig(r: dict[str, Any]) -> int:
+    return hash((r.get("title") or "", r.get("abstract") or ""))
 
 
 def _orig_seeds(state: dict[str, Any]) -> list[str]:
@@ -376,7 +403,14 @@ def _tokens(rec: dict[str, Any]) -> Counter:
 
 def _features(state: dict[str, Any]) -> dict[str, dict[str, float]]:
     pool = state["pool"]
-    docs = {k: _tokens(r) for k, r in pool.items()}
+    cache = _cache(state)["tokens"]
+    docs, titles = {}, {}
+    for k, r in pool.items():
+        sig = _text_sig(r)
+        hit = cache.get(k)
+        if hit is None or hit[0] != sig:
+            hit = cache[k] = (sig, _tokens(r), list(_tokens({"title": r.get("title")})))
+        docs[k], titles[k] = hit[1], hit[2]
     df = Counter(w for c in docs.values() for w in c)
     n, nq = len(pool), max(1, len(state["queries"]))
     out = {}
@@ -387,7 +421,7 @@ def _features(state: dict[str, Any]) -> dict[str, dict[str, float]]:
         r = pool[k]
         # Title words again, on their own: a title says what the paper is about
         # better than the abstract, and is all there is when the abstract is missing.
-        v.update({"t:" + w: TITLE_WEIGHT for w in _tokens({"title": r.get("title")})})
+        v.update({"t:" + w: TITLE_WEIGHT for w in titles[k]})
         v["_coupling"] = math.log1p(r.get("anchored", 0)) / 3
         v["_queries"] = r.get("query_hits", 0) / nq
         v["_no_abstract"] = 0.0 if r.get("abstract") else 1.0
