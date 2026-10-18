@@ -397,3 +397,16 @@ def test_stop_checks_keep_one_entry_per_number_rated():
     log = st["stop_checks"]
     assert [c["screened"] for c in log] == [1, 2]
     assert log[-1]["rule"] == "knee" and log[-1]["estimate"] == 4.2 and log[-1]["high"] == 1
+
+
+def test_only_the_session_in_use_keeps_its_token_cache():
+    deep_search._CACHES.clear()
+    pool = {"10.1/a": rec("10.1/a", "Pressureless infiltration", abstract="SiC aluminum")}
+    a = _state(pool, ["10.1/a"], ["10.1/a"]) | {"session": "s-a"}
+    b = _state(dict(pool), ["10.1/a"], ["10.1/a"]) | {"session": "s-b"}
+    deep_search._score(a)
+    deep_search._features(a)
+    deep_search._features(b)
+    assert deep_search._CACHES["s-a"]["tokens"] == {} and deep_search._CACHES["s-a"]["hits"]
+    assert deep_search._CACHES["s-b"]["tokens"]
+    assert deep_search._session_lock("s-a") is deep_search._session_lock("s-a")

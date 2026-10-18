@@ -859,17 +859,58 @@ _LAUNCHED_LOCK = _threading.Lock()
 # thread works for, so a paper's skip, end or watchdog closes only its own
 # browsers, not another paper's.
 OWNER: Any = None
+# The owner a pool thread inherited from the thread that submitted its task
+# (see carry_owner): pool threads have none of the orchestrator's thread-locals.
+_OWNER_TLS = _threading.local()
 
 
 def _owner() -> str | None:
     try:
-        return OWNER() if OWNER is not None else None
+        owner = OWNER() if OWNER is not None else None
     except Exception:
-        return None
+        owner = None
+    return owner or getattr(_OWNER_TLS, "owner", None)
+
+
+def current_owner() -> str | None:
+    """The paper the calling thread works for, if any."""
+    return _owner()
+
+
+def carry_owner(fn: Any) -> Any:
+    """Wrap ``fn`` for another thread (a pool worker): browsers it launches belong
+    to the paper the submitting thread works for, so that paper's skip or end
+    closes them (2026-10-18: Sci-Hub's mirror race opened windows nobody owned)."""
+    owner = _owner()
+
+    def run(*args: Any, **kwargs: Any) -> Any:
+        prev = getattr(_OWNER_TLS, "owner", None)
+        _OWNER_TLS.owner = owner
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _OWNER_TLS.owner = prev
+    return run
+
+
+def _gone(obj: Any) -> bool:
+    """Whether a registered browser is already dead (killed, or its driver exited)."""
+    conn = _connection_of(obj)
+    if conn is None:
+        return False
+    if getattr(conn, "_litloop_killed", False):
+        return True
+    try:
+        return conn._transport._proc.returncode is not None  # type: ignore[union-attr]
+    except Exception:
+        return False
 
 
 def _remember(obj: Any) -> Any:
     with _LAUNCHED_LOCK:
+        # Drop the dead ones, so a browser whose owner never closed it (closed by
+        # its own code, or by a crash) does not stay referenced for ever.
+        _LAUNCHED[:] = [e for e in _LAUNCHED if not _gone(e[1])]
         _LAUNCHED.append((_time.perf_counter(), obj, _owner()))
     return obj
 

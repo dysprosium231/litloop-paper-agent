@@ -125,28 +125,11 @@ def _check_skill_docs() -> list[str]:
 
 
 def _check_source_hygiene() -> list[str]:
-    problems = []
-    user_path_re = re.compile(r"[A-Za-z]:[\\/]+(?:Projects|Users)[\\/]+", re.I)
-    ua_re = re.compile(r"(?:LitLoop|litloop)/\d+")
+    sys.path.insert(0, str(ROOT / "src"))
+    from litloop._source_hygiene import check_source_hygiene
 
-    src_dir = ROOT / "src" / "litloop"
-    for py_file in sorted(src_dir.rglob("*.py")):
-        if py_file.name.startswith("test_") or "tests" in py_file.parts:
-            continue
-        rel = py_file.relative_to(ROOT).as_posix()
-        try:
-            lines = py_file.read_text(encoding="utf-8", errors="ignore").splitlines()
-        except OSError as exc:
-            problems.append(f"{rel}: could not read file ({exc})")
-            continue
+    return [str(problem) for problem in check_source_hygiene(ROOT / "src" / "litloop", repo_root=ROOT)]
 
-        is_network = py_file.name == "network.py"
-        for idx, line in enumerate(lines, 1):
-            if user_path_re.search(line):
-                problems.append(f"{rel}:{idx}: hard-coded user path: {line.strip()}")
-            if not is_network and ua_re.search(line):
-                problems.append(f"{rel}:{idx}: hard-coded User-Agent: {line.strip()}")
-    return problems
 
 
 def main() -> int:

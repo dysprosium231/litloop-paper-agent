@@ -32,17 +32,45 @@ log = get_logger()
 # parallel threads, so a module-global would let one lane's error leak into
 # another lane's fallback decision.
 _ERR_TLS = threading.local()
-_LAST_ANY_ERROR = ["", ""]
 
 # Page titles of human checks (Cloudflare and the like), lower case.
 _CHALLENGE_TITLES = ("just a moment", "attention required", "verify", "security check",
                      "请稍候", "正在验证", "checking", "cloudflare")
 
-# DOIs whose publisher site was logged into with the school's identity and
-# still gave no full text: the school does not subscribe, and the school routes
-# (WebVPN, CARSI) end at the same publisher with the same identity
+# DOIs whose publisher site was logged into with the school's identity and then
+# still offered the paper for sale: the school does not subscribe, and the
+# school routes (WebVPN, CARSI) end at the same publisher with the same identity
 # (2026-10-18: a Springer chapter, 3 minutes and a WebVPN login for nothing).
-LOGIN_NO_ACCESS: set[str] = set()
+# DOI -> when it was seen. Kept NO_ACCESS_HOURS (自定值) or until the paper is
+# downloaded, so a retry does not walk the school routes again.
+LOGIN_NO_ACCESS: dict[str, float] = {}
+NO_ACCESS_HOURS = 6
+# Cues of an article page that still sells the paper. Narrower than
+# _detect_paywall: "access through your institution" stays on entitled pages too.
+_NO_ACCESS_CUES = ("buy article", "buy this article", "buy chapter", "buy ebook", "buy pdf", "purchase pdf",
+                   "purchase access", "purchase this article", "rent this article", "get access",
+                   "subscribe to access", "you do not have access", "you don't have access")
+
+
+def note_no_access(doi: str | None) -> None:
+    LOGIN_NO_ACCESS[(doi or "").strip().lower()] = time.time()
+
+
+def no_access(doi: str | None) -> bool:
+    seen = LOGIN_NO_ACCESS.get((doi or "").strip().lower())
+    return seen is not None and time.time() - seen < NO_ACCESS_HOURS * 3600
+
+
+def clear_no_access(doi: str | None) -> None:
+    LOGIN_NO_ACCESS.pop((doi or "").strip().lower(), None)
+
+
+def _page_sells_paper(page: Any) -> bool:
+    try:
+        text = (page.evaluate("() => document.body ? document.body.innerText : ''") or "").lower()
+    except Exception:
+        return False
+    return any(c in text for c in _NO_ACCESS_CUES)
 
 # Global lock to prevent multiple visible browser windows in parallel racing
 _visible_browser_lock = threading.Lock()
@@ -50,19 +78,18 @@ _visible_browser_active = False
 
 
 def get_last_error() -> tuple[str, str]:
-    """Return (error_type, action) from last _browser_download call."""
-    if hasattr(_ERR_TLS, "type"):
-        return _ERR_TLS.type, _ERR_TLS.action
-    # A thread that ran no browser strategy (the download's own thread, which
-    # builds the failure message) sees the latest error any lane reported.
-    return _LAST_ANY_ERROR[0], _LAST_ANY_ERROR[1]
+    """(error_type, action) of the last browser strategy run in this thread.
+
+    Only this thread's: the download's own thread reads its lanes' errors from
+    its DownloadAttempt (``sources._try_source`` copies them there), never a
+    process-wide value another paper's lane may have written.
+    """
+    return getattr(_ERR_TLS, "type", ""), getattr(_ERR_TLS, "action", "")
 
 
 def _set_error(error_type: str, action: str = "") -> None:
     _ERR_TLS.type = error_type
     _ERR_TLS.action = action
-    if error_type:
-        _LAST_ANY_ERROR[:] = [error_type, action]
 
 
 def _is_browser_error_page(page: Any) -> bool:
@@ -80,7 +107,6 @@ def _is_browser_error_page(page: Any) -> bool:
 
 def _clear_error() -> None:
     _set_error("", "")
-    _LAST_ANY_ERROR[:] = ["", ""]  # same reporting semantics as the old global
 
 
 # Click the institution in a search-result list. Containers (the whole result
@@ -965,9 +991,14 @@ def _visible_browser_download(
                     return success(doi, output_path, f"{publisher}(Visible)")
 
         log.info(f"   [{publisher}] visible browser download failed")
-        if login_ok:
-            LOGIN_NO_ACCESS.add((doi or "").strip().lower())
+        if login_ok and _page_sells_paper(page):
+            # Logged in as the school and the page still sells it: not subscribed.
+            note_no_access(doi)
             _set_error("not_entitled", "no_subscription")
+        elif login_ok:
+            # Logged in, no PDF, no sign of a missing subscription: the school
+            # routes may still get it, so this says nothing about entitlement.
+            _set_error("no_pdf_found", "try_other_source")
         return None
 
 

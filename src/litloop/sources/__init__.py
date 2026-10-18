@@ -201,7 +201,9 @@ def _try_source(
         log.info(f"   [timing] {label}: {time.time() - t0:.1f}s, {'PDF' if ok else 'no PDF'}")
         att = _attempt.get(key)
         if att is not None:
-            att.add_step("school" if label in _STEP_TEXT else "free", label, time.time() - t0, result)
+            from .._publisher_strategies_core import get_last_error
+            att.add_step("school" if label in _STEP_TEXT else "free", label, time.time() - t0, result,
+                         error=get_last_error())  # this thread's: _try_source_inner cleared it first
     if settled:
         # Late finisher of an already-returned download: its copy is a duplicate.
         if output_path.exists():
@@ -1066,10 +1068,48 @@ def _auto_rename(result: dict[str, Any], identifier: str, config: dict[str, Any]
 _INFLIGHT_LOCK = threading.Lock()
 # The papers in flight are the DownloadAttempts registered in sources.attempt.
 
+class _RecentSet:
+    """A set that keeps only the latest ``limit`` keys (insertion order).
+
+    Late finishers only need to know a paper ended while they still run, so a
+    long-running server need not remember every paper it ever downloaded.
+    """
+
+    def __init__(self, limit: int = 2000) -> None:
+        self._keys: dict[str, None] = {}
+        self._limit = limit
+        self._lock = threading.Lock()
+
+    def add(self, key: str) -> None:
+        with self._lock:
+            self._keys.pop(key, None)
+            self._keys[key] = None
+            while len(self._keys) > self._limit:
+                self._keys.pop(next(iter(self._keys)))
+
+    def update(self, keys: Any) -> None:
+        for k in keys:
+            self.add(k)
+
+    def discard(self, key: str) -> None:
+        with self._lock:
+            self._keys.pop(key, None)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._keys.clear()
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._keys
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+
 # DOIs whose download() has returned. Racing returns on the first success while
 # other sources keep running ("waived"); those late finishers check this set to
 # drop their duplicate files and to stop launching browsers.
-_SETTLED: set[str] = set()
+_SETTLED = _RecentSet()
 _SOURCE_TLS = threading.local()
 
 # Heartbeats from sources that are waiting for the user to log in, by DOI.
@@ -1188,6 +1228,9 @@ def _source_may_continue() -> bool:
     if race is not None and race.is_set():
         return False  # waived lane: its race already returned
     doi = getattr(_SOURCE_TLS, "doi", None)
+    if not doi:  # a pool thread working for a source (Sci-Hub's mirror race)
+        from ..browser_backend import current_owner
+        doi = current_owner()
     return not (doi and doi in _SETTLED)
 
 
@@ -1241,7 +1284,8 @@ def download(
                 action="wait for the in-flight attempt to finish (it is still "
                        "racing sources); retry in a minute only if it failed",
             )
-        if key in _SKIPPED:  # the user skipped it (kept until the next job starts)
+        if key in _SKIPPED:  # the user skipped it while it was queued
+            _SKIPPED.discard(key)  # used up: a later retry of the paper runs
             return fail(key, "skipped by user", error_type="skipped", action="none")
         _attempt.begin(key, gen if gen is not None else _CANCEL_GEN[0])
         _SETTLED.discard(key)
@@ -1268,11 +1312,15 @@ def download(
         att = _attempt.get(key)
         steps = list(att.steps) if att is not None else []
         if key in _SKIPPED and not result.get("success"):
+            _SKIPPED.discard(key)  # used up: a later retry of the paper runs
             return {**fail(key, "skipped by user", error_type="skipped", action="none"), "attempts": steps}
         if _cancelled() and not result.get("success"):
             return {**fail(key, "cancelled by user", error_type="cancelled", action="none"), "attempts": steps}
         if steps and isinstance(result, dict):
             result.setdefault("attempts", steps)  # which ways were tried, how long, why they failed
+        if result.get("success"):
+            from .._publisher_strategies_core import clear_no_access
+            clear_no_access(key)
         return result
     finally:
         _DL_TLS.key = prev_key
@@ -1476,9 +1524,8 @@ def _download_impl(
 
     # Phase 2: Institutional access — only when Phase 1 failed
     # Skip institutional fallback for grey_only/scihub_only strategy
-    from .._publisher_strategies_core import LOGIN_NO_ACCESS
-    if doi.lower() in LOGIN_NO_ACCESS and not config.get("school_routes_after_publisher_login", False):
-        LOGIN_NO_ACCESS.discard(doi.lower())
+    from .._publisher_strategies_core import no_access
+    if _institutional and no_access(doi) and not config.get("school_routes_after_publisher_login", False):
         log.info("   Logged into the publisher as the school and still no full text: skipping the school routes")
         return fail(identifier, "the school does not subscribe: logged into the publisher with the school's identity, still no full text",
                     error_type="not_entitled", action="no_subscription")
@@ -1548,23 +1595,17 @@ def _download_impl(
                 result["bibtex"] = fetch_bibtex(identifier, config)
             return result
 
-    # Build actionable guidance based on what was tried
-    guidance = _build_failure_guidance(doi, config)
-
-    # Check if browser strategy detected a specific error
-    try:
-        from ..publisher_strategies import get_last_error
-        error_type, error_action = get_last_error()
-    except Exception:
-        error_type, error_action = "", ""
+    # What this paper's own browser strategies reported (never another paper's).
+    att = _attempt.get(getattr(_DL_TLS, "key", None))
+    error_type, error_action = att.last_error if att is not None else ("", "")
+    guidance = _build_failure_guidance(doi, config, error_type)
 
     hint: dict[str, Any] = {"manual_url": f"https://sci-hub.ru/{doi}", "guidance": guidance}
 
     reason = "no PDF found"
-    if error_type == "paywall":
-        reason = "paywall — requires institutional access"
-    elif error_type == "cloudflare_blocked":
-        reason = "Cloudflare anti-bot protection blocked access"
+    if error_type in ("paywall", "cloudflare_blocked"):
+        from ..error_text import raw_for
+        reason = raw_for(error_type)
 
     # Add agent hint for paywall - clear instruction on what to do next
     if error_type == "paywall" or error_action == "login_required":
@@ -1606,17 +1647,13 @@ def _download_impl(
     return result
 
 
-def _build_failure_guidance(doi: str, config: dict[str, Any]) -> list[str]:
-    """Build actionable guidance when all download sources fail."""
+def _build_failure_guidance(doi: str, config: dict[str, Any], error_type: str = "") -> list[str]:
+    """Build actionable guidance when all download sources fail.
+
+    error_type: what this paper's browser strategies reported (its DownloadAttempt).
+    """
     import os
     tips = []
-
-    # Check if browser strategy detected a paywall
-    try:
-        from ..publisher_strategies import get_last_error
-        error_type, _ = get_last_error()
-    except Exception:
-        error_type = ""
 
     if error_type == "paywall":
         tips.append("此论文需要机构订阅才能下载")

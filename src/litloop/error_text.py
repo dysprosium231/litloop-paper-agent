@@ -35,16 +35,24 @@ _RULES: list[tuple[str, str, str]] = [
     (r"cannot create the collection|empty collection path|Failed to create collection",
      "无法创建分类", "检查分类路径后重试"),
     (r"holds no file|exists but holds no file", "Zotero 里的附件为空", "在「附件检查」中重新附加"),
+    (r"school login not completed", "学校登录没有完成", "重试，并在弹出的窗口中完成登录"),
+    (r"Cloudflare|anti-bot|human check", "网站要求人机验证，没有通过", "重试，并在弹出的窗口中完成验证"),
+    (r"could not open the publisher page|site unreachable|\bERR_[A-Z_]+", "打不开出版商网页", "检查网络或代理后重试"),
+    (r"browser not available", "浏览器无法启动", "确认已安装 Chrome 后重试"),
+    (r"no PDF link", "出版商网页上没有 PDF 链接，可能没有权限", "连接校园网或在「设置 → 学校认证」中登录后重试"),
+    (r"already being downloaded|\bin progress\b", "这篇正在另一个任务里下载", "等那个任务结束"),
     (r"full_text_extracted_but_no_pdf", "只取得网页全文，没有 PDF", ""),
     (r"PDF file not found on disk", "下载后找不到 PDF 文件", "检查保存位置是否可写入"),
+    (r"PDF not found after batch download", "所有来源都没有找到 PDF", ""),
+    (r"arXiv PDF not available", "arXiv 上没有这篇的 PDF", ""),
     (r"no OA url|fast lane failed", "未找到开放获取版本", ""),
     (r"\b429\b|rate.?limit|too many requests", "请求过于频繁，已被限流", "稍后重试"),
     (r"\b40[13]\b|forbidden|unauthori[sz]ed", "出版商拒绝访问，可能需要学校认证", "连接校园网或在「设置 → 学校认证」中登录后重试"),
     (r"\b404\b|not found", "出版商处找不到此文献", ""),
     (r"timed? ?out|timeout", "连接超时", "检查网络后重试"),
     (r"paywall", "需要订阅才能下载", "连接校园网或在「设置 → 学校认证」中登录后重试"),
-    (r"^no result$|all sources failed|no source", "所有来源都没有找到 PDF", ""),
-    (r"unrecognized identifier", "无法识别的 DOI", "检查 DOI 是否完整"),
+    (r"^no result$|all sources failed|no source|no PDF found", "所有来源都没有找到 PDF", ""),
+    (r"unrecognized identifier|invalid DOI", "无法识别的 DOI", "检查 DOI 是否完整"),
 ]
 
 _COMPILED = [(re.compile(p, re.I), r, n) for p, r, n in _RULES]
@@ -60,7 +68,26 @@ def _match(raw: str) -> tuple[str, str] | None:
 
 # Which failure explains a paper best, when several ways failed (most telling first).
 _FAILURE_ORDER = ("not_entitled", "login_abandoned", "cloudflare_blocked", "navigate_failed",
-                  "timeout", "paywall", "not_found")
+                  "timeout", "paywall", "no_pdf_found", "browser_unavailable", "not_found")
+
+# A browser strategy reports (error_type, action) instead of a sentence; this is
+# the raw text a failed step records for it, worded so a rule above matches.
+_RAW_BY_TYPE = {
+    "not_entitled": "NOT_ENTITLED",
+    "login_abandoned": "school login not completed",
+    "cloudflare_blocked": "Cloudflare anti-bot protection blocked access",
+    "navigate_failed": "could not open the publisher page",
+    "paywall": "paywall — requires institutional access",
+    "no_pdf_found": "no PDF link on the publisher page",
+    "browser_unavailable": "browser not available",
+}
+
+
+def raw_for(error_type: str, action: str = "") -> str:
+    """Raw reason for a browser strategy's (error_type, action)."""
+    if error_type == "not_entitled" and action == "no_subscription":
+        return "the school does not subscribe: logged into the publisher with the school's identity, still no full text"
+    return _RAW_BY_TYPE.get(error_type, error_type)
 
 
 def pick_failure(result: dict | None) -> str | None:
@@ -104,7 +131,7 @@ def reason(raw: str | None) -> str | None:
     if not raw:
         return None
     hit = _match(str(raw))
-    return hit[0] if hit else "出现意外错误"
+    return hit[0] if hit else "出现意外错误"  # docs/UI_COPY.md 7: the raw text goes in the tooltip
 
 
 def message(raw: str | None, action: str) -> str | None:

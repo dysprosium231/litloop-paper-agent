@@ -40,7 +40,7 @@
 | `abstract_translation` / `translation_provider` | `高` / `deepseek` | 摘要翻译的范围和服务（见 [桌面 app 能做什么](../README.md#桌面-app-能做什么)） |
 | `update_check_days` | `7` | 每隔几天检查 LitLoop、easyseek、zotero-mcp 有没有新版本，有则在检索、下载结果和 app 设置页提示（不自动安装）；设 0 关闭 |
 | `agent_command` / `agent_args` | `claude` / 空 | app 里「新建检索」调起的 Agent 命令和参数 |
-| `agent_idle_minutes` | `15` | app 调起的 Agent 这么久没有任何输出就停止，记为失败（卡住或在等没人看得到的提示）；自定值 |
+| `agent_idle_minutes` | `15` | app 调起的 Agent 这么久没有任何输出就停止，记为失败（卡住或在等没人看得到的提示），0 = 不限；自定值 |
 
 </details>
 

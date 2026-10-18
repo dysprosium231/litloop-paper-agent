@@ -75,6 +75,12 @@ _RACE_POOL_LOCK = threading.Lock()
 _HTTP_POOL: ThreadPoolExecutor | None = None
 
 
+def _submit(pool: ThreadPoolExecutor, fn: Any, *args: Any, **kwargs: Any) -> Any:
+    """Submit to a pool so browsers the task opens belong to the submitting paper."""
+    from ..browser_backend import carry_owner
+    return pool.submit(carry_owner(fn), *args, **kwargs)
+
+
 def _race_pool(config: dict[str, Any]) -> ThreadPoolExecutor:
     """Workers for the mirror race. With browsers, few (scihub_browser_workers:
     each may hold a window). Over HTTP only, plenty (scihub_http_workers):
@@ -1070,14 +1076,14 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
             # (browser lives on the pool worker, not the caller's thread).
             for domain in browser_domains:
                 landing_url = f"{domain.rstrip('/')}/{urllib.parse.quote(doi, safe='/')}"
-                result = pool.submit(
-                    _browser_first_download, landing_url, doi, output_path, config
+                result = _submit(
+                    pool, _browser_first_download, landing_url, doi, output_path, config
                 ).result()
                 if result:
                     return result
         else:
-            result = pool.submit(
-                _race_browser_domains, browser_domains, doi, output_path, config, max_workers
+            result = _submit(
+                pool, _race_browser_domains, browser_domains, doi, output_path, config, max_workers
             ).result()
             if result:
                 return result
@@ -1164,8 +1170,8 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
     best_output = output_path.parent / f"{output_path.stem}_scihub_{best_domain.split('//')[1].replace('.', '_')}.pdf"
     log.info(f"   Sci-Hub: trying {best_domain} first...")
     try:
-        result = _race_pool(config).submit(
-            try_scihub_domain, doi, best_domain, best_output, config, use_tor, fail_notes
+        result = _submit(
+            _race_pool(config), try_scihub_domain, doi, best_domain, best_output, config, use_tor, fail_notes
         ).result()
         if result and result.get("success"):
             final_path = Path(result.get("file", ""))
@@ -1198,7 +1204,7 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
     futures = {}
     for domain in remaining:
         src_output = output_path.parent / f"{output_path.stem}_scihub_{domain.split('//')[1].replace('.', '_')}.pdf"
-        futures[pool.submit(try_scihub_domain, doi, domain, src_output, config, use_tor, fail_notes)] = (domain, src_output)
+        futures[_submit(pool, try_scihub_domain, doi, domain, src_output, config, use_tor, fail_notes)] = (domain, src_output)
     try:
         # 10 s ended the race while the backups were still streaming PDFs they
         # had already found (sci.bban.top serves at a few hundred KB/s here).

@@ -3,6 +3,13 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-18：复核 1–3、8——失败原因说清、不串到别的文献、“学校没有订阅”判得准
+
+DeepSeek Harness 复核评审修改时指出、已复现：
+- 最常见的三种失败（`no PDF found`、Cloudflare、页面上没有 PDF 链接）在 app 里都显示“出现意外错误”；浏览器通道失败时返回 None，`attempts` 里这一步没有原因。改：`error_text` 补规则（学校登录没有完成、人机验证没有通过、打不开出版商网页、浏览器无法启动、页面上没有 PDF 链接、正在另一个任务里下载、arXiv 没有 PDF、DOI 无效），`raw_for(error_type, action)` 把浏览器策略报的错误类型翻成原文；`_try_source` 结束时把本线程的错误写进这一步；不认识的原因仍按 `docs/UI_COPY.md` 第 7 节用通用句“出现意外错误”、原文放悬停提示（评审建议改成别的说法，与文案规范冲突，不改）。测试用引擎真实写出的原因参数化（`tests/test_failure_reasons.py`）。
+- 下载线程自己不跑浏览器策略，`get_last_error()` 回退到进程级的“最后一个错误”，A 篇的付费墙会成为 B 篇的失败原因。改：去掉进程级回退，`get_last_error()` 只读本线程；每篇的最后一个浏览器错误存进 `DownloadAttempt.last_error`，最终原因和下一步建议从这里读。新测试两篇同时下载，在旧代码上失败。
+- 官网机构登录走完后，任何失败都记成“学校没有订阅”，用一次就丢。改：只有登录后页面仍在卖这篇（Buy article / Buy chapter / Get access / You do not have access 等，不含 “access through your institution”，它在有权限的页面上也有）才记；记下的保留 6 小时（`NO_ACCESS_HOURS`，自定值）或到这篇下载成功；登录后没下到、又没有缺订阅迹象的，记为“页面上没有 PDF 链接”，照常走学校通道；不走学校通道的下载（`_institutional=False`）不受这条影响。
+
 ## 2026-10-18：停止规则校准开始攒数据（评审 8）
 
 - 深度检索每次出批前，把停止规则的判断（`rule`：cap / knee / few_useful / 空）、剩余估计（`estimate`、`next_batch`、`decay`）和当时已评、高相关的篇数记进候选池文件的 `stop_checks`；同一已评篇数只留最新一条。

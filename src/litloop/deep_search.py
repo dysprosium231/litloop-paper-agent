@@ -361,14 +361,31 @@ _CACHES_LOCK = threading.Lock()
 
 
 def _cache(state: dict[str, Any]) -> dict[str, dict]:
-    """In memory only: a restarted server simply recomputes. Keeps the latest few sessions."""
+    """In memory only: a restarted server simply recomputes.
+
+    Query hits (one number per paper) are kept for the latest 4 sessions; the
+    token counts (measured 2026-10-18: about 37 MB for 7,309 papers, 270 MB for
+    52,668) only for the session in use.
+    """
     session = str(state.get("session") or "")
     with _CACHES_LOCK:
         c = _CACHES.pop(session, None) or {"hits": {}, "tokens": {}}
+        for other in _CACHES.values():
+            other["tokens"] = {}
         _CACHES[session] = c  # most recent last
         while len(_CACHES) > 4:
             _CACHES.pop(next(iter(_CACHES)))
         return c
+
+
+_SESSION_LOCKS: dict[str, threading.Lock] = {}
+
+
+def _session_lock(session: str) -> threading.Lock:
+    """One round at a time per session (the app's 继续检索 and the agent's next
+    could otherwise rank the same pool, and its caches, at once)."""
+    with _CACHES_LOCK:
+        return _SESSION_LOCKS.setdefault(session, threading.Lock())
 
 
 def _text_sig(r: dict[str, Any]) -> int:
@@ -628,7 +645,8 @@ def next_batch(session: str, force: bool = False) -> dict[str, Any]:
     """
     _run.progress = store.Progress(session, "next")
     try:
-        out = _next_round(session, force)
+        with _session_lock(session):
+            out = _next_round(session, force)
     except BaseException:
         _run.progress.finish("failed")
         raise

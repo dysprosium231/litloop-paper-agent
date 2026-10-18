@@ -68,10 +68,14 @@ export interface Summary {
 }
 
 export interface SessionRecord {
+  schema?: number
   id: string
+  created?: string
   question: string
   mode: string
   updated: string
+  criteria?: string[]
+  searches?: { query: string; time?: string; params?: Record<string, unknown>; results?: number }[]
   items: Item[]
 }
 

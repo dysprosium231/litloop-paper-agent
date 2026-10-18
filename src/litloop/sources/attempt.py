@@ -10,7 +10,9 @@ What it records:
 - ``gen``: the cancel generation the download started under (a cancel bumps it);
 - ``user_wait_at``: the last heartbeat of a source waiting for the user;
 - ``steps``: every source tried — route, label, seconds, outcome, error type and
-  reason — so the app can say which way was tried and why it failed.
+  reason — so the app can say which way was tried and why it failed;
+- ``last_error``: the latest (error_type, action) a browser strategy of this
+  paper reported, for the final failure message and its advice.
 """
 
 from __future__ import annotations
@@ -28,16 +30,27 @@ class DownloadAttempt:
     started: float = field(default_factory=time.perf_counter)  # browser_backend's clock
     user_wait_at: float = 0.0
     steps: list[dict[str, Any]] = field(default_factory=list)
+    last_error: tuple[str, str] = ("", "")
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
-    def add_step(self, route: str, label: str, seconds: float, result: dict[str, Any] | None) -> None:
+    def add_step(self, route: str, label: str, seconds: float, result: dict[str, Any] | None,
+                 error: tuple[str, str] = ("", "")) -> None:
+        """``error``: the (error_type, action) the source's browser strategy reported,
+        for sources that fail by returning None."""
+        from ..error_text import raw_for
         ok = bool(result and result.get("success"))
         step = {"route": route, "source": label, "seconds": round(seconds, 1), "ok": ok}
-        if not ok and result:
-            step["error_type"] = str(result.get("error_type") or "")
-            step["reason"] = str(result.get("reason") or result.get("error") or "")[:200]
+        if not ok:
+            if result and (result.get("reason") or result.get("error")):
+                step["error_type"] = str(result.get("error_type") or "")
+                step["reason"] = str(result.get("reason") or result.get("error") or "")[:200]
+            elif error[0]:
+                step["error_type"] = error[0]
+                step["reason"] = raw_for(*error)
         with self._lock:
             self.steps.append(step)
+            if not ok and error[0]:
+                self.last_error = error
 
 
 _LOCK = threading.Lock()

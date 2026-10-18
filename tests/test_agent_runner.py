@@ -101,3 +101,73 @@ def test_a_silent_agent_is_stopped(agent, monkeypatch):
     assert time.time() - t < 15
     assert d["state"] == "failed" and "没有任何输出" in d["error"]
     assert not agent_runner._CANCELLED
+
+
+def test_session_extracted_without_tool_use_id_when_last_tool_is_deep_search():
+    data = {"events": []}
+    agent_runner._read(data, json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "mcp__litloop__litloop_deep_search", "input": {"action": "start"}}]}}))
+    agent_runner._read(data, json.dumps({"type": "user", "message": {"content": [
+        {"type": "tool_result", "content": '{"session": "20261018-deep"}'}]}}))
+    assert data.get("session") == "20261018-deep"
+
+    # 对不上记录的 id 时也退回最近一次 tool_use
+    data2 = {"events": []}
+    agent_runner._read(data2, json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "t1", "name": "litloop_deep_search", "input": {"action": "start"}}]}}))
+    agent_runner._read(data2, json.dumps({"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": "unmatched_id", "content": '{"session": "20261018-deep2"}'}]}}))
+    assert data2.get("session") == "20261018-deep2"
+
+
+def test_session_ignored_without_tool_use_id_when_last_tool_is_other():
+    data = {"events": []}
+    agent_runner._read(data, json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "WebFetch", "input": {}}]}}))
+    agent_runner._read(data, json.dumps({"type": "user", "message": {"content": [
+        {"type": "tool_result", "content": '{"session": "not-ours"}'}]}}))
+    assert data.get("session") is None
+
+    # 对不上记录的 id 且最近一次不是会话工具
+    data2 = {"events": []}
+    agent_runner._read(data2, json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "s1", "name": "litloop_search", "input": {}}]}}))
+    agent_runner._read(data2, json.dumps({"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": "mismatched", "content": '{"session": "not-ours"}'}]}}))
+    assert data2.get("session") is None
+
+
+def test_agent_idle_minutes_zero_does_not_stop_agent(agent, monkeypatch):
+    script = (
+        "import json, sys, time\n"
+        "prompt = sys.stdin.read()\n"
+        "time.sleep(0.3)\n"
+        "print(json.dumps({'type': 'result', 'result': 'ok', 'is_error': False}), flush=True)\n"
+    )
+    (agent / "fake_agent.py").write_text(script, encoding="utf-8")
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", 0)
+    watch_called = []
+    orig_watch = agent_runner._watch_idle
+    monkeypatch.setattr(agent_runner, "_watch_idle", lambda *a, **k: (watch_called.append(True), orig_watch(*a, **k))[1])
+    d = _wait(agent_runner.start({"question": "x"})["run"])
+    assert d["state"] == "done"
+    assert d["result"] == "ok"
+    assert d.get("error") is None
+    assert not watch_called
+
+
+def test_idle_minutes_parsing(monkeypatch):
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", 0)
+    assert agent_runner._idle_minutes() == 0.0
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", "0")
+    assert agent_runner._idle_minutes() == 0.0
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", -1)
+    assert agent_runner._idle_minutes() == 15.0
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", "-10")
+    assert agent_runner._idle_minutes() == 15.0
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", "not-a-number")
+    assert agent_runner._idle_minutes() == 15.0
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", False)
+    assert agent_runner._idle_minutes() == 15.0
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", 20)
+    assert agent_runner._idle_minutes() == 20.0

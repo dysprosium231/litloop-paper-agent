@@ -183,6 +183,7 @@ def _read(data: dict[str, Any], line: str) -> None:
             continue
         if c.get("type") == "tool_use":
             name = str(c.get("name") or "").split("__")[-1]
+            data["_last_tool"] = name
             if c.get("id"):
                 data.setdefault("_tools", {})[c["id"]] = name
             action = (c.get("input") or {}).get("action")
@@ -196,7 +197,11 @@ def _read(data: dict[str, Any], line: str) -> None:
             body = c.get("content")
             body = body if isinstance(body, str) else " ".join(
                 x.get("text", "") for x in body or [] if isinstance(x, dict))
-            session = _session_from(data.get("_tools", {}).get(c.get("tool_use_id")), body or "")
+            tool_id = c.get("tool_use_id")
+            tool = (data.get("_tools") or {}).get(tool_id) if tool_id else None
+            if not tool:
+                tool = data.get("_last_tool")
+            session = _session_from(tool, body or "")
             if session:
                 data["session"] = session
         elif c.get("type") == "text" and kind == "assistant" and c.get("text", "").strip():
@@ -230,10 +235,26 @@ def _session_from(tool: str | None, body: str) -> str | None:
     return m.group(1) if m else None
 
 
-def _watch_idle(run: str, proc: subprocess.Popen, data: dict[str, Any], seen: list[float]) -> None:
+def _idle_minutes() -> float:
+    raw = _config.load_config().get("agent_idle_minutes", 15)
+    if isinstance(raw, bool):
+        return 15.0
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        return 15.0
+    if val < 0:
+        return 15.0
+    return val
+
+
+def _watch_idle(run: str, proc: subprocess.Popen, data: dict[str, Any], seen: list[float], limit_minutes: float | None = None) -> None:
     """Stop an agent that has printed nothing for agent_idle_minutes (it hung,
     or waits on a prompt nobody sees); the run would otherwise stay "running"."""
-    limit = float(_config.load_config().get("agent_idle_minutes", 15) or 15) * 60
+    minutes = _idle_minutes() if limit_minutes is None else limit_minutes
+    if minutes <= 0:
+        return
+    limit = minutes * 60
     while proc.poll() is None:
         time.sleep(min(5.0, max(0.2, limit / 4)))
         if time.time() - seen[0] > limit and proc.poll() is None:
@@ -254,7 +275,9 @@ def _follow(run: str, proc: subprocess.Popen, prompt: str, data: dict[str, Any])
     log = _path(run).with_suffix(".log")
     last = 0.0
     seen = [time.time()]  # when the agent last printed anything
-    threading.Thread(target=_watch_idle, args=(run, proc, data, seen), daemon=True).start()
+    idle = _idle_minutes()
+    if idle > 0:
+        threading.Thread(target=_watch_idle, args=(run, proc, data, seen, idle), daemon=True).start()
     try:
         assert proc.stdin and proc.stdout
         proc.stdin.write(prompt.encode("utf-8"))
@@ -280,6 +303,7 @@ def _follow(run: str, proc: subprocess.Popen, prompt: str, data: dict[str, Any])
     finally:
         data["doing"] = None
         data.pop("_tools", None)
+        data.pop("_last_tool", None)
         data["finished"] = datetime.now().isoformat(timespec="seconds")
         _write(run, data)
         with _LOCK:

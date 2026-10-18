@@ -10,12 +10,12 @@ import litloop.sources as src
 
 def test_quiet_step_closes_its_browsers(monkeypatch):
     closed = []
-    monkeypatch.setattr(bb, "close_browsers_since", lambda t0, owner=None: closed.append(t0) or 1)
+    monkeypatch.setattr(bb, "close_browsers_since", lambda t0, owner=None: closed.append(owner) or 1)
     monkeypatch.setattr(src, "_user_waiting_for", lambda doi: False)
     monkeypatch.setattr(threading.Event, "wait", lambda self, t=None: self.is_set())  # no 5 s sleeps
     done = threading.Event()
     src._step_watchdog("10.1/x", "WebVPN", done, {"institutional_step_seconds": 0.001})
-    assert closed
+    assert closed == ["10.1/x"], "the watchdog must close only this paper's browsers"
 
 
 def test_step_that_finishes_closes_nothing(monkeypatch):
