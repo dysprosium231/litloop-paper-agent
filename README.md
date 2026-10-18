@@ -204,7 +204,7 @@ MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、�
 | [docs/API_LIMITS.md](docs/API_LIMITS.md) | 各外部接口的官方限额（附来源和核对日期）和 LitLoop 的节奏控制 |
 | [docs/APP_DATA.md](docs/APP_DATA.md) | app 与 Agent 共用的筛选、下载、进度文件格式 |
 | [app/README.md](app/README.md) | 桌面 app 的开发方式 |
-| [CHARTER.md](CHARTER.md) · [TODO.md](TODO.md) | 设计与验收标准 · 进度与待办 |
+| [CHARTER.md](CHARTER.md) · [TODO.md](TODO.md) · [docs/DECISIONS.md](docs/DECISIONS.md) | 设计与验收标准 · 进度与待办 · 决定与实验记录 |
 
 ## 项目状态
 
