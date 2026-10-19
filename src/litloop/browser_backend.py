@@ -906,12 +906,33 @@ def _gone(obj: Any) -> bool:
         return False
 
 
+# Owner of a browser that several papers take turns on (a Sci-Hub pool thread's
+# browser, a publisher group's window, a fetcher's browser): no paper's skip or
+# end closes it, since another paper may be using it; a cancel (owner=None) does.
+SHARED = "<shared>"
+_SHARED_TLS = _threading.local()
+
+
+class shared:
+    """``with shared():`` browsers launched inside are SHARED (2026-10-19, DeepSeek
+    review: a Sci-Hub worker reuses its browser, so skipping the paper that
+    happened to launch it killed it under the next paper)."""
+
+    def __enter__(self) -> None:
+        self._prev = getattr(_SHARED_TLS, "on", False)
+        _SHARED_TLS.on = True
+
+    def __exit__(self, *exc: Any) -> None:
+        _SHARED_TLS.on = self._prev
+
+
 def _remember(obj: Any) -> Any:
+    owner = SHARED if getattr(_SHARED_TLS, "on", False) else _owner()
     with _LAUNCHED_LOCK:
         # Drop the dead ones, so a browser whose owner never closed it (closed by
         # its own code, or by a crash) does not stay referenced for ever.
         _LAUNCHED[:] = [e for e in _LAUNCHED if not _gone(e[1])]
-        _LAUNCHED.append((_time.perf_counter(), obj, _owner()))
+        _LAUNCHED.append((_time.perf_counter(), obj, owner))
     return obj
 
 

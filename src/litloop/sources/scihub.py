@@ -76,9 +76,21 @@ _HTTP_POOL: ThreadPoolExecutor | None = None
 
 
 def _submit(pool: ThreadPoolExecutor, fn: Any, *args: Any, **kwargs: Any) -> Any:
-    """Submit to a pool so browsers the task opens belong to the submitting paper."""
-    from ..browser_backend import carry_owner
-    return pool.submit(carry_owner(fn), *args, **kwargs)
+    """Submit to the long-lived Sci-Hub pool.
+
+    The task knows which paper it works for (``carry_owner``: a waived paper's
+    task must not launch a browser), but the browser it opens is the worker's
+    own and serves later papers too, so it is registered as SHARED: skipping or
+    finishing one paper does not kill it under the next (DeepSeek review
+    2026-10-19); cancelling the job does."""
+    from ..browser_backend import carry_owner, shared
+
+    owned = carry_owner(fn)
+
+    def run(*a: Any, **k: Any) -> Any:
+        with shared():
+            return owned(*a, **k)
+    return pool.submit(run, *args, **kwargs)
 
 
 def _race_pool(config: dict[str, Any]) -> ThreadPoolExecutor:

@@ -776,6 +776,11 @@ def run_lanes(
         _progress.update(phase="机构级联")
 
         def _inst_fetch_chunk(chunk: list[str]) -> list[dict[str, Any]]:
+            from .browser_backend import shared
+            with shared():  # the fetcher's browser serves every paper of the chunk
+                return _inst_fetch_chunk_inner(chunk)
+
+        def _inst_fetch_chunk_inner(chunk: list[str]) -> list[dict[str, Any]]:
             cfg = ConfigAdapter.load()
             cfg._config["output_dir"] = str(out)
             fetcher = PaperFetcher(cfg)
@@ -890,6 +895,11 @@ def _fetch_si_for_results(results: list[dict[str, Any]], out: Path, config: dict
     manifest_lock = threading.Lock()
 
     def _si_one(row: dict[str, Any]) -> None:
+        from .browser_backend import shared
+        with shared():  # the pool thread's browser serves the next papers too
+            _si_one_inner(row)
+
+    def _si_one_inner(row: dict[str, Any]) -> None:
         doi = row["doi"]
         try:
             files = fetch_supplementary(doi, out, config)

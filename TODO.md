@@ -27,8 +27,8 @@
 4. [x] 同一篇重试时，上一轮迟到的通道把步骤和错误写进新的 `DownloadAttempt`（按 DOI 反查登记表）。
 5. [x] app 的大批量任务（>30 篇，走车道）拿不到失败原因和“尝试经过”（MCP 出口剥掉 `attempts` 时一起剥了）。
 6. [x] `main.py publisher-batch` 读不存在的 `summary["results"]`，永远报 0 篇。
-7. [ ] 还有三处开浏览器不带所属文献：`_batch_institutional_phase`、`pipeline._inst_fetch_chunk`、`pipeline._si_one`。
-8. [ ] Sci-Hub 池线程复用一个浏览器，按篇的所属与共享冲突：跳过 A 可能关掉 B 正在用的浏览器。
+7. [x] 还有三处开浏览器不带所属文献：`_batch_institutional_phase`、`pipeline._inst_fetch_chunk`、`pipeline._si_one`。
+8. [x] Sci-Hub 池线程复用一个浏览器，按篇的所属与共享冲突：跳过 A 可能关掉 B 正在用的浏览器。
 9. [x] `paywall` 规则匹配到 Unpaywall（没填邮箱被说成需要订阅）；`download exception` 等内部原因补文案。
 10. [x] 合并后学校登录窗口跟随 `browser_headless`，改为始终可见。
 11. [x] `test_login_no_access` 会真的联网。

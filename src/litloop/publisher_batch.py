@@ -935,7 +935,9 @@ class PublisherBatchDownloader:
         # The user signs in to their school in this window: always visible, whatever
         # browser_headless says (institutional/'s copy forced it; kept after the merge).
         config["browser_headless"] = False
-        ctx = get_persistent_context(profile_path, config)
+        from .browser_backend import shared
+        with shared():  # one window for the whole publisher group, not one paper's
+            ctx = get_persistent_context(profile_path, config)
         # Record the binding so _fetch_pdf_url can route plain-HTTP requests
         # through the same proxy as this context's browser traffic.
         if proxy:

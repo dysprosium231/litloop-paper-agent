@@ -200,9 +200,29 @@ def test_a_browser_opened_in_a_pool_thread_belongs_to_the_paper(monkeypatch):
     finally:
         src._SOURCE_TLS.doi = None
     raw.submit(lambda: None).result()  # the worker is reused for another task
-    assert [o for _, _, o in bb._LAUNCHED] == ["10.9999/pool.a"]
-    assert bb.close_browsers_since(0.0, owner="10.9999/pool.a") == 1 and killed == ["sci"]
+    # The worker's browser serves later papers too: it is shared, so skipping or
+    # ending paper a leaves it alone (DeepSeek review 2026-10-19); a cancel closes it.
+    assert [o for _, _, o in bb._LAUNCHED] == [bb.SHARED]
+    assert bb.close_browsers_since(0.0, owner="10.9999/pool.a") == 0 and killed == []
+    assert bb.close_browsers_since(0.0) == 1 and killed == ["sci"]
     raw.shutdown()
+
+
+def test_a_pool_task_still_knows_its_paper(monkeypatch):
+    """Shared or not, a task for a paper that has ended must not launch a browser."""
+    from concurrent.futures import ThreadPoolExecutor
+    import litloop.browser_backend as bb
+    from litloop.sources import scihub
+    raw = ThreadPoolExecutor(max_workers=1)
+    src._SOURCE_TLS.doi = "10.9999/pool.done"
+    src._SETTLED.add("10.9999/pool.done")
+    try:
+        assert scihub._submit(raw, src._source_may_continue).result() is False
+        assert scihub._submit(raw, bb.current_owner).result() == "10.9999/pool.done"
+    finally:
+        src._SOURCE_TLS.doi = None
+        src._SETTLED.discard("10.9999/pool.done")
+        raw.shutdown()
 
 
 def test_settled_keeps_only_recent_papers():
