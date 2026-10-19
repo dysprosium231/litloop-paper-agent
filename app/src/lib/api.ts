@@ -372,12 +372,22 @@ export const searchApi = {
   cancel: (run: string) => call<{ cancelled: boolean }>(`/api/searches/${encodeURIComponent(run)}/cancel`, {}),
 }
 
+/** What /api/downloads/parse found in pasted text. */
+export interface PastedList {
+  papers: { doi: string }[]
+  unrecognized: string[]
+  unrecognized_count: number
+  too_many: boolean
+  downloaded: string[]
+}
+
 export const downloadsApi = {
   list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; pushing: string | null; output_dir: string }>("/api/downloads"),
   pending: () => call<PendingGroup[]>("/api/downloads/pending"),
   job: (id: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(id)}`),
   start: (papers: PendingGroup["papers"], title: string, session?: string, zoteroTarget?: string) =>
     call<DownloadJob>("/api/downloads", { papers, title, session: session ?? null, zotero_target: zoteroTarget ?? null }),
+  parse: (text: string) => call<PastedList>("/api/downloads/parse", { text }),
   cancel: () => call<{ cancelled: boolean }>("/api/downloads/cancel", {}),
   skip: (doi: string) => call<{ skipped: boolean }>("/api/downloads/skip", { doi }),
   open: (path: string) => call<{ opened: string }>("/api/open", { path }),

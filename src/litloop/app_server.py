@@ -82,6 +82,10 @@ class NewDownload(BaseModel):
     zotero_target: str | None = None
 
 
+class PastedList(BaseModel):
+    text: str
+
+
 class ZoteroCheck(BaseModel):
     key: str
 
@@ -560,6 +564,20 @@ def create_app(token: str) -> FastAPI:
     def search_cancel(run: str) -> dict[str, Any]:
         from . import agent_runner
         return {"cancelled": agent_runner.cancel(run)}
+
+    @app.post("/api/downloads/parse")
+    def downloads_parse(body: PastedList) -> dict[str, Any]:
+        """DOIs, doi.org links and arXiv ids in pasted text, for a download list.
+
+        ``downloaded``: those an earlier job already got (the app says so; they
+        are downloaded again only if the file is gone)."""
+        from . import download_jobs
+        from .identifiers import extract_identifiers
+        dois, unrecognized = extract_identifiers(body.text[:200_000])
+        got = {k for d in download_jobs.downloaded_dois() for k in download_jobs.same_paper(d)}
+        return {"papers": [{"doi": d} for d in dois[:2000]], "unrecognized": unrecognized[:50],
+                "unrecognized_count": len(unrecognized), "too_many": len(dois) > 2000,
+                "downloaded": [d for d in dois if download_jobs.same_paper(d) & got]}
 
     @app.post("/api/downloads/skip")
     def download_skip(body: SkipPaper) -> dict[str, Any]:

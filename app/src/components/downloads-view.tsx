@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CheckCircle2Icon, ChevronRightIcon, CircleDashedIcon, FileTextIcon, FolderOpenIcon, LoaderIcon, SkipForwardIcon, XCircleIcon } from "lucide-react"
+import { CheckCircle2Icon, ChevronRightIcon, CircleDashedIcon, ClipboardPasteIcon, FileTextIcon, FolderOpenIcon, LoaderIcon, SkipForwardIcon, XCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import {
   type DownloadStep,
   type JobState,
   type LiveDownload,
+  type PastedList,
   type PendingGroup,
   type ZoteroCollection,
   errorMessage,
@@ -87,8 +88,67 @@ const FILTERS: { id: Filter; label: string; keep: (j: DownloadJobEntry) => boole
 ]
 
 /**
+ * A list pasted by hand (DOIs, doi.org links, arXiv ids, mixed with other text):
+ * the backend says what it found as the user types, the user names the job and
+ * starts it. For papers that come from outside a screening session.
+ */
+function PasteList({ busy, onStart, onClose }: {
+  busy: boolean
+  onStart: (papers: PendingGroup["papers"], title: string) => void
+  onClose: () => void
+}) {
+  const [text, setText] = React.useState("")
+  const [title, setTitle] = React.useState(() => `粘贴的清单 · ${new Date().toLocaleDateString("zh-CN")}`)
+  const [parsed, setParsed] = React.useState<PastedList | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    if (!text.trim()) { setParsed(null); return }
+    const t = setTimeout(() => {
+      downloadsApi.parse(text).then((p) => { setParsed(p); setError(null) }).catch((e) => setError(errorMessage(e)))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [text])
+  const n = parsed?.papers.length ?? 0
+  return (
+    <Card className="mb-4 space-y-3 px-5 py-4">
+      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} autoFocus
+        placeholder="粘贴 DOI、doi.org 链接或 arXiv 编号，每行一个，也可以夹在其他文字里"
+        className="w-full resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 font-mono text-[13px] outline-none placeholder:font-sans placeholder:text-muted-foreground focus-visible:border-foreground/30 dark:bg-input/30" />
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {parsed && (
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <p>
+            识别到 {n} 篇
+            {parsed.downloaded.length > 0 && `，其中 ${parsed.downloaded.length} 篇已下载过（保存位置里有文件的不会重新下载）`}
+            {parsed.too_many && "，一次最多 2000 篇，其余未加入"}
+          </p>
+          {parsed.unrecognized_count > 0 && (
+            <details>
+              <summary className="cursor-pointer">{parsed.unrecognized_count} 行没有找到 DOI 或 arXiv 编号</summary>
+              <ul className="mt-1 space-y-0.5 pl-4">
+                {parsed.unrecognized.map((l, i) => <li key={i} className="truncate">{l}</li>)}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} className="max-w-sm" aria-label="任务名称" />
+        <div className="flex-1" />
+        <Button size="sm" variant="ghost" onClick={onClose}>取消</Button>
+        <Button size="sm" disabled={busy || n === 0 || !title.trim()}
+          onClick={() => parsed && onStart(parsed.papers, title.trim())}>
+          开始下载{n > 0 ? ` ${n} 篇` : ""}
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
+/**
  * The downloads page: totals and the save folder, the papers picked 选中下载 in
- * screening (grouped by session, one click from a job), then the job history.
+ * screening (grouped by session, one click from a job), a pasted list, then the
+ * job history.
  */
 export function DownloadsOverview({ jobs, pending, outputDir, busy, running, onStarted, onOpen, onChanged }: {
   jobs: DownloadJobEntry[]; pending: PendingGroup[]; outputDir: string; busy: boolean; running: string | null
@@ -96,9 +156,11 @@ export function DownloadsOverview({ jobs, pending, outputDir, busy, running, onS
 }) {
   const [error, setError] = React.useState<string | null>(null)
   const [filter, setFilter] = React.useState<Filter>("all")
+  const [pasting, setPasting] = React.useState(false)
   const start = async (papers: PendingGroup["papers"], title: string, session?: string) => {
     try {
       onStarted((await downloadsApi.start(papers, title, session)).job)
+      setPasting(false)
     } catch (e) {
       setError(errorMessage(e))
     }
@@ -142,13 +204,19 @@ export function DownloadsOverview({ jobs, pending, outputDir, busy, running, onS
 
         <section>
           <SectionTitle title="下载队列" note={all.length ? `${all.length} 篇 · ${pending.length} 个检索会话` : undefined}>
+            {!pasting && (
+              <Button size="sm" variant="outline" onClick={() => setPasting(true)}>
+                <ClipboardPasteIcon />粘贴 DOI
+              </Button>
+            )}
             {pending.length > 1 && (
               <Button size="sm" disabled={busy} onClick={() => start(all, `${pending.length} 个检索会话 · ${all.length} 篇`)}>全部下载</Button>
             )}
           </SectionTitle>
           {busy && <p className="mb-3 text-sm text-muted-foreground">当前有下载任务进行中。</p>}
+          {pasting && <PasteList busy={busy} onStart={(papers, title) => start(papers, title)} onClose={() => setPasting(false)} />}
           <Card className="divide-y">
-            {pending.length === 0 && <Empty title="暂无待下载文献" note="在筛选中加入下载的文献将显示在此处" />}
+            {pending.length === 0 && <Empty title="暂无待下载文献" note="在筛选中加入下载的文献，或点「粘贴 DOI」" />}
             {pending.map((g) => (
               <div key={g.session} className="px-5 py-4">
                 <div className="mb-2 flex items-center justify-between gap-4">

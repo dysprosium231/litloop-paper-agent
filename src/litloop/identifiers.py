@@ -55,6 +55,53 @@ def is_arxiv_identifier(value: str) -> bool:
     return normalize_arxiv_id(value) is not None
 
 
+# Anywhere in a line: a DOI (bare, doi:, doi.org link, or inside a publisher
+# URL), an arXiv link, or "arXiv:2401.01234".
+_DOI_IN_TEXT = re.compile(r"\b10\.\d{4,9}/[^\s\"'<>]+")
+_ARXIV_IN_TEXT = re.compile(r"(?:arxiv\.org/(?:abs|pdf)/|arxiv:\s*)(\d{4}\.\d{4,5})(?:v\d+)?", re.I)
+_BARE_ARXIV_LINE = re.compile(r"^\s*(\d{4}\.\d{4,5})(?:v\d+)?\s*$")
+
+
+def extract_identifiers(text: str) -> tuple[list[str], list[str]]:
+    """Papers in pasted text, for a download list: (DOIs, lines with none).
+
+    One line may hold several. DOIs come back canonical (lower case, no
+    prefix); arXiv papers as their DataCite DOI 10.48550/arxiv.<id>, which the
+    downloads treat as the same paper as the bare id. Duplicates are dropped,
+    first occurrence kept. Lines with nothing recognisable come back as they
+    were, so the user can see what was not understood.
+    """
+    found: list[str] = []
+    seen: set[str] = set()
+    unrecognized: list[str] = []
+
+    def add(doi: str) -> None:
+        if doi and doi not in seen:
+            seen.add(doi)
+            found.append(doi)
+
+    for line in (text or "").splitlines():
+        if not line.strip():
+            continue
+        hits = 0
+        for m in _DOI_IN_TEXT.finditer(urllib.parse.unquote(line)):
+            doi = m.group(0).rstrip(".,;:)]}>")
+            doi = re.sub(r"(?i)(\.pdf|/pdf|/full|/abstract|/epdf)$", "", doi)
+            arxiv = ARXIV_DOI_RE.fullmatch(doi)
+            add(f"10.48550/arxiv.{arxiv.group('id')}" if arxiv else canonical_doi(doi))
+            hits += 1
+        for m in _ARXIV_IN_TEXT.finditer(line):
+            add(f"10.48550/arxiv.{m.group(1)}")
+            hits += 1
+        bare = _BARE_ARXIV_LINE.match(line)
+        if bare and not hits:
+            add(f"10.48550/arxiv.{bare.group(1)}")
+            hits += 1
+        if not hits:
+            unrecognized.append(line.strip())
+    return found, unrecognized
+
+
 def normalize_doi_unicode(value: str) -> str | None:
     """Fix DOI with unicode hyphens and embedded spaces. Returns None if invalid."""
     doi = value.strip()
