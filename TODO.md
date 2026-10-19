@@ -41,7 +41,6 @@
 - [x] Agent / 命令行的下载在 app 下载页也看得到（2026-10-19 用户定：只做这一步，随后用户要求把旧的“LitLoop · 进度”小窗口整个删掉，已删）：`/api/downloads` 的 `external`，下载页顶部显示任务、进度、当前文献和登录提示，只显示不能控制。
 - [x] Springer 选择机构页搜学校约 30 秒（11:47:26 → 11:47:57）：改为填完学校名后每 0.5 秒看一次结果、出来就点，并记录每个输入框用了多久；下次实测看效果。
 - [x] “app 的登录提示晚 36 秒”是误读：提示的 `since` 每次心跳都被刷新，11:48:39 只是读文件那一刻的心跳；提示 11:48:03 就有了。`since` 改为只记第一次出现。
-- [ ] Sci-Hub 一轮开始前又探测一次镜像（15 秒），测速刚做过，查能否直接用测速结果。
 - [x] “粘贴 DOI”认 PDF 里复制来的 Unicode 连字符和不换行空格；认不出的行（整段参考文献、只有标题）点「按参考文献查找 DOI」用 Crossref `query.bibliographic` 查，标题词 85% 以上出现在这一行才算，列出标题供核对（2026-10-19，盘点残留代码时由 `normalize_doi_unicode`、`search_by_title` 得到的启发）。
 - [x] 删除没人用的代码（2026-10-19，清单见 DECISIONS「删除没人用的代码」）。
 - [ ] 以后用得上的现成代码（2026-10-19 盘点）：`deps.is_feature_available` / `embedded_tor.is_tor_installed` 可做首次引导里一直没做的“可选组件”一步；`extractors.extract_figures` 留给“分析归纳”；`progress_reporter.elapsed_sec` 可给 app 里“Agent 正在下载”加已用时间。
