@@ -3,6 +3,12 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-19：publisher-batch 验收
+
+- 实测 `litloop publisher-batch`（校园网，直连出口 106.39.42.165；用户代理出口 161.153.73.55）：合并后的 Elsevier 异步取 PDF 不再出错，但没下到。查明并修了（37871f5）：只拼不带令牌的 `/pii/<PII>/pdfft`，被 ScienceDirect 以 403 “There was a problem providing the content you requested” 拒绝，又被当成 IP 封锁；改为先等 linkinghub 跳到文章页、在点 PDF 按钮前用文章页自带的 `pdfft?md5=…` 链接；能读到内容的 403 不算封锁；命令传学校名。
+- 仍下不到：文章页（上午 app 刚下到的 `j.jallcom.2025.179147`）15 秒内没有 View PDF。推测（未验证）：app 的引擎每家出版商一个资料目录（`~/.litloop/cache/publisher_profile_<出版商>`），用户登录后保存登录状态、下次导入（上午日志 “imported 322 cookies”）；publisher-batch 用共享的 `~/.litloop/browser_profiles/publisher`，看不到那份登录状态。即在 Elsevier 看来校园网 IP 本身可能不带权限。另：先挑的 `j.anucene.2025.111783`（Annals of Nuclear Energy）可能学校没订，不适合做验收。
+- 用户决定（2026-10-19）：不给它补登录状态；记进 TODO，之后把这条路去掉，改用 app 在用的下载引擎。app 不经过这里。
+
 ## 2026-10-19：DeepSeek 验收 7–8：几篇轮流用的浏览器标为“共享”
 
 - 问题：Sci-Hub 线程池的工作线程复用自己的浏览器，登记时记的是第一次用它的那篇；跳过那篇会把下一篇正在用的浏览器关掉，跳过下一篇又关不掉。出版商批量那组共用的窗口、大批量学校通道 fetcher 的浏览器、补充材料线程池的浏览器同理。
