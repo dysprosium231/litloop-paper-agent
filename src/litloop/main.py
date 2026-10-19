@@ -805,7 +805,15 @@ def publisher_batch_cmd(
         raise SystemExit(
             f"Unknown/unresolved publisher '{publisher or key or '(auto)'}'. "
             f"Pass --publisher with one of: {', '.join(list_publisher_profiles())}")
-    downloader = PublisherBatchDownloader(config, profile=profile)
+    # Pick the school on the publisher's institution page, as the other routes do
+    # (searched in English: "Beihang", not the configured Chinese name).
+    school = config.get("carsi_idp_name") or config.get("vpnsci_school") or ""
+    try:
+        from ._publisher_strategies_core import _IDP_MAP
+        school = _IDP_MAP.get(school, school)
+    except Exception:
+        pass
+    downloader = PublisherBatchDownloader(config, profile=profile, institution_query=school)
     records = [PaperRecord(doi=d) for d in dois]
     summary = downloader.run_records(records, output)
     # run_records returns counts (count, success, missing, ...), not the results themselves.

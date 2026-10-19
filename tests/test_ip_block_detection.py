@@ -50,6 +50,12 @@ class IsIpBlockResponseTests(unittest.TestCase):
         self.assertTrue(self.d._is_ip_block_response(403, ""))
         self.assertTrue(self.d._is_ip_block_response(429, ""))
 
+    def test_a_readable_403_without_a_block_page_is_not_a_block(self):
+        # ScienceDirect's answer to a tokenless pdfft (2026-10-19, campus network).
+        page = ("<html><title>ScienceDirect</title>There was a problem providing the content you "
+                "requested. Reference number: a4ccf51eef9a1360 ... CPE00001</html>")
+        self.assertFalse(self.d._is_ip_block_response(403, page))
+
     def test_ok_status_is_not_block(self):
         self.assertFalse(self.d._is_ip_block_response(200, ""))
         self.assertFalse(self.d._is_ip_block_response(200, "<html>article body</html>"))

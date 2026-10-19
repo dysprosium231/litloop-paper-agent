@@ -2090,6 +2090,33 @@ class PublisherBatchDownloader:
             except Exception:
                 continue
 
+    def _page_own_pdf(self, page: Any, doi: str, result: DownloadResult) -> tuple[bytes | None, str]:
+        """The article page's own PDF link, read in the browser.
+
+        ScienceDirect's link (``pdfft?md5=…&pid=…``) carries tokens the page
+        issues; the bare ``/pii/<PII>/pdfft`` built from the PII is refused with
+        "There was a problem providing the content you requested" (2026-10-19,
+        on the campus network). Single downloads already get Elsevier PDFs this
+        way (``browser_pdf``), so batches try it before building URLs.
+        """
+        try:
+            from .browser_pdf import capture_pdf_via_cdp, find_page_pdf_link, wait_page_settled, wait_url_stable
+            # doi.org lands on linkinghub.elsevier.com first, which redirects to
+            # the article a few seconds later: wait for that, as single downloads do.
+            wait_url_stable(page)
+            wait_page_settled(page)
+            href = find_page_pdf_link(page, max_wait_s=15.0, doi=doi)
+            if not href:
+                self._event(result, "page_pdf_link_none", str(getattr(page, "url", "") or ""))
+                return None, ""
+            self._event(result, "page_pdf_link", href)
+            body = capture_pdf_via_cdp(page.context, page, href)
+            if body and body[:5] == b"%PDF-" and len(body) > MIN_PDF_BYTES:
+                return body, href
+        except Exception as exc:
+            self._event(result, "page_pdf_link_error", f"{type(exc).__name__}: {exc}")
+        return None, ""
+
     def _capture_pdf(self, page: Any, doi: str, result: DownloadResult) -> tuple[bytes | None, str, str | None]:
         """Capture the PDF for ``doi`` from ``page``.
 
@@ -2140,7 +2167,13 @@ class PublisherBatchDownloader:
         page.on("response", on_response)
         try:
             self._return_to_record_article_if_needed(page, result, doi)
-            if self._click_pdf_entry(page, result, doi=doi):
+            # The article page's own link first, while the page is still the
+            # article: clicking the PDF entry navigates away (2026-10-19).
+            body, link = self._page_own_pdf(page, doi, result)
+            if body:
+                captured["bytes"] = body
+                captured["url"] = link
+            if not captured["bytes"] and self._click_pdf_entry(page, result, doi=doi):
                 time.sleep(5)
                 if not captured["bytes"]:
                     body, final_url, block_reason = self._fetch_page_state_pdf(page)
@@ -2557,11 +2590,17 @@ class PublisherBatchDownloader:
           contact mailbox "ipblock@acs.org"
 
         ``body_or_text`` may be bytes or str; only a prefix is inspected.
+
+        A 403 alone is no block: ScienceDirect answers a tokenless ``pdfft`` with
+        403 "There was a problem providing the content you requested" while the
+        same exit gets the PDF through the page's link (2026-10-19). So a 403
+        whose body can be read needs a block-page marker; a 403 with no body to
+        read, and 429 (rate limit), count as is.
         """
-        if status_code is not None and status_code in _IP_BLOCK_STATUS_CODES:
+        if status_code == 429:
             return True
         if not body_or_text:
-            return False
+            return status_code == 403
         if isinstance(body_or_text, bytes):
             try:
                 body_or_text = body_or_text[:8192].decode("utf-8", errors="ignore")

@@ -83,3 +83,17 @@ def test_the_school_login_window_is_always_visible(monkeypatch):
     monkeypatch.setattr(pb.Path, "mkdir", lambda self, **k: None)
     d._launch_context()
     assert seen["browser_headless"] is False
+
+
+def test_the_pages_own_pdf_link_comes_first(monkeypatch):
+    """2026-10-19: the bare /pii/<PII>/pdfft was refused; the page's own
+    pdfft?md5=… link (what single downloads use) is read in the browser first."""
+    import litloop.browser_pdf as bp
+    d = _downloader("elsevier")
+    result = pb.DownloadResult(doi="10.1016/j.anucene.2025.111783", status="pending")
+    link = "https://www.sciencedirect.com/science/article/pii/S0306454925006000/pdfft?md5=ab&pid=1-s2.0-x-main.pdf"
+    monkeypatch.setattr(bp, "find_page_pdf_link", lambda page, max_wait_s=0, doi="": link)
+    monkeypatch.setattr(bp, "capture_pdf_via_cdp", lambda ctx, page, url, timeout_s=90: b"%PDF-1.7" + b"0" * 20000)
+    body, url = d._page_own_pdf(SimpleNamespace(context=object()), result.doi, result)
+    assert body.startswith(b"%PDF") and url == link
+    assert any(e["state"] == "page_pdf_link" for e in result.events)
