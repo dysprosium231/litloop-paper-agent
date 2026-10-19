@@ -110,3 +110,43 @@ def test_note_result_drops_after_three_failures(monkeypatch):
     assert scihub_speed.current() is not None
     scihub_speed.note_result(mirror, False)
     assert scihub_speed.current() is None
+
+
+def _order_of_events(monkeypatch, tmp_path, fastest):
+    import threading
+    from litloop.sources import scihub, scihub_speed
+    events = []
+    probe_done = threading.Event()
+
+    def probe(config):
+        events.append(("probe", threading.current_thread().name))
+        probe_done.wait(0.5)
+
+    def domain(doi, d, out, config, use_tor=False, fail_notes=None):
+        events.append(("try", d))
+        return None
+
+    monkeypatch.setattr(scihub, "_probe_scihub_domains", probe)
+    monkeypatch.setattr(scihub, "try_scihub_domain", domain)
+    monkeypatch.setattr(scihub_speed, "preferred_mirror", lambda: fastest)
+    monkeypatch.setattr(scihub, "_wall_guard", lambda d, config: False)
+    monkeypatch.setattr(scihub, "load_stats", lambda config: {})
+    monkeypatch.setattr(scihub, "record_result", lambda *a, **k: None)
+    cfg = {"scihub_enabled": True, "scihub_domains": ["https://sci-hub.vg", "https://sci-hub.st"]}
+    scihub._try_scihub_impl("10.9999/probe", tmp_path / "x.pdf", cfg)
+    probe_done.set()
+    return events
+
+
+def test_a_fresh_speed_test_starts_the_paper_without_waiting_for_the_probe(monkeypatch, tmp_path):
+    events = _order_of_events(monkeypatch, tmp_path, "https://sci-hub.vg")
+    tries = [e for e in events if e[0] == "try"]
+    assert tries and tries[0] == ("try", "https://sci-hub.vg")
+    probes = [e for e in events if e[0] == "probe"]
+    assert all(name == "scihub-probe" for _, name in probes)  # off the paper's thread
+
+
+def test_without_a_speed_test_the_probe_comes_first(monkeypatch, tmp_path):
+    import threading
+    events = _order_of_events(monkeypatch, tmp_path, None)
+    assert events[0] == ("probe", threading.current_thread().name)

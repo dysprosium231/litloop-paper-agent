@@ -206,6 +206,40 @@ def _mark(job: str, doi: str, **fields: Any) -> None:
                 it.update(fields)
 
 
+def _fill_years(path: Path, wait_s: float = 10.0) -> None:
+    """Papers without a publication year (a pasted list has none) get it from
+    OpenAlex, so the Sci-Hub year rule (scihub_skip_from_year) applies to them
+    too; the years also go into the job file. The job waits at most ``wait_s``;
+    years that come later still reach the papers not yet started."""
+    missing = [i["doi"] for i in store.read_json(path)["items"] if i.get("doi") and not i.get("year")]
+    if not missing:
+        return
+
+    def run() -> None:
+        from .deep_search import _get
+        from .sources.scihub import note_years
+        for k in range(0, len(missing), 50):
+            chunk = missing[k:k + 50]
+            try:
+                data = _get({"filter": "doi:" + "|".join(chunk), "select": "doi,publication_year",
+                             "per_page": 50}, tries=1)
+            except Exception:  # no network, no budget: the papers just stay without a year
+                return
+            years = {canonical_doi(w.get("doi")): int(w["publication_year"])
+                     for w in data.get("results", []) if w.get("doi") and w.get("publication_year")}
+            if not years:
+                continue
+            note_years(years)
+            with store.update(path, indent=1) as data_file:
+                for it in data_file["items"]:
+                    if not it.get("year") and it.get("doi") in years:
+                        it["year"] = years[it["doi"]]
+
+    t = threading.Thread(target=run, name="job-years", daemon=True)
+    t.start()
+    t.join(wait_s)
+
+
 def _run(job: str) -> None:
     path = job_path(job)
     dois = [i["doi"] for i in store.read_json(path)["items"] if i["status"] != "done"]  # not the ones already here
@@ -243,6 +277,7 @@ def _run(job: str) -> None:
     _SKIPPED.clear()  # skips asked for in an earlier job do not carry over
     # The publication year decides whether Sci-Hub is asked (scihub_skip_from_year).
     note_years({i["doi"]: i.get("year") for i in store.read_json(path)["items"] if i.get("year")})
+    _fill_years(path)
     progress_reporter.add_listener(on_item)
     progress_reporter.add_stage_listener(on_stage)
     progress_reporter.add_result_listener(on_result)

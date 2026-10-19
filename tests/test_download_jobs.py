@@ -1356,3 +1356,41 @@ def test_api_zotero_write_mode_and_authorize(client, monkeypatch):
 
 
 
+
+
+def test_a_pasted_list_gets_its_years_for_the_scihub_rule(tmp_path, monkeypatch):
+    """Pasted DOIs come without a year; the job looks them up (one OpenAlex
+    request per 50) so "newer papers skip Sci-Hub" applies to them too."""
+    import json as _json
+    from litloop import deep_search, download_jobs, store
+    from litloop.sources import scihub
+    path = tmp_path / "job.json"
+    store.write_json(path, {"items": [{"doi": "10.1016/j.jallcom.2025.179147", "year": None},
+                                      {"doi": "10.1016/j.old.1999.000001", "year": 1999},
+                                      {"doi": "10.1016/j.nothere.2020.1", "year": None}]})
+    asked = []
+
+    def fake_get(params, tries=6):
+        asked.append(params["filter"])
+        return {"results": [{"doi": "https://doi.org/10.1016/j.jallcom.2025.179147", "publication_year": 2025}]}
+
+    monkeypatch.setattr(deep_search, "_get", fake_get)
+    download_jobs._real_fill_years(path)
+    items = store.read_json(path)["items"]
+    assert [i["year"] for i in items] == [2025, 1999, None]
+    assert asked == ["doi:10.1016/j.jallcom.2025.179147|10.1016/j.nothere.2020.1"]  # only the missing ones
+    assert scihub.publication_year("10.1016/j.jallcom.2025.179147") == 2025
+    assert scihub.too_new("10.1016/j.jallcom.2025.179147", {"scihub_skip_from_year": 2024})
+
+
+def test_a_failed_year_lookup_does_not_hold_the_job(tmp_path, monkeypatch):
+    from litloop import deep_search, download_jobs, store
+    path = tmp_path / "job.json"
+    store.write_json(path, {"items": [{"doi": "10.1/x", "year": None}]})
+
+    def boom(params, tries=6):
+        raise RuntimeError("OpenAlex daily budget used up")
+
+    monkeypatch.setattr(deep_search, "_get", boom)
+    download_jobs._real_fill_years(path)
+    assert store.read_json(path)["items"][0]["year"] is None

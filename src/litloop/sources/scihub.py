@@ -265,6 +265,25 @@ def _probe_single_domain(domain: str, proxy: str | None, timeout: tuple[int, int
         return (domain, False, 99999.0)
 
 
+_PROBE_RUNNING = threading.Lock()
+
+
+def _probe_in_background(config: dict[str, Any]) -> None:
+    """_probe_scihub_domains off the paper's path; one at a time (papers of a
+    round start together and would otherwise all probe)."""
+    if not _PROBE_RUNNING.acquire(blocking=False):
+        return
+
+    def run() -> None:
+        try:
+            _probe_scihub_domains(config)
+        except Exception as exc:
+            log.info(f"   Sci-Hub: background probe failed: {type(exc).__name__}: {exc}")
+        finally:
+            _PROBE_RUNNING.release()
+    threading.Thread(target=run, name="scihub-probe", daemon=True).start()
+
+
 def _probe_scihub_domains(config: dict[str, Any]) -> None:
     last_probe = get_probe_timestamp(config)
     now = time.time()
@@ -1099,8 +1118,15 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
             if result:
                 return result
 
-    _probe_scihub_domains(config)
     all_domains = config.get("scihub_domains") or DEFAULT_SCIHUB_DOMAINS
+    fastest = scihub_speed.preferred_mirror()
+    if fastest and fastest in all_domains and not _wall_guard(fastest, config):
+        # The batch's speed test has just reached this mirror end to end: start
+        # with it, and refresh the reachability stats in the background
+        # (2026-10-19: the probe held the first paper 15 s after a 5 s speed test).
+        _probe_in_background(config)
+    else:
+        _probe_scihub_domains(config)
     stats = load_stats(config)
 
     # Track failure reason for better diagnostic messages

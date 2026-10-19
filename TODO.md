@@ -45,8 +45,8 @@
 - [x] “粘贴 DOI”认 PDF 里复制来的 Unicode 连字符和不换行空格；认不出的行（整段参考文献、只有标题）点「按参考文献查找 DOI」用 Crossref `query.bibliographic` 查，标题词 85% 以上出现在这一行才算，列出标题供核对（2026-10-19，盘点残留代码时由 `normalize_doi_unicode`、`search_by_title` 得到的启发）。
 - [x] 删除没人用的代码（2026-10-19，清单见 DECISIONS「删除没人用的代码」）。
 - [ ] 以后用得上的现成代码（2026-10-19 盘点）：`deps.is_feature_available` / `embedded_tor.is_tor_installed` 可做首次引导里一直没做的“可选组件”一步；`extractors.extract_figures` 留给“分析归纳”；`progress_reporter.elapsed_sec` 可给 app 里“Agent 正在下载”加已用时间。
-- [ ] Sci-Hub 一轮前不重复探测镜像（Antigravity 2026-10-19 未完成，半成品已撤回，自己做）。
-- [ ] “粘贴 DOI”进来的文献没有年份（Antigravity 2026-10-19 未完成，自己做），Sci-Hub 按年份跳过不起作用：解析时顺便查年份（Crossref / OpenAlex）。
+- [x] Sci-Hub 一轮前不重复探测镜像（2026-10-19）：测速有新鲜结果时先试它选的镜像，探测放后台、同时只跑一个。
+- [x] “粘贴 DOI”进来的文献没有年份（2026-10-19）：任务开始时向 OpenAlex 补查（每 50 篇一次，最多等 10 秒，查不到就不管），写回任务文件并交给 Sci-Hub 的年份判断，Sci-Hub 按年份跳过不起作用：解析时顺便查年份（Crossref / OpenAlex）。
 
 **还没做的（从 2026-10-17 的计划里留下）**
 - [ ] 批量引擎：浏览器下载超过竞速时限后“迟到的成功”没算进车道结果，冷却重试又下了一遍（ceramint.2024.08.002）。（2026-10-18 从 DECISIONS 移回）
