@@ -100,11 +100,17 @@ def pick_failure(result: dict | None) -> str | None:
         return None
     own = result.get("error") or result.get("reason")
     hit = _match(str(own)) if own else None
-    # "All sources failed" says nothing the attempts cannot say better.
-    if own and ((hit is not None and hit[0] != "所有来源都没有找到 PDF")
-                or result.get("error_type") in ("skipped", "cancelled")):
-        return str(own)
     failed = [s for s in result.get("attempts") or [] if not s.get("ok") and s.get("reason")]
+    if own and result.get("error_type") in ("skipped", "cancelled"):
+        return str(own)
+    # The result's own reason, unless one of the ways tried explains it better
+    # ("All sources failed" never does; a lane's paywall loses to the school's
+    # "not subscribed" whichever came last).
+    rank = {t: i for i, t in enumerate(_FAILURE_ORDER)}
+    own_rank = rank.get(str(result.get("error_type") or ""), len(rank))
+    better = [s for s in failed if rank.get(str(s.get("error_type") or ""), len(rank)) < own_rank]
+    if own and hit is not None and hit[0] != "所有来源都没有找到 PDF" and not better:
+        return str(own)
     for kind in _FAILURE_ORDER:
         for s in failed:
             if s.get("error_type") == kind:

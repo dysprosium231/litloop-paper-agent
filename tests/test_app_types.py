@@ -55,7 +55,7 @@ def test_download_item_type_covers_the_download_job_items(tmp_path, monkeypatch)
             "attempts": [{"source": "cr", "route": "free", "seconds": 1.5, "ok": True, "why": None}],
         }]
     }
-    monkeypatch.setattr(server, "_batch_download_impl", lambda dois, batch_id: json.dumps(mock_batch))
+    monkeypatch.setattr(server, "_batch_download_impl", lambda dois, batch_id, keep_attempts=False: json.dumps(mock_batch))
     monkeypatch.setattr(zotero, "ensure_collection", lambda col, cfg: {"success": True, "key": "k"})
     monkeypatch.setattr(zotero, "push_via_zotero_mcp", lambda doi, path, cfg, **k: {"success": True, "zotero_key": "zk", "pdf_attached": True})
 

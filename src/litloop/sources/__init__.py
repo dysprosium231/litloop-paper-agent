@@ -190,16 +190,19 @@ def _try_source(
     t0 = time.time()
     key = normalize_doi(doi) if not is_arxiv_identifier(doi) else doi
     _SOURCE_TLS.doi = key
+    # The download this source works for, taken now: by the time a slow source
+    # ends, a retry of the same paper may have registered a new attempt, which
+    # must not get this one's steps or errors (DeepSeek review 2026-10-19).
+    att = _attempt.get(key)
     result = None
     try:
         result = _try_source_inner(source_fn, doi, output_path, config, label, use_tor, t0,
                                    record_result, classify_error, get_user_advice)
     finally:
-        settled = _SOURCE_TLS.doi in _SETTLED
+        settled = _SOURCE_TLS.doi in _SETTLED or (att is not None and _attempt.get(key) is not att)
         _SOURCE_TLS.doi = None
         ok = bool(result and result.get("success"))
         log.info(f"   [timing] {label}: {time.time() - t0:.1f}s, {'PDF' if ok else 'no PDF'}")
-        att = _attempt.get(key)
         if att is not None:
             from .._publisher_strategies_core import get_last_error
             att.add_step("school" if label in _STEP_TEXT else "free", label, time.time() - t0, result,

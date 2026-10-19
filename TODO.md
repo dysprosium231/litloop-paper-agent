@@ -23,9 +23,9 @@
 **DeepSeek 验收（2026-10-19，复核 `d06654a..6ebc61d`；已逐条核实，按此顺序改）**
 1. [x] Elsevier 异步 PDF 捕获按 2 元组解包 3 元组，CLI / 批量的学校通道必失败（合并带来）。
 2. [x] “页面仍在卖这篇”误判（“Get access through your institution”、推荐文章的 Purchase PDF）；随“先看页面状态再决定”一起改，见 DECISIONS「出版商官网：先看页面说什么」。
-3. [ ] 最终失败原因取最后一条通道，不按 `_FAILURE_ORDER` 选最说明问题的一条。
-4. [ ] 同一篇重试时，上一轮迟到的通道把步骤和错误写进新的 `DownloadAttempt`（按 DOI 反查登记表）。
-5. [ ] app 的大批量任务（>30 篇，走车道）拿不到失败原因和“尝试经过”（MCP 出口剥掉 `attempts` 时一起剥了）。
+3. [x] 最终失败原因取最后一条通道，不按 `_FAILURE_ORDER` 选最说明问题的一条。
+4. [x] 同一篇重试时，上一轮迟到的通道把步骤和错误写进新的 `DownloadAttempt`（按 DOI 反查登记表）。
+5. [x] app 的大批量任务（>30 篇，走车道）拿不到失败原因和“尝试经过”（MCP 出口剥掉 `attempts` 时一起剥了）。
 6. [x] `main.py publisher-batch` 读不存在的 `summary["results"]`，永远报 0 篇。
 7. [ ] 还有三处开浏览器不带所属文献：`_batch_institutional_phase`、`pipeline._inst_fetch_chunk`、`pipeline._si_one`。
 8. [ ] Sci-Hub 池线程复用一个浏览器，按篇的所属与共享冲突：跳过 A 可能关掉 B 正在用的浏览器。

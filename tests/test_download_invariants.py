@@ -279,3 +279,31 @@ def test_a_download_started_while_a_cancel_winds_down_runs(monkeypatch, tmp_path
     old.join(10)
     assert new.get("success"), new
     assert not out["old"].get("success") and out["old"].get("error_type") == "cancelled", out["old"]
+
+
+def test_a_late_lane_of_the_last_try_does_not_write_into_the_retry(monkeypatch, tmp_path):
+    """DeepSeek review 2026-10-19: a slow source of the first try ended during the
+    retry and wrote its steps and paywall error into the retry's attempt."""
+    from litloop.sources import attempt
+    doi = "10.9999/invariant.retry-late"
+    first = attempt.begin(doi, 0)
+    started, release = threading.Event(), threading.Event()
+
+    def late_lane(d, output_path, config):
+        started.set()
+        release.wait(5)
+        core._set_error("paywall", "login_required")
+        return None
+
+    t = threading.Thread(target=lambda: src._try_source(late_lane, doi, tmp_path / "late.pdf", {}, "ElsevierBrowser"))
+    t.start()
+    started.wait(5)
+    attempt.end(doi)              # the first try returned
+    retry = attempt.begin(doi, 0)  # the user retries
+    release.set()
+    t.join(10)
+    try:
+        assert retry.steps == [] and retry.last_error == ("", ""), retry
+        assert first.steps and first.last_error[0] == "paywall"
+    finally:
+        attempt.end(doi)

@@ -24,7 +24,7 @@ class FakeBatch:
         self.entered_event: threading.Event | None = None
         self.exception_to_raise: Exception | None = None
 
-    def __call__(self, dois: list[str], batch_id: str | None = None) -> str:
+    def __call__(self, dois: list[str], batch_id: str | None = None, keep_attempts: bool = False) -> str:
         if self.entered_event:
             self.entered_event.set()
         if self.block_event:

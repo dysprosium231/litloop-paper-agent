@@ -250,7 +250,7 @@ def _run(job: str) -> None:
     try:
         if dois:
             from .server import _batch_download_impl
-            out = json.loads(_batch_download_impl(dois, batch_id=f"app-{job}"))
+            out = json.loads(_batch_download_impl(dois, batch_id=f"app-{job}", keep_attempts=True))  # the app shows them
             results = out.get("results", [])
     except Exception as exc:  # the job file says what went wrong; the app shows it
         state, error = "failed", f"{type(exc).__name__}: {exc}"
@@ -267,7 +267,7 @@ def _run(job: str) -> None:
                         from . import error_text
                         it.update(status="done" if r.get("success") else "failed", retrying=False, stage=None, source=r.get("source"),
                                   file=r.get("file") or None,
-                                  error=error_text.pick_failure(r) if r.get("attempts") else (None if r.get("success") else it.get("error") or r.get("error")),
+                                  error=error_text.pick_failure(r) or (None if r.get("success") else it.get("error")),
                                   note=r.get("note") or it.get("note"),
                                   attempts=error_text.steps_for_app(r.get("attempts")) or it.get("attempts"))
                     elif it["status"] == "waiting" and state == "done":

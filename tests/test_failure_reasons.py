@@ -98,3 +98,18 @@ def test_a_browser_step_without_a_result_keeps_its_reason():
 ])
 def test_config_and_internal_failures_are_not_called_paywalls(raw, shown):
     assert shown in error_text.reason(raw)
+
+
+def test_the_most_telling_lane_wins_not_the_last():
+    from litloop.sources.attempt import DownloadAttempt
+    att = DownloadAttempt(key="10.1/x", gen=0)
+    att.add_step("free", "ElsevierBrowser", 30.0, None, error=("paywall", "login_required"))
+    att.add_step("free", "SSRNBrowser", 5.0, None, error=("navigate_failed", "site_unreachable"))
+    assert att.last_error == ("navigate_failed", "site_unreachable")  # outranks a paywall
+    att.add_step("free", "SpringerBrowser", 60.0, None, error=("not_entitled", "no_subscription"))
+    att.add_step("free", "WileyBrowser", 2.0, None, error=("paywall", "login_required"))
+    assert att.last_error == ("not_entitled", "no_subscription")
+    # The result's own reason gives way to a better-ranked attempt.
+    r = {"success": False, "error": "paywall — requires institutional access", "error_type": "paywall",
+         "attempts": att.steps}
+    assert "学校没有订阅" in error_text.reason(error_text.pick_failure(r))

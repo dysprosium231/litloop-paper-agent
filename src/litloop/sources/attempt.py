@@ -30,7 +30,8 @@ class DownloadAttempt:
     started: float = field(default_factory=time.perf_counter)  # browser_backend's clock
     user_wait_at: float = 0.0
     steps: list[dict[str, Any]] = field(default_factory=list)
-    last_error: tuple[str, str] = ("", "")
+    last_error: tuple[str, str] = ("", "")  # the most telling of ``errors`` (worst_error)
+    errors: list[tuple[str, str]] = field(default_factory=list)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def add_step(self, route: str, label: str, seconds: float, result: dict[str, Any] | None,
@@ -50,7 +51,16 @@ class DownloadAttempt:
         with self._lock:
             self.steps.append(step)
             if not ok and error[0]:
-                self.last_error = error
+                self.errors.append(error)
+                self.last_error = self.worst_error()
+
+    def worst_error(self) -> tuple[str, str]:
+        """The browser error that explains this paper best (error_text._FAILURE_ORDER),
+        not merely the last lane to fail (DeepSeek review 2026-10-19)."""
+        from ..error_text import _FAILURE_ORDER
+        rank = {t: i for i, t in enumerate(_FAILURE_ORDER)}
+        best = min(self.errors, key=lambda e: rank.get(e[0], len(rank)), default=("", ""))
+        return best
 
 
 _LOCK = threading.Lock()

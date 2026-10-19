@@ -132,6 +132,7 @@ def _batch_download_impl(
     resume: bool = True,
     lanes: bool | None = None,
     ctx: Any = None,
+    keep_attempts: bool = False,
 ) -> str:
     """Download multiple papers by DOI or arXiv ID.
 
@@ -148,6 +149,8 @@ def _batch_download_impl(
             pretriage -> fast HTTP lane (OA/Elsevier/MDPI CDN) -> grey racing
             -> institutional cascade. Lane mode ignores batch_id/resume (the
             grey lane keeps its own resume). Set false for per-item racing.
+        keep_attempts: keep each paper's ``attempts`` (the app's download jobs
+            show them); the MCP tool leaves them out to keep its answer small.
     """
     from .log import get_logger
     _log = get_logger()
@@ -201,7 +204,7 @@ def _batch_download_impl(
             "unique": len(all_entries),
             "succeeded": succeeded,
             "failed": len(raw) - succeeded,
-            "results": _without_attempts(raw),
+            "results": raw if keep_attempts else _without_attempts(raw),
             "failed_dois": [r.get("doi") or r.get("identifier", "")
                             for r in raw if not r.get("success")],
             "batch_id": batch_id or "lanes",
@@ -229,7 +232,7 @@ def _batch_download_impl(
         )
 
     if isinstance(result.get("results"), list):
-        result["results"] = _without_attempts(result["results"])
+        result["results"] = result["results"] if keep_attempts else _without_attempts(result["results"])
     return json.dumps(result, ensure_ascii=False)
 
 
