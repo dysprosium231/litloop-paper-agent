@@ -45,11 +45,29 @@ _CHALLENGE_TITLES = ("just a moment", "attention required", "verify", "security 
 # downloaded, so a retry does not walk the school routes again.
 LOGIN_NO_ACCESS: dict[str, float] = {}
 NO_ACCESS_HOURS = 6
-# Cues of an article page that still sells the paper. Narrower than
-# _detect_paywall: "access through your institution" stays on entitled pages too.
-_NO_ACCESS_CUES = ("buy article", "buy this article", "buy chapter", "buy ebook", "buy pdf", "purchase pdf",
-                   "purchase access", "purchase this article", "rent this article", "get access",
-                   "subscribe to access", "you do not have access", "you don't have access")
+# What an article page says about access, read from the article itself (side
+# panels, recommendations, navigation and cookie banners removed: their "Buy
+# eBook" / "Purchase PDF" belong to other papers). Narrower than _detect_paywall:
+# "(Get) access through your institution" stays on entitled pages too, so it is
+# no cue; a page offering "View PDF" / "Download PDF" is never "no access".
+_SALE_CUES = ("buy article", "buy this article", "buy chapter", "buy this chapter", "purchase pdf",
+              "purchase this article", "purchase access", "rent this article", "subscribe to access",
+              "you do not have access", "you don't have access")
+_BUY_WORDS = ("buy", "purchase", "rent")
+_PRICE = re.compile(r"(?:[$€£¥]\s?\d|\b\d[\d.,]*\s?(?:usd|eur|gbp)\b)", re.I)
+# A login prompt in place of the full text. Before the school login it only says
+# "not logged in"; after it, "the school has no access".
+_LOGIN_CUES = ("log in via an institution", "access this chapter", "access this article", "access this book")
+_ARTICLE_TEXT_JS = r"""() => {
+  const root = document.querySelector('main') || document.querySelector('article') || document.body;
+  if (!root) return {text: '', pdf: false};
+  const pdf = /\b(view|download) pdf\b/i.test(root.innerText || '');
+  const clone = root.cloneNode(true);
+  clone.querySelectorAll('aside, nav, footer, script, style, noscript, [class*="recommend" i], [id*="recommend" i],'
+    + ' [class*="related" i], [id*="related" i], [class*="cookie" i], [id*="cookie" i], [class*="consent" i]')
+    .forEach((e) => e.remove());
+  return {text: (clone.textContent || '').replace(/\s+/g, ' '), pdf};
+}"""
 
 
 def note_no_access(doi: str | None) -> None:
@@ -57,20 +75,81 @@ def note_no_access(doi: str | None) -> None:
 
 
 def no_access(doi: str | None) -> bool:
-    seen = LOGIN_NO_ACCESS.get((doi or "").strip().lower())
-    return seen is not None and time.time() - seen < NO_ACCESS_HOURS * 3600
+    key = (doi or "").strip().lower()
+    seen = LOGIN_NO_ACCESS.get(key)
+    if seen is not None and time.time() - seen >= NO_ACCESS_HOURS * 3600:
+        LOGIN_NO_ACCESS.pop(key, None)  # expired: drop it
+        return False
+    return seen is not None
 
 
 def clear_no_access(doi: str | None) -> None:
     LOGIN_NO_ACCESS.pop((doi or "").strip().lower(), None)
 
 
-def _page_sells_paper(page: Any) -> bool:
+def _page_access(page: Any) -> dict[str, bool]:
+    """{"pdf": offers View/Download PDF, "sells": sells the paper, "asks_login": asks to log in}."""
     try:
-        text = (page.evaluate("() => document.body ? document.body.innerText : ''") or "").lower()
+        got = page.evaluate(_ARTICLE_TEXT_JS) or {}
     except Exception:
-        return False
-    return any(c in text for c in _NO_ACCESS_CUES)
+        return {"pdf": False, "sells": False, "asks_login": False}
+    text = str(got.get("text") or "").lower()
+    if got.get("pdf"):
+        return {"pdf": True, "sells": False, "asks_login": False}
+    sells = any(c in text for c in _SALE_CUES) or (
+        bool(_PRICE.search(text)) and any(w in text for w in _BUY_WORDS))
+    return {"pdf": False, "sells": sells, "asks_login": any(c in text for c in _LOGIN_CUES)}
+
+
+def _page_sells_paper(page: Any) -> bool:
+    """After the school login: the page still sells the paper or asks to log in."""
+    state = _page_access(page)
+    return state["sells"] or state["asks_login"]
+
+
+def _wait_for_pdf_link(page: Any, doi: str, publisher: str) -> tuple[str | None, str]:
+    """The article page's own PDF link, by what the page says once it is quiet.
+
+    Returns (href, state), state being "pdf", "no_access" or "unclear":
+    - a PDF link or button: take it;
+    - the page sells the paper or asks to log in: no link will come, so say so
+      at once (before the school login: go and log in; after it: not
+      subscribed) instead of looking for 30 s and reloading (2026-10-19,
+      Springer: 80 s lost on a page that said "Log in via an institution");
+    - neither: the access check may still be running ("View PDF" came after
+      15 s on ScienceDirect, 2026-10-18), so look longer and reload once.
+    """
+    from .browser_pdf import find_page_pdf_link
+    for attempt in range(2):
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
+        href = find_page_pdf_link(page, max_wait_s=2.0, doi=doi)
+        if href:
+            return href, "pdf"
+        state = _page_access(page)
+        if state["sells"] or state["asks_login"]:
+            time.sleep(3)  # the cue must still be there, not a flash before the access check
+            href = find_page_pdf_link(page, max_wait_s=1.0, doi=doi)
+            if href:
+                return href, "pdf"
+            again = _page_access(page)
+            if again["sells"] or again["asks_login"]:
+                log.info(f"   [{publisher}] the page {'sells the paper' if again['sells'] else 'asks to log in'}; "
+                         "not waiting for a PDF link")
+                return None, "no_access"
+        href = find_page_pdf_link(page, max_wait_s=18.0 if attempt == 0 else 8.0, doi=doi)
+        if href:
+            return href, "pdf"
+        if attempt:
+            break
+        log.info(f"   [{publisher}] no PDF link yet; reloading the page once")
+        try:
+            page.reload(wait_until="domcontentloaded", timeout=30000)
+        except Exception:
+            pass
+    return None, "unclear"
 
 # Global lock to prevent multiple visible browser windows in parallel racing
 _visible_browser_lock = threading.Lock()
@@ -763,26 +842,8 @@ def _visible_browser_download(
             return None
 
         def _page_pdf_via_cdp() -> dict[str, Any] | None:
-            """Open the page's own PDF link in the browser and read the body via CDP.
-
-            The "View PDF" button appears only once the page's scripts have
-            checked access (2026-10-18, ScienceDirect: after the 15 s look, so
-            the lane went to an SSO login it did not need). Wait for the page's
-            requests to settle, look for 20 s, and reload once before giving up."""
-            href = None
-            for attempt in range(2):
-                try:
-                    page.wait_for_load_state("networkidle", timeout=10000)
-                except Exception:
-                    pass
-                href = find_page_pdf_link(page, max_wait_s=20.0 if attempt == 0 else 10.0, doi=doi)
-                if href or attempt:
-                    break
-                log.info(f"   [{publisher}] no PDF link yet; reloading the page once")
-                try:
-                    page.reload(wait_until="domcontentloaded", timeout=30000)
-                except Exception:
-                    pass
+            """Open the page's own PDF link in the browser and read the body via CDP."""
+            href, state = _wait_for_pdf_link(page, doi, publisher)
             if not href:
                 return None
             log.info(f"   [{publisher}] page PDF link: {href[:80]}")

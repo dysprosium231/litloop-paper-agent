@@ -353,6 +353,18 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
     return () => { alive = false; clearInterval(t) }
   }, [id])
   const act = (f: () => Promise<unknown>) => f().then(onChanged).catch((e) => setError(errorMessage(e)))
+  // Skips and the cancel take a few seconds to land (the sources wind down): say so at once.
+  const [skipping, setSkipping] = React.useState<Set<string>>(() => new Set())
+  const [cancelling, setCancelling] = React.useState(false)
+  const skip = (doi: string) => {
+    setSkipping((s) => new Set(s).add(doi.toLowerCase()))
+    act(() => downloadsApi.skip(doi)).catch(() => undefined)
+  }
+  const cancel = () => {
+    setCancelling(true)
+    act(downloadsApi.cancel)
+  }
+  React.useEffect(() => { if (!running) setCancelling(false) }, [running])
 
   if (!job) {
     return (
@@ -370,7 +382,11 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title={<Crumb onBack={onBack} title={job.title} />}>
-        {running && <Button size="sm" variant="outline" onClick={() => act(downloadsApi.cancel)}>取消下载</Button>}
+        {running && (
+          <Button size="sm" variant="outline" disabled={cancelling} onClick={cancel}>
+            {cancelling ? <><LoaderIcon className="animate-spin" />正在停止…</> : "取消下载"}
+          </Button>
+        )}
         {!running && missing.length > 0 && (
           <Button size="sm" variant="outline" onClick={() => act(async () => onStarted((await downloadsApi.start(missing, `重试 · ${job.title}`, job.session ?? undefined)).job))}>
             重试未完成项（{missing.length}）
@@ -401,8 +417,9 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
             <span className="min-w-0 flex-1">{a.message}</span>
             {/* A paper waiting for the user's login or check: the user may decline it. */}
             {key.startsWith("wait:") && (
-              <Button size="sm" variant="outline" className="shrink-0" onClick={() => act(() => downloadsApi.skip(key.slice(5)))}>
-                跳过这篇
+              <Button size="sm" variant="outline" className="shrink-0" disabled={skipping.has(key.slice(5).toLowerCase())}
+                onClick={() => skip(key.slice(5))}>
+                {skipping.has(key.slice(5).toLowerCase()) ? "正在跳过…" : "跳过这篇"}
               </Button>
             )}
           </div>
@@ -423,7 +440,12 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
               <div className="text-xs text-muted-foreground">
                 {[metaLine(it), it.source && it.status === "done" ? `来源：${it.source}` : null].filter(Boolean).join(" · ") || it.doi}
               </div>
-              {it.status === "waiting" && running && (it.stage || it.retrying) && (
+              {it.status === "waiting" && running && (skipping.has(it.doi.toLowerCase()) || cancelling) && (
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <LoaderIcon className="size-3 animate-spin" />{cancelling ? "正在停止…" : "正在跳过，等手上的来源收尾…"}
+                </div>
+              )}
+              {it.status === "waiting" && running && !skipping.has(it.doi.toLowerCase()) && !cancelling && (it.stage || it.retrying) && (
                 <div className="mt-0.5 flex items-center gap-1.5 text-xs text-primary">
                   <LoaderIcon className="size-3 animate-spin" />{it.stage ?? "换渠道重试中"}
                 </div>
@@ -441,8 +463,8 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
             {it.file && (
               <RowAction label="打开 PDF" onClick={() => act(() => downloadsApi.open(it.file!))}><FileTextIcon /></RowAction>
             )}
-            {running && it.status === "waiting" && (
-              <RowAction label="跳过这篇" hover onClick={() => act(() => downloadsApi.skip(it.doi))}><SkipForwardIcon /></RowAction>
+            {running && it.status === "waiting" && !skipping.has(it.doi.toLowerCase()) && !cancelling && (
+              <RowAction label="跳过这篇" hover onClick={() => skip(it.doi)}><SkipForwardIcon /></RowAction>
             )}
           </li>
         ))}

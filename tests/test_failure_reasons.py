@@ -87,3 +87,14 @@ def test_a_browser_step_without_a_result_keeps_its_reason():
     assert att.last_error == ("paywall", "login_required")
     r = {"success": False, "error": "no PDF found", "attempts": att.steps}
     assert error_text.reason(error_text.pick_failure(r)) == "需要订阅才能下载"
+
+
+@pytest.mark.parametrize("raw, shown", [
+    ("Unpaywall needs the user's real email address - only a placeholder is configured", "邮箱"),
+    ("Unpaywall rejected the configured email address (HTTP 422)", "邮箱"),
+    ("download exception: KeyError", "下载过程出错"),
+    ("missing result", "下载过程出错"),
+    ("invalid", "下载过程出错"),
+])
+def test_config_and_internal_failures_are_not_called_paywalls(raw, shown):
+    assert shown in error_text.reason(raw)

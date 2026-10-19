@@ -3,6 +3,13 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-19：出版商官网：先看页面说什么，再决定等不等
+
+- 下载验收（2026-10-19，Springer 书章，北航没订）：章节页 11:46:18 就出来了，程序固定找 PDF 链接 20 秒、刷新、再找 10 秒；登录后又来一遍；共约 80 秒白等。页面明明写着 “Access this chapter / Log in via an institution”。用户确认：同一句话登录前只说明还没登录，登录后才说明学校没订。
+- 改为（`_publisher_strategies_core._wait_for_pdf_link`）：页面请求停下（最多 10 秒）后先看一眼：有 PDF 链接或 View/Download PDF 按钮就下；在卖这篇或要求登录，3 秒后再确认一次，仍是这样就不等了（登录前去登录，登录后判“学校没有订阅”）；两样都没有（ScienceDirect 权限晚到的那种），照旧找 18 秒、刷新、再找 8 秒。
+- 页面读法（`_page_access`，DeepSeek 验收第 2 条）：只读文章主体（`main` / `article`），去掉侧栏、推荐、导航、Cookie 横幅；有 View/Download PDF 就不算没权限；“在卖”要么是明确说法（Buy article / Buy chapter / Purchase PDF / You do not have access 等），要么购买字样和价格同时出现；不再单认 “get access”（“Get access through your institution” 在有权限的页面也有）。“学校没有订阅”的记录过期时从表里删掉。
+- 同批：DeepSeek 验收第 1 条（Elsevier 异步 PDF 捕获 3 元组）、第 6 条（`main.py publisher-batch` 报数）、第 9 条（Unpaywall 不再算付费墙）、第 10 条（学校登录窗口始终可见）、第 11 条（测试不联网）；下载页跳过 / 取消立即有反馈；排队文案如实说明有没有查 Sci-Hub。
+
 ## 2026-10-19：下载页「粘贴 DOI」
 
 - 用户要求（2026-10-19）：下载页原来只能从筛选会话里“选中下载”的文献生成待下载列表，不在筛选里的文献没法下。

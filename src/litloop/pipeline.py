@@ -652,8 +652,13 @@ def run_scihub_then_single(
         _progress.update(phase="逐篇下载")
         use_vpnsci = bool(config.get("vpnsci_enabled") or config.get("ezproxy_enabled"))
         with ThreadPoolExecutor(max_workers=max(1, min(workers, len(left)))) as ex:
+            searched = set(grey_ids) if grey_ids and allow_grey and grey_allowed(config) else set()
             for i in left:
-                _progress.item_stage(i, "排队中：Sci-Hub 未找到，将逐篇查找")
+                # Say what really happened: only papers the Sci-Hub round asked were "not found" there.
+                why = ("Sci-Hub 未找到" if i in searched
+                       else "发表较新，不查 Sci-Hub" if allow_grey and grey_allowed(config) and too_new(i, config)
+                       else "")
+                _progress.item_stage(i, f"排队中：{why}，将逐篇查找" if why else "排队中，将逐篇查找")
 
             def _staged(i: str) -> dict[str, Any]:
                 _progress.update(current=i)

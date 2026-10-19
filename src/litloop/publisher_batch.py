@@ -932,6 +932,9 @@ class PublisherBatchDownloader:
         config = dict(self.config)
         if proxy:
             config["browser_static_proxy"] = proxy
+        # The user signs in to their school in this window: always visible, whatever
+        # browser_headless says (institutional/'s copy forced it; kept after the merge).
+        config["browser_headless"] = False
         ctx = get_persistent_context(profile_path, config)
         # Record the binding so _fetch_pdf_url can route plain-HTTP requests
         # through the same proxy as this context's browser traffic.
@@ -1070,14 +1073,6 @@ class PublisherBatchDownloader:
                     result.title = self._title(page)
                     self._write_diagnostic(page, result, run_dir)
                     return result
-
-            if not pdf_bytes:
-                result.reason = "pdf_not_captured"
-                result.state = "pdf_not_captured"
-                result.final_url = page.url
-                result.title = self._title(page)
-                self._write_diagnostic(page, result, run_dir)
-                return result
 
             if not pdf_bytes:
                 result.reason = "pdf_not_captured"
@@ -2505,7 +2500,8 @@ class PublisherBatchDownloader:
                 if not self._is_pdf_candidate_url(candidate_url) or self._is_supplementary_url(candidate_url):
                     continue
                 self._event(result, "pdf_state_candidate", candidate_url)
-                body, final_url = self._fetch_pdf_url_with_browser_state(candidate_url, page)
+                # (body, final_url, block_reason): the root module's helper reports IP blocks too.
+                body, final_url, _block = self._fetch_pdf_url_with_browser_state(candidate_url, page)
                 if body:
                     return body, final_url
             time.sleep(2)

@@ -20,6 +20,28 @@
 
 - [x] 下载页「粘贴 DOI」（2026-10-19 用户要求：原来只能从筛选会话选中下载）：粘贴任意文本，认出 DOI、doi.org 和出版商链接里的 DOI、arXiv 编号，边输边显示认出几篇、几篇已下载过、几行认不出，命名后开始下载。见 DECISIONS。待重启 app 后实测。
 
+**DeepSeek 验收（2026-10-19，复核 `d06654a..6ebc61d`；已逐条核实，按此顺序改）**
+1. [x] Elsevier 异步 PDF 捕获按 2 元组解包 3 元组，CLI / 批量的学校通道必失败（合并带来）。
+2. [x] “页面仍在卖这篇”误判（“Get access through your institution”、推荐文章的 Purchase PDF）；随“先看页面状态再决定”一起改，见 DECISIONS「出版商官网：先看页面说什么」。
+3. [ ] 最终失败原因取最后一条通道，不按 `_FAILURE_ORDER` 选最说明问题的一条。
+4. [ ] 同一篇重试时，上一轮迟到的通道把步骤和错误写进新的 `DownloadAttempt`（按 DOI 反查登记表）。
+5. [ ] app 的大批量任务（>30 篇，走车道）拿不到失败原因和“尝试经过”（MCP 出口剥掉 `attempts` 时一起剥了）。
+6. [x] `main.py publisher-batch` 读不存在的 `summary["results"]`，永远报 0 篇。
+7. [ ] 还有三处开浏览器不带所属文献：`_batch_institutional_phase`、`pipeline._inst_fetch_chunk`、`pipeline._si_one`。
+8. [ ] Sci-Hub 池线程复用一个浏览器，按篇的所属与共享冲突：跳过 A 可能关掉 B 正在用的浏览器。
+9. [x] `paywall` 规则匹配到 Unpaywall（没填邮箱被说成需要订阅）；`download exception` 等内部原因补文案。
+10. [x] 合并后学校登录窗口跟随 `browser_headless`，改为始终可见。
+11. [x] `test_login_no_access` 会真的联网。
+12. [ ] 回归测试补齐（随各项）；`institutional_download` 成功后不清“学校没有订阅”的记录。
+13. [~] 小问题：重复的 `if not pdf_bytes` 块（已删）；`instsci_bridge.try_institutional` 已无调用方；`_SESSION_LOCKS` 不回收；下载成功后再点跳过会残留一次；`not_entitled_after_login` 只记事件、没写进失败原因。
+
+- [x] 下载页“跳过这篇”“取消下载”点了立即显示“正在跳过…”“正在停止…”（2026-10-19 用户提出：原来要等几秒才有变化）。
+- [x] 逐篇下载排队时如实说明（2026-10-19 用户发现：没查 Sci-Hub 的新文献也写“Sci-Hub 未找到”）：查过没找到写“Sci-Hub 未找到”，按年份跳过的写“发表较新，不查 Sci-Hub”。
+- [ ] Springer 选择机构页搜学校约 30 秒（11:47:26 → 11:47:57），查能否在地址里直接带上学校。
+- [ ] 后台 11:48:03 已在等用户登录，app 的提示 11:48:39 才出现，查延迟在哪。
+- [ ] Sci-Hub 一轮开始前又探测一次镜像（15 秒），测速刚做过，查能否直接用测速结果。
+- [ ] “粘贴 DOI”进来的文献没有年份，Sci-Hub 按年份跳过不起作用：解析时顺便查年份（Crossref / OpenAlex）。
+
 **还没做的（从 2026-10-17 的计划里留下）**
 - [ ] 批量引擎：浏览器下载超过竞速时限后“迟到的成功”没算进车道结果，冷却重试又下了一遍（ceramint.2024.08.002）。（2026-10-18 从 DECISIONS 移回）
 - [ ] 下载慢：开始前用 Crossref / doi.org 验证 DOI（不存在的 DOI 跑完了所有车道）；车道不必等整批走完；Sci-Hub 镜像找到 PDF 但传输慢时被 45 秒窗口判失败；arXiv 进度用编号汇报、下载任务对不上 DOI。（2026-10-18 从 DECISIONS 移回）

@@ -808,14 +808,8 @@ def publisher_batch_cmd(
     downloader = PublisherBatchDownloader(config, profile=profile)
     records = [PaperRecord(doi=d) for d in dois]
     summary = downloader.run_records(records, output)
-    results = summary.get("results", []) if isinstance(summary, dict) else []
-
-    def _ok(r: Any) -> bool:
-        if isinstance(r, dict):
-            return bool(r.get("ok"))
-        return bool(getattr(r, "ok", False))
-
-    success = sum(1 for r in results if _ok(r))
+    # run_records returns counts (count, success, missing, ...), not the results themselves.
+    success = int(summary.get("success") or 0) if isinstance(summary, dict) else 0
     print(f"\n  Results: {success}/{len(dois)} downloaded")
 
 

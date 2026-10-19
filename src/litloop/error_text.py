@@ -50,7 +50,9 @@ _RULES: list[tuple[str, str, str]] = [
     (r"\b40[13]\b|forbidden|unauthori[sz]ed", "出版商拒绝访问，可能需要学校认证", "连接校园网或在「设置 → 学校认证」中登录后重试"),
     (r"\b404\b|not found", "出版商处找不到此文献", ""),
     (r"timed? ?out|timeout", "连接超时", "检查网络后重试"),
-    (r"paywall", "需要订阅才能下载", "连接校园网或在「设置 → 学校认证」中登录后重试"),
+    (r"Unpaywall.*email|email.*Unpaywall", "Unpaywall 需要你的真实邮箱", "在设置中填写联系邮箱"),
+    (r"\bpaywall\b", "需要订阅才能下载", "连接校园网或在「设置 → 学校认证」中登录后重试"),
+    (r"download exception|missing result|^invalid$", "下载过程出错", "详情已写入日志，可重试"),
     (r"^no result$|all sources failed|no source|no PDF found", "所有来源都没有找到 PDF", ""),
     (r"unrecognized identifier|invalid DOI", "无法识别的 DOI", "检查 DOI 是否完整"),
 ]

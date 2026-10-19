@@ -89,3 +89,14 @@ def test_cancel_stops_the_papers_not_yet_started(calls, monkeypatch, tmp_path: P
     results = pipeline.run_scihub_then_single(entries, tmp_path, config={}, allow_grey=False)
     assert [c[0] for c in calls] == ["10.1/subscription"]           # the next paper never started
     assert {r["doi"]: r.get("error_type") for r in results}["10.1/nowhere"] == "cancelled"
+
+
+def test_queued_papers_say_why_they_wait(calls, monkeypatch, tmp_path: Path):
+    """Only papers the Sci-Hub round asked are "not found" there; new ones were never asked."""
+    stages = {}
+    import litloop.progress_reporter as pr
+    monkeypatch.setattr(pr, "item_stage", lambda i, s: s.startswith("排队中") and stages.setdefault(i, s))
+    entries = [QueueEntry(identifier=d) for d in ("10.1/subscription", "10.1016/j.jallcom.2025.179147")]
+    pipeline.run_scihub_then_single(entries, tmp_path, config={"scihub_skip_from_year": 2024})
+    assert stages["10.1/subscription"] == "排队中：Sci-Hub 未找到，将逐篇查找"
+    assert stages["10.1016/j.jallcom.2025.179147"] == "排队中：发表较新，不查 Sci-Hub，将逐篇查找"

@@ -54,3 +54,32 @@ def test_back_on_the_article_after_the_school_sign_in_counts_as_not_entitled(mon
 def test_optica_profile_is_in_the_one_registry():
     from litloop.publisher_profiles import infer_publisher_profile
     assert infer_publisher_profile("10.1364/ol.47.013297").name == "Optica"
+
+
+def test_async_pdf_navigation_takes_the_three_part_helper_result(monkeypatch):
+    """DeepSeek review 2026-10-19: the helper returns (body, url, block) since the
+    IP-block work; this caller still unpacked two and raised on every Elsevier paper."""
+    d = _downloader("elsevier")
+    d.pdf_timeout_ms = 10_000
+    result = pb.DownloadResult(doi="10.1016/x", status="pending")
+    page = SimpleNamespace(url="https://www.sciencedirect.com/x", evaluate=lambda *a: None)
+    monkeypatch.setattr(d, "_is_challenge_page", lambda p: False)
+    monkeypatch.setattr(d, "_page_state_pdf_urls", lambda p: ["https://pdf.sciencedirectassets.com/x.pdf"])
+    monkeypatch.setattr(d, "_is_pdf_candidate_url", lambda u: True)
+    monkeypatch.setattr(d, "_is_supplementary_url", lambda u: False)
+    monkeypatch.setattr(d, "_fetch_pdf_url_with_browser_state", lambda u, p: (b"%PDF-1.7", u, None))
+    assert d._capture_pdf_via_async_navigation(page, "https://x/pdfft", result) == \
+        (b"%PDF-1.7", "https://pdf.sciencedirectassets.com/x.pdf")
+
+
+def test_the_school_login_window_is_always_visible(monkeypatch):
+    d = _downloader("elsevier")
+    d.config = {"browser_headless": True}
+    d._context_proxy = {}
+    seen = {}
+    import litloop.browser_engine as be
+    monkeypatch.setattr(be, "get_persistent_context", lambda path, cfg: seen.update(cfg) or object())
+    monkeypatch.setattr(pb, "_resolve_profile_dir", lambda cfg, explicit=None: pb.Path(__file__).parent / "_unused_profile")
+    monkeypatch.setattr(pb.Path, "mkdir", lambda self, **k: None)
+    d._launch_context()
+    assert seen["browser_headless"] is False
