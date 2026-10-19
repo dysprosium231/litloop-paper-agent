@@ -359,9 +359,8 @@ def open_login_browser(
             try:
                 live = [p for p in context.pages if not p.is_closed()]
                 if live:
-                    live[-1].wait_for_timeout(2000)
-                else:
-                    time.sleep(2)
+                    live[-1].title()  # lets the driver deliver events; raises if the browser is gone
+                time.sleep(2)  # not wait_for_timeout: it hangs on a page stuck loading
             except Exception:
                 time.sleep(2)
             elapsed += 2

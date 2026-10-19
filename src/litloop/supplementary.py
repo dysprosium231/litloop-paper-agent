@@ -8,6 +8,7 @@ cookies for the attachment downloads. SI failure never fails the main download.
 from __future__ import annotations
 
 import re
+import time
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -159,7 +160,7 @@ def _browser_page(article_url: str, config: dict, timeout: int):
 
     try:
         page.goto(article_url, wait_until="domcontentloaded", timeout=max(timeout, 45) * 1000)
-        page.wait_for_timeout(2500)
+        time.sleep(2.5)  # not page.wait_for_timeout: it hangs on a page stuck loading
         html = page.content()
 
         def fetch_bytes(url: str):

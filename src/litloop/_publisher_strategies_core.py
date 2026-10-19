@@ -618,7 +618,7 @@ def _wait_login_in_tab(tab_id: str, config: dict[str, Any], publisher: str, idp_
     for _ in range(100):  # ~5 min
         _user_waiting("login", page)
         try:
-            page.wait_for_timeout(3000)
+            time.sleep(3)  # not page.wait_for_timeout: it hangs on a page stuck loading
             title = page.title() or ""
             url = page.url or ""
         except Exception:
@@ -847,6 +847,12 @@ def _visible_browser_download(
             if not href:
                 return None
             log.info(f"   [{publisher}] page PDF link: {href[:80]}")
+            try:  # as the headless path says it (2026-10-19: this one stayed on "opening the window")
+                from . import progress_reporter as _pr
+                _pr.item_stage(doi, f"在 {publisher} 找到 PDF 链接，正在打开" if publisher not in ("", "Unknown")
+                               else "在出版商官网找到 PDF 链接，正在打开")
+            except Exception:
+                pass
             body = capture_pdf_via_cdp(context, page, href)
             if body:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -920,7 +926,21 @@ def _visible_browser_download(
                 si = sso_page.query_selector(sel)
                 if not si:
                     continue
-                si.fill(idp_en)
+                # fill() first waits for the box to take input, by default up
+                # to 30 s, outside the polling below (2026-10-19: Springer's
+                # WAYF still took 30.5 s after the polling fix).
+                # Not ready in 5 s (covered by a banner, still animating): type
+                # into it anyway, which skips those checks.
+                try:
+                    si.fill(idp_en, timeout=5000)
+                except Exception:
+                    try:
+                        si.fill(idp_en, force=True, timeout=3000)
+                        log.info(f"   [{publisher}] institution search via {sel!r}: box not ready, typed in anyway")
+                    except Exception as exc:
+                        log.info(f"   [{publisher}] institution search via {sel!r}: cannot type "
+                                 f"({type(exc).__name__}) after {time.time() - t_pick:.1f}s")
+                        continue
                 clicked = False
                 for _ in range(16):  # up to 8 s for the results to appear
                     time.sleep(0.5)
@@ -1112,7 +1132,15 @@ def _try_browser_fetch_pdf(page: Any, paths: list[str]) -> bytes | None:
 # Sites whose bot wall answers plain HTTP clients with 403 whatever cookies
 # they carry (the clearance is bound to the browser fingerprint). The direct
 # HTTP try only delayed the browser: pubs.acs.org takes ~12.6 s to say 403.
-_HTTP_DIRECT_BLOCKED = frozenset({"ACS", "Wiley", "RSC", "IOP"})
+# Publishers whose PDF URLs never answer a plain HTTP request (Cloudflare and
+# the like): skip straight to the browser. SAGE added 2026-10-19: two direct
+# tries at journals.sagepub.com hung 20.8 + 31.6 s before failing, every paper.
+_HTTP_DIRECT_BLOCKED = frozenset({"ACS", "Wiley", "RSC", "IOP", "SAGE"})
+
+# Hosts whose direct PDF request timed out: skipped for _STALLED_HOST_SECONDS
+# (自定值), so a site that hangs costs one timeout per session, not one per paper.
+_STALLED_HOSTS: dict[str, float] = {}
+_STALLED_HOST_SECONDS = 1800
 
 
 def _direct_pdf_urls(doi: str, publisher: str) -> list[str]:
@@ -1621,12 +1649,23 @@ def _try_http_download(
     config: dict[str, Any],
     cookies: dict[str, str] | None = None,
 ) -> bool:
-    """Try direct HTTP download of a PDF URL. Returns True on success."""
+    """Try direct HTTP download of a PDF URL. Returns True on success.
+
+    A host that timed out is skipped for a while (``_STALLED_HOSTS``); every
+    failure says why and how long it took (2026-10-19: SAGE's two silent
+    timeouts cost 52 s a paper and showed nowhere in the log)."""
     import requests
+    from urllib.parse import urlparse
     from .network import USER_AGENT
     from .pdf_utils import _response_looks_pdf, is_pdf_file
     from .sources.publishers import _write_pdf_atomic, _load_publisher_cookies
 
+    host = (urlparse(pdf_url).hostname or "").lower()
+    stalled_at = _STALLED_HOSTS.get(host)
+    if stalled_at and time.time() - stalled_at < _STALLED_HOST_SECONDS:
+        log.info(f"   direct PDF: skipped {host} (it timed out {time.time() - stalled_at:.0f}s ago)")
+        return False
+    t_start = time.time()
     try:
         s = requests.Session()
         s.trust_env = False
@@ -1641,11 +1680,13 @@ def _try_http_download(
                      allow_redirects=True)
 
         if resp.status_code >= 400:
+            log.info(f"   direct PDF: HTTP {resp.status_code} from {host} ({time.time() - t_start:.1f}s)")
             return False
 
         iterator = resp.iter_content(chunk_size=8192)
         first = next(iterator, b"")
         if not _response_looks_pdf(resp, first):
+            log.info(f"   direct PDF: not a PDF from {host} ({time.time() - t_start:.1f}s)")
             return False
 
         # timeout=20 bounds each read, not the transfer: a server that trickles
@@ -1663,7 +1704,13 @@ def _try_http_download(
         if not _write_pdf_atomic(output_path, first, _bounded(iterator)):
             return False
         return is_pdf_file(output_path)
-    except Exception:
+    except (requests.Timeout, requests.ConnectionError) as exc:
+        if isinstance(exc, requests.Timeout):
+            _STALLED_HOSTS[host] = time.time()
+        log.info(f"   direct PDF: {type(exc).__name__} from {host} after {time.time() - t_start:.1f}s")
+        return False
+    except Exception as exc:
+        log.info(f"   direct PDF: {type(exc).__name__} from {host} after {time.time() - t_start:.1f}s")
         return False
 
 

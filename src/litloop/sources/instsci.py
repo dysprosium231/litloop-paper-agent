@@ -862,7 +862,7 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
             for i in range(100):
                 note_user_waiting("login")  # the race waits, the app asks the user; stops if the paper is done
                 try:
-                    page.wait_for_timeout(3000)
+                    time.sleep(3)  # not page.wait_for_timeout: it hangs on a page stuck loading
                     # Post-login SAML/redirect hops also pass through interstitials
                     # without auth keywords; wait for them before declaring success.
                     title, url_now = wait_page_settled(page, max_wait_s=15)

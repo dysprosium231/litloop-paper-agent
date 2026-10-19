@@ -64,6 +64,20 @@ PAGE_PDF_LINK_JS = """
 """
 
 
+_GONE_MARKERS = ("driver is gone", "has been closed", "browser has disconnected", "target closed",
+                 "connection closed")
+
+
+def browser_gone(exc: BaseException) -> bool:
+    """The page's browser is no longer there (killed by a skip or a cancel, or closed).
+
+    The waiting helpers below used to swallow this like any other error and keep
+    waiting out their whole budget (2026-10-19: a skipped paper took 101 s to
+    stop, three helpers of ~35 s each on a browser already killed)."""
+    text = str(exc).lower()
+    return any(m in text for m in _GONE_MARKERS)
+
+
 def wait_page_settled(page: Any, max_wait_s: float = 30.0) -> tuple[str, str]:
     """Wait until the page leaves interstitial/redirect states; return (title, url).
 
@@ -76,12 +90,15 @@ def wait_page_settled(page: Any, max_wait_s: float = 30.0) -> tuple[str, str]:
     while waited < max_wait_s:
         try:
             page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
+        except Exception as exc:
+            if browser_gone(exc):
+                return "", ""
         try:
             title = page.title() or ""
             url = page.url or ""
-        except Exception:
+        except Exception as exc:
+            if browser_gone(exc):
+                return "", ""
             title, url = "", ""
         low = title.strip().lower()
         if low and not any(low.startswith(t) or t in low for t in _LOADING_TITLES):
@@ -118,7 +135,9 @@ def wait_url_stable(page: Any, max_wait_s: float = 45.0) -> str:
         try:
             url = page.url or ""
             state = page.evaluate("document.readyState")
-        except Exception:
+        except Exception as exc:
+            if browser_gone(exc):
+                return prev
             url, state = "", ""
         host = url.split("/")[2] if url.count("/") >= 2 else ""
         in_transit = any(t in host for t in _TRANSIT_HOSTS)
@@ -128,10 +147,7 @@ def wait_url_stable(page: Any, max_wait_s: float = 45.0) -> str:
         if url and url == prev and state in ("interactive", "complete") and not in_transit:
             return url
         prev = url
-        try:
-            page.wait_for_timeout(1000)
-        except Exception:
-            return url
+        time.sleep(1.0)  # not page.wait_for_timeout: it hangs on a page stuck loading
         waited += 1.0
     return prev
 
@@ -150,8 +166,9 @@ def find_page_pdf_link(page: Any, max_wait_s: float = 15.0, doi: str = "") -> st
             href = page.evaluate(PAGE_PDF_LINK_JS, doi or "")
             if href:
                 return href
-        except Exception:
-            pass
+        except Exception as exc:
+            if browser_gone(exc):
+                return None
         time.sleep(0.5)  # not page.wait_for_timeout: it hangs on a page stuck loading
     return None
 
