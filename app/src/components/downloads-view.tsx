@@ -14,6 +14,7 @@ import {
   type JobState,
   type LiveDownload,
   type PastedList,
+  type ResolvedLine,
   type PendingGroup,
   type ZoteroCollection,
   errorMessage,
@@ -127,14 +128,31 @@ function PasteList({ busy, onStart, onClose }: {
   const [title, setTitle] = React.useState(() => `粘贴的清单 · ${new Date().toLocaleDateString("zh-CN")}`)
   const [parsed, setParsed] = React.useState<PastedList | null>(null)
   const [error, setError] = React.useState<string | null>(null)
+  const [resolved, setResolved] = React.useState<ResolvedLine[] | null>(null)
+  const [resolving, setResolving] = React.useState(false)
   React.useEffect(() => {
+    setResolved(null)
     if (!text.trim()) { setParsed(null); return }
     const t = setTimeout(() => {
       downloadsApi.parse(text).then((p) => { setParsed(p); setError(null) }).catch((e) => setError(errorMessage(e)))
     }, 300)
     return () => clearTimeout(t)
   }, [text])
-  const n = parsed?.papers.length ?? 0
+  const found = (resolved ?? []).filter((r) => r.doi)
+  const notFound = (resolved ?? []).filter((r) => !r.doi)
+  const papers = React.useMemo(() => {
+    const seen = new Set((parsed?.papers ?? []).map((p) => p.doi))
+    return [...(parsed?.papers ?? []), ...found.filter((r) => !seen.has(r.doi!)).map((r) => ({ doi: r.doi!, title: r.title, year: r.year }))]
+  }, [parsed, found])
+  const n = papers.length
+  const resolve = () => {
+    if (!parsed) return
+    setResolving(true)
+    downloadsApi.resolve(parsed.unrecognized)
+      .then((r) => { setResolved(r.results); setError(null) })
+      .catch((e) => setError(errorMessage(e)))
+      .finally(() => setResolving(false))
+  }
   return (
     <Card className="mb-4 space-y-3 px-5 py-4">
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} autoFocus
@@ -148,13 +166,43 @@ function PasteList({ busy, onStart, onClose }: {
             {parsed.downloaded.length > 0 && `，其中 ${parsed.downloaded.length} 篇已下载过（保存位置里有文件的不会重新下载）`}
             {parsed.too_many && "，一次最多 2000 篇，其余未加入"}
           </p>
-          {parsed.unrecognized_count > 0 && (
-            <details>
-              <summary className="cursor-pointer">{parsed.unrecognized_count} 行没有找到 DOI 或 arXiv 编号</summary>
-              <ul className="mt-1 space-y-0.5 pl-4">
-                {parsed.unrecognized.map((l, i) => <li key={i} className="truncate">{l}</li>)}
-              </ul>
-            </details>
+          {parsed.unrecognized_count > 0 && !resolved && (
+            <div className="flex items-center gap-2">
+              <details className="min-w-0 flex-1">
+                <summary className="cursor-pointer">{parsed.unrecognized_count} 行没有找到 DOI 或 arXiv 编号</summary>
+                <ul className="mt-1 space-y-0.5 pl-4">
+                  {parsed.unrecognized.map((l, i) => <li key={i} className="truncate">{l}</li>)}
+                </ul>
+              </details>
+              <Button size="sm" variant="outline" disabled={resolving} onClick={resolve}>
+                {resolving ? <><LoaderIcon className="animate-spin" />正在查找…</> : `按参考文献查找 DOI（${Math.min(parsed.unrecognized_count, 100)} 行）`}
+              </Button>
+            </div>
+          )}
+          {resolved && (
+            <>
+              {found.length > 0 && (
+                <details open>
+                  <summary className="cursor-pointer">按参考文献找到 {found.length} 篇，已加入，请核对标题</summary>
+                  <ul className="mt-1 space-y-1 pl-4">
+                    {found.map((r, i) => (
+                      <li key={i} className="truncate" title={r.line}>
+                        <span className="text-foreground">{r.title}</span>
+                        <span className="ml-2">{[r.year, r.doi].filter(Boolean).join(" · ")}{r.downloaded ? " · 已下载过" : ""}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {notFound.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer">{notFound.length} 行仍没有找到</summary>
+                  <ul className="mt-1 space-y-0.5 pl-4">
+                    {notFound.map((r, i) => <li key={i} className="truncate">{r.line}</li>)}
+                  </ul>
+                </details>
+              )}
+            </>
           )}
         </div>
       )}
@@ -163,7 +211,7 @@ function PasteList({ busy, onStart, onClose }: {
         <div className="flex-1" />
         <Button size="sm" variant="ghost" onClick={onClose}>取消</Button>
         <Button size="sm" disabled={busy || n === 0 || !title.trim()}
-          onClick={() => parsed && onStart(parsed.papers, title.trim())}>
+          onClick={() => n > 0 && onStart(papers, title.trim())}>
           开始下载{n > 0 ? ` ${n} 篇` : ""}
         </Button>
       </div>

@@ -383,6 +383,15 @@ export interface PastedList {
   downloaded: string[]
 }
 
+/** A pasted line looked up on Crossref: found (doi, title) or not. */
+export interface ResolvedLine {
+  line: string
+  doi?: string
+  title?: string
+  year?: number | null
+  downloaded?: boolean
+}
+
 export const downloadsApi = {
   list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; external: LiveDownload | null; pushing: string | null; output_dir: string }>("/api/downloads"),
   pending: () => call<PendingGroup[]>("/api/downloads/pending"),
@@ -390,6 +399,7 @@ export const downloadsApi = {
   start: (papers: PendingGroup["papers"], title: string, session?: string, zoteroTarget?: string) =>
     call<DownloadJob>("/api/downloads", { papers, title, session: session ?? null, zotero_target: zoteroTarget ?? null }),
   parse: (text: string) => call<PastedList>("/api/downloads/parse", { text }),
+  resolve: (lines: string[]) => call<{ results: ResolvedLine[] }>("/api/downloads/resolve", { lines }),
   cancel: () => call<{ cancelled: boolean }>("/api/downloads/cancel", {}),
   skip: (doi: string) => call<{ skipped: boolean }>("/api/downloads/skip", { doi }),
   open: (path: string) => call<{ opened: string }>("/api/open", { path }),

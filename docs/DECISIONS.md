@@ -3,6 +3,11 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-19：盘点没人用的代码；“粘贴 DOI”认整段参考文献
+
+- 用户要求找出残留代码，并问哪些对现在的工作有用。导入关系图找出 13 个没人导入的文件（约 1400 行）；vulture 列出约 40 个没人调用的函数。核对时发现 vulture 有误报（`proxy_check.litloop_paths` 经 `模块.函数` 调用，设置页“网络”的 v2rayN 步骤已在列出程序完整路径），所以删除前每个名字都要在源码、测试、脚本、app、技能文档里全文搜过（用户：彻底删除前一定要慎重）。
+- 有用的：`identifiers.normalize_doi_unicode` 的思路并进 `extract_identifiers`（PDF 里复制的 Unicode 连字符、不换行空格）；整段参考文献按 Crossref `query.bibliographic` 查 DOI（`resolver.resolve_reference(s)`，经 `quota` 限速和礼貌池，免费；不用 OpenAlex 按标题搜，那样每篇约 10 积分），标题词 85% 以上在这一行里才算找到；`POST /api/downloads/resolve`，只在用户点按钮时查，一次最多 100 行。`_is_elsevier_pdf_security` 不用：人机验证的标题词里已有 “verify”。
+
 ## 2026-10-19：Agent 和命令行的下载在 app 里也看得到
 
 - 用户问旧的“LitLoop · 进度”小窗口（`progress_bar.py`）还有没有用：命令行和 Agent（MCP）下载是独立进程，app 下载页原来只显示 app 自己的任务，看不到它们，小窗口是唯一能看到进度和“请登录”提示的地方；在 app 里“新建检索”交给 Agent、Agent 再下载时也是这样。

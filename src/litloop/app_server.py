@@ -86,6 +86,10 @@ class PastedList(BaseModel):
     text: str
 
 
+class ReferenceLines(BaseModel):
+    lines: list[str]
+
+
 class ZoteroCheck(BaseModel):
     key: str
 
@@ -578,9 +582,24 @@ def create_app(token: str) -> FastAPI:
         from .identifiers import extract_identifiers
         dois, unrecognized = extract_identifiers(body.text[:200_000])
         got = {k for d in download_jobs.downloaded_dois() for k in download_jobs.same_paper(d)}
-        return {"papers": [{"doi": d} for d in dois[:2000]], "unrecognized": unrecognized[:50],
+        return {"papers": [{"doi": d} for d in dois[:2000]], "unrecognized": unrecognized[:100],
                 "unrecognized_count": len(unrecognized), "too_many": len(dois) > 2000,
                 "downloaded": [d for d in dois if download_jobs.same_paper(d) & got]}
+
+    @app.post("/api/downloads/resolve")
+    def downloads_resolve(body: ReferenceLines) -> dict[str, Any]:
+        """Pasted lines with no DOI (reference-list entries, titles): look each up
+        on Crossref. Only when the user asks (a button), at most 100 lines."""
+        from . import download_jobs
+        from .config import load_config
+        from .resolver import resolve_references
+        lines = [ln.strip() for ln in body.lines if ln.strip()][:100]
+        rows = resolve_references(lines, load_config())
+        got = {k for d in download_jobs.downloaded_dois() for k in download_jobs.same_paper(d)}
+        for r in rows:
+            if r.get("doi"):
+                r["downloaded"] = bool(download_jobs.same_paper(r["doi"]) & got)
+        return {"results": rows}
 
     @app.post("/api/downloads/skip")
     def download_skip(body: SkipPaper) -> dict[str, Any]:

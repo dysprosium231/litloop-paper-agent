@@ -80,7 +80,11 @@ def extract_identifiers(text: str) -> tuple[list[str], list[str]]:
             seen.add(doi)
             found.append(doi)
 
-    for line in (text or "").splitlines():
+    # Copied from PDFs: Unicode hyphens and dashes inside DOIs, non-breaking and
+    # zero-width spaces (normalize_doi_unicode had the same idea, for one DOI).
+    text = re.sub("[‐‑‒–—−]", "-", text or "")
+    text = re.sub("[ ​‌‍﻿]", " ", text)
+    for line in text.splitlines():
         if not line.strip():
             continue
         hits = 0

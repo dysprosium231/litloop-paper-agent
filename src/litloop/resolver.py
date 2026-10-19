@@ -14,6 +14,64 @@ log = logging.getLogger(__name__)
 TITLE_SIMILARITY_THRESHOLD = 0.75
 
 
+def _words(text: str) -> list[str]:
+    import re
+    return [w for w in re.findall(r"[a-z0-9]+", text.lower()) if len(w) > 2]
+
+
+def resolve_reference(line: str, config: dict[str, Any], timeout: float = 15.0) -> dict[str, Any] | None:
+    """The paper a reference line (or a bare title) names, by Crossref's
+    ``query.bibliographic`` (built for matching whole citations; free, and in
+    the polite pool with the contact email). Accepted only when nearly all of
+    the found title's words are in the line, so a near miss never becomes a
+    download. Returns {"doi", "title", "year"} or None."""
+    import requests
+
+    from . import quota
+    line = " ".join((line or "").split())
+    if len(line) < 15:
+        return None
+    email = str(config.get("email") or "").strip()
+    provider = "crossref_polite" if email else "crossref"
+    params = {"query.bibliographic": line[:600], "rows": 3, "select": "DOI,title,issued"}
+    if email:
+        params["mailto"] = email
+    try:
+        with quota.slot(provider):
+            r = requests.get("https://api.crossref.org/works", params=params, timeout=timeout)
+        quota.record("crossref", r)
+        if r.status_code != 200:
+            return None
+        items = r.json().get("message", {}).get("items", [])
+    except (requests.RequestException, ValueError):
+        return None
+    have = set(_words(line))
+    for it in items:
+        title = ((it.get("title") or [""])[0] or "").strip()
+        words = _words(title)
+        if len(words) < 3 or not it.get("DOI"):
+            continue
+        if sum(1 for w in words if w in have) / len(words) >= 0.85:
+            parts = (it.get("issued") or {}).get("date-parts") or [[None]]
+            return {"doi": str(it["DOI"]).lower(), "title": title, "year": parts[0][0] if parts and parts[0] else None}
+    return None
+
+
+def resolve_references(lines: list[str], config: dict[str, Any], budget_s: float = 60.0) -> list[dict[str, Any]]:
+    """resolve_reference for each line, three at a time (the polite pool's
+    limit), within ``budget_s``; [{"line", "doi", "title", "year"} | {"line"}]."""
+    from concurrent.futures import ThreadPoolExecutor, wait
+    ex = ThreadPoolExecutor(max_workers=3)
+    futs = [ex.submit(resolve_reference, ln, config) for ln in lines]
+    wait(futs, timeout=budget_s)
+    ex.shutdown(wait=False, cancel_futures=True)
+    out = []
+    for ln, f in zip(lines, futs):
+        hit = f.result() if f.done() and not f.cancelled() and f.exception() is None else None
+        out.append({"line": ln, **hit} if hit else {"line": ln})
+    return out
+
+
 def resolve_title_to_doi(title: str, config: dict[str, Any]) -> str | None:
     """Search OpenAlex by title and return best-matching DOI."""
     from .network import _get_session, request_timeout
