@@ -1324,6 +1324,7 @@ def download(
         if result.get("success"):
             from .._publisher_strategies_core import clear_no_access
             clear_no_access(key)
+            _SKIPPED.discard(key)  # a skip that came too late must not skip the next try
         return result
     finally:
         _DL_TLS.key = prev_key
@@ -2023,6 +2024,8 @@ def institutional_download(
     result = _run_institutional_sequence(inst_sources, doi, target_dir, output_path, config)
     if not result:
         return None
+    from .._publisher_strategies_core import clear_no_access
+    clear_no_access(doi)  # the school routes got it: "not subscribed" was wrong
     _update_doi_index(target_dir, doi, Path(result.get("file", "")), source=result.get("source") or "",
                       strategy=config.get("download_strategy", ""), config=config)
     _auto_rename(result, identifier, config, doi=doi, target_dir=target_dir)

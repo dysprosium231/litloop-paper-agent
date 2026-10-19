@@ -385,6 +385,9 @@ def _session_lock(session: str) -> threading.Lock:
     """One round at a time per session (the app's 继续检索 and the agent's next
     could otherwise rank the same pool, and its caches, at once)."""
     with _CACHES_LOCK:
+        if session not in _SESSION_LOCKS and len(_SESSION_LOCKS) >= 50:
+            for old in [s for s, lk in _SESSION_LOCKS.items() if not lk.locked()]:
+                del _SESSION_LOCKS[old]  # idle sessions' locks: made again if needed
         return _SESSION_LOCKS.setdefault(session, threading.Lock())
 
 

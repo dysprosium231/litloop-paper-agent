@@ -144,7 +144,7 @@ app 发起的下载，每次一个文件，由 app 后台的 `download_jobs.py` 
 - `items[].status`：`waiting` → `done` / `failed`。每篇一出结果就写入 `source`、`file`、`error`（逐篇下载的短清单；批量车道在整批结束时填入）。
 - `items[].error`：失败的原始原因。几条路都失败时取最说明问题的一条（没有订阅 > 学校登录未完成 > 人机验证 > 打不开 > 超时 > 付费墙 > 没找到），不再是笼统的“所有来源都失败”；app 显示时由后台换成中文 `error_text`。
 - `items[].attempts`：这篇走过的路，`[{source, route, seconds, ok, why}]`。`route` 为 `free`（免费来源和出版商官网）或 `school`（学校通道）；`why` 是失败原因的中文说法。不到 1 秒就答复“没有”的接口查询不列入；没有时为空。（2026-10-18 起）
-- 同一时间只运行一个任务：引擎的进度报告和取消开关是整个进程共用的。运行中的实时信息（正在处理哪篇、需要用户处理的验证码或登录提示）不存进这个文件，app 通过 `/api/downloads` 读取 `progress_reporter` 的报告。
+- 同一时间只运行一个任务：引擎的进度报告和取消开关是整个进程共用的。运行中的实时信息（正在处理哪篇、需要用户处理的验证码或登录提示）不存进这个文件，app 通过 `/api/downloads` 读取 `progress_reporter` 的报告。Agent（MCP）或命令行在别的进程里下载时，`/api/downloads` 的 `external` 给出它的报告（进度文件 `progress/current.json`，`status` 为 running 且写它的进程 `pid` 还活着），下载页只显示、不能跳过或取消。
 - `zotero_target`：附件检查发起的下载会带上它，推送时默认推回这个分类；其他任务为 `null`，推送默认用 `<zotero_collection_root>/<title>`。
 - `zotero`（推送过才有）：`state` 为 `running` → `done` / `failed`，app 中途关闭读出为 `interrupted`；`collection` 是分类路径，`key` 是它在 Zotero 里的键。`items[].zotero.status`：`pushing` → `added`（新建）/ `reused`（库里已有）/ `no_pdf`（条目在了但 PDF 没附上，再推送一次会补附）/ `failed`。推送和下载可以同时进行，同一时间只推送一个任务。
 - “待下载”不单独存文件：取各筛选记录里 `decision` 为 `selected`、且还没有被任何任务下载成功的文章。

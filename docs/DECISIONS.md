@@ -3,6 +3,12 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-19：Agent 和命令行的下载在 app 里也看得到
+
+- 用户问旧的“LitLoop · 进度”小窗口（`progress_bar.py`）还有没有用：命令行和 Agent（MCP）下载是独立进程，app 下载页原来只显示 app 自己的任务，看不到它们，小窗口是唯一能看到进度和“请登录”提示的地方；在 app 里“新建检索”交给 Agent、Agent 再下载时也是这样。
+- 用户定：只做“app 里也显示”这一步；随后（同日）要求把小窗口整个删掉：`progress_bar.py`、`litloop progress` 命令、配置 `progress_bar_auto`、环境变量 `LITLOOP_PROGRESS_BAR` 都已删除，进度文件保留（app 读它）。进度报告加 `pid`；`progress_reporter.running_elsewhere()` 只认状态为 running、写它的进程还活着、且不是 app 自己的报告；`/api/downloads` 返回 `external`，下载页顶部显示任务名、已完成/总数、当前文献和提示。跳过、取消只在发起下载的那个进程里有效，所以只显示。
+- 同时查明：上午“app 登录提示晚 36 秒”是误读（提示的 `since` 被每次心跳刷新），改为只记第一次出现；Springer 选择机构页改为结果一出来就点、记录每步耗时。
+
 ## 2026-10-19：publisher-batch 验收
 
 - 实测 `litloop publisher-batch`（校园网，直连出口 106.39.42.165；用户代理出口 161.153.73.55）：合并后的 Elsevier 异步取 PDF 不再出错，但没下到。查明并修了（37871f5）：只拼不带令牌的 `/pii/<PII>/pdfft`，被 ScienceDirect 以 403 “There was a problem providing the content you requested” 拒绝，又被当成 IP 封锁；改为先等 linkinghub 跳到文章页、在点 PDF 按钮前用文章页自带的 `pdfft?md5=…` 链接；能读到内容的 403 不算封锁；命令传学校名。

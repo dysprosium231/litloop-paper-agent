@@ -318,14 +318,6 @@ def coverage_report(
 
 # ── Institutional access commands ─────────────────────────────────────────────
 
-@app.command("progress")
-def progress_cmd() -> None:
-    """Show the frosted-glass floating progress bar for running download tasks."""
-    from .progress_bar import main as _progress_bar_main
-
-    _progress_bar_main()
-
-
 @app.command("setup")
 def setup_school(
     school: str = typer.Argument("", help="School name to configure"),

@@ -327,3 +327,13 @@ def test_a_late_lane_of_the_last_try_does_not_write_into_the_retry(monkeypatch, 
         assert first.steps and first.last_error[0] == "paywall"
     finally:
         attempt.end(doi)
+
+
+def test_a_skip_after_success_does_not_skip_the_next_try(monkeypatch, tmp_path):
+    monkeypatch.setattr(src, "_build_free_sources", lambda doi, config: [(_writer(), "Crossref")])
+    doi = "10.9999/invariant.late-skip"
+    assert src.download(doi, str(tmp_path / "a"), _institutional=False).get("success")
+    src._SKIPPED.add(doi)  # the user's click arrived as the paper finished
+    r = src.download(doi, str(tmp_path / "b"), _institutional=False)
+    assert "skipped" in str(r.get("reason"))  # used up here...
+    assert src.download(doi, str(tmp_path / "c"), _institutional=False).get("success")  # ...not again

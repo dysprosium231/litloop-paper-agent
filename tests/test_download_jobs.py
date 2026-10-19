@@ -438,7 +438,7 @@ def test_api_downloads_endpoints(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body.pop("output_dir").endswith("papers")  # the configured save folder
-    assert body == {"jobs": [], "running": None, "live": None, "pushing": None}
+    assert body == {"jobs": [], "running": None, "live": None, "external": None, "pushing": None}
 
 
 def test_job_failure_on_engine_exception(fake_batch):

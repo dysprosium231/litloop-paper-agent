@@ -31,6 +31,7 @@ export function useDownloads(active: boolean) {
   const [jobs, setJobs] = React.useState<DownloadJobEntry[]>([])
   const [running, setRunning] = React.useState<string | null>(null)
   const [live, setLive] = React.useState<LiveDownload | null>(null)
+  const [external, setExternal] = React.useState<LiveDownload | null>(null)
   const [pending, setPending] = React.useState<PendingGroup[]>([])
   const [outputDir, setOutputDir] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
@@ -40,6 +41,7 @@ export function useDownloads(active: boolean) {
       setJobs(l.jobs)
       setRunning(l.running)
       setLive(l.live)
+      setExternal(l.external)
       setOutputDir(l.output_dir)
       setPending(p)
       setError(null)
@@ -50,10 +52,10 @@ export function useDownloads(active: boolean) {
   React.useEffect(() => {
     if (!active) return
     refresh()
-    const t = setInterval(refresh, running ? 1500 : 5000)
+    const t = setInterval(refresh, running || external ? 1500 : 5000)
     return () => clearInterval(t)
-  }, [active, running, refresh])
-  return { jobs, running, live, pending, outputDir, error, refresh }
+  }, [active, running, external, refresh])
+  return { jobs, running, live, external, pending, outputDir, error, refresh }
 }
 
 /** Second column of the download section: what waits, then the jobs, newest first. */
@@ -86,6 +88,30 @@ const FILTERS: { id: Filter; label: string; keep: (j: DownloadJobEntry) => boole
   { id: "failed", label: "有失败", keep: (j) => j.failed > 0 },
   { id: "unfinished", label: "未完成", keep: (j) => j.state !== "done" },
 ]
+
+/**
+ * A download another process runs (the agent through MCP, the command line).
+ * The app only shows it: skipping or cancelling works in that process alone.
+ */
+function ExternalDownload({ task }: { task: LiveDownload }) {
+  const notices = Object.values(task.attention ?? {})
+  const finished = task.done
+  return (
+    <Card className="space-y-2 border-primary/30 bg-primary/5 px-5 py-3">
+      <div className="flex items-center gap-3 text-sm">
+        <LoaderIcon className="size-4 shrink-0 animate-spin text-primary" />
+        <span className="min-w-0 flex-1 truncate">
+          Agent 或命令行正在下载：{task.task || "文献下载"}
+          <span className="ml-2 text-muted-foreground tabular-nums">{finished} / {task.total}</span>
+        </span>
+      </div>
+      {task.current && <p className="truncate pl-7 text-xs text-muted-foreground">正在处理：{task.current}</p>}
+      {notices.map((a, i) => (
+        <p key={i} className="rounded-md bg-warning px-3 py-2 text-sm text-warning-foreground">{a.message}</p>
+      ))}
+    </Card>
+  )
+}
 
 /**
  * A list pasted by hand (DOIs, doi.org links, arXiv ids, mixed with other text):
@@ -150,8 +176,8 @@ function PasteList({ busy, onStart, onClose }: {
  * screening (grouped by session, one click from a job), a pasted list, then the
  * job history.
  */
-export function DownloadsOverview({ jobs, pending, outputDir, busy, running, onStarted, onOpen, onChanged }: {
-  jobs: DownloadJobEntry[]; pending: PendingGroup[]; outputDir: string; busy: boolean; running: string | null
+export function DownloadsOverview({ jobs, pending, outputDir, external, busy, running, onStarted, onOpen, onChanged }: {
+  jobs: DownloadJobEntry[]; pending: PendingGroup[]; outputDir: string; external?: LiveDownload | null; busy: boolean; running: string | null
   onStarted: (job: string) => void; onOpen: (job: string) => void; onChanged: () => void
 }) {
   const [error, setError] = React.useState<string | null>(null)
@@ -196,6 +222,7 @@ export function DownloadsOverview({ jobs, pending, outputDir, busy, running, onS
             <Button size="sm" variant="outline" onClick={() => downloadsApi.cancel().then(onChanged).catch((e) => setError(errorMessage(e)))}>取消下载</Button>
           </Card>
         )}
+        {external && <ExternalDownload task={external} />}
         <div className="grid grid-cols-3 gap-4">
           <Stat label="已下载" value={done} />
           <Stat label="失败" value={failed} tone="bad" />

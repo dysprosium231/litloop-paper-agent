@@ -96,3 +96,35 @@ def test_publisher_challenge_wait_uses_the_same_attention_channel(tmp_path, monk
     assert "challenge_manual_wait" in events
     assert "challenge_resolved" in events
     assert progress_reporter.read_state()["attention"] == {}
+
+
+def test_attention_keeps_the_time_it_first_appeared(tmp_path, monkeypatch):
+    """A waiting source repeats its notice on every poll; "since" must stay put
+    (2026-10-19: it moved, which made a prompt notice look 36 s late)."""
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
+    progress_reporter.start_task("文献下载", total=1)
+    progress_reporter.set_attention("wait:10.1/x", "请登录", current="10.1/x")
+    first = progress_reporter.read_state()["attention"]["wait:10.1/x"]["since"]
+    import time
+    time.sleep(1.1)
+    progress_reporter.set_attention("wait:10.1/x", "请登录", current="10.1/x")
+    assert progress_reporter.read_state()["attention"]["wait:10.1/x"]["since"] == first
+
+
+def test_the_app_sees_a_download_another_process_runs(tmp_path, monkeypatch):
+    """The agent's or the command line's download shows in the app; the app's own
+    report, a finished one and one whose writer died do not."""
+    import os
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
+    progress_reporter.start_task("出版商下载 · Elsevier", total=2)
+    assert progress_reporter.running_elsewhere() is None  # this process's own
+    state = progress_reporter.read_state()
+    write = progress_reporter._atomic_write
+    write({**state, "pid": os.getppid()})  # the parent: alive, not us
+    assert progress_reporter.running_elsewhere()["task"] == "出版商下载 · Elsevier"
+    monkeypatch.setattr(progress_reporter, "_pid_alive", lambda pid: False)
+    assert progress_reporter.running_elsewhere() is None  # its writer died
+    monkeypatch.undo()
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
+    write({**state, "pid": os.getppid(), "status": "done"})
+    assert progress_reporter.running_elsewhere() is None

@@ -375,7 +375,10 @@ def create_app(token: str) -> FastAPI:
         from . import download_jobs, progress_reporter
         from .config import load_config
         live = progress_reporter.read_state() if download_jobs.running() else None
+        # A download the agent or the command line runs: shown on the page too.
+        external = None if download_jobs.running() else progress_reporter.running_elsewhere()
         return {"jobs": download_jobs.list_jobs(), "running": download_jobs.running(), "live": live,
+                "external": external,
                 "pushing": download_jobs.pushing(), "output_dir": str(load_config().get("output_dir") or "")}
 
     @app.get("/api/downloads/pending")
@@ -642,11 +645,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--token", required=True, help="random token every request must carry")
     ap.add_argument("--port", type=int, default=0, help="0 = pick a free port")
     args = ap.parse_args(argv)
-    import os
-
     import uvicorn
-    # The app shows download progress itself; no floating progress bar next to it.
-    os.environ.setdefault("LITLOOP_PROGRESS_BAR", "0")
     port = args.port or _free_port()
     print(json.dumps({"litloop_app_server": 1, "port": port}), flush=True)
     uvicorn.run(create_app(args.token), host="127.0.0.1", port=port, log_level="warning")

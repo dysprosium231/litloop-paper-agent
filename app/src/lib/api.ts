@@ -308,6 +308,8 @@ export interface LiveDownload {
   current?: string
   phase?: string
   attention?: Record<string, { message: string; current?: string }>
+  /** The task's name ("文献下载", "出版商下载 · Elsevier"); set for downloads run outside the app. */
+  task?: string
 }
 
 export interface PendingGroup {
@@ -382,7 +384,7 @@ export interface PastedList {
 }
 
 export const downloadsApi = {
-  list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; pushing: string | null; output_dir: string }>("/api/downloads"),
+  list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; external: LiveDownload | null; pushing: string | null; output_dir: string }>("/api/downloads"),
   pending: () => call<PendingGroup[]>("/api/downloads/pending"),
   job: (id: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(id)}`),
   start: (papers: PendingGroup["papers"], title: string, session?: string, zoteroTarget?: string) =>

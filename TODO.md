@@ -32,15 +32,15 @@
 9. [x] `paywall` 规则匹配到 Unpaywall（没填邮箱被说成需要订阅）；`download exception` 等内部原因补文案。
 10. [x] 合并后学校登录窗口跟随 `browser_headless`，改为始终可见。
 11. [x] `test_login_no_access` 会真的联网。
-12. [ ] 回归测试补齐（随各项）；`institutional_download` 成功后不清“学校没有订阅”的记录。
-13. [~] 小问题：重复的 `if not pdf_bytes` 块（已删）；`instsci_bridge.try_institutional` 已无调用方；`_SESSION_LOCKS` 不回收；下载成功后再点跳过会残留一次；`not_entitled_after_login` 只记事件、没写进失败原因。
+12. [x] 回归测试补齐（随各项）；`institutional_download` 成功后清“学校没有订阅”的记录（2026-10-19）。
+13. [~] 小问题：重复的 `if not pdf_bytes` 块（已删）；`_SESSION_LOCKS` 超过 50 个时清掉空闲的（已改）；下载成功时清掉跳过标记（已改）；`instsci_bridge.try_institutional` 已无调用方（随“去掉 publisher_batch 这条路”删）；`not_entitled_after_login` 只记事件、没写进失败原因（同上，这条路之后去掉）。
 
 - [x] 下载页“跳过这篇”“取消下载”点了立即显示“正在跳过…”“正在停止…”（2026-10-19 用户提出：原来要等几秒才有变化）。
 - [x] 逐篇下载排队时如实说明（2026-10-19 用户发现：没查 Sci-Hub 的新文献也写“Sci-Hub 未找到”）：查过没找到写“Sci-Hub 未找到”，按年份跳过的写“发表较新，不查 Sci-Hub”。
 - [ ] **去掉 `publisher_batch` 这条路**（2026-10-19 用户同意记下、之后做）：MCP 批量下载非车道模式的第二阶段（`_batch_institutional_phase`）改用 app 在用的下载引擎（学校通道、登录状态、失败原因都能用上）；`litloop publisher-batch` 改为调用同一引擎或删除；`instsci_bridge` 已无调用方，一并删。原因见 DECISIONS「publisher-batch 验收」。
-- [ ] 桌面 app 开着时不弹旧的“LitLoop · 进度”小窗口（`progress_bar.py`，命令行和 MCP 下载会弹，2026-10-19 用户问“这是什么”）。
-- [ ] Springer 选择机构页搜学校约 30 秒（11:47:26 → 11:47:57），查能否在地址里直接带上学校。
-- [ ] 后台 11:48:03 已在等用户登录，app 的提示 11:48:39 才出现，查延迟在哪。
+- [x] Agent / 命令行的下载在 app 下载页也看得到（2026-10-19 用户定：只做这一步，随后用户要求把旧的“LitLoop · 进度”小窗口整个删掉，已删）：`/api/downloads` 的 `external`，下载页顶部显示任务、进度、当前文献和登录提示，只显示不能控制。
+- [x] Springer 选择机构页搜学校约 30 秒（11:47:26 → 11:47:57）：改为填完学校名后每 0.5 秒看一次结果、出来就点，并记录每个输入框用了多久；下次实测看效果。
+- [x] “app 的登录提示晚 36 秒”是误读：提示的 `since` 每次心跳都被刷新，11:48:39 只是读文件那一刻的心跳；提示 11:48:03 就有了。`since` 改为只记第一次出现。
 - [ ] Sci-Hub 一轮开始前又探测一次镜像（15 秒），测速刚做过，查能否直接用测速结果。
 - [ ] “粘贴 DOI”进来的文献没有年份，Sci-Hub 按年份跳过不起作用：解析时顺便查年份（Crossref / OpenAlex）。
 

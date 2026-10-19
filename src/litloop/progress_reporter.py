@@ -1,9 +1,9 @@
 """Task progress reporting via a well-known JSON file.
 
-Writers (batch / lanes / fetch) report per-paper progress here; readers (the
-frosted-glass progress bar, ``litloop progress``) watch the file. The two
-are decoupled on purpose: a headless background task stays GUI-free while the
-floating bar makes its progress visible on the desktop.
+Writers (batch / lanes / fetch) report per-paper progress here; the desktop
+app reads it: its own download jobs, and downloads the agent (MCP) or the
+command line run in other processes (``running_elsewhere``). The floating
+progress bar that also watched it was removed on 2026-10-19 (the user's call).
 
 File: <data_dir>/progress/current.json — atomically replaced (tmp + rename)
 on every update, so readers never see a torn write.
@@ -140,56 +140,9 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
-def ensure_progress_bar(config: dict[str, Any] | None = None) -> None:
-    """Spawn the floating progress bar once (no-op when one is already up).
-
-    Called whenever a task starts, so users always get visibility without
-    launching anything by hand. The bar is an independent process; a stale
-    pid lock (dead bar) is reclaimed. Disable via config
-    ``progress_bar_auto: false`` or env ``LITLOOP_PROGRESS_BAR=0``.
-    """
-    if os.environ.get("LITLOOP_PROGRESS_BAR") == "0":
-        return
-    if os.environ.get("LITLOOP_PROGRESS_BAR_CHILD") == "1":
-        return
-    if config is not None and config.get("progress_bar_auto") is False:
-        return
-    lock = _progress_dir() / "bar.pid"
-    try:
-        if lock.exists():
-            pid = int(lock.read_text(encoding="utf-8").strip() or 0)
-            if _pid_alive(pid):
-                return  # a bar is already up
-            # else: stale lock (bar died) - reclaim below
-    except (ValueError, OSError):
-        return
-    try:
-        import subprocess
-        import sys
-
-        kwargs = {"creationflags": 0x08000000} if os.name == "nt" else {}
-        env = {**os.environ, "LITLOOP_PROGRESS_BAR_CHILD": "1"}
-        subprocess.Popen(
-            [sys.executable, "-m", "litloop.progress_bar"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            env=env, **kwargs,
-        )
-    except Exception:
-        pass
-
-
 def start_task(task: str, total: int, **extra: Any) -> None:
     """Begin (or restart) the reported task with a known total."""
     global _STATE, _STARTED_MONO
-    try:
-        from .config import load_config
-
-        ensure_progress_bar(load_config())
-    except Exception:
-        try:
-            ensure_progress_bar()
-        except Exception:
-            pass
     with _LOCK:
         _STARTED_MONO = time.monotonic()
         _STATE = {
@@ -203,6 +156,7 @@ def start_task(task: str, total: int, **extra: Any) -> None:
             "status": "running",
             "attention": {},
             "started_at": datetime.now().isoformat(timespec="seconds"),
+            "pid": os.getpid(),  # readers can tell a live task from a crashed one
             **extra,
         }
         _STATE["updated_at"] = datetime.now().isoformat(timespec="seconds")
@@ -258,11 +212,14 @@ def set_attention(key: str, message: str, *, current: str = "", phase: str = "")
         if not isinstance(attention, dict):
             attention = {}
             _STATE["attention"] = attention
+        before = attention.get(str(key)) or {}
         attention[str(key)] = {
             "message": str(message),
             "current": str(current or ""),
             "phase": str(phase or ""),
-            "since": datetime.now().isoformat(timespec="seconds"),
+            # When the notice first appeared: a waiting source repeats it on
+            # every poll, which must not move this.
+            "since": before.get("since") or datetime.now().isoformat(timespec="seconds"),
         }
         _STATE["updated_at"] = datetime.now().isoformat(timespec="seconds")
         try:
@@ -272,8 +229,7 @@ def set_attention(key: str, message: str, *, current: str = "", phase: str = "")
 
 
 def set_output_dir(path) -> None:
-    """Record the task's output folder — the progress bar shows it as a
-    clickable link so users can jump straight to the downloads."""
+    """Record the task's output folder (the report carries it for readers)."""
     with _LOCK:
         if not _STATE:
             return
@@ -318,6 +274,22 @@ def finish() -> None:
 
 def elapsed_sec() -> float:
     return max(0.0, time.monotonic() - _STARTED_MONO)
+
+
+def running_elsewhere() -> dict[str, Any] | None:
+    """A download another process is running now (the agent through MCP, the
+    command line), for the desktop app to show; None when there is none, when
+    the report is this process's own, or when its writer has died."""
+    state = read_state()
+    if not state or state.get("status") != "running":
+        return None
+    try:
+        pid = int(state.get("pid") or 0)
+    except (TypeError, ValueError):
+        pid = 0
+    if pid == os.getpid() or (pid and not _pid_alive(pid)):
+        return None
+    return state
 
 
 def read_state() -> dict[str, Any] | None:

@@ -912,17 +912,30 @@ def _visible_browser_download(
 
             log.info(f"   [{publisher}] after SSO click: '{sso_page.title()[:30] if sso_page else '?'}' {sso_page.url[:60] if sso_page else '?'}")
 
-            # Search for institution on the SSO page
+            # Search for institution on the SSO page. Pick as soon as the
+            # results show (2026-10-19, Springer's WAYF: a fixed 3 s per
+            # selector added up to 31 s before the school was picked).
+            t_pick = time.time()
             for sel in search_selectors:
                 si = sso_page.query_selector(sel)
-                if si:
-                    si.fill(idp_en)
-                    time.sleep(3)
-                    clicked = sso_page.evaluate(_PICK_INSTITUTION_JS, idp_en)
+                if not si:
+                    continue
+                si.fill(idp_en)
+                clicked = False
+                for _ in range(16):  # up to 8 s for the results to appear
+                    time.sleep(0.5)
+                    try:
+                        clicked = sso_page.evaluate(_PICK_INSTITUTION_JS, idp_en)
+                    except Exception:
+                        clicked = False
                     if clicked:
-                        log.info(f"   [{publisher}] selected institution '{idp_en}'")
-                        time.sleep(5)
                         break
+                log.info(f"   [{publisher}] institution search via {sel!r}: "
+                         f"{'picked' if clicked else 'no match'} after {time.time() - t_pick:.1f}s")
+                if clicked:
+                    log.info(f"   [{publisher}] selected institution '{idp_en}'")
+                    time.sleep(5)
+                    break
 
         # Wait for user to complete CAS login
         print(f"\n  请在浏览器中完成机构登录 ({idp_name})")

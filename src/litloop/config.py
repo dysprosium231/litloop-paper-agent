@@ -90,8 +90,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "fast_retry_wait_sec": 60,
     # 冷却重试期间的逐篇间隔（秒）。实测 15s/篇可 100% 绕开 Elsevier API 限流。
     "fast_retry_delay_sec": 15,
-    # 任务启动时自动弹出悬浮进度条（独立进程，已有实例则不重复弹出）。
-    "progress_bar_auto": True,
     # Turnstile 交互门（如 sci-hub.vg）：无头会话下无法点击，默认跳过并冷却。
     # scihub_browser_headless=false 时可开启人工点一次模式（点一次整批复用）。
     "scihub_turnstile_click": True,

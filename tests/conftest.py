@@ -8,7 +8,6 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 import os
 
-os.environ.setdefault("LITLOOP_PROGRESS_BAR", "0")  # pytest 不得弹出 GUI
 
 # Tests never touch the user's ~/.litloop: the desktop app reads its progress
 # file, download jobs and settings from there while it runs (2026-10-17 a test
