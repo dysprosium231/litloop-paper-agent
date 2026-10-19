@@ -107,16 +107,6 @@ def _neg_blocked(label: str, doi: str) -> bool:
 
 
 
-def _any_institutional_path(config: dict[str, Any]) -> bool:
-    """Check if any institutional access is configured."""
-    return bool(
-        (config.get("carsi_enabled") and config.get("carsi_idp_name", "").strip())
-        or (config.get("vpnsci_enabled") and (config.get("vpnsci_school") or config.get("vpnsci_base_url")))
-        or (config.get("ezproxy_enabled") and config.get("ezproxy_login_url"))
-        or config.get("elsevier_api_key")
-    )
-
-
 def _get_browser_semaphore(config: dict[str, Any]) -> threading.Semaphore:
     """Get or create the global browser concurrency semaphore."""
     global _browser_semaphore
@@ -284,88 +274,6 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
     finally:
         if sem:
             sem.release()
-
-
-def _run_tier(
-    tier_sources: list[tuple[Any, str]],
-    tier_label: str,
-    timeout_sec: int,
-    doi: str,
-    target_dir: Path,
-    output_path: Path,
-    config: dict[str, Any],
-    use_tor: bool = False,
-) -> dict[str, Any] | None:
-    if not tier_sources:
-        return None
-    _SETTLED.discard(normalize_doi(doi) if not is_arxiv_identifier(doi) else doi)  # see _run_tiers_parallel
-
-    if len(tier_sources) == 1:
-        fn, label = tier_sources[0]
-        log.info(f"   [{tier_label}] Racing 1 sources...")
-        src_output = target_dir / f"{safe_filename(doi)}_{label}.pdf"
-        try:
-            result = _try_source(fn, doi, src_output, config, label, use_tor=use_tor)
-            if result and result.get("success"):
-                final_path = Path(result.get("file", ""))
-                if final_path != output_path and final_path.exists():
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    if output_path.exists():
-                        output_path.unlink()
-                    final_path.rename(output_path)
-                    result["file"] = str(output_path)
-                log.info(f"   OK {label}")
-                return result
-            else:
-                log.info(f"   FAIL {label}")
-                if src_output.exists():
-                    try:
-                        src_output.unlink(missing_ok=True)
-                    except OSError:
-                        pass
-        except Exception:
-            log.info(f"   FAIL {label}")
-        return None
-
-    log.info(f"   [{tier_label}] Racing {len(tier_sources)} sources...")
-    with ThreadPoolExecutor(max_workers=len(tier_sources)) as pool:
-        futures = {}
-        for fn, label in tier_sources:
-            src_output = target_dir / f"{safe_filename(doi)}_{label}.pdf"
-            futures[pool.submit(_try_source, fn, doi, src_output, config, label, use_tor)] = (label, src_output)
-        try:
-            for future in as_completed(futures, timeout=timeout_sec):
-                label, src_output = futures[future]
-                try:
-                    result = future.result(timeout=1)
-                except Exception:
-                    result = None
-                if result and result.get("success"):
-                    final_path = Path(result.get("file", ""))
-                    if final_path != output_path and final_path.exists():
-                        output_path.parent.mkdir(parents=True, exist_ok=True)
-                        if output_path.exists():
-                            output_path.unlink()
-                        final_path.rename(output_path)
-                        result["file"] = str(output_path)
-                    for _, other_path in futures.values():
-                        if other_path != output_path and other_path.exists():
-                            try:
-                                other_path.unlink(missing_ok=True)
-                            except OSError:
-                                pass
-                    log.info(f"   OK {label}")
-                    return result
-                else:
-                    log.info(f"   FAIL {label}")
-                    if src_output.exists():
-                        try:
-                            src_output.unlink(missing_ok=True)
-                        except OSError:
-                            pass
-        except TimeoutError:
-            log.info(f"   [{tier_label}] Timeout after {timeout_sec}s")
-    return None
 
 
 def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str]]:

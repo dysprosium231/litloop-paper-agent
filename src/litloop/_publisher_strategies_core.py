@@ -1601,15 +1601,6 @@ def _is_elsevier_crasolve(url: str, html: str) -> bool:
     return "crasolve" in lower and "sciencedirect" in url.lower()
 
 
-def _is_elsevier_pdf_security(html: str) -> bool:
-    """Detect Elsevier's PDF security verification page."""
-    lower = html[:3000].lower()
-    return (
-        "pdf.sciencedirectassets.com" in lower
-        and ("security verification" in lower or "verify" in lower)
-    )
-
-
 # ============================================================
 # AIP/AVS loading page detection
 # ============================================================

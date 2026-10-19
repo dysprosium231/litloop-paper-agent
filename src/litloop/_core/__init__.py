@@ -33,14 +33,3 @@ __all__ = [
     "decrypt_data",
 ]
 
-
-def _check_availability() -> dict[str, bool]:
-    """Check which compiled modules are available."""
-    status = {}
-    for mod_name in ("racing", "scihub_core", "instsci_core"):
-        try:
-            __import__(f"litloop._core.{mod_name}")
-            status[mod_name] = True
-        except ImportError:
-            status[mod_name] = False
-    return status

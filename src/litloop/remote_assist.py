@@ -240,10 +240,6 @@ class RemoteAssist:
         """Update the displayed browser URL."""
         self._state["browser_url"] = browser_url
 
-    def update_publisher(self, publisher: str) -> None:
-        """Update the displayed publisher name."""
-        self._state["publisher"] = publisher
-
     def wait_for_user(self, timeout: int = 300) -> bool:
         """Block until user signals completion or timeout.
 

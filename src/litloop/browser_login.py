@@ -180,22 +180,6 @@ _browser = PersistentBrowser()
 atexit.register(_browser.close)
 
 
-def get_browser(config: dict[str, Any] | None = None):
-    """Get the persistent browser singleton. Returns (browser, context, page)."""
-    context, page = _browser.get_page(config)
-    return _browser, context, page
-
-
-def save_browser_cookies(config: dict[str, Any]):
-    """Save cookies from the persistent browser."""
-    _browser.save_cookies(config)
-
-
-def close_browser():
-    """Close the persistent browser."""
-    _browser.close()
-
-
 def _save_cookies_json(cookies: list[dict[str, Any]], cookie_file: Path) -> None:
     """Save cookies in JSON format (litloop compatible)."""
     cookie_data = [

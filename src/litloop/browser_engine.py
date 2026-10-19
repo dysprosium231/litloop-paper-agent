@@ -399,19 +399,6 @@ def shutdown_shared_browser():
         logger.info("browser_engine: browser shut down")
 
 
-def _ensure_compat():
-    """Ensure CloakBrowser platform compatibility."""
-    try:
-        from ..institutional.cloakbrowser_compat import ensure_cloakbrowser_platform_compatible
-        ensure_cloakbrowser_platform_compatible()
-    except Exception:
-        try:
-            from .institutional.cloakbrowser_compat import ensure_cloakbrowser_platform_compatible
-            ensure_cloakbrowser_platform_compatible()
-        except Exception:
-            pass
-
-
 # ---------------------------------------------------------------------------
 # Public API — drop-in replacements for camofox.py functions
 # ---------------------------------------------------------------------------
@@ -511,23 +498,6 @@ def solve_url(
                 page.close()
             except Exception:
                 pass
-
-
-def get_cookies(
-    url: str,
-    config: dict[str, Any],
-    *,
-    max_timeout: int = 60000,
-) -> dict[str, str] | None:
-    """Solve and return cookies as a dict."""
-    result = solve_url(url, config, max_timeout=max_timeout)
-    if not result:
-        return None
-    solution = result.get("solution", {})
-    cookies = solution.get("cookies", [])
-    if isinstance(cookies, list):
-        return {c["name"]: c["value"] for c in cookies if "name" in c and "value" in c}
-    return None
 
 
 def get_html(
@@ -640,19 +610,6 @@ _TRANSIENT_NET_ERRORS = (
     "net::ERR_TIMED_OUT", "net::ERR_CONNECTION_TIMED_OUT", "net::ERR_CONNECTION_RESET",
     "net::ERR_CONNECTION_CLOSED", "net::ERR_NETWORK_CHANGED", "net::ERR_EMPTY_RESPONSE",
 )
-
-
-def get_snapshot(tab_id: str, config: dict[str, Any], *, timeout: float = 15.0) -> dict[str, Any]:
-    """Get page content as a snapshot dict."""
-    page = _resolve_tab(tab_id)
-    if not page:
-        return {"url": "", "snapshot": "", "error": "tab not found"}
-    try:
-        html = page.content()
-        url = page.url
-        return {"url": url, "snapshot": html, "status": 200}
-    except Exception as e:
-        return {"url": "", "snapshot": "", "error": str(e)}
 
 
 def download_pdf_via_browser(
@@ -973,12 +930,6 @@ def get_captured_responses(
     if consume:
         _captured[tab_id] = []
     return result
-
-
-def close_all_tabs(config: dict[str, Any]) -> None:
-    """Close all tracked browser tabs (pages only, not the shared browser)."""
-    for tab_id in list(_tabs.keys()):
-        close_tab(tab_id, config)
 
 
 # ---------------------------------------------------------------------------

@@ -866,9 +866,8 @@ def _try_browser(
     """Try CloakBrowser to bypass Cloudflare. Returns Response or None."""
     if not _is_browser_available(config):
         return None
-    # solve_url lives in browser_engine (flaresolverr.py only hosts the
-    # raw FlareSolverr client); the old import path broke the challenge
-    # bypass with ImportError.
+    # solve_url lives in browser_engine; the old import path (the FlareSolverr
+    # client module, removed 2026-10-19) broke the challenge bypass with ImportError.
     from ..browser_engine import solve_url
     result = solve_url(url, config)
     if not result:

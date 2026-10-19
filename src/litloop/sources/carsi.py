@@ -491,21 +491,6 @@ class CARSIClient:
                 log.info(f"   [CARSI-Browser] Error: {e}")
                 return None
 
-    def _find_downloaded_pdf(self, download_dir: str, doi: str) -> Path | None:
-        """Check download directory for recently downloaded PDF files."""
-        dir_path = Path(download_dir)
-        if not dir_path.exists():
-            return None
-        now = time.time()
-        for f in dir_path.iterdir():
-            if f.suffix.lower() == ".pdf" and (now - f.stat().st_mtime) < 30:
-                try:
-                    if f.stat().st_size > 1000:
-                        return f
-                except OSError:
-                    pass
-        return None
-
     def _try_load_cookies(self, publisher: str) -> bool:
         cookie_file = self._cookie_path(publisher)
         if not cookie_file.exists():
@@ -577,54 +562,6 @@ class CARSIClient:
         except Exception as exc:
             log.error(f"   [CARSI] CloakBrowser login failed: {exc}")
             return False
-
-    def _extract_chrome_cookies(self, publisher: str) -> None:
-        """Try to extract cookies from Chrome's cookie database."""
-        cfg = self._publisher_configs.get(publisher)
-        if not cfg:
-            return
-
-        cookie_paths = [
-            Path.home() / "AppData/Local/Google/Chrome/User Data/Default/Cookies",
-            Path.home() / "AppData/Local/Google/Chrome/User Data/Default/Network/Cookies",
-        ]
-
-        for cookie_path in cookie_paths:
-            if not cookie_path.exists():
-                continue
-            try:
-                import shutil
-                import sqlite3
-                tmp_cookie = self._cookie_dir / "chrome_cookies_tmp.db"
-                shutil.copy2(cookie_path, tmp_cookie)
-
-                conn = sqlite3.connect(str(tmp_cookie))
-                cursor = conn.cursor()
-
-                cookies = []
-                for domain in cfg.domains:
-                    cursor.execute(
-                        "SELECT name, value, host_key, path FROM cookies WHERE host_key LIKE ?",
-                        (f"%{domain}%",),
-                    )
-                    cookies.extend(cursor.fetchall())
-                conn.close()
-                tmp_cookie.unlink(missing_ok=True)
-
-                if cookies:
-                    cookie_file = self._cookie_path(publisher)
-                    cookie_data = [
-                        {"name": n, "value": v, "domain": h, "path": p}
-                        for n, v, h, p in cookies
-                    ]
-                    cookie_file.write_text(
-                        json.dumps(cookie_data, indent=2, ensure_ascii=False),
-                        encoding="utf-8",
-                    )
-                    log.info(f"   [CARSI] Extracted {len(cookie_data)} cookies from Chrome")
-                    return
-            except Exception as e:
-                log.warning(f"   [CARSI] Chrome cookie extraction failed: {e}")
 
     def close(self):
         for sess in self._sessions.values():

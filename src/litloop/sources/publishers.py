@@ -100,15 +100,6 @@ DOI_PREFIX_TO_PUBLISHER: dict[str, str] = {
     "10.3762/": "Beilstein",
 }
 
-PREPRINT_PREFIXES: dict[str, str] = {
-    "10.1101/": "bioRxiv/medRxiv",
-    "10.48550/": "arXiv",
-    "10.31219/": "Research Square",
-    "10.21203/": "Research Square",
-    "10.26434/": "chemRxiv",
-    "10.20944/": "Preprints.org",
-}
-
 # Fast sources per publisher (used by tiered racing)
 # Browser strategies (ElsevierBrowser, etc.) use camofox for anti-bot bypass
 PUBLISHER_TOOL_MAP: dict[str, list[str]] = {
@@ -653,13 +644,6 @@ def get_publisher_fast_sources(doi: str) -> list[tuple[Any, str]]:
         if fn:
             sources.append((fn, tool))
     return sources
-
-
-def is_preprint(doi: str) -> bool:
-    for prefix in PREPRINT_PREFIXES:
-        if doi.startswith(prefix):
-            return True
-    return False
 
 
 # Populate function map

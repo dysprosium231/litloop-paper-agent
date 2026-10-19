@@ -43,6 +43,7 @@
 - [x] “app 的登录提示晚 36 秒”是误读：提示的 `since` 每次心跳都被刷新，11:48:39 只是读文件那一刻的心跳；提示 11:48:03 就有了。`since` 改为只记第一次出现。
 - [ ] Sci-Hub 一轮开始前又探测一次镜像（15 秒），测速刚做过，查能否直接用测速结果。
 - [x] “粘贴 DOI”认 PDF 里复制来的 Unicode 连字符和不换行空格；认不出的行（整段参考文献、只有标题）点「按参考文献查找 DOI」用 Crossref `query.bibliographic` 查，标题词 85% 以上出现在这一行才算，列出标题供核对（2026-10-19，盘点残留代码时由 `normalize_doi_unicode`、`search_by_title` 得到的启发）。
+- [x] 删除没人用的代码（2026-10-19，清单见 DECISIONS「删除没人用的代码」）。
 - [ ] 以后用得上的现成代码（2026-10-19 盘点）：`deps.is_feature_available` / `embedded_tor.is_tor_installed` 可做首次引导里一直没做的“可选组件”一步；`extractors.extract_figures` 留给“分析归纳”；`progress_reporter.elapsed_sec` 可给 app 里“Agent 正在下载”加已用时间。
 - [ ] Sci-Hub 一轮前不重复探测镜像（Antigravity 2026-10-19 未完成，半成品已撤回，自己做）。
 - [ ] “粘贴 DOI”进来的文献没有年份（Antigravity 2026-10-19 未完成，自己做），Sci-Hub 按年份跳过不起作用：解析时顺便查年份（Crossref / OpenAlex）。

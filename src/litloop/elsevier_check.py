@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import time
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
 from typing import Any
 
 import requests
@@ -42,18 +41,6 @@ ROUTE_ADVICE = {
     NO_KEY: "未配置 API key——运行 elsevier-setup",
     NETWORK: "网络不可达——检查代理连通性",
 }
-
-
-@dataclass
-class ProbeRow:
-    doi: str
-    sample_type: str
-    proxy: str
-    direct: str
-    verdict: str
-    route_advice: str
-    note: str = ""
-    extras: dict[str, Any] = field(default_factory=dict)
 
 
 def normalize_status(code: int | None) -> str:

@@ -100,20 +100,3 @@ def parse_bib_text(content: str, *, require_doi: bool = True) -> list[dict[str, 
 
     return entries
 
-
-def extract_dois_from_bib(file_path: str | Path) -> list[str]:
-    """Extract DOIs from a .bib file."""
-    entries = parse_bib_file(file_path)
-    return [e["doi"] for e in entries if e.get("doi")]
-
-
-def extract_dois_from_text(text: str) -> list[str]:
-    """Extract DOIs from plain text (one per line or comma-separated)."""
-    dois = []
-    # Split by newline, comma, or semicolon
-    for part in re.split(r"[,\n;]+", text):
-        doi = part.strip()
-        # Basic DOI pattern validation
-        if re.match(r"^10\.\d{4,}/", doi):
-            dois.append(doi)
-    return dois

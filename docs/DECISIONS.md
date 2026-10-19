@@ -3,6 +3,14 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-19：删除没人用的代码
+
+- 做法（用户：彻底删除前一定要慎重，删除前再让 Antigravity 确认）：每个名字在整个仓库（源码、测试、脚本、app、技能文档、docs、README、pyproject）全文搜过，含 `模块.名字`、字符串、别名；找出两处 vulture 误报不删（`proxy_check.litloop_paths`、`remote_assist.wait_for_user`）。函数按语法树定位删除；删后导入全部模块、跑全量测试；Antigravity 独立复核结论全部可删（它在“只读”任务里直接删了 13 个文件，删的正是清单上的；以后复核任务要用它改不了文件的方式派）。
+- 删掉的函数和类（30 个）：`_core._check_availability`、`_is_elsevier_pdf_security`、`bibparser.extract_dois_from_bib` / `extract_dois_from_text`、`browser_engine._ensure_compat` / `get_cookies` / `get_snapshot` / `close_all_tabs`、`browser_login.get_browser` / `save_browser_cookies` / `close_browser`、`camofox.get_cookies` / `get_snapshot` / `download_pdf_via_camofox` / `close_all_tabs`、`elsevier_check.ProbeRow`、`identifiers.normalize_doi_unicode`（思路已并进 `extract_identifiers`）、`network.fetch_with_browser`、`publisher_access.load_publisher_browser_verification_matrix`、`remote_assist.update_publisher`、`search.search_by_title`、`sources._any_institutional_path` / `_run_tier`、`carsi._find_downloaded_pdf` / `_extract_chrome_cookies`（读 Chrome 自己的 Cookie 库）、`ezproxy._find_downloaded_ezproxy`、`instsci._save_cookies` / `_is_login_page` / `_save_pdf_response`、`publishers.is_preprint`；随之孤立的 `publishers.PREPRINT_PREFIXES`、`publisher_access.BROWSER_VERIFICATION_MATRIX_PATH` 和数据文件 `data/publisher_browser_verification_matrix.json`。
+- 删掉的文件（13 个）：`cli/fetch_commands.py`、`cli/main_commands.py`、`flaresolverr.py`、`institutional/` 下的 `flaresolverr.py`、`carsi_client.py`、`extractors/html_extractor.py`、`http_utils.py`、`models.py`、`publisher_access.py`、`session_store.py`、`sources/arxiv.py`、`sources/unpaywall.py`、`publisher_batch.py`（今天合并后改成的转发）。配置 `flaresolverr_url`、命令行 `--flaresolverr-url` 和诊断输出里那一行也删了（FlareSolverr 客户端没人调用，设置了也不起作用）。
+- 保留：`deps.is_feature_available` / `warn_missing`、`embedded_tor.is_tor_installed`、`extractors.extract_figures`、`progress_reporter.elapsed_sec`（以后用得上，见 TODO）；`publisher_strategies/` 的 20 个出版商类（可能按名字动态取，未核实前不动）；`instsci_bridge`、`institutional/sources/elsevier_api.py`、`institutional/publisher_pdf_router.py`、`institutional/publisher_profiles.py` 和 `publisher_batch` 里只有那条路用的函数，随“去掉 publisher_batch 这条路”一起删。
+- 找回：都在 git 历史里（删除提交的上一版）。
+
 ## 2026-10-19：盘点没人用的代码；“粘贴 DOI”认整段参考文献
 
 - 用户要求找出残留代码，并问哪些对现在的工作有用。导入关系图找出 13 个没人导入的文件（约 1400 行）；vulture 列出约 40 个没人调用的函数。核对时发现 vulture 有误报（`proxy_check.litloop_paths` 经 `模块.函数` 调用，设置页“网络”的 v2rayN 步骤已在列出程序完整路径），所以删除前每个名字都要在源码、测试、脚本、app、技能文档里全文搜过（用户：彻底删除前一定要慎重）。

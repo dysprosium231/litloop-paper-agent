@@ -192,13 +192,6 @@ def _load_cookies(config: dict[str, Any]) -> requests.cookies.RequestsCookieJar:
     return jar
 
 
-def _save_cookies(cookies: list[dict], config: dict[str, Any]) -> None:
-    path = instsci_cookie_path(config)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(cookies, indent=2, ensure_ascii=False), encoding="utf-8")
-    log.info(f"   [WebVPN] Saved {len(cookies)} cookies")
-
-
 def session_status(config: dict[str, Any]) -> str:
     """Classify the WebVPN session: ``none`` | ``valid`` | ``expired`` | ``unreachable``.
 
@@ -503,20 +496,6 @@ def _resolve_href(href: str, base: str) -> str:
     if href.startswith("/"):
         return base + href
     return base + "/" + href
-
-
-def _is_login_page(url: str, config: dict[str, Any] | None = None) -> bool:
-    """Check if URL indicates a login/CAS page (not yet authenticated)."""
-    lower = url.lower()
-    # If on the WebVPN itself (not login subpage), we're authenticated
-    if "webvpn." in lower and "/login" not in lower:
-        return False
-    # If on auth check page (2FA), user is actively authenticating — treat as login
-    keywords = ["cas", "sso", "/do/off/ui/auth"]
-    if config:
-        from ..publisher_strategies import _school_auth_patterns
-        keywords.extend(_school_auth_patterns(config))
-    return any(x in lower for x in keywords)
 
 
 def _is_inline_pdf_page(page: Any) -> bool:
@@ -1297,32 +1276,6 @@ def _try_carsi(doi: str, resolved_url: str, output_path: Path, config: dict[str,
             return result
     except Exception as e:
         log.info(f"   [CARSI] {e}")
-    return None
-
-
-def _save_pdf_response(resp: requests.Response, output_path: Path, doi: str, source: str) -> dict[str, Any] | None:
-    """Save a PDF response to disk and validate it."""
-    try:
-        iterator = resp.iter_content(chunk_size=8192)
-        first = next(iterator, b"")
-        if not _response_looks_pdf(resp, first):
-            return None
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = output_path.with_suffix(output_path.suffix + ".part")
-        try:
-            with tmp_path.open("wb") as fh:
-                fh.write(first)
-                for chunk in iterator:
-                    if chunk:
-                        fh.write(chunk)
-            tmp_path.replace(output_path)
-        except Exception:
-            tmp_path.unlink(missing_ok=True)
-            raise
-        if is_pdf_file(output_path):
-            return success(doi, output_path, source)
-    except Exception:
-        pass
     return None
 
 

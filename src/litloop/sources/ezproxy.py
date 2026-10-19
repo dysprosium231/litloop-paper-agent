@@ -315,18 +315,3 @@ def try_ezproxy(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str
 
     return None
 
-
-def _find_downloaded_ezproxy(download_dir: str, doi: str) -> Path | None:
-    """Check download directory for recently downloaded PDF files."""
-    dir_path = Path(download_dir)
-    if not dir_path.exists():
-        return None
-    now = time.time()
-    for f in dir_path.iterdir():
-        if f.suffix.lower() == ".pdf" and (now - f.stat().st_mtime) < 30:
-            try:
-                if f.stat().st_size > 1000:
-                    return f
-            except OSError:
-                pass
-    return None

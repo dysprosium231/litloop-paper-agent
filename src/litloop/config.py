@@ -211,7 +211,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # user pushes from the job page), into <root>/<the job's title>.
     "zotero_auto_push": False,
     "zotero_collection_root": "LitLoop",
-    "flaresolverr_url": "http://127.0.0.1:8191/v1",
     # Per-host proxy exception: these domains (and subdomains) go through
     # host_proxy_url, everything else stays direct. For publishers that grant
     # access by login cookie rather than campus IP, where the direct route is

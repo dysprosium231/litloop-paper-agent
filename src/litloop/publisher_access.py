@@ -12,7 +12,6 @@ from .publisher_pdf_router import build_pdf_candidates, discover_pdf_candidates_
 from .publisher_profiles import get_publisher_profile, list_publisher_profiles
 
 CATALOG_PATH = Path(__file__).parent / "data" / "publisher_access_catalog.json"
-BROWSER_VERIFICATION_MATRIX_PATH = Path(__file__).parent / "data" / "publisher_browser_verification_matrix.json"
 INSTITUTIONAL_IDENTITY_POLICY_PATH = Path(__file__).parent / "data" / "institutional_identity_policy.json"
 
 DEFAULT_HEADERS = {
@@ -28,12 +27,6 @@ def load_publisher_access_catalog(path: str | Path | None = None) -> dict[str, A
     """Load the machine-readable publisher access catalog."""
     catalog_path = Path(path) if path else CATALOG_PATH
     return json.loads(catalog_path.read_text(encoding="utf-8"))
-
-
-def load_publisher_browser_verification_matrix(path: str | Path | None = None) -> dict[str, Any]:
-    """Load browser-backed publisher PDF verification verdicts."""
-    matrix_path = Path(path) if path else BROWSER_VERIFICATION_MATRIX_PATH
-    return json.loads(matrix_path.read_text(encoding="utf-8"))
 
 
 def load_institutional_identity_policy(path: str | Path | None = None) -> dict[str, Any]:

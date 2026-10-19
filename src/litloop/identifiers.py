@@ -106,22 +106,6 @@ def extract_identifiers(text: str) -> tuple[list[str], list[str]]:
     return found, unrecognized
 
 
-def normalize_doi_unicode(value: str) -> str | None:
-    """Fix DOI with unicode hyphens and embedded spaces. Returns None if invalid."""
-    doi = value.strip()
-    # Unicode hyphens → ASCII
-    doi = doi.replace("\u2010", "-")  # HYPHEN
-    doi = doi.replace("\u2012", "-")  # FIGURE DASH
-    doi = doi.replace("\u2013", "-")  # EN DASH
-    doi = doi.replace("\u2014", "-")  # EM DASH
-    # Remove internal spaces (from PDF copy-paste line breaks)
-    doi = re.sub(r"\s+", "", doi)
-    # Validate
-    if re.match(r"^10\.\d{4,}/", doi):
-        return doi
-    return None
-
-
 def validate_doi(doi: str) -> tuple[bool, str]:
     """Check if a DOI resolves via doi.org. Returns (valid, resolved_url or error)."""
     import requests
