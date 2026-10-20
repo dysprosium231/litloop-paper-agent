@@ -3,6 +3,11 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-20：`carsi.edu.cn`、`export.arxiv.org` 不加进走代理的名单
+
+- 2026-10-19 的连通性测试里两者“校园网直连不通、代理可达”。复查：`ds.carsi.edu.cn` 有 IPv6 地址，本机走 IPv6 连它超时（别的网站 IPv6 正常），curl 默认先试 IPv6 就卡住；强制 IPv4 直连 1.3 秒返回 200。LitLoop 的 Python 请求按系统顺序先用 IPv4（1.5 秒），Chrome 会自动换用能通的地址，都不受影响。`export.arxiv.org` 只有 IPv4，复查时直连 2 秒正常，上次多半是偶发。
+- 用户 2026-10-20：国内域名不该走代理。两者都不加。以后测连通性用 `curl -4` 和 `-6` 各测一次，不只看默认结果。
+
 ## 2026-10-20：深度检索的布尔运算符计数一直失效
 
 - `deep_search._boolean_heavy` 的正则 `\b(?:OR|AND|NOT)\b` 写入时 `\b` 被转成了退格符（9b8f336 起），永远数出 0 个，于是超过 5 个布尔运算符的 OpenAlex 检索没有按官方的每秒 5 次放慢。已修正，并加 `tests/test_no_control_chars.py` 扫全部源码里的控制字符（同时修了 `test_supplementary.py` 里写成原始字节的 `PK\x03\x04`）。
