@@ -576,12 +576,13 @@ def create_app(token: str) -> FastAPI:
     def downloads_parse(body: PastedList) -> dict[str, Any]:
         """DOIs, doi.org links and arXiv ids in pasted text, for a download list.
 
-        ``downloaded``: those an earlier job already got (the app says so; they
-        are downloaded again only if the file is gone)."""
+        ``downloaded``: those whose PDF is still in the save folder; the job skips
+        exactly these (2026-10-20: the job history counted too, so the app had to
+        say "downloaded before, skipped if the file is still there")."""
         from . import download_jobs
         from .identifiers import extract_identifiers
         dois, unrecognized = extract_identifiers(body.text[:200_000])
-        got = {k for d in download_jobs.downloaded_dois() for k in download_jobs.same_paper(d)}
+        got = set(download_jobs.local_files())
         return {"papers": [{"doi": d} for d in dois[:2000]], "unrecognized": unrecognized[:100],
                 "unrecognized_count": len(unrecognized), "too_many": len(dois) > 2000,
                 "downloaded": [d for d in dois if download_jobs.same_paper(d) & got]}
@@ -595,7 +596,7 @@ def create_app(token: str) -> FastAPI:
         from .resolver import resolve_references
         lines = [ln.strip() for ln in body.lines if ln.strip()][:100]
         rows = resolve_references(lines, load_config())
-        got = {k for d in download_jobs.downloaded_dois() for k in download_jobs.same_paper(d)}
+        got = set(download_jobs.local_files())
         for r in rows:
             if r.get("doi"):
                 r["downloaded"] = bool(download_jobs.same_paper(r["doi"]) & got)

@@ -163,7 +163,7 @@ function PasteList({ busy, onStart, onClose }: {
         <div className="space-y-1 text-xs text-muted-foreground">
           <p>
             识别到 {n} 篇
-            {parsed.downloaded.length > 0 && `，其中 ${parsed.downloaded.length} 篇以前下载过，保存位置里还有文件的会跳过`}
+            {parsed.downloaded.length > 0 && `，其中 ${parsed.downloaded.length} 篇已在保存位置中，不会重复下载`}
             {parsed.too_many && "，一次最多 2000 篇，其余未加入"}
           </p>
           {parsed.unrecognized_count > 0 && !resolved && (
@@ -188,7 +188,7 @@ function PasteList({ busy, onStart, onClose }: {
                     {found.map((r, i) => (
                       <li key={i} className="truncate" title={r.line}>
                         <span className="text-foreground">{r.title}</span>
-                        <span className="ml-2">{[r.year, r.doi].filter(Boolean).join(" · ")}{r.downloaded ? " · 已下载过" : ""}</span>
+                        <span className="ml-2">{[r.year, r.doi].filter(Boolean).join(" · ")}{r.downloaded ? " · 已在保存位置中" : ""}</span>
                       </li>
                     ))}
                   </ul>

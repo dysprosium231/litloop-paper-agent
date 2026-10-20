@@ -39,7 +39,7 @@ def test_every_kind_of_identifier_is_found_once():
 
 def test_endpoint_reports_what_it_found_and_what_was_downloaded(monkeypatch):
     from litloop import download_jobs
-    monkeypatch.setattr(download_jobs, "downloaded_dois", lambda: ["10.1016/j.jallcom.2025.179147"])
+    monkeypatch.setattr(download_jobs, "local_files", lambda: {"10.1016/j.jallcom.2025.179147": "a.pdf"})
     c = TestClient(app_server.create_app("t"))
     r = c.post("/api/downloads/parse", json={"text": PASTED}, headers={"X-LitLoop-Token": "t"})
     assert r.status_code == 200
@@ -80,7 +80,7 @@ def test_resolve_endpoint_marks_what_was_downloaded(monkeypatch):
     from litloop import download_jobs, resolver
     monkeypatch.setattr(resolver, "resolve_reference",
                         lambda line, config, timeout=15.0: {"doi": "10.1/a", "title": "A paper", "year": 2020} if "A paper" in line else None)
-    monkeypatch.setattr(download_jobs, "downloaded_dois", lambda: ["10.1/a"])
+    monkeypatch.setattr(download_jobs, "local_files", lambda: {"10.1/a": "a.pdf"})
     c = TestClient(app_server.create_app("t"))
     r = c.post("/api/downloads/resolve", json={"lines": ["Smith (2020). A paper. J. 1-2.", "nothing here at all, really"]},
                headers={"X-LitLoop-Token": "t"})
