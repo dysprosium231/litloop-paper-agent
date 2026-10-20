@@ -926,6 +926,9 @@ def _fetch_si_for_results(results: list[dict[str, Any]], out: Path, config: dict
             pass
 
 
+_OA_BROWSER_LOCK = threading.Lock()
+
+
 def _run_fast_lane(
     entries: list[QueueEntry],
     out: Path,
@@ -973,7 +976,13 @@ def _run_fast_lane(
                     from .browser_engine import download_pdf_via_browser
 
                     bpath = out / _safe_name(e.identifier)
-                    if download_pdf_via_browser(e.oa_url, bpath, config):
+                    # One at a time (each worker thread would start its own visible
+                    # Chrome) and short: a miss here is tried again paper by paper.
+                    with _OA_BROWSER_LOCK:
+                        got = download_pdf_via_browser(
+                            e.oa_url, bpath, config,
+                            timeout=float(config.get("oa_browser_fallback_timeout", 25)))
+                    if got:
                         return {"success": True, "doi": e.identifier,
                                 "file": str(bpath), "source": "oa_browser"}
                 except Exception:
@@ -999,7 +1008,12 @@ def _run_fast_lane(
     def _one_paced(e: QueueEntry) -> dict[str, Any]:
         if delay > 0:
             _time.sleep(delay)  # 节流：冷却重试期间按间隔逐篇取，绕开限流
-        return one(e)
+        t0 = _time.time()
+        r = one(e)
+        # per paper: the round waits for its slowest one (2026-10-17: 110 s, cause unlogged)
+        logger.info(f"   [timing] fast lane {e.identifier}: {_time.time() - t0:.1f}s, "
+                    f"{r.get('source') or 'no PDF'}")
+        return r
 
     with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
         futures = {ex.submit(_one_paced, e): e for e in entries}

@@ -80,6 +80,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "browser_headless": False,
     # 出版商官网的专用窗口先最小化，需要登录或人机验证时再弹到前台
     "publisher_window_minimized": True,
+    # 开放获取一轮：直链被挡时用浏览器取一次，最多等这么多秒（自定值；没下到的逐篇下载时再试）
+    "oa_browser_fallback_timeout": 25,
     "browser_humanize": True,
     # 浏览器后端：patchright（默认，Apache-2.0 开源 playwright fork，内核随本机 Chrome 自动更新）
     # 或 cloakbrowser（免费版内核卡 Chromium 146，作为可选回退）
