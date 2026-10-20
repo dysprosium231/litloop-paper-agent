@@ -310,6 +310,8 @@ export interface LiveDownload {
   attention?: Record<string, { message: string; current?: string }>
   /** The task's name ("文献下载", "出版商下载 · Elsevier"); set for downloads run outside the app. */
   task?: string
+  /** When the task started (local time, ISO without zone). */
+  started_at?: string
 }
 
 export interface PendingGroup {

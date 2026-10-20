@@ -3,7 +3,7 @@ import { TriangleAlertIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { Progress, Summary } from "@/lib/api"
-import { cn } from "@/lib/utils"
+import { cn, duration } from "@/lib/utils"
 
 const PHASES: [string, string][] = [
   ["keywords", "关键词"],
@@ -13,14 +13,7 @@ const PHASES: [string, string][] = [
   ["batch", "生成批次"],
 ]
 
-const secs = (s: number) => {
-  if (s >= 60) {
-    const m = Math.floor(s / 60)
-    const rem = Math.round(s % 60)
-    return rem > 0 ? `${m} 分 ${rem} 秒` : `${m} 分`
-  }
-  return `${Math.max(1, Math.round(s))} 秒`
-}
+const secs = duration
 
 /**
  * Share of 高 in each batch, newest on the right, scaled to the best batch. Each bar answers hover over its

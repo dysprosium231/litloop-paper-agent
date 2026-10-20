@@ -65,7 +65,7 @@
 - [ ] 安装包与自动更新（评审 12）：`tauri.conf.json` 的 updater 为空；按 CHARTER 定的 PyInstaller sidecar + 安装包 + 自动更新做，不换方案。
 - [ ] 深度链接、完成通知。
 - [ ] 首次引导里“可选组件”一步（一直没做）：可用现成的 `deps.is_feature_available` / `warn_missing`、`embedded_tor.is_tor_installed`。
-- [ ] 下载页“Agent 或命令行正在下载”加已用时间（现成的 `progress_reporter.elapsed_sec`）。
+- [x] 下载页“Agent 或命令行正在下载”加已用时间（2026-10-20：按进度文件的 `started_at` 算，显示「3/6 · 用时 1 分 20 秒」；时长格式统一到 `lib/utils.duration`，补上「1 小时 5 分」）。
 
 ### 测试
 - [ ] 补测试空洞（评审 14）：第一批（`schools`、`resolver`、`session_broker`、PDF 归属校验）已补；`publisher_access`、`publisher_pdf_router`、`session_store` 等其余模块待补。

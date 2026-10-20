@@ -19,7 +19,7 @@ import {
   type ZoteroCollection,
   errorMessage,
 } from "@/lib/api"
-import { cn } from "@/lib/utils"
+import { cn, duration } from "@/lib/utils"
 
 export const OVERVIEW = "overview"
 
@@ -103,7 +103,9 @@ function ExternalDownload({ task }: { task: LiveDownload }) {
         <LoaderIcon className="size-4 shrink-0 animate-spin text-primary" />
         <span className="min-w-0 flex-1 truncate">
           Agent 或命令行正在下载：{task.task || "文献下载"}
-          <span className="ml-2 text-muted-foreground tabular-nums">{finished} / {task.total}</span>
+          <span className="ml-2 text-muted-foreground tabular-nums">
+            {finished}/{task.total}{task.started_at ? ` · 用时 ${duration((Date.now() - new Date(task.started_at).getTime()) / 1000)}` : ""}
+          </span>
         </span>
       </div>
       {task.current && <p className="truncate pl-7 text-xs text-muted-foreground">正在处理：{task.current}</p>}
