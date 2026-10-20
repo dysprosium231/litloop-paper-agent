@@ -190,6 +190,21 @@ def settings() -> list[dict[str, Any]]:
     return out
 
 
+def _check_path(value: str, pick: str) -> None:
+    r"""A path setting must be a full path on a drive that exists (2026-10-19: the
+    user typed ":\Users\Echo\.litloop\papers" and the app said it was saved).
+    A folder that does not exist yet is fine: downloads create it."""
+    p = Path(value).expanduser()
+    if not p.is_absolute():
+        raise ValueError(r"不是完整的路径，请从盘符写起，例如 D:\文献\papers")
+    if not Path(p.anchor).exists():
+        raise ValueError(f"找不到 {p.anchor} 这个位置，请检查盘符")
+    if pick == "dir" and p.exists() and not p.is_dir():
+        raise ValueError("这个位置是一个文件，不是文件夹")
+    if pick == "file" and not p.is_file():
+        raise ValueError("找不到这个文件")
+
+
 def update(key: str, value: Any) -> dict[str, Any]:
     """Save one setting from the app. Only keys on the settings page can be changed."""
     field = _FIELDS.get(key)
@@ -201,6 +216,8 @@ def update(key: str, value: Any) -> dict[str, Any]:
         raise ValueError(f"{key} must be one of {[o[0] for o in field['options']]}")
     elif field["type"] == "email" and value and "@" not in str(value):
         raise ValueError("not an email address")
+    elif field["type"] == "path" and str(value or "").strip():
+        _check_path(str(value).strip(), field.get("pick", ""))
     _config.update_config(key, str(value if value is not None else "").strip())
     if key == "rename_format":
         _config.update_config("auto_rename", "true")  # the older switch must not override the choice
