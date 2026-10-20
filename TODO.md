@@ -67,7 +67,7 @@
 - [x] 下载页“Agent 或命令行正在下载”加已用时间（2026-10-20：按进度文件的 `started_at` 算，显示「3/6 · 用时 1 分 20 秒」；时长格式统一到 `lib/utils.duration`，补上「1 小时 5 分」）。
 
 ### 测试
-- [ ] 补测试空洞（评审 14）：第一批（`schools`、`resolver`、`session_broker`、PDF 归属校验）已补；`publisher_pdf_router` 已补（2026-10-20）；`publisher_access`、`session_store` 等其余模块待补。
+- [ ] 补测试空洞（评审 14）：第一批（`schools`、`resolver`、`session_broker`、PDF 归属校验）已补；`publisher_pdf_router`、`session_store` 已补（2026-10-20）；`publisher_access` 等其余模块待补。
 
 ### 分析归纳
 - [ ] 从全文抽取要点、做对比表、起草综述（现成的 `extractors.extract_figures` 可抽图注）；app 的分析归纳页。
