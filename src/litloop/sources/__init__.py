@@ -875,6 +875,13 @@ def _pdf_mentions_doi(path: Path, doi: str, pages: int = 3) -> bool:
     return doi.lower() in flat
 
 
+def _same_dir(a: Path, b: Path) -> bool:
+    try:
+        return a.resolve() == b.resolve()
+    except OSError:
+        return str(a) == str(b)
+
+
 def _update_doi_index(
     target_dir: Path,
     doi: str,
@@ -1302,7 +1309,25 @@ def _download_impl(
     cached = cache_get(identifier, config)
     if cached and cached.get("success"):
         cached_file = Path(cached.get("file", ""))
-        if cached_file.exists():
+        if cached_file.is_file() and not _same_dir(cached_file.parent, target_dir):
+            # Got before into another folder (the save location has changed since,
+            # 2026-10-19): the user expects it here. Copy it, no new download.
+            try:
+                import shutil
+                copied = target_dir / cached_file.name
+                if not copied.exists():
+                    shutil.copy2(cached_file, copied)
+                log.info(f"   Cached file is in another folder; copied {cached_file.name} here")
+                cached = {**cached, "file": str(copied)}
+                cached_file = copied
+                if cached.get("doi"):
+                    _update_doi_index(target_dir, str(cached["doi"]), copied,
+                                      source=str(cached.get("source") or ""), config=config)
+                cache_set(identifier, cached, config)
+            except OSError as exc:
+                log.info(f"   Cannot copy the cached file here ({exc}); downloading again")
+                cached_file = Path("")
+        if cached_file.is_file():
             cached["cached"] = True
             if bibtex:
                 from ..bibtex import fetch_bibtex
