@@ -425,7 +425,7 @@ def _run_institutional_sequence(steps: list[tuple[Any, str]], doi: str, target_d
     for fn, label in steps:
         if _cancelled():
             return None
-        progress_reporter.item_stage(doi, f"正在走学校通道：{_STEP_TEXT.get(label, label)}")
+        progress_reporter.item_stage(doi, f"正在通过学校认证下载：{_STEP_TEXT.get(label, label)}")
         src_output = target_dir / f"{safe_filename(doi)}_{label}.pdf"
         done = threading.Event()
         threading.Thread(target=_step_watchdog, args=(doi, label, done, config), daemon=True).start()
@@ -1035,7 +1035,7 @@ _USER_WAIT_MAX_S = 600.0
 
 _WAIT_TEXT = {
     "login": "请在弹出的浏览器窗口中登录学校账号",
-    "verify": "请在弹出的浏览器窗口中完成人机验证（出现勾选框时点击它）",
+    "verify": "请在弹出的浏览器窗口中完成人机验证，出现勾选框时勾选它",
 }
 
 

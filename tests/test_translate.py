@@ -68,7 +68,7 @@ def test_errors_are_user_text(cfg, monkeypatch, status, words):
 
 def test_missing_key(cfg):
     cfg["deepseek_api_key"] = ""
-    with pytest.raises(translate.TranslationError, match="未填写 DeepSeek API Key"):
+    with pytest.raises(translate.TranslationError, match="未填写 DeepSeek Key"):
         translate.translate_text("Text.")
 
 

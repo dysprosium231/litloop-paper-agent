@@ -2271,7 +2271,7 @@ def _browser_download(
         # Check for paywall AFTER challenge resolution
         if pdf_refused:
             log.info(f"   [{publisher}] PDF refused — no access with the current session")
-            progress_reporter.item_stage(doi, f"{publisher if _known else '出版商官网'}拒绝了 PDF（当前没有权限），正在尝试登录")
+            progress_reporter.item_stage(doi, f"{publisher + ' ' if _known else '出版商官网'}拒绝下载 PDF，可能没有权限，正在尝试登录")
         if pdf_refused or _detect_paywall(html):
             log.info(f"   [{publisher}] paywall detected — trying institutional login...")
             if _try_institutional_login(tab_id, config, publisher):
@@ -2631,7 +2631,7 @@ def _browser_download_with_fallback(
         log.info(f"   [{publisher}] headless failed ({err_type}), trying visible browser fallback...")
         try:
             from . import progress_reporter as _pr
-            _pr.item_stage(doi, f"正在打开 {publisher} 的可见窗口" if publisher not in ("", "Unknown") else "正在打开出版商官网的可见窗口")
+            _pr.item_stage(doi, f"正在用浏览器窗口打开 {publisher}" if publisher not in ("", "Unknown") else "正在用浏览器窗口打开出版商官网")
         except Exception:
             pass
         try:

@@ -46,7 +46,7 @@ function WriteModeLine({ mode, running, onDone }: { mode: WriteMode | null | und
   if (mode === undefined) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <LoaderIcon className="size-4 animate-spin" />写入方式：检测中…
+        <LoaderIcon className="size-4 animate-spin" />写入方式：正在检测…
       </div>
     )
   }
@@ -97,7 +97,7 @@ export function ZoteroPage({ data, error, mode, onModeChanged, onChanged, onOpen
   const tabs: { id: ZoteroView; label: string; count?: number }[] = [
     { id: "queue", label: "推送队列", count: waiting },
     { id: "check", label: "附件检查" },
-    { id: "history", label: "推送记录", count: data?.history.length },
+    { id: "history", label: "历史记录", count: data?.history.length },
   ]
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -106,7 +106,7 @@ export function ZoteroPage({ data, error, mode, onModeChanged, onChanged, onOpen
         {data ? (
           <>
             <Check ok={data.running} yes="Zotero 运行中" no="Zotero 未运行" />
-            <Check ok={Boolean(data.mcp)} yes="zotero-mcp 已就绪" no="未找到 zotero-mcp（「设置 → Zotero」）" />
+            <Check ok={Boolean(data.mcp)} yes="zotero-mcp 已就绪" no="未找到 zotero-mcp，在「设置 → Zotero」中填写" />
             {data.mcp && <WriteModeLine mode={mode} running={data.running} onDone={onModeChanged} />}
           </>
         ) : (error ?? "正在加载…")}
@@ -126,7 +126,7 @@ function ZoteroHistory({ history, onOpenJob }: { history: ZoteroHistoryEntry[]; 
   return (
     <PageBody wide>
       <Card>
-        {!history.length && <Empty title="暂无推送记录" note="推送到 Zotero 的下载任务将显示在此处" />}
+        {!history.length && <Empty title="暂无历史记录" note="推送到 Zotero 的下载任务将显示在此处" />}
         <ul className="divide-y">
           {history.map((h) => (
             <li key={h.job}>
@@ -173,7 +173,7 @@ export function ZoteroPane({ data, error, onChanged, onOpenJob }: {
         </p>
       )}
       <section>
-        <SectionTitle title="待推送" note={all ? `${all} 篇 · ${data.pending.length} 个下载任务` : undefined} />
+        <SectionTitle title="推送队列" note={all ? `${all} 篇 · ${data.pending.length} 个下载任务` : undefined} />
         <Card className="divide-y">
           {all === 0 && <Empty title="暂无待推送文献" note="下载完成的文献将显示在此处" />}
           {data.pending.map((g) => (

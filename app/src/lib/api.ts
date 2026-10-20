@@ -122,10 +122,10 @@ export class ApiError extends Error {
 /** Text to show for a failed call: the backend's own words, or a generic sentence (docs/UI_COPY.md section 7). */
 export function errorMessage(e: unknown): string {
   if (e instanceof ApiError) {
-    if (e.status === 404 && e.message === "Not Found") return "后台版本与界面不一致，请重启应用"
+    if (e.status === 404 && e.message === "Not Found") return "后台版本与界面不一致。重启 LitLoop 后重试"
     return e.message
   }
-  return "无法连接后台，请重启应用"
+  return "无法连接后台。重启 LitLoop 后重试"
 }
 
 async function call<T>(path: string, body?: unknown): Promise<T> {

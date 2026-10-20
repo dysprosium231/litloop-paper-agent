@@ -265,23 +265,23 @@ def test_papers_deduped_missing_doi_dropped_and_empty_raises(client):
     wait_job(job_id)
 
     # all-empty raises ValueError in Python
-    with pytest.raises(ValueError, match="no paper with a DOI to download"):
+    with pytest.raises(ValueError, match="没有带 DOI 的文献"):
         download_jobs.start([{"doi": ""}, {"title": "Missing"}], title="All Empty")
 
-    with pytest.raises(ValueError, match="no paper with a DOI to download"):
+    with pytest.raises(ValueError, match="没有带 DOI 的文献"):
         download_jobs.start([], title="Empty list")
 
     # all-empty returns 400 via API
     resp_empty = client.post("/api/downloads", json={"papers": [], "title": "Empty"})
     assert resp_empty.status_code == 400
-    assert "no paper with a DOI to download" in resp_empty.json()["detail"]
+    assert "没有带 DOI 的文献" in resp_empty.json()["detail"]
 
     resp_no_doi = client.post("/api/downloads", json={
         "papers": [{"doi": ""}, {"doi": "  "}],
         "title": "Blank DOIs",
     })
     assert resp_no_doi.status_code == 400
-    assert "no paper with a DOI to download" in resp_no_doi.json()["detail"]
+    assert "没有带 DOI 的文献" in resp_no_doi.json()["detail"]
 
 
 def test_downloads_pending_filters_selected_and_downloaded(client):
@@ -351,7 +351,7 @@ def test_api_open_unrecorded_and_recorded(client, monkeypatch, tmp_path):
 
     resp_unrec = client.post("/api/open", json={"path": str(unrecorded)})
     assert resp_unrec.status_code == 403
-    assert "only downloaded PDFs and their folders can be opened" in resp_unrec.json()["detail"]
+    assert "只能打开 LitLoop 下载的 PDF" in resp_unrec.json()["detail"]
     assert not opened_paths
 
     # Non-existent file -> 403
@@ -594,12 +594,12 @@ def test_push_zotero_nothing_waits_raises_and_api_400(client, tmp_path):
     }
     store.write_json(download_jobs.job_path(job_id), job_data)
 
-    with pytest.raises(ValueError, match="nothing to push"):
+    with pytest.raises(ValueError, match="没有待推送的文献"):
         download_jobs.push_zotero(job_id)
 
     resp = client.post(f"/api/downloads/{job_id}/zotero", json={})
     assert resp.status_code == 400
-    assert "nothing to push" in resp.json()["detail"]
+    assert "没有待推送的文献" in resp.json()["detail"]
 
 
 def test_push_zotero_busy_raises_and_api_409(client, monkeypatch, tmp_path):

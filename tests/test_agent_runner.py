@@ -66,7 +66,7 @@ def test_a_run_reports_the_session_it_saved(agent):
     d = _wait(agent_runner.start({"question": "x"})["run"])
     assert d["state"] == "done" and d["session"] == "20261017-x" and d["agent_session"] == "abc"
     assert d["result"] == "已保存 20261017-x，True"
-    assert [e["text"] for e in d["events"]] == ["深度检索：开始"]
+    assert [e["text"] for e in d["events"]] == ["深度检索：正在构建候选池"]
     assert (agent / "agent_runs" / f"{d['run']}.log").read_text(encoding="utf-8").count("\n") == 4
     assert agent_runner.list_runs()[0]["run"] == d["run"]
 
@@ -81,7 +81,7 @@ def test_an_agent_that_is_not_logged_in_says_what_to_do():
     data = {"events": [], "result": None, "error": None}
     agent_runner._read(data, json.dumps({"type": "result", "is_error": True,
                                          "result": "Failed to authenticate: OAuth session expired"}))
-    assert data["error"].startswith("Agent 没有登录") and data["result"] is None
+    assert data["error"].startswith("无法完成检索：Agent 未登录") and data["result"] is None
 
 
 def test_a_session_named_by_another_tool_is_ignored():
@@ -99,7 +99,7 @@ def test_a_silent_agent_is_stopped(agent, monkeypatch):
     t = time.time()
     d = _wait(agent_runner.start({"question": "x"})["run"])
     assert time.time() - t < 15
-    assert d["state"] == "failed" and "没有任何输出" in d["error"]
+    assert d["state"] == "failed" and "没有输出" in d["error"]
     assert not agent_runner._CANCELLED
 
 

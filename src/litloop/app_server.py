@@ -148,10 +148,10 @@ def _fail(status: int, raw: str | None, action: str, fallback: str) -> HTTPExcep
 
 def _record_path(session: str):
     if not _SESSION_ID.match(session) or session.startswith("."):
-        raise HTTPException(400, "bad session id")
+        raise HTTPException(400, "无法打开检索会话：会话编号不正确")
     p = screening.screening_dir() / f"{session}.json"
     if not p.exists():
-        raise HTTPException(404, f"no session {session}")
+        raise HTTPException(404, "无法打开检索会话：此会话已不存在")
     return p
 
 
@@ -172,7 +172,7 @@ def _ensure_item(session: str, doi: str | None, title: str | None, relevance: st
     except FileNotFoundError:
         paper = None
     if not paper:
-        raise HTTPException(404, "no such paper in this session")
+        raise HTTPException(404, "此检索会话中没有这篇文献")
     screening.save("", [{**paper, "relevance": relevance, "reason": ""}], session=session, mode="deep")
 
 
@@ -181,7 +181,7 @@ def _find(items: list[dict[str, Any]], doi: str | None, title: str | None) -> di
     for it in items:
         if screening._key(it) == key:
             return it
-    raise HTTPException(404, "no such paper in this session")
+    raise HTTPException(404, "此检索会话中没有这篇文献")
 
 
 def create_app(token: str) -> FastAPI:
@@ -227,7 +227,7 @@ def create_app(token: str) -> FastAPI:
     @app.post("/api/sessions/{session}/rating")
     def rate(session: str, body: Rating) -> dict[str, Any]:
         if body.relevance is not None and body.relevance not in screening.RELEVANCE:
-            raise HTTPException(400, f"relevance must be one of {screening.RELEVANCE} or null")
+            raise HTTPException(400, f"无法评分：评分只能是{'、'.join(screening.RELEVANCE)}")
         _ensure_item(session, body.doi, body.title, body.relevance)
         with store.update(_record_path(session), indent=2) as data:
             item = _find(data["items"], body.doi, body.title)
@@ -282,11 +282,11 @@ def create_app(token: str) -> FastAPI:
         from . import export
         _record_path(session)
         if body.which not in ("selected", "high"):
-            raise HTTPException(400, "which must be selected or high")
+            raise HTTPException(400, "无法导出：只能导出待下载或评为高的文献")
         try:
             return export.export(session, body.format, body.which)
         except ValueError as exc:
-            raise HTTPException(400, "无法导出：没有可导出的文献。" if "no papers" in str(exc) else str(exc)) from exc
+            raise HTTPException(400, "无法导出：没有可导出的文献" if "no papers" in str(exc) else "无法导出：不支持此格式") from exc
 
     @app.get("/api/translation")
     def translation() -> dict[str, Any]:
@@ -306,7 +306,7 @@ def create_app(token: str) -> FastAPI:
         if item.get("abstract_zh"):
             return {"abstract_zh": item["abstract_zh"]}
         if not item.get("abstract"):
-            raise HTTPException(400, "无法翻译：此文献没有摘要")
+            raise HTTPException(400, "无法翻译：此文献暂无摘要")
         try:
             text = translate.translate_text(item["abstract"])
         except translate.TranslationError as exc:
@@ -318,7 +318,7 @@ def create_app(token: str) -> FastAPI:
     @app.post("/api/sessions/{session}/decision")
     def decide(session: str, body: Decision) -> dict[str, Any]:
         if body.decision not in (None, "selected", "rejected"):
-            raise HTTPException(400, "decision must be selected, rejected or null")
+            raise HTTPException(400, "无法保存：只能加入下载或排除")
         with store.update(_record_path(session), indent=2) as data:
             item = _find(data["items"], body.doi, body.title)
             item["decision"] = body.decision
@@ -350,7 +350,7 @@ def create_app(token: str) -> FastAPI:
         try:
             return app_settings.update(body.key, body.value)
         except KeyError as exc:
-            raise HTTPException(400, str(exc)) from exc
+            raise HTTPException(400, "无法保存：此项不能在 app 中修改") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
@@ -371,7 +371,7 @@ def create_app(token: str) -> FastAPI:
         try:
             return app_settings.run_test(group)
         except KeyError as exc:
-            raise HTTPException(404, str(exc)) from exc
+            raise HTTPException(404, "无法完成检测：此分组没有检测项") from exc
 
     # Downloads: jobs started from the app (download_jobs), one at a time.
     @app.get("/api/downloads")
@@ -415,11 +415,11 @@ def create_app(token: str) -> FastAPI:
     def download_job(job: str) -> dict[str, Any]:
         from . import download_jobs
         if not re.fullmatch(r"[\w-]{1,40}", job):
-            raise HTTPException(400, "bad job id")
+            raise HTTPException(400, "无法打开下载任务：任务编号不正确")
         try:
             d = download_jobs.get(job)
         except FileNotFoundError as exc:
-            raise HTTPException(404, f"no job {job}") from exc
+            raise HTTPException(404, "无法打开下载任务：此任务已不存在") from exc
         d["zotero_default"] = download_jobs.default_collection(d["title"])
         _explain(d, full=True)
         _explain(d.get("zotero"), "推送", full=True)
@@ -432,11 +432,11 @@ def create_app(token: str) -> FastAPI:
     def download_push(job: str, body: ZoteroPush) -> dict[str, Any]:
         from . import download_jobs
         if not re.fullmatch(r"[\w-]{1,40}", job):
-            raise HTTPException(400, "bad job id")
+            raise HTTPException(400, "无法推送：任务编号不正确")
         try:
             return download_jobs.push_zotero(job, body.collection, body.tags)
         except FileNotFoundError as exc:
-            raise HTTPException(404, f"no job {job}") from exc
+            raise HTTPException(404, "无法推送：此下载任务已不存在") from exc
         except download_jobs.Busy as exc:
             raise HTTPException(409, "已有推送任务在进行，完成后再开始新的推送") from exc
         except ValueError as exc:
@@ -495,7 +495,7 @@ def create_app(token: str) -> FastAPI:
         from .config import load_config
         from .zotero import check_collection
         if not re.fullmatch(r"[A-Z0-9]{8}", body.key):
-            raise HTTPException(400, "bad collection key")
+            raise HTTPException(400, "无法检查附件：分类编号不正确")
         r = check_collection(body.key, load_config())
         if not r.get("success"):
             raise _fail(503, r.get("error"), "检查附件", "Zotero is not reachable")
@@ -511,7 +511,7 @@ def create_app(token: str) -> FastAPI:
         from .config import load_config
         from .zotero import repair_attachment
         if not re.fullmatch(r"[A-Z0-9]{8}", body.item_key) or any(not re.fullmatch(r"[A-Z0-9]{8}", k) for k in body.trash):
-            raise HTTPException(400, "bad item key")
+            raise HTTPException(400, "无法重新附加：条目编号不正确")
         pdf = download_jobs.find_local_pdf(body.doi or "") if body.attach else None  # never a path from the client
         if body.attach and not pdf:
             raise _fail(404, "no local PDF", "重新附加", "")
@@ -637,7 +637,7 @@ def create_app(token: str) -> FastAPI:
         ok_file = target in allowed and target.suffix.lower() == ".pdf" and target.is_file()
         ok_dir = target.is_dir() and (target in allowed or any(target == a.parent for a in allowed if a.suffix))
         if not (ok_file or ok_dir):
-            raise HTTPException(403, "only downloaded PDFs and their folders can be opened")
+            raise HTTPException(403, "无法打开：只能打开 LitLoop 下载的 PDF 和它们的文件夹")
         _open_with_system(target)
         return {"opened": str(target)}
 

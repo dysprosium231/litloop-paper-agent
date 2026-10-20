@@ -162,7 +162,7 @@ def start(papers: list[dict[str, Any]], title: str, session: str | None = None,
         items.append({"doi": doi, "title": p.get("title") or doi, "year": p.get("year"),
                       "journal": p.get("journal"), "status": "waiting", "source": None, "file": None, "error": None})
     if not items:
-        raise ValueError("no paper with a DOI to download")
+        raise ValueError("无法下载：没有带 DOI 的文献")
     # Already in the save folder: done at once, the engine is not asked again.
     for it, f in ((it, local_files([it["doi"]]).get(it["doi"])) for it in items):
         if f:
@@ -398,7 +398,7 @@ def push_zotero(job: str, collection: str | None = None, tags: list[str] | None 
     todo = [i for i in data["items"] if i["status"] == "done" and i.get("file")
             and (i.get("zotero") or {}).get("status") not in ("added", "reused")]
     if not todo:
-        raise ValueError("nothing to push: no downloaded paper waits for Zotero")
+        raise ValueError("无法推送：没有待推送的文献")
     collection = (collection or "").strip().strip("/") or data.get("zotero_target") or default_collection(data["title"])
     if not _PUSH_LOCK.acquire(blocking=False):
         raise Busy("another Zotero push is still running")

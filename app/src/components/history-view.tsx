@@ -36,7 +36,7 @@ export function HistoryPage({ onBack, onOpen, onDownloaded }: {
           <Card key={question}>
             <div className="border-b px-5 py-3">
               <h2 className="line-clamp-2 text-[15px] font-semibold">{question}</h2>
-              <div className="mt-0.5 text-xs text-muted-foreground">{sessions.length} 次检索</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{sessions.length} 个检索会话</div>
             </div>
             <ul className="divide-y">
               {sessions.map((s) => <SessionRow key={s.session} entry={s} onOpen={onOpen} onDownloaded={onDownloaded} />)}
@@ -72,11 +72,11 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
           <span className="shrink-0 text-sm tabular-nums">{(s.created || s.updated).slice(0, 16)}</span>
           <span className="shrink-0 rounded border px-1.5 text-xs text-muted-foreground">{MODE[s.mode] ?? s.mode}</span>
           <span className="truncate text-xs text-muted-foreground">
-            已评 {s.items} · 高 {s.by_relevance["高"] ?? 0} · 中 {s.by_relevance["中"] ?? 0}
+            已评分 {s.items} · 高 {s.by_relevance["高"] ?? 0} · 中 {s.by_relevance["中"] ?? 0}
           </span>
         </button>
         <span className={cn("shrink-0 text-sm tabular-nums", s.selected.length ? "font-medium" : "text-muted-foreground")}>
-          已选 {s.selected.length} 篇
+          待下载 {s.selected.length} 篇
         </span>
         <Button size="sm" variant="ghost" onClick={() => onOpen(s.session)}>打开</Button>
       </div>

@@ -47,19 +47,19 @@ def _key(name: str, config: dict[str, Any]) -> str:
     key = str(config.get(f"{name}_api_key") or "").strip()
     if not key:
         label = "DeepSeek" if name == "deepseek" else "DeepL"
-        raise TranslationError(f"未填写 {label} API Key。在「设置 → 筛选」中填写")
+        raise TranslationError(f"未填写 {label} Key。在「设置 → 筛选」中填写")
     return key
 
 
 def _fail(service: str, r: requests.Response) -> TranslationError:
     if r.status_code in (401, 403):
-        return TranslationError(f"{service} API Key 无效")
+        return TranslationError(f"{service} Key 无效")
     if r.status_code == 402:
         return TranslationError(f"{service} 账户余额不足")
     if r.status_code == 456:
         return TranslationError("DeepL 本月额度已用完")
     if r.status_code == 429:
-        return TranslationError(f"{service} 请求过于频繁，稍后重试")
+        return TranslationError(f"{service} 请求过于频繁，已被限流")
     return TranslationError(f"{service} 返回错误（HTTP {r.status_code}）")
 
 
@@ -89,13 +89,13 @@ def translate_text(text: str, config: dict[str, Any] | None = None) -> str:
     config = config or load_config()
     name = provider(config)
     if name == "agent":
-        raise TranslationError("翻译服务为 Agent，由 Agent 在评分时翻译")
+        raise TranslationError("翻译服务设为 Agent，由 Agent 在评分时翻译")
     try:
         out = (_deepseek if name == "deepseek" else _deepl)(text, config)
     except requests.Timeout as exc:
-        raise TranslationError("连接翻译服务超时，检查网络后重试") from exc
+        raise TranslationError("连接翻译服务超时。检查网络后重试") from exc
     except requests.RequestException as exc:
-        raise TranslationError("无法连接翻译服务，检查网络或代理设置") from exc
+        raise TranslationError("翻译服务没有响应。检查网络或代理设置") from exc
     except (KeyError, IndexError, ValueError) as exc:
         raise TranslationError("翻译服务返回了无法识别的结果") from exc
     if not out:

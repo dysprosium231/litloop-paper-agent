@@ -173,8 +173,8 @@ def warnings(lang: str = "en") -> list[str]:
         if s["remaining"] is not None and s["limit"] and s["remaining"] < s["limit"] * WARN_FRACTION:
             credits = name == "openalex"  # OpenAlex's headers count credits
             if lang == "zh":
-                notes.append(f"{shown} 剩余 {s['remaining']:,} / {s['limit']:,} {'积分' if credits else '次请求'}"
-                             + (f"，{s['resets_at']} 重置" if s["resets_at"] else ""))
+                notes.append(f"{shown} 剩余 {s['remaining']:,} / {s['limit']:,} {'积分' if credits else '次'}"
+                             + (f"，重置 {s['resets_at']}" if s["resets_at"] else ""))
             else:
                 notes.append(f"{name}: only {s['remaining']} of {s['limit']} {'credits' if credits else 'requests'} left"
                              + (f", resets at {s['resets_at']}" if s["resets_at"] else ""))

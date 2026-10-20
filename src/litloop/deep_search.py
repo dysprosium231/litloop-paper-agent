@@ -832,7 +832,7 @@ def _stop(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any]:
     est = _remaining_estimate(state, rated)
     if len(rated) >= state["cap"]:
         return _with_estimate({"stop_suggested": True, "stop_rule": "cap",
-                               "stop_reason": f"已筛 {len(rated)} 篇，达到上限 {state['cap']}"}, est)
+                               "stop_reason": f"已评分 {len(rated)} 篇，达到上限 {state['cap']} 篇"}, est)
     batches = [b for b in state["served"] if b]
     last = batches[-1] if batches else []
     judged = [rated[k] for k in last if k in rated]
@@ -843,12 +843,12 @@ def _stop(state: dict[str, Any], rated: dict[str, str]) -> dict[str, Any]:
     best = max(rates)
     if best > 0 and high / len(judged) <= best / KNEE_RATIO:
         return _with_estimate({"stop_suggested": True, "stop_rule": "knee",
-                               "stop_reason": (f"最近一批 {len(judged)} 篇里只有 {high} 篇高相关，不到此前最好一批"
-                                               f"（{best:.0%}）的 1/{KNEE_RATIO}，相关文章大多已经读到")}, est)
+                               "stop_reason": (f"本批 {len(judged)} 篇中只有 {high} 篇评为高，不到此前最好一批"
+                                               f"（{best:.0%}）的 1/{KNEE_RATIO}，相关文献大多已读到")}, est)
     useful = sum(1 for r in judged if r in ("高", "中"))
     if useful <= max(1, len(judged) // 15):
         return _with_estimate({"stop_suggested": True, "stop_rule": "few_useful",
-                               "stop_reason": f"最近一批 {len(judged)} 篇里只有 {useful} 篇高或中相关，新增已经很少"}, est)
+                               "stop_reason": f"本批 {len(judged)} 篇中只有 {useful} 篇评为高或中，新增已经很少"}, est)
     return _with_estimate({"stop_suggested": False, "stop_reason": ""}, est)
 
 
@@ -878,8 +878,8 @@ def _with_estimate(stop: dict[str, Any], est: dict[str, Any] | None) -> dict[str
         return stop
     stop["remaining_estimate"] = est
     if stop["stop_suggested"] and "remaining" in est:
-        stop["stop_reason"] += (f"。按每批高相关比例的下降趋势粗略外推，继续读下去约还能找到 "
-                                f"{est['remaining']:.0f} 篇高相关（下一批约 {est['next_batch']:.0f} 篇）")
+        stop["stop_reason"] += (f"。按每批高相关比例的下降趋势估算，继续读约还能找到 "
+                                f"{est['remaining']:.0f} 篇高相关文献（下一批约 {est['next_batch']:.0f} 篇）")
     return stop
 
 

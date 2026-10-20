@@ -634,7 +634,7 @@ def run_scihub_then_single(
         _progress.update(phase="Sci-Hub")
         with ThreadPoolExecutor(max_workers=min(int(config.get("scihub_round_workers", 10) or 10), len(grey_ids))) as ex:
             for i in grey_ids:
-                _progress.item_stage(i, "正在查 Sci-Hub")
+                _progress.item_stage(i, "正在查找 Sci-Hub")
             # Over HTTP only: no browser, so these really run side by side; a
             # paper whose gate needs the browser gets it in round 2.
             futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False, _scihub_http_only=True): i
@@ -655,14 +655,14 @@ def run_scihub_then_single(
             searched = set(grey_ids) if grey_ids and allow_grey and grey_allowed(config) else set()
             for i in left:
                 # Say what really happened: only papers the Sci-Hub round asked were "not found" there.
-                why = ("Sci-Hub 未找到" if i in searched
+                why = ("Sci-Hub 上没有" if i in searched
                        else "发表较新，不查 Sci-Hub" if allow_grey and grey_allowed(config) and too_new(i, config)
                        else "")
-                _progress.item_stage(i, f"排队中：{why}，将逐篇查找" if why else "排队中，将逐篇查找")
+                _progress.item_stage(i, f"等待中：{why}，接下来逐篇查找" if why else "等待中，接下来逐篇查找")
 
             def _staged(i: str) -> dict[str, Any]:
                 _progress.update(current=i)
-                _progress.item_stage(i, "正在查找免费全文和出版商官网")
+                _progress.item_stage(i, "正在查找开放获取版本和出版商官网")
                 t_one = time.time()
                 r = _one(i, _institutional=True, use_vpnsci=use_vpnsci)
                 logger.info(f"[timing] {i}: {time.time() - t_one:.1f}s, "

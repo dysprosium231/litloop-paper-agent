@@ -71,7 +71,7 @@ def test_egress_checks_report_the_exit_and_the_publishers_answer(monkeypatch):
     monkeypatch.setattr(elsevier_check, "_head_probe", lambda doi, key, proxies: (403, elsevier_check.NOT_ENTITLED))
     ip, right = app_settings._egress_checks({"elsevier_api_key": "k"})
     assert "219.143.23.107" in ip["detail"] and "AS4847" in ip["detail"]
-    assert right["ok"] is None and "不代表出口不被学校认可" in right["detail"]  # a notice, not a failure
+    assert right["ok"] is None and "没有全文权限" in right["detail"]  # a notice, not a failure
     monkeypatch.setattr(elsevier_check, "_head_probe", lambda doi, key, proxies: (200, elsevier_check.ENTITLED))
     assert app_settings._egress_checks({"elsevier_api_key": "k"})[1]["ok"] is True
     assert app_settings._egress_checks({})[1]["ok"] is None  # no key: cannot tell

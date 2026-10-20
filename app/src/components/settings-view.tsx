@@ -48,7 +48,7 @@ const SECTIONS: { title: string; ids: string[] }[] = [
 
 // One line under each page title.
 const ABOUT: Record<string, string> = {
-  sources: "检索与下载使用的数据接口和密钥。",
+  sources: "检索接口的 API Key 和联系邮箱。",
   downloads: "PDF 的保存位置、文件名和下载方式。",
   network: "代理和校园网的访问方式。",
   school: "通过学校认证下载订阅期刊。",
@@ -175,7 +175,7 @@ function Field({ field, onSaved }: { field: SettingField; onSaved: (f: SettingFi
                 const p = await choosePath(field.pick!, draft)
                 if (p) { setDraft(p); save(p) }
               } catch (e) {
-                setState("无法打开选择窗口，请重启应用")  // e.g. a window built before the dialog plugin
+                setState("无法打开选择窗口。重启 LitLoop 后重试")  // e.g. a window built before the dialog plugin
               }
             }}>
             <FolderOpenIcon />
@@ -195,7 +195,7 @@ function Field({ field, onSaved }: { field: SettingField; onSaved: (f: SettingFi
       {state === "saved" && <span className="text-xs text-emerald-600 dark:text-emerald-400">已保存</span>}
       {field.link && (
         <a href={field.link} target="_blank" rel="noreferrer" className="flex items-center gap-0.5 text-xs text-primary hover:underline">
-          申请<ExternalLinkIcon className="size-3" />
+          申请 Key<ExternalLinkIcon className="size-3" />
         </a>
       )}
     </span>
@@ -317,7 +317,7 @@ function QuotaPane() {
         </Row>
       )}
       {live && !live.error && (
-        <Row title="OpenAlex 今日剩余" note={`重置 ${live.resets_at ? new Date(live.resets_at).toLocaleString() : "未知"}`}>
+        <Row title="OpenAlex 今日剩余" note={live.resets_at ? `重置 ${new Date(live.resets_at).toLocaleString()}` : undefined}>
           <div className="w-56 space-y-1.5 text-right">
             <div className="text-sm tabular-nums">{live.credits_remaining?.toLocaleString()} / {live.credits_limit?.toLocaleString()} 积分</div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">

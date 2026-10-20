@@ -391,7 +391,7 @@ export default function App() {
               <PlusIcon />新建检索
             </Button>
             <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setHistory(true)}>
-              <HistoryIcon />历史
+              <HistoryIcon />筛选历史
             </Button>
           </header>
           <ProgressStrip progress={progress} summary={summary} onContinue={continueSearch} />

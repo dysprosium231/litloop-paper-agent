@@ -85,7 +85,7 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
                 {(["quick", "deep"] as const).map((m) => (
                   <button key={m} type="button" onClick={() => set("mode", m)}
                     className={cn("rounded px-3 py-1 text-sm", form.mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                    {m === "quick" ? "快速查找" : "深度检索"}
+                    {m === "quick" ? "快速检索" : "深度检索"}
                   </button>
                 ))}
               </div>
@@ -144,14 +144,14 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
           <div className="flex items-center gap-3">
             <Button onClick={start} disabled={!form.question.trim() || Boolean(running)}>开始检索</Button>
             <span className="text-xs text-muted-foreground">
-              {running ? "已有检索在进行，结束后才能开始新的检索" : "检索要求会发给 Agent，由它检索、评分并保存结果"}
+              {running ? "已有检索在进行，完成后再开始新的检索" : "检索要求会发给 Agent，由它检索、评分并保存结果"}
             </span>
           </div>
         </Card>
 
         <SectionTitle title="最近的检索" />
         <Card>
-          {runs && runs.length === 0 && <Empty title="还没有从 app 发起的检索" />}
+          {runs && runs.length === 0 && <Empty title="暂无从 app 发起的检索" />}
           <ul className="divide-y">
             {runs?.map((r) => {
               const cur = live && live.run === r.run ? live : r
@@ -170,15 +170,15 @@ function RunRow({ run: r, onOpen, onCancel }: { run: SearchRun; onOpen: (s: stri
     <li className="space-y-1.5 px-5 py-3">
       <div className="flex items-center gap-3">
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.question}</span>
-        <span className="shrink-0 rounded border px-1.5 text-xs text-muted-foreground">{r.mode === "deep" ? "深度检索" : "快速查找"}</span>
+        <span className="shrink-0 rounded border px-1.5 text-xs text-muted-foreground">{r.mode === "deep" ? "深度检索" : "快速检索"}</span>
         <span className={cn("shrink-0 text-xs", r.state === "failed" ? "text-destructive" : "text-muted-foreground")}>{STATE[r.state]}</span>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{r.started.slice(5, 16).replace("T", " ")}</span>
-        {r.state === "running" && <Button size="sm" variant="ghost" onClick={onCancel}>取消</Button>}
+        {r.state === "running" && <Button size="sm" variant="ghost" onClick={onCancel}>取消检索</Button>}
         {r.session && r.state !== "running" && <Button size="sm" variant="outline" onClick={() => onOpen(r.session!)}>查看结果</Button>}
       </div>
       {r.state === "running" && (
         <div className="flex items-center gap-1.5 text-xs text-primary">
-          <LoaderIcon className="size-3 animate-spin" />{r.doing ?? "Agent 在工作"}
+          <LoaderIcon className="size-3 animate-spin" />{r.doing ?? "Agent 正在检索…"}
         </div>
       )}
       {r.state === "running" && steps.length > 0 && (

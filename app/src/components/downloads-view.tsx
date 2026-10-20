@@ -163,7 +163,7 @@ function PasteList({ busy, onStart, onClose }: {
         <div className="space-y-1 text-xs text-muted-foreground">
           <p>
             识别到 {n} 篇
-            {parsed.downloaded.length > 0 && `，其中 ${parsed.downloaded.length} 篇已下载过（保存位置里有文件的不会重新下载）`}
+            {parsed.downloaded.length > 0 && `，其中 ${parsed.downloaded.length} 篇以前下载过，保存位置里还有文件的会跳过`}
             {parsed.too_many && "，一次最多 2000 篇，其余未加入"}
           </p>
           {parsed.unrecognized_count > 0 && !resolved && (
@@ -207,12 +207,12 @@ function PasteList({ busy, onStart, onClose }: {
         </div>
       )}
       <div className="flex items-center gap-2">
-        <Input value={title} onChange={(e) => setTitle(e.target.value)} className="max-w-sm" aria-label="任务名称" />
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} className="max-w-sm" aria-label="下载任务名" />
         <div className="flex-1" />
         <Button size="sm" variant="ghost" onClick={onClose}>取消</Button>
         <Button size="sm" disabled={busy || n === 0 || !title.trim()}
           onClick={() => n > 0 && onStart(papers, title.trim())}>
-          开始下载{n > 0 ? ` ${n} 篇` : ""}
+          开始下载{n > 0 ? `（${n}）` : ""}
         </Button>
       </div>
     </Card>
@@ -291,7 +291,7 @@ export function DownloadsOverview({ jobs, pending, outputDir, external, busy, ru
           {busy && <p className="mb-3 text-sm text-muted-foreground">当前有下载任务进行中。</p>}
           {pasting && <PasteList busy={busy} onStart={(papers, title) => start(papers, title)} onClose={() => setPasting(false)} />}
           <Card className="divide-y">
-            {pending.length === 0 && <Empty title="暂无待下载文献" note="在筛选中加入下载的文献，或点「粘贴 DOI」" />}
+            {pending.length === 0 && <Empty title="暂无待下载文献" note="在筛选中加入下载的文献将显示在此处，也可以选择「粘贴 DOI」" />}
             {pending.map((g) => (
               <div key={g.session} className="px-5 py-4">
                 <div className="mb-2 flex items-center justify-between gap-4">
@@ -326,8 +326,8 @@ export function DownloadsOverview({ jobs, pending, outputDir, external, busy, ru
             ))}
           </SectionTitle>
           <Card>
-            {jobs.length === 0 && <Empty title="暂无下载记录" />}
-            {jobs.length > 0 && shown.length === 0 && <Empty title="无符合条件的记录" />}
+            {jobs.length === 0 && <Empty title="暂无历史记录" />}
+            {jobs.length > 0 && shown.length === 0 && <Empty title="没有匹配的下载任务" />}
             {shown.length > 0 && (
               <ul className="divide-y">
                 {shown.map((j) => (
@@ -399,8 +399,8 @@ function ZoteroPanel({ job, onPushed }: { job: DownloadJob; onPushed: () => void
           <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>取消</Button>
         </form>
       )}
-      {open && collections?.length === 0 && <p className="text-xs text-muted-foreground">无法读取 Zotero 分类：Zotero 未运行。启动 Zotero 后重试，或直接输入分类路径（不存在的分类会自动创建）。</p>}
-      {open && !!collections?.length && <p className="text-xs text-muted-foreground">可选择已有分类，或输入新路径（不存在的分类会自动创建）。</p>}
+      {open && collections?.length === 0 && <p className="text-xs text-muted-foreground">无法读取 Zotero 分类：Zotero 未运行。启动 Zotero 后重试，或直接输入分类路径，不存在的分类会自动创建。</p>}
+      {open && !!collections?.length && <p className="text-xs text-muted-foreground">选择已有分类，或输入新路径，不存在的分类会自动创建。</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   )
@@ -517,12 +517,12 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
               </div>
               {it.status === "waiting" && running && (skipping.has(it.doi.toLowerCase()) || cancelling) && (
                 <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <LoaderIcon className="size-3 animate-spin" />{cancelling ? "正在停止…" : "正在跳过，等手上的来源收尾…"}
+                  <LoaderIcon className="size-3 animate-spin" />{cancelling ? "正在停止…" : "正在跳过，等待进行中的来源结束…"}
                 </div>
               )}
               {it.status === "waiting" && running && !skipping.has(it.doi.toLowerCase()) && !cancelling && (it.stage || it.retrying) && (
                 <div className="mt-0.5 flex items-center gap-1.5 text-xs text-primary">
-                  <LoaderIcon className="size-3 animate-spin" />{it.stage ?? "换渠道重试中"}
+                  <LoaderIcon className="size-3 animate-spin" />{it.stage ?? "正在换一个来源重试"}
                 </div>
               )}
               {it.status === "done" && it.note && <div className="mt-0.5 text-xs text-muted-foreground">{it.note}</div>}
@@ -587,13 +587,13 @@ function Attempts({ steps }: { steps: DownloadStep[] }) {
     <div className="mt-0.5 text-xs">
       <button type="button" className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground" onClick={() => setOpen((v) => !v)}>
         <ChevronRightIcon className={cn("size-3 transition-transform", open && "rotate-90")} />
-        尝试经过（{steps.length} 步）
+        尝试记录（{steps.length} 步）
       </button>
       {open && (
         <ol className="mt-1 space-y-0.5 border-l pl-3 text-muted-foreground">
           {steps.map((s, i) => (
             <li key={i}>
-              {s.route === "school" ? "学校通道 · " : ""}{stepName(s.source)} · {Math.round(s.seconds)} 秒 · {s.ok ? "成功" : s.why ?? "没拿到"}
+              {s.route === "school" ? "学校认证 · " : ""}{stepName(s.source)} · {Math.round(s.seconds)} 秒 · {s.ok ? "成功" : s.why ?? "未取得"}
             </li>
           ))}
         </ol>

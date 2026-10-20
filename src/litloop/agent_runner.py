@@ -28,12 +28,12 @@ from . import store
 
 # What the agent tells the app, by tool: shown under the run as it works.
 _TOOL_TEXT = {
-    "litloop_search": "检索中",
-    "litloop_deep_search": "深度检索中",
-    "litloop_screening": "保存筛选结果",
-    "litloop_find": "查找文献",
-    "litloop_config": "读取设置",
-    "litloop_diagnostics": "检查设置",
+    "litloop_search": "正在检索",
+    "litloop_deep_search": "正在深度检索",
+    "litloop_screening": "正在保存评分",
+    "litloop_find": "正在查找文献",
+    "litloop_config": "正在读取设置",
+    "litloop_diagnostics": "正在检测设置",
 }
 _SESSION_RE = re.compile(r'"session"\s*:\s*"([^"]+)"')
 _LOCK = threading.Lock()
@@ -48,7 +48,7 @@ def runs_dir() -> Path:
 
 def _path(run: str) -> Path:
     if not re.fullmatch(r"[0-9-]+", run):
-        raise ValueError(f"bad run id: {run}")
+        raise ValueError("无法打开检索：编号不正确")
     return runs_dir() / f"{run}.json"
 
 
@@ -60,7 +60,7 @@ def build_prompt(form: dict[str, Any]) -> str:
     """The message the user would have typed, from the app's form."""
     question = str(form.get("question") or "").strip()
     if not question:
-        raise ValueError("请填写检索问题")
+        raise ValueError("填写检索问题")
     deep = form.get("mode") == "deep"
     parts = [f"用 litloop 技能{'做深度检索' if deep else '快速查找文献'}：{question}"]
     criteria = _lines(str(form.get("criteria") or ""))
@@ -140,7 +140,7 @@ def running() -> str | None:
 def start(form: dict[str, Any]) -> dict[str, Any]:
     prompt = build_prompt(form)
     if running():
-        raise RuntimeError("已有一个检索在进行，等它结束或先取消")
+        raise RuntimeError("已有检索在进行，完成或取消后再开始新的检索")
     run = datetime.now().strftime("%Y%m%d-%H%M%S")
     runs_dir().mkdir(parents=True, exist_ok=True)
     data = {"run": run, "state": "running", "started": datetime.now().isoformat(timespec="seconds"),
@@ -155,7 +155,7 @@ def start(form: dict[str, Any]) -> dict[str, Any]:
             cwd=str(Path.home()), env={**os.environ, "PYTHONUTF8": "1"},
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except OSError as e:
-        data.update(state="failed", doing=None, error=f"无法启动 Agent（{cmd[0]}）：{e}。在设置里检查 Agent 命令")
+        data.update(state="failed", doing=None, error=f"无法启动 Agent（{cmd[0]}）。在「设置 → Agent」中检查 Agent 命令")
         _write(run, data)
         return data
     with _LOCK:
@@ -187,10 +187,10 @@ def _read(data: dict[str, Any], line: str) -> None:
             if c.get("id"):
                 data.setdefault("_tools", {})[c["id"]] = name
             action = (c.get("input") or {}).get("action")
-            text = _TOOL_TEXT.get(name, f"调用 {name}")
+            text = _TOOL_TEXT.get(name, f"正在调用 {name}")
             if name == "litloop_deep_search" and action:
-                text = {"start": "深度检索：开始", "rate": "深度检索：保存这一批的评分",
-                        "next": "深度检索：取下一批", "status": "深度检索：查看进度"}.get(action, text)
+                text = {"start": "深度检索：正在构建候选池", "rate": "深度检索：正在保存本批评分",
+                        "next": "深度检索：正在生成下一批", "status": "深度检索：正在查看进度"}.get(action, text)
             data["doing"] = text
             _event(data, text)
         elif c.get("type") == "tool_result":
@@ -205,14 +205,14 @@ def _read(data: dict[str, Any], line: str) -> None:
             if session:
                 data["session"] = session
         elif c.get("type") == "text" and kind == "assistant" and c.get("text", "").strip():
-            data["doing"] = "Agent 在判断文献"
+            data["doing"] = "Agent 正在评分"
     if kind == "result":
         data["result"] = str(msg.get("result") or "").strip() or None
         if msg.get("is_error"):
-            data["error"] = data["result"] or "Agent 报错"
+            data["error"] = data["result"] or "无法完成检索：Agent 出错"
             if re.search(r"authenticat|log ?in|OAuth", data["error"], re.I):
                 cmd = _config.load_config().get("agent_command") or "claude"
-                data["error"] = f"Agent 没有登录：在终端运行 {cmd}，登录后再试（{data['error']}）"
+                data["error"] = f"无法完成检索：Agent 未登录。在终端运行 {cmd} 登录后重试"
             data["result"] = None
         data["cost_usd"] = msg.get("total_cost_usd")
 
@@ -258,7 +258,7 @@ def _watch_idle(run: str, proc: subprocess.Popen, data: dict[str, Any], seen: li
     while proc.poll() is None:
         time.sleep(min(5.0, max(0.2, limit / 4)))
         if time.time() - seen[0] > limit and proc.poll() is None:
-            data["error"] = f"Agent 超过 {limit / 60:.0f} 分钟没有任何输出，已停止"
+            data["error"] = f"检索已停止：Agent 超过 {limit / 60:.0f} 分钟没有输出"
             _kill(proc)
             return
 
@@ -297,7 +297,7 @@ def _follow(run: str, proc: subprocess.Popen, prompt: str, data: dict[str, Any])
             ok = code == 0 and not data.get("error")
             data["state"] = "done" if ok else "failed"
             if not ok and not data.get("error"):
-                data["error"] = f"Agent 退出码 {code}，详见日志"
+                data["error"] = f"无法完成检索：Agent 异常退出（退出码 {code}）。详情已写入日志"
     except Exception as e:
         data.update(state="failed", error=str(e))
     finally:

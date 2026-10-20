@@ -42,5 +42,5 @@ def test_half_rated_batches_do_not_count():
 def test_stop_reason_mentions_the_estimate():
     st, rated = _state([12, 9, 7, 5, 0])
     stop = deep_search._stop(st, rated)
-    assert stop["stop_suggested"] and "粗略外推" in stop["stop_reason"]
+    assert stop["stop_suggested"] and "下降趋势估算" in stop["stop_reason"]
     assert stop["remaining_estimate"]["remaining"] >= 0

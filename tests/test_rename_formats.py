@@ -213,5 +213,5 @@ def test_app_settings_update_rename_format_saves_and_enables_auto_rename(config_
 
 
 def test_app_settings_update_invalid_rename_format_raises_value_error(config_home):
-    with pytest.raises(ValueError, match="rename_format must be one of"):
+    with pytest.raises(ValueError, match="rename_format 不接受"):
         app_settings.update("rename_format", "invalid_format")

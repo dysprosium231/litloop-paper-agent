@@ -45,16 +45,16 @@ GROUPS: list[dict[str, Any]] = [
             {"key": "rename_format", "label": "文件名", "type": "select",
              "options": [[k, v] for k, v in _RENAME_FORMATS.items()]},
             {"key": "download_strategy", "label": "来源顺序", "type": "select",
-             "options": [["fastest", "谁快用谁"], ["oa_first", "开放获取优先"], ["legal_only", "只用合法来源"],
+             "options": [["fastest", "速度优先"], ["oa_first", "开放获取优先"], ["legal_only", "只用合法来源"],
                          ["scihub_first", "Sci-Hub 优先"], ["scihub_only", "只用 Sci-Hub"], ["grey_only", "只用 Sci-Hub、LibGen 等"]]},
             {"key": "scihub_enabled", "label": "允许 Sci-Hub、LibGen 等来源", "type": "bool",
              "help": "可能违反出版商条款或学校规定，自行判断是否开启", "warn": True},
             {"key": "scihub_skip_from_year", "label": "较新的文献不查 Sci-Hub", "type": "select",
-             "options": [["0", "都查"], ["2022", "2022 年起"], ["2023", "2023 年起"], ["2024", "2024 年起"], ["2025", "2025 年起"]],
-             "help": "新文献 Sci-Hub 基本没有；年份取自文献列表或 DOI，不知年份的照查"},
+             "options": [["0", "不限"], ["2022", "2022 年起"], ["2023", "2023 年起"], ["2024", "2024 年起"], ["2025", "2025 年起"]],
+             "help": "Sci-Hub 很少收录新文献；不知道年份的文献仍会查"},
             {"key": "scihub_route", "label": "Sci-Hub、LibGen 线路", "type": "select",
-             "options": [["direct", "直连"], ["proxy", "只走代理"], ["auto", "谁快用谁（下载前测速）"]],
-             "help": "代理即「网络」里的代理软件地址；只走代理时学校的出口不连 Sci-Hub"},
+             "options": [["direct", "直连"], ["proxy", "经代理"], ["auto", "下载前测速选择"]],
+             "help": "代理是「网络」中的代理软件地址；选「经代理」时不从校园网直连"},
         ],
     },
     {
@@ -63,10 +63,10 @@ GROUPS: list[dict[str, Any]] = [
             # network_proxy is the campus egress (auth.py skips the school login when it is set),
             # not a personal VPN: filling in Clash's port breaks institutional downloads.
             {"key": "network_proxy", "label": "校园出口代理", "type": "text",
-             "help": "只填学校提供的代理地址，个人代理软件的端口会导致机构下载失败"},
+             "help": "只填学校提供的代理地址，个人代理软件的端口会导致学校认证失败"},
             {"key": "host_proxy_url", "label": "代理软件地址", "type": "text", "placeholder": "http://127.0.0.1:10808",
              "help": "只有指定的网站（如 Sci-Hub）经它访问，其余直连"},
-            {"key": "is_campus_network", "label": "电脑连在校园网上", "type": "bool",
+            {"key": "is_campus_network", "label": "已连接校园网", "type": "bool",
              "help": "打开后直接按学校 IP 下载，不再登录 WebVPN 或 CARSI"},
         ],
     },
@@ -84,10 +84,10 @@ GROUPS: list[dict[str, Any]] = [
         "fields": [
             {"key": "abstract_translation", "label": "自动翻译摘要", "type": "select",
              "options": [["高", "评为高的文献"], ["高中", "评为高、中的文献"], ["all", "全部文献"], ["off", "不自动翻译"]],
-             "help": "打开范围内的文献时翻译成中文，译文会保存；范围外的文献可在详情页手动翻译"},
+             "help": "打开范围内的文献时自动翻译并保存，其他文献可在详情页翻译"},
             {"key": "translation_provider", "label": "翻译服务", "type": "select",
              "options": [["deepseek", "DeepSeek"], ["deepl", "DeepL"], ["agent", "Agent（评分时翻译）"]],
-             "help": "DeepSeek 处理专业术语较好；选 Agent 不需要 Key，但会消耗对话额度"},
+             "help": "DeepSeek 翻译专业术语较好；Agent 不需要 Key，但消耗对话额度"},
             {"key": "deepseek_api_key", "label": "DeepSeek Key", "type": "secret",
              "link": "https://platform.deepseek.com/api_keys"},
             {"key": "deepl_api_key", "label": "DeepL Key", "type": "secret",
@@ -123,8 +123,8 @@ STEPS = [
                                   "Elsevier Key 用于 ScienceDirect 全文和 Scopus 摘要，对深度检索影响很大。"
                                   "联系邮箱只发给 Crossref、OpenAlex、Unpaywall，它们要求填写。"},
     {"group": "screening", "intro": "筛选时可把摘要翻译成中文。填 DeepSeek 或 DeepL 的 Key 后由 app 翻译，不占用对话额度；也可以以后再设置。"},
-    {"group": "downloads", "intro": "PDF 保存在哪里、文件怎么命名。Sci-Hub、LibGen 等来源可能违反出版商条款或学校规定，默认不使用，是否开启由你决定。"},
-    {"group": "network", "intro": "开着代理软件时，机构下载需要绕开代理，否则学校认不出你。点检测查看当前网络和需要的设置。"},
+    {"group": "downloads", "intro": "设置 PDF 的保存位置和文件名。Sci-Hub、LibGen 等来源可能违反出版商条款或学校规定，默认不使用，是否开启由你决定。"},
+    {"group": "network", "intro": "开启代理软件时，学校认证的流量需要直连，否则学校无法识别你的身份。选择「检测」查看当前网络和需要的设置。"},
     {"group": "school", "intro": "下载学校订阅的期刊需要学校认证。填写学校代号并选择认证方式；不在校园网时会弹出浏览器让你登录一次。"},
     {"group": "zotero", "intro": "下载的文献可推送到 Zotero。需要 Zotero 7 以上和 zotero-mcp；推荐授权本地写入，速度最快。"},
 ]
@@ -196,13 +196,13 @@ def _check_path(value: str, pick: str) -> None:
     A folder that does not exist yet is fine: downloads create it."""
     p = Path(value).expanduser()
     if not p.is_absolute():
-        raise ValueError(r"不是完整的路径，请从盘符写起，例如 D:\文献\papers")
+        raise ValueError(r"填写从盘符开始的完整路径，例如 D:\文献\papers")
     if not Path(p.anchor).exists():
-        raise ValueError(f"找不到 {p.anchor} 这个位置，请检查盘符")
+        raise ValueError(f"找不到 {p.drive or p.anchor}，换成本机存在的盘符")
     if pick == "dir" and p.exists() and not p.is_dir():
-        raise ValueError("这个位置是一个文件，不是文件夹")
+        raise ValueError("这里是一个文件，填写文件夹的路径")
     if pick == "file" and not p.is_file():
-        raise ValueError("找不到这个文件")
+        raise ValueError("找不到这个文件，检查路径后重新填写")
 
 
 def update(key: str, value: Any) -> dict[str, Any]:
@@ -213,9 +213,9 @@ def update(key: str, value: Any) -> dict[str, Any]:
     if field["type"] == "bool":
         value = "true" if value in (True, "true", "1", 1) else "false"
     elif field["type"] == "select" and value not in [o[0] for o in field["options"]]:
-        raise ValueError(f"{key} must be one of {[o[0] for o in field['options']]}")
+        raise ValueError(f"从列表中选择一项（{key} 不接受 {value!r}）")
     elif field["type"] == "email" and value and "@" not in str(value):
-        raise ValueError("not an email address")
+        raise ValueError("填写完整邮箱，例如 name@example.edu")
     elif field["type"] == "path" and str(value or "").strip():
         _check_path(str(value).strip(), field.get("pick", ""))
     _config.update_config(key, str(value if value is not None else "").strip())
@@ -240,6 +240,13 @@ def _get(url: str, **kw: Any):
     return requests.get(url, timeout=15, **kw)
 
 
+def _cannot_reach(name: str, raw: Any) -> str:
+    """'无法连接 <name>：<reason>' with the raw error translated (docs/UI_COPY.md 7.2)."""
+    from . import error_text
+    why = error_text.reason(str(raw)) if raw else "没有响应"
+    return f"无法连接 {name}" if why == "出现意外错误" else f"无法连接 {name}：{why}"
+
+
 def test_sources() -> list[dict[str, Any]]:
     from . import quota
     cfg = _config.load_config()
@@ -247,7 +254,7 @@ def test_sources() -> list[dict[str, Any]]:
 
     live = quota.openalex_live()
     if not live or live.get("error"):
-        out.append(_result("OpenAlex", False, f"无法连接 OpenAlex：{(live or {}).get('error', '无响应')}"))
+        out.append(_result("OpenAlex", False, _cannot_reach("OpenAlex", (live or {}).get("error"))))
     else:
         left, limit = live.get("credits_remaining"), live.get("credits_limit")
         if live.get("has_key"):
@@ -270,9 +277,9 @@ def test_sources() -> list[dict[str, Any]]:
             elif r.status_code in (401, 403):
                 out.append(_result("Elsevier", False, f"Key 无效（HTTP {r.status_code}）"))
             else:
-                out.append(_result("Elsevier", False, f"HTTP {r.status_code}"))
+                out.append(_result("Elsevier", False, f"无法使用（HTTP {r.status_code}）"))
         except Exception as exc:
-            out.append(_result("Elsevier", False, f"无法连接 Elsevier：{exc}"))
+            out.append(_result("Elsevier", False, _cannot_reach("Elsevier", exc)))
 
     key = str(cfg.get("springer_meta_api_key") or "").strip()
     if not key:
@@ -287,9 +294,9 @@ def test_sources() -> list[dict[str, Any]]:
             elif r.status_code in (401, 403):
                 out.append(_result("Springer Nature", False, f"Key 无效或不是 Meta API 的 Key（HTTP {r.status_code}）"))
             else:
-                out.append(_result("Springer Nature", False, f"HTTP {r.status_code}"))
+                out.append(_result("Springer Nature", False, f"无法使用（HTTP {r.status_code}）"))
         except Exception as exc:
-            out.append(_result("Springer Nature", False, f"无法连接 Springer Nature：{exc}"))
+            out.append(_result("Springer Nature", False, _cannot_reach("Springer Nature", exc)))
 
     email = str(cfg.get("email") or "").strip()
     if not email or email.endswith(".invalid"):
@@ -298,9 +305,9 @@ def test_sources() -> list[dict[str, Any]]:
         try:
             r = _get("https://api.crossref.org/works", params={"rows": 0, "mailto": email})
             out.append(_result("Crossref", r.status_code == 200,
-                               "可用" if r.status_code == 200 else f"HTTP {r.status_code}"))
+                               "可用" if r.status_code == 200 else f"无法使用（HTTP {r.status_code}）"))
         except Exception as exc:
-            out.append(_result("Crossref", False, f"无法连接 Crossref：{exc}"))
+            out.append(_result("Crossref", False, _cannot_reach("Crossref", exc)))
     return out
 
 
@@ -316,19 +323,20 @@ def test_downloads() -> list[dict[str, Any]]:
             free = shutil.disk_usage(folder).free / 1024 ** 3
         except OSError:
             pass
-        return [_result("保存位置", True, f"可写入" + (f"，剩余 {free:.0f} GB" if free is not None else ""))]
+        return [_result("保存位置", True, "可写入" + (f"，剩余 {free:.0f} GB" if free is not None else ""))]
     except OSError as exc:
-        return [_result("保存位置", False, f"无法写入：{exc}")]
+        why = "没有此文件夹的写入权限" if isinstance(exc, PermissionError) else "检查保存位置是否正确"
+        return [_result("保存位置", False, f"无法写入：{why}")]
 
 
 def test_zotero() -> list[dict[str, Any]]:
     try:
         r = _get("http://127.0.0.1:23119/connector/ping", proxies={"http": None, "https": None})
         if r.status_code == 200:
-            return [_result("Zotero", True, "运行中")]
-        return [_result("Zotero", False, f"HTTP {r.status_code}")]
+            return [_result("Zotero", True, "Zotero 运行中")]
+        return [_result("Zotero", False, f"Zotero 没有响应（HTTP {r.status_code}）")]
     except Exception:
-        return [_result("Zotero", False, "未运行")]
+        return [_result("Zotero", False, "Zotero 未运行")]
 
 
 def test_network() -> list[dict[str, Any]]:
@@ -348,11 +356,11 @@ def test_network() -> list[dict[str, Any]]:
     names, paths = found["direct_processes"], proxy_check.litloop_paths()
     programs = "、".join(found["programs"]) or "代理软件"
     if found["mode"] == "unknown":
-        out.append(_result("代理软件", None, "暂不支持在此系统上检测。"))
+        out.append(_result("代理软件", None, "暂不支持在此系统上检测"))
     elif found["mode"] == "none":
-        out.append(_result("代理软件", True, "未检测到代理软件。"))
+        out.append(_result("代理软件", True, "未检测到代理软件"))
     elif found["mode"] == "system":
-        out.append(_result("代理软件", True, f"{programs} 以系统代理模式运行，LitLoop 会自动直连，无需设置。"))
+        out.append(_result("代理软件", True, f"{programs} 以系统代理模式运行，LitLoop 会自动直连，无需设置"))
     else:
         guides = []
         if any(p in ("v2rayN", "sing-box", "Xray") for p in found["programs"]) or not found["programs"]:
@@ -375,8 +383,8 @@ def test_network() -> list[dict[str, Any]]:
                 "note": "如果规则未生效，在「扩展配置」中加入 find-process-mode: always。",
             })
         out.append(_result("代理软件", False,
-                           f"{programs} 正以 TUN 模式运行。学校认证的流量会经由代理出口，无法通过学校的身份认证。"
-                           "已按下方设置直连的，看下面两项的结果。",
+                           f"{programs} 正以 TUN 模式运行，学校认证的流量会经代理出口，学校无法识别你的身份。"
+                           "按下方步骤设置直连后，查看下面两项的结果。",
                            guides=guides))
     out += _egress_checks(cfg)
     return out
@@ -417,11 +425,11 @@ def _egress_checks(cfg: dict[str, Any]) -> list[dict[str, Any]]:
         out.append(_result("Elsevier 全文接口", True, "可用：ScienceDirect 的订阅全文可直接通过接口下载"))
     elif verdict.startswith(NOT_ENTITLED):
         out.append(_result("Elsevier 全文接口", None,
-                           "这个 Key 没有全文权限，ScienceDirect 的论文改由浏览器打开官网下载。"
-                           "这不代表出口不被学校认可；要判断出口，可在不开代理时用浏览器打开 ScienceDirect "
-                           "的订阅论文，看页面上是否显示学校名称"))
+                           "此 Key 没有全文权限，ScienceDirect 的文献改由浏览器从官网下载。"
+                           "要判断出口是否被学校认可，关闭代理后用浏览器打开一篇 ScienceDirect "
+                           "订阅文献，看页面上是否显示学校名称。"))
     else:
-        out.append(_result("Elsevier 全文接口", None, f"无法判断（Elsevier 返回 {code or '无响应'}）"))
+        out.append(_result("Elsevier 全文接口", None, f"无法判断（HTTP {code}）" if code else "无法判断：Elsevier 没有响应"))
     return out
 
 
@@ -439,7 +447,7 @@ def test_screening() -> list[dict[str, Any]]:
         out = translate.translate_text("Amorphous calcium phosphate nanoparticles release doxorubicin at pH 5.5.", config)
     except translate.TranslationError as exc:
         return [_result(label, False, str(exc))]
-    return [_result(label, True, f"可用。示例译文：{out}")]
+    return [_result(label, True, f"可用，示例译文：{out}")]
 
 
 TESTS = {"sources": test_sources, "downloads": test_downloads, "network": test_network, "zotero": test_zotero,

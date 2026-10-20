@@ -119,7 +119,7 @@ export function CollectionPicker({ collections, value, onChange, disabled, place
           </div>
           <div role="tree" className="scrollable max-h-80 overflow-y-auto p-1">
             {rows(null, 0)}
-            {visible?.size === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">无匹配的分类</p>}
+            {visible?.size === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">没有匹配的分类</p>}
           </div>
         </div>
       )}

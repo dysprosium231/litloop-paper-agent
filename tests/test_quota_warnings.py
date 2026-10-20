@@ -22,6 +22,6 @@ def test_english_for_agents(monkeypatch):
 def test_chinese_for_the_app(monkeypatch):
     _fake_summary(monkeypatch)
     assert quota.warnings("zh") == [
-        "Scopus 剩余 414 / 10,000 次请求，2026-10-22 16:45 重置",
+        "Scopus 剩余 414 / 10,000 次，重置 2026-10-22 16:45",
         "OpenAlex 今日被限流 110 次，已放慢请求",
     ]

@@ -45,7 +45,7 @@ function BatchBars({ batches, highs }: { batches: Summary["batches"]; highs: num
       </span>
       {b && (
         <span className="pointer-events-none absolute top-full left-0 z-50 mt-2 w-max rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md">
-          第 {b.batch} 批：高 {b.高} / 已评 {b.rated}（{Math.round(highs[hover!] * 100)}%）
+          第 {b.batch} 批：高 {b.高} / 已评分 {b.rated}（{Math.round(highs[hover!] * 100)}%）
         </span>
       )}
     </span>
@@ -92,7 +92,7 @@ export function ProgressStrip({ progress, summary, onContinue }: {
     return (
       <div className="flex min-h-13 min-w-0 items-center gap-5 border-b px-6 py-3 text-sm text-muted-foreground">
         <span className="shrink-0 whitespace-nowrap tabular-nums" title={`候选池 ${summary.pool.toLocaleString()} 篇，已评分 ${summary.screened.toLocaleString()} 篇`}>
-          已评 <span className="font-medium text-foreground">{summary.screened.toLocaleString()}</span> / {summary.pool.toLocaleString()}
+          已评分 <span className="font-medium text-foreground">{summary.screened.toLocaleString()}</span> / {summary.pool.toLocaleString()}
         </span>
         {highs.length > 0 && <BatchBars batches={summary.batches} highs={highs} />}
         <span className="ml-auto flex shrink-0 items-center gap-2">
@@ -114,7 +114,7 @@ export function ProgressStrip({ progress, summary, onContinue }: {
           )}
           {summary.current_batch && (
             <Button size="sm" onClick={onContinue}
-              title="按目前全部评分（包括你改过的）重新排序，生成下一批；不经过 Agent">继续检索</Button>
+              title="按当前全部评分重新排序并生成下一批，不经过 Agent">继续检索</Button>
           )}
         </span>
       </div>
