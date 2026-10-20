@@ -60,7 +60,7 @@ class FetchSupplementaryTests(unittest.TestCase):
             if url.endswith("MOESM1_ESM.pdf"):
                 return b"<html>gate page</html>", "text/html"  # gate, not attachment
             if url.endswith(".xlsx"):
-                return b"PK", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                return b"PK\x03\x04", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             return b"%PDF-1.4 fake", "application/pdf"
 
         with patch("litloop.supplementary._fetch_page", return_value=(HTML, fake_fetch)), \

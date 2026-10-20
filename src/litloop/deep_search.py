@@ -85,7 +85,7 @@ RESERVE_CREDITS = 1000 # and leave this much of the daily budget for everything 
 def _boolean_heavy(params: dict[str, Any]) -> bool:
     """OpenAlex allows only 5 requests/s for searches with more than five boolean operators."""
     text = " ".join(str(v) for v in params.values())
-    return len(re.findall(r"(?:OR|AND|NOT)", text)) > 5
+    return len(re.findall(r"\b(?:OR|AND|NOT)\b", text)) > 5
 
 
 def _get(params: dict[str, Any], *, tries: int = 6) -> dict[str, Any]:
