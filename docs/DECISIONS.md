@@ -3,6 +3,18 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-20：出版商官网只用专用窗口
+
+- 起因：第二轮新文献重测里，多数浪费出在第一轮共用浏览器：判断过早（Elsevier）、打不开文章页（Wiley、SSRN）、人机验证慢且每篇重验（T&F 57 秒、ACS 42 秒）。
+- 原来有三条路：第一轮共用浏览器 `_browser_download`；失败后才进的专用窗口 `_visible_browser_download`（每家出版商一个持久资料目录，**只有填了学校 `carsi_idp_name` 才会进**）；共用浏览器起不来时的 CloakBrowser 直开窗口 `_browser_download_visible`。
+- 现在：`_browser_download_with_fallback` 先试「带 cookie 直接下 PDF 链接」（不开浏览器），然后直接进专用窗口；没填学校也进，只是不登录（页面在卖或要登录记为需要订阅，否则记为没找到 PDF）。
+- 从第一轮搬进窗口的：`doi.org` 打不开时问 DOI 接口要落地页；AIP 加载页多等 10 秒、Elsevier crasolve 空壳多等 5 秒；各家自己的 PDF 链接规则（Cell Press showPdf、ScienceDirect View PDF 与 pdfft、Wiley pdfdirect、IEEE stamp、`/doi/pdf/` 排除补充材料、SAGE 中国站页面数据里的 `/storage/…pdf`），在通用找链接失败后再用（`_PUBLISHER_PDF_LINK_JS`）。没搬的：校园网直接用浏览器下载（窗口本来就走校园网出口）、共用浏览器里的通用选机构（窗口有每家的选机构配置）、Cell Press「有机构登录链接没有 PDF 链接」的判断（`_page_sells_paper` 覆盖）。
+- 用户的决定：
+  - 窗口不跨篇共用，每篇开一次、下完就关（跨篇共用要按落地域名识别网站，太麻烦）；验证结果和 cookie 靠每家出版商的持久资料目录保留。
+  - 窗口打开后先最小化（配置 `publisher_window_minimized`，默认开），需要登录时立即弹到前台，人机验证 8 秒（自定值）还没自己过才弹（`_show_window_for_user`，经 CDP `Browser.setWindowBounds`）。
+- 删除约 1060 行：`_browser_download`、`_browser_download_visible`、`_try_institutional_login`、`_wait_login_in_tab`、`_visible_institutional_login`、`_extract_pdf_from_page`、`_visible_browser_lock` / `_visible_browser_active`，以及 `browser_engine.download_pdf_via_camofox` 别名。删前用脚本逐轮查了删后没人引用的定义（删后没有新的孤立函数）；请 Antigravity 复查，它 258 秒没有返回结果，未采用。共用浏览器的标签页函数（`create_tab` 等）还有 Elsevier 和校园网路径在用，保留。
+- 待实测：最小化窗口里人机验证能否自己通过；连续几篇同一出版商时第二篇起是否不再验证；与第二轮重测逐篇对比用时。
+
 ## 2026-10-20：界面文字按 UI_COPY.md 全部过一遍
 
 - 起因：设置页填错路径时一直显示「已保存」（f62acc0 改为保存前检查，报错写清怎样填才对）；用户要求所有给用户看的文字都按 [UI_COPY.md](UI_COPY.md) 检查。

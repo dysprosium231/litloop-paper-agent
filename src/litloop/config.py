@@ -78,6 +78,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "batch_stagger_seconds": 0.3,
     "min_pdf_size_bytes": 10000,
     "browser_headless": False,
+    # 出版商官网的专用窗口先最小化，需要登录或人机验证时再弹到前台
+    "publisher_window_minimized": True,
     "browser_humanize": True,
     # 浏览器后端：patchright（默认，Apache-2.0 开源 playwright fork，内核随本机 Chrome 自动更新）
     # 或 cloakbrowser（免费版内核卡 Chromium 146，作为可选回退）

@@ -151,10 +151,6 @@ def _wait_for_pdf_link(page: Any, doi: str, publisher: str) -> tuple[str | None,
             pass
     return None, "unclear"
 
-# Global lock to prevent multiple visible browser windows in parallel racing
-_visible_browser_lock = threading.Lock()
-_visible_browser_active = False
-
 
 def get_last_error() -> tuple[str, str]:
     """(error_type, action) of the last browser strategy run in this thread.
@@ -203,6 +199,31 @@ _PICK_INSTITUTION_JS = """
     if (!best) return null;
     best.el.click();
     return best.text.substring(0, 60);
+}
+"""
+
+
+# Publishers' own PDF links the generic finder (find_page_pdf_link) may miss;
+# moved from the shared-browser first pass (2026-10-20): Cell Press showPdf,
+# ScienceDirect's View PDF button and pdfft, Wiley pdfdirect, IEEE stamp, and
+# SAGE's China platform, whose PDF button has no href (the file's path sits in
+# the page data as /storage/.../<doi with _ for />.pdf, seen 2026-10-17).
+_PUBLISHER_PDF_LINK_JS = r"""
+(doi) => {
+    const first = (sel) => { for (const a of document.querySelectorAll(sel)) if (a.href) return a.href; return null; };
+    const hit = first('a[href*="showPdf"]') || first('a[aria-label*="View PDF" i], a.pdf-download-btn-link')
+        || first('a[href*="pdfft"]') || first('a[href*="pdfdirect"]')
+        || first('a[href*="/stamp/"], a[href*="getPDF"], a.xpl-pdf-btn');
+    if (hit) return hit;
+    for (const a of document.querySelectorAll('a[href*="/doi/pdf/"]')) {
+        const h = a.href.toLowerCase();
+        if (!h.includes('supplement') && !h.includes('supporting')) return a.href;
+    }
+    if (location.hostname.endsWith('cnpereading.com')) {
+        const m = document.documentElement.outerHTML.match(/\/storage\/[^"'\\\s<>]+?\.pdf/);
+        if (m && m[0].toLowerCase().includes(doi.replace(/\//g, '_').toLowerCase())) return location.origin + m[0];
+    }
+    return null;
 }
 """
 
@@ -282,6 +303,42 @@ def _user_waiting(what: str = "verify", where: Any = None) -> None:
         raise
     except Exception:
         pass
+    _show_window_for_user(what)
+
+
+# The publisher window of this thread (``_visible_browser``): it starts
+# minimized and comes up when the user has to act (2026-10-20, user's choice).
+_WINDOW_TLS = threading.local()
+_VERIFY_GRACE_S = 8  # most human checks pass by themselves within seconds (own value)
+
+
+def _set_window_state(page: Any, state: str) -> bool:
+    """Minimize the window of ``page`` or bring it back ("minimized" / "normal")."""
+    try:
+        cdp = page.context.new_cdp_session(page)
+        win = cdp.send("Browser.getWindowForTarget")["windowId"]
+        cdp.send("Browser.setWindowBounds", {"windowId": win, "bounds": {"windowState": state}})
+        if state == "normal":
+            page.bring_to_front()
+        return True
+    except Exception as exc:
+        log.info(f"   publisher window: cannot set it {state} ({type(exc).__name__})")
+        return False
+
+
+def _show_window_for_user(what: str) -> None:
+    """Bring this thread's publisher window up, once: at once for a login, after
+    a few seconds for a human check (one that passes by itself needs no one)."""
+    page = getattr(_WINDOW_TLS, "page", None)
+    if page is None or getattr(_WINDOW_TLS, "shown", False):
+        return
+    if what == "verify":
+        since = getattr(_WINDOW_TLS, "verify_since", None)
+        if since is None:
+            _WINDOW_TLS.verify_since = since = time.time()
+        if time.time() - since < _VERIFY_GRACE_S:
+            return
+    _WINDOW_TLS.shown = _set_window_state(page, "normal")
 
 
 def _get_profile_dir(config: dict[str, Any], publisher: str = "shared") -> Path:
@@ -347,9 +404,13 @@ def _visible_browser(config: dict[str, Any], publisher: str, *, viewport: dict |
         _restore_cookies_to_context(ctx, config)
         page = ctx.new_page()
 
+    _WINDOW_TLS.page, _WINDOW_TLS.shown, _WINDOW_TLS.verify_since = page, False, None
+    if config.get("publisher_window_minimized", True):
+        _set_window_state(page, "minimized")
     try:
         yield ctx, page
     finally:
+        _WINDOW_TLS.page = None
         try:
             if browser:
                 browser.close()
@@ -493,246 +554,6 @@ def _inject_cookies_to_tab(tab_id: str, config: dict[str, Any], publisher: str) 
         log.info(f"   [{publisher}] imported {total} cookies into browser session")
 
 
-def _try_institutional_login(tab_id: str, config: dict[str, Any], publisher: str) -> bool:
-    """Try institutional login (OpenAthens/CARSI) when paywall detected.
-
-    Works within the existing browser-engine tab:
-    1. Find and click "Institutional login" / SSO link
-    2. Search for configured institution
-    3. Wait for user to complete CAS login
-    4. Navigate back to article
-
-    Returns True if login succeeded (cookies saved).
-    """
-    from .browser_engine import evaluate_js, navigate_tab
-
-    idp_name = config.get("carsi_idp_name", "")
-    if not idp_name:
-        log.info(f"   [{publisher}] no carsi_idp_name configured, skipping institutional login")
-        return False
-
-    idp_en = _IDP_MAP.get(idp_name, idp_name)
-
-    # Step 1: Click SSO/institutional login link on the article page
-    sso_clicked = evaluate_js(tab_id, """
-        (() => {
-            const links = [...document.querySelectorAll('a')];
-            for (const a of links) {
-                const href = (a.href || '').toLowerCase();
-                const text = (a.innerText || '').toLowerCase();
-                if (href.includes('ssostart') || href.includes('saml') || href.includes('shibboleth')
-                    || href.includes('institutional-login') || href.includes('federation')
-                    || (text.includes('institutional') && text.includes('login'))
-                    || text.includes('access through your institution')) {
-                    a.click();
-                    return a.href;
-                }
-            }
-            return null;
-        })()
-    """, config)
-
-    if not sso_clicked:
-        log.info(f"   [{publisher}] no SSO/institutional login link found on page")
-        return False
-
-    log.info(f"   [{publisher}] clicked institutional login: {str(sso_clicked)[:60]}")
-    time.sleep(8)
-
-    # Step 2: Look for institution search box and search
-    search_done = evaluate_js(tab_id, f"""
-        (() => {{
-            const name = {json.dumps(idp_en)};
-            const selectors = {json.dumps(_INSTITUTION_SEARCH_SELECTORS)};
-            for (const sel of selectors) {{
-                const input = document.querySelector(sel);
-                if (input) {{
-                    input.focus();
-                    input.value = name;
-                    input.dispatchEvent(new Event('input', {{bubbles: true}}));
-                    input.dispatchEvent(new Event('change', {{bubbles: true}}));
-                    input.dispatchEvent(new KeyboardEvent('keyup', {{key: 'n', bubbles: true}}));
-                    return sel;
-                }}
-            }}
-            return null;
-        }})()
-    """, config)
-
-    if search_done:
-        log.info(f"   [{publisher}] searched for '{idp_en}' via {search_done}")
-        time.sleep(3)
-
-        # Click matching institution result
-        clicked = evaluate_js(tab_id, f"({_PICK_INSTITUTION_JS})({json.dumps(idp_en)})", config)
-
-        if clicked:
-            log.info(f"   [{publisher}] selected institution: {clicked}")
-            time.sleep(5)
-        else:
-            log.info(f"   [{publisher}] no matching institution found for '{idp_en}'")
-            return False
-    else:
-        log.info(f"   [{publisher}] no institution search box found")
-
-    # Step 3: Check if CAS login page appeared (headless tab → user can't interact)
-    # Use module-level constants
-    _ak = _AUTH_KEYWORDS
-    _at = _AUTH_TITLES
-
-    current_url = evaluate_js(tab_id, "window.location.href", config) or ""
-    current_title = evaluate_js(tab_id, "document.title", config) or ""
-
-    needs_login = any(x in current_url.lower() for x in _ak) or any(x in current_title for x in _at)
-
-    if needs_login:
-        shared_headless = bool(config.get("scihub_browser_headless", config.get("browser_headless", False)))
-        if not shared_headless:
-            # The shared browser window is visible: the user logs in right here.
-            # Opening a second window would (a) restart the login the user is
-            # already doing and (b) start a second sync Playwright in this
-            # thread, which breaks the shared browser ("Event loop is closed").
-            return _wait_login_in_tab(tab_id, config, publisher, idp_name)
-        # browser-engine is headless — user can't see the tab
-        # Open a visible browser window for the CAS login
-        log.info(f"   [{publisher}] CAS login required — opening visible browser...")
-        return _visible_institutional_login(current_url, config, publisher, idp_name, idp_en, tab_id)
-
-    # If we ended up back on the article page, login might have succeeded via cookies
-    log.info(f"   [{publisher}] institutional login flow completed")
-    return True
-
-
-def _wait_login_in_tab(tab_id: str, config: dict[str, Any], publisher: str, idp_name: str) -> bool:
-    """Wait for the user to finish institutional login in the (visible) shared-browser tab."""
-    from .browser_engine import _resolve_tab
-    from .browser_pdf import wait_url_stable
-
-    page = _resolve_tab(tab_id)
-    if page is None:
-        return False
-    log.info(f"   [{publisher}] CAS login required — please log in in the open browser window")
-    print(f"\n  请在已打开的浏览器窗口中完成机构登录 ({idp_name})")
-    print("  登录成功后会自动继续下载\n")
-
-    for _ in range(100):  # ~5 min
-        _user_waiting("login", page)
-        try:
-            time.sleep(3)  # not page.wait_for_timeout: it hangs on a page stuck loading
-            title = page.title() or ""
-            url = page.url or ""
-        except Exception:
-            log.info(f"   [{publisher}] browser closed during login")
-            _set_error("login_abandoned", "retry_login")
-            return False
-        is_auth = any(x in title for x in _AUTH_TITLES) or any(x in url.lower() for x in _AUTH_KEYWORDS)
-        if not is_auth:
-            wait_url_stable(page)
-            log.info(f"   [{publisher}] login finished, back at {page.url[:70]}")
-            try:
-                _save_all_cookie_formats(page.context.cookies(), publisher, config)
-            except Exception as e:
-                log.info(f"   [{publisher}] cookie save note: {e}")
-            return True
-
-    log.info(f"   [{publisher}] login timed out")
-    _set_error("login_abandoned", "retry_login")
-    return False
-
-
-def _visible_institutional_login(
-    cas_url: str, config: dict[str, Any], publisher: str,
-    idp_name: str, idp_en: str, headless_tab_id: str,
-) -> bool:
-    """Open a visible browser for CAS login, then inject cookies back."""
-    from .browser_engine import evaluate_js, navigate_tab, import_cookies
-
-    with _visible_browser(config, publisher, viewport=None) as (context, page):
-
-        # Start from article page to get Cloudflare clearance, then do SSO flow
-        article_url = evaluate_js(headless_tab_id, "window.location.href", config) or cas_url
-        doi_match = re.search(r'10\.\d{4,}/[^\s?&]+', article_url)
-        doi_str = doi_match.group(0) if doi_match else ""
-        from urllib.parse import urlparse as _urlparse
-        parsed = _urlparse(article_url)
-        publisher_host = parsed.netloc or "onlinelibrary.wiley.com"
-        article_page = f"https://{publisher_host}/doi/{doi_str}" if doi_str else article_url
-
-        log.info(f"   [{publisher}] visible browser: loading article page first...")
-        try:
-            page.goto(article_page, wait_until="domcontentloaded", timeout=60000)
-            time.sleep(5)
-        except Exception:
-            pass
-
-        title = page.title()
-        url = page.url
-        log.info(f"   [{publisher}] visible browser: '{title[:40]}' {url[:60]}")
-
-        # Check if already on CAS page (previous cookies caused redirect)
-        already_on_auth = any(x in (title or "") for x in _AUTH_TITLES) or \
-                          any(x in (url or "").lower() for x in _AUTH_KEYWORDS)
-
-        if not already_on_auth:
-            # Click "Institutional login" link on article page
-            page.evaluate("""
-                (() => {
-                    const a = [...document.querySelectorAll('a')].find(a => a.href && a.href.includes('ssostart'));
-                    if (a) a.click();
-                })()
-            """)
-            time.sleep(8)
-
-            title = page.title()
-            url = page.url
-            log.info(f"   [{publisher}] after SSO click: '{title[:30]}' {url[:60]}")
-
-            # Search for institution
-            si = page.query_selector('#searchInstitution')
-            if si:
-                si.fill(idp_en)
-                time.sleep(3)
-                page.evaluate(f"""
-                    (name) => {{
-                        const items = document.querySelectorAll('[class*="result"], [class*="suggestion"], li, a, button');
-                        for (const el of items) {{
-                            if (el.textContent.includes(name) && el.offsetParent !== null) {{
-                                el.click();
-                                return true;
-                            }}
-                        }}
-                        return false;
-                    }}
-                """, idp_en)
-                time.sleep(5)
-
-        # Wait for user to complete CAS login
-        print(f"\n  请在浏览器中完成机构登录 ({idp_name})")
-        print("  登录成功后浏览器会自动跳转回文章页面，程序会自动检测\n")
-
-        for i in range(100):
-            _user_waiting("login", page)
-            time.sleep(3)
-            try:
-                title = page.title()
-                url = page.url
-            except Exception:
-                break
-            is_auth = any(x in title for x in _AUTH_TITLES)
-            is_auth_url = any(x in url.lower() for x in _AUTH_KEYWORDS)
-            if not is_auth and not is_auth_url:
-                log.info(f"   [{publisher}] login successful in visible browser!")
-                try:
-                    cookies = context.cookies()
-                    _save_all_cookie_formats(cookies, publisher, config)
-                except Exception as e:
-                    log.info(f"   [{publisher}] cookie save error: {e}")
-                return True
-
-        log.info(f"   [{publisher}] visible login timed out")
-        return False
-
-
 # ============================================================
 # Publisher direct PDF URL patterns
 # ============================================================
@@ -743,11 +564,15 @@ def _visible_browser_download(
     output_path: Path,
     config: dict[str, Any],
     publisher: str,
+    *,
+    wait_for_loading: float = 0,
 ) -> dict[str, Any] | None:
-    """Open a visible browser for full SSO login + direct PDF download.
+    """Open the publisher's window: the page's own PDF, else SSO login, then the PDF.
 
     Works for any publisher. Uses _PUBLISHER_SSO_CONFIG for publisher-specific
     SSO link patterns, institution search selectors, and PDF fetch paths.
+    Without a school set (carsi_idp_name) the login step is skipped: the window
+    still passes human checks and uses the campus network's access.
     """
     from .pdf_utils import is_pdf_file, success
     import base64
@@ -785,6 +610,20 @@ def _visible_browser_download(
             time.sleep(5)
         except Exception as exc:
             log.info(f"   [{publisher}] page load warning: {exc}")
+        if "doi.org/" in article_url and _is_browser_error_page(page):
+            # doi.org itself sometimes times out from here: ask its API for the
+            # publisher URL and go there directly.
+            landing = _resolve_doi_landing(doi)
+            if landing:
+                log.info(f"   [{publisher}] doi.org did not load, opening {landing[:80]}")
+                article_url = landing
+                try:
+                    page.goto(article_url, wait_until="domcontentloaded", timeout=60000)
+                    time.sleep(5)
+                except Exception as exc:
+                    log.info(f"   [{publisher}] page load warning: {exc}")
+        if wait_for_loading > 0:  # AIP/AVS "Loading" pages
+            time.sleep(wait_for_loading)
 
         # If stuck on linkinghub redirect, extract target and navigate directly
         url = page.url
@@ -839,11 +678,27 @@ def _visible_browser_download(
         if _is_browser_error_page(page):
             # 2026-10-18: SSRN timed out; the lane waited on it for 16 minutes.
             log.info(f"   [{publisher}] the site did not load (browser error page); giving up on it")
+            _set_error("navigate_failed", "site_unreachable")
             return None
+        try:
+            html = page.content()
+            if publisher == "Elsevier" and _is_elsevier_crasolve(page.url, html):
+                log.info(f"   [{publisher}] crasolve shell detected, waiting...")
+                time.sleep(5)
+            elif publisher == "AIP" and _is_aip_loading_page(html):
+                log.info(f"   [{publisher}] loading page detected, waiting...")
+                time.sleep(10)
+        except Exception:
+            pass
 
         def _page_pdf_via_cdp() -> dict[str, Any] | None:
             """Open the page's own PDF link in the browser and read the body via CDP."""
             href, state = _wait_for_pdf_link(page, doi, publisher)
+            if not href:
+                try:  # publishers' own link patterns the generic finder misses
+                    href = page.evaluate(_PUBLISHER_PDF_LINK_JS, doi) or None
+                except Exception:
+                    href = None
             if not href:
                 return None
             log.info(f"   [{publisher}] page PDF link: {href[:80]}")
@@ -883,6 +738,15 @@ def _visible_browser_download(
                 pdf_fetched = True
             else:
                 log.info(f"   [{publisher}] direct PDF fetch failed, need SSO login")
+
+        if not idp_name and not pdf_fetched:
+            # No school set: nobody to log in as. Say why there is no PDF.
+            log.info(f"   [{publisher}] no PDF and no school set (carsi_idp_name): not logging in")
+            if _page_sells_paper(page) or already_on_auth:
+                _set_error("paywall", "login_required")
+            elif not get_last_error()[0]:
+                _set_error("no_pdf_found", "try_other_source")
+            return None
 
         # SSO login needed
         if not already_on_auth and not pdf_fetched:
@@ -1714,301 +1578,9 @@ def _try_http_download(
         return False
 
 
-def _extract_pdf_from_page(
-    html: str,
-    article_url: str,
-    publisher: str,
-) -> str | None:
-    """Extract PDF URL from article page HTML using publisher-specific selectors."""
-    try:
-        from bs4 import BeautifulSoup
-    except ImportError:
-        return None
-
-    soup = BeautifulSoup(html, "html.parser")
-    selectors = _PDF_LINK_SELECTORS.get(publisher, [])
-
-    for selector in selectors:
-        try:
-            for el in soup.select(selector):
-                href = el.get("href", "")
-                if not href:
-                    continue
-                # Resolve relative URLs
-                if href.startswith("/"):
-                    from urllib.parse import urljoin
-                    href = urljoin(article_url, href)
-                if href.startswith("http"):
-                    return href
-        except Exception:
-            continue
-
-    # Generic fallback: look for any link containing "pdf" (exclude supplements)
-    for a in soup.find_all("a", href=True):
-        href = a["href"].lower()
-        # Skip supplement/attachment links
-        if any(skip in href for skip in ["/attachment/", "/cms/", "/mmc", "supplement", "supporting"]):
-            continue
-        if "/pdf/" in href or href.endswith(".pdf") or "pdfdirect" in href:
-            if a["href"].startswith("http"):
-                return a["href"]
-            elif a["href"].startswith("/"):
-                from urllib.parse import urljoin
-                return urljoin(article_url, a["href"])
-
-    return None
-
-
 def _is_campus_network(config: dict[str, Any]) -> bool:
     """Check if user is on campus network (IP-authenticated access)."""
     return config.get("is_campus_network", False)
-
-
-def _browser_download_visible(
-    doi: str,
-    article_url: str,
-    output_path: Path,
-    config: dict[str, Any],
-    publisher: str,
-) -> bool:
-    """Launch visible CloakBrowser to download PDF when browser service is offline.
-
-    Opens a visible browser window, navigates to the article page, finds the
-    PDF link via CSS selectors, and downloads it. If paywall is detected,
-    attempts institutional login (CARSI/OpenAthens).
-
-    Persistent browser profile keeps cookies between sessions. When session
-    cookies expire server-side, re-triggers SSO (IdP may auto-login if its
-    own session is still active).
-    """
-    from .pdf_utils import is_pdf_file
-    import base64
-
-    log.info(f"   [{publisher}] launching visible browser for {article_url[:80]}")
-
-    with _visible_browser(config, publisher) as (context, page):
-        # Intercept PDF responses during navigation
-        _captured_pdf: bytes | None = None
-        _nonlocal = {"pdf": None}
-
-        def _on_response(response):
-            try:
-                ct = response.headers.get("content-type", "")
-                url = response.url.lower()
-                if ("application/pdf" in ct or url.endswith(".pdf")) and response.status < 400:
-                    body = response.body()
-                    if body and body[:5] == b"%PDF-":
-                        _nonlocal["pdf"] = body
-            except Exception:
-                pass
-
-        page.on("response", _on_response)
-
-        def _navigate_article():
-            """Navigate to article and return (title, html)."""
-            try:
-                page.goto(article_url, wait_until="domcontentloaded", timeout=60000)
-                time.sleep(3)
-            except Exception as e:
-                log.info(f"   [{publisher}] page load warning: {e}")
-            return page.title(), page.content()
-
-        title, html = _navigate_article()
-        log.info(f"   [{publisher}] page: '{title[:50]}' {page.url[:80]}")
-
-        # SSO login loop — handles both first login and session expiry
-        max_login_attempts = 2
-        for login_attempt in range(max_login_attempts):
-            if not _detect_paywall(html):
-                break
-
-            log.info(f"   [{publisher}] paywall detected (attempt {login_attempt + 1})")
-            idp_name = config.get("carsi_idp_name", "")
-            if not idp_name:
-                log.info(f"   [{publisher}] no carsi_idp_name configured, cannot login")
-                return False
-
-            idp_en = _IDP_MAP.get(idp_name, idp_name)
-
-            # Click SSO link
-            sso_clicked = page.evaluate("""
-                (() => {
-                    const links = [...document.querySelectorAll('a')];
-                    for (const a of links) {
-                        const href = (a.href || '').toLowerCase();
-                        const text = (a.innerText || '').toLowerCase();
-                        if (href.includes('ssostart') || href.includes('saml') || href.includes('shibboleth')
-                            || href.includes('institutional-login') || href.includes('federation')
-                            || (text.includes('institutional') && text.includes('login'))
-                            || text.includes('access through your institution')
-                            || text.includes('access through institution')) {
-                            a.click();
-                            return a.href;
-                        }
-                    }
-                    return null;
-                })()
-            """)
-            if not sso_clicked:
-                log.info(f"   [{publisher}] no SSO link found on page")
-                return False
-
-            log.info(f"   [{publisher}] clicked SSO: {str(sso_clicked)[:60]}")
-            # Wait for SSO redirects to settle (ACS → OpenAthens → IdP)
-            # Use long sleep since multiple redirects happen
-            time.sleep(15)
-
-            # Search for institution — retry on context destruction
-            for _attempt in range(3):
-                try:
-                    si = (page.query_selector('#searchInstitution')
-                          or page.query_selector('input[placeholder*="University"]')
-                          or page.query_selector('input[placeholder*="Organization"]'))
-                    if si:
-                        si.fill(idp_en)
-                        time.sleep(3)
-                        # Use keyboard to select first result (more reliable than click)
-                        si.press('ArrowDown')
-                        time.sleep(1)
-                        si.press('Enter')
-                        time.sleep(5)
-                    break
-                except Exception as e:
-                    if "navigation" in str(e).lower() or "destroyed" in str(e).lower():
-                        time.sleep(5)
-                        continue
-                    log.info(f"   [{publisher}] institution search: {e}")
-                    break
-
-            # Wait for user to complete CAS login
-            print(f"\n  请在浏览器中完成机构登录 ({idp_name})")
-            print("  登录成功后浏览器会自动跳转回文章页面\n")
-
-            logged_in = False
-            for _ in range(100):
-                _user_waiting("login", page)
-                time.sleep(3)
-                try:
-                    cur_title = page.title()
-                    cur_url = page.url
-                except Exception:
-                    # Page might be navigating, wait and retry
-                    time.sleep(2)
-                    continue
-                is_auth = any(x in cur_title for x in _AUTH_TITLES)
-                is_auth_url = any(x in cur_url.lower() for x in _AUTH_KEYWORDS)
-                if not is_auth and not is_auth_url:
-                    log.info(f"   [{publisher}] login successful!")
-                    logged_in = True
-                    # Save cookies
-                    try:
-                        cookies = context.cookies()
-                        _save_all_cookie_formats(cookies, publisher, config)
-                    except Exception:
-                        pass
-                    break
-
-            if not logged_in:
-                log.info(f"   [{publisher}] login not completed")
-                return False
-
-            # Reload article page after login
-            title, html = _navigate_article()
-            log.info(f"   [{publisher}] after login: '{title[:50]}'")
-
-        # Check if captured PDF from response interceptor (e.g., auto-download)
-        if _nonlocal["pdf"]:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_bytes(_nonlocal["pdf"])
-            if is_pdf_file(output_path):
-                log.info(f"   [{publisher}] PDF captured via response interceptor")
-                return True
-
-        # Find PDF link
-        pdf_url = _find_pdf_link(page, publisher)
-        if not pdf_url:
-            log.info(f"   [{publisher}] no PDF link found on article page")
-            return False
-
-        log.info(f"   [{publisher}] found PDF: {pdf_url[:80]}")
-
-        # Download PDF: try expect_download first, then response capture
-        _nonlocal["pdf"] = None
-        try:
-            with page.expect_download(timeout=30000) as dl_info:
-                page.click(f'a[href*="pdf"]', timeout=5000)
-            download = dl_info.value
-            download.save_as(str(output_path))
-            if is_pdf_file(output_path):
-                log.info(f"   [{publisher}] download via expect_download succeeded")
-                return True
-        except Exception as e:
-            log.info(f"   [{publisher}] expect_download: {e}")
-
-        # Check response interceptor
-        if _nonlocal["pdf"]:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_bytes(_nonlocal["pdf"])
-            if is_pdf_file(output_path):
-                log.info(f"   [{publisher}] PDF captured via interceptor after click")
-                return True
-
-        # Fallback: navigate to PDF URL
-        _nonlocal["pdf"] = None
-        try:
-            resp = page.goto(pdf_url, wait_until="domcontentloaded", timeout=30000)
-            time.sleep(3)
-            # Check interceptor first
-            if _nonlocal["pdf"]:
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                output_path.write_bytes(_nonlocal["pdf"])
-                if is_pdf_file(output_path):
-                    log.info(f"   [{publisher}] PDF captured via interceptor after nav")
-                    return True
-            # Check response body
-            if resp and resp.status < 400:
-                body = resp.body()
-                if body and body[:5] == b"%PDF-":
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    output_path.write_bytes(body)
-                    if is_pdf_file(output_path):
-                        log.info(f"   [{publisher}] PDF from response body")
-                        return True
-        except Exception as e:
-            log.info(f"   [{publisher}] PDF nav error: {e}")
-
-        # Last resort: fetch API with credentials
-        try:
-            pdf_data = page.evaluate("""
-                async () => {
-                    try {
-                        const resp = await fetch(window.location.href, {
-                            credentials: 'include',
-                            headers: {'Accept': 'application/pdf'}
-                        });
-                        if (!resp.ok) return null;
-                        const ct = resp.headers.get('content-type') || '';
-                        if (ct.includes('pdf')) {
-                            const buf = await resp.arrayBuffer();
-                            return btoa(String.fromCharCode(...new Uint8Array(buf)));
-                        }
-                        return null;
-                    } catch (e) { return null; }
-                }
-            """)
-            if pdf_data:
-                pdf_bytes = base64.b64decode(pdf_data)
-                if pdf_bytes[:5] == b"%PDF-":
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    output_path.write_bytes(pdf_bytes)
-                    if is_pdf_file(output_path):
-                        log.info(f"   [{publisher}] PDF via fetch API")
-                        return True
-        except Exception:
-            pass
-
-        log.info(f"   [{publisher}] no PDF found via visible browser")
-        return False
 
 
 def _find_pdf_link(page: Any, publisher: str) -> str | None:
@@ -2049,544 +1621,6 @@ def _find_pdf_link(page: Any, publisher: str) -> str | None:
         return None
 
 
-def _browser_download(
-    doi: str,
-    article_url: str,
-    output_path: Path,
-    config: dict[str, Any],
-    publisher: str,
-    *,
-    wait_for_loading: float = 0,
-) -> bool:
-    """Navigate to article page via browser, find PDF link, download it."""
-    from .browser_engine import (
-        is_available, create_tab, close_tab, evaluate_js,
-        navigate_tab, download_pdf_via_browser, _is_pdf_url,
-        fetch_url, get_captured_responses,
-    )
-    from .pdf_utils import is_pdf_file
-
-    _clear_error()
-
-    # Campus network fast-path: skip HTTP, go directly to CloakBrowser
-    # Campus networks use IP authentication, so CloakBrowser can access directly
-    if _is_campus_network(config) and is_available(config):
-        log.info(f"   [{publisher}] campus network detected, using CloakBrowser directly")
-        if download_pdf_via_browser(article_url, output_path, config):
-            from .pdf_utils import is_pdf_file, success
-            if is_pdf_file(output_path):
-                log.info(f"   [{publisher}] campus network download succeeded")
-                return success(doi, output_path, f"{publisher}(Campus)")
-
-    # Fast-path: if we have publisher cookies and a PDF-like URL, try HTTP first
-    # This avoids 15-30s browser startup overhead
-    if _has_publisher_cookies(config) and _is_pdf_url(article_url):
-        log.info(f"   [{publisher}] trying HTTP with cookies first (fast-path)")
-        if _try_http_download(article_url, output_path, config):
-            from .pdf_utils import is_pdf_file, success
-            if is_pdf_file(output_path):
-                log.info(f"   [{publisher}] HTTP download succeeded with cached cookies")
-                return success(doi, output_path, f"{publisher}(HTTP)")
-
-    if not is_available(config):
-        log.info(f"   [{publisher}] browser not available, skipping browser strategy")
-        _set_error("browser_unavailable", "start_browser")
-        return False
-
-    log.info(f"   [{publisher}] browser download: {article_url[:80]}")
-    from . import progress_reporter
-    # The generic lane does not know the publisher ("Unknown"): say 出版商官网.
-    _known = publisher not in ("", "Unknown")
-    # A link is not yet a PDF: the site may still refuse it (2026-10-18).
-    _found_text = f"在 {publisher} 找到 PDF 链接，正在打开" if _known else "在出版商官网找到 PDF 链接，正在打开"
-    progress_reporter.item_stage(doi, f"正在打开 {publisher} 的页面" if _known else "正在打开出版商官网")
-
-    # Create tab to a lightweight page first, inject cookies, then navigate
-    # to target. about:blank — a google.com warm-up hard-fails on networks
-    # where Google is unreachable (China), killing the strategy even when
-    # the publisher site itself is reachable.
-    tab_id = create_tab("about:blank", config, timeout=15.0)
-    if not tab_id:
-        return False
-
-    try:
-        # Inject saved publisher/CARSI cookies into the browser session
-        _inject_cookies_to_tab(tab_id, config, publisher)
-
-        # Now navigate to the actual article page
-        log.info(f"   [{publisher}] navigating to {article_url[:80]}")
-        nav_ok = navigate_tab(tab_id, article_url, config, timeout=60.0)
-        if not nav_ok and "doi.org/" in article_url:
-            # doi.org itself sometimes times out from here: ask its API for the
-            # publisher URL and go there directly.
-            landing = _resolve_doi_landing(doi)
-            if landing:
-                log.info(f"   [{publisher}] doi.org timed out, opening {landing[:80]}")
-                article_url = landing
-                nav_ok = navigate_tab(tab_id, article_url, config, timeout=60.0)
-        if not nav_ok:
-            log.info(f"   [{publisher}] navigation failed, tab may be destroyed")
-            _set_error("navigate_failed", "cloudflare_timeout")
-            return False
-
-        # Wait for loading pages (AIP/AVS)
-        if wait_for_loading > 0:
-            time.sleep(wait_for_loading)
-
-        # Wait for page to settle: publisher pages keep redirecting after
-        # DOMContentLoaded (e.g. ScienceDirect -> id.elsevier.com OAuth -> back),
-        # and reading the DOM mid-hop fails. Then give JS-rendered PDF links
-        # (ScienceDirect's "View PDF") time to appear.
-        time.sleep(3)
-        from .browser_engine import _resolve_tab
-        from .browser_pdf import find_page_pdf_link, wait_url_stable
-        # The page offered a PDF link but the PDF itself was refused (bounced
-        # back to the article): that is a paywall even when the page's text
-        # does not say so — go to the institutional login in this window.
-        pdf_refused = False
-        _page = _resolve_tab(tab_id)
-        if _page is not None:
-            settled_url = wait_url_stable(_page)
-            log.info(f"   [{publisher}] page settled at {settled_url[:80]}")
-            if _is_browser_error_page(_page):
-                log.info(f"   [{publisher}] the site did not load (browser error page); giving up on it")
-                _set_error("navigate_failed", "site_unreachable")
-                return False
-            # If the page already offers its own PDF link, the session is entitled:
-            # take it directly (text-based paywall detection misfires on pages that
-            # show "access through your institution" even when access is granted).
-            # On a challenge page there is no PDF link yet: don't spend 10 s
-            # looking for one, go straight to the challenge wait below.
-            try:
-                _on_challenge = _is_challenge_page(_page.content())
-            except Exception:
-                _on_challenge = False
-            _href = None if _on_challenge else find_page_pdf_link(_page, max_wait_s=10, doi=doi)
-            if _href:
-                from .browser_pdf import capture_pdf_via_cdp
-                log.info(f"   [{publisher}] page PDF link: {_href[:80]}")
-                progress_reporter.item_stage(doi, _found_text)
-                _body = capture_pdf_via_cdp(_page.context, _page, _href)
-                if _body:
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    output_path.write_bytes(_body)
-                    from .pdf_utils import success
-                    if is_pdf_file(output_path):
-                        close_tab(tab_id, config)
-                        return success(doi, output_path, f"{publisher}(Browser)")
-                pdf_refused = True
-
-        # Detect meta-refresh redirects (e.g., linkinghub.elsevier.com)
-        # Wait longer if we're on a redirect page
-        current_url = evaluate_js(tab_id, "window.location.href", config) or ""
-        if "linkinghub" in current_url or "retrieve/pii" in current_url:
-            log.info(f"   [{publisher}] on Elsevier redirect hub, waiting for meta-refresh...")
-            # Wait for the browser to follow the meta-refresh chain
-            for _ in range(5):
-                time.sleep(3)
-                new_url = evaluate_js(tab_id, "window.location.href", config) or ""
-                if new_url != current_url and "linkinghub" not in new_url and "retrieve/pii" not in new_url:
-                    log.info(f"   [{publisher}] redirected to {new_url[:80]}")
-                    break
-            else:
-                # Manually extract and follow meta-refresh
-                redirect_url = evaluate_js(tab_id, """
-                    (() => {
-                        const meta = document.querySelector('meta[http-equiv="REFRESH"], meta[http-equiv="refresh"]');
-                        if (meta) {
-                            const content = meta.content || '';
-                            const urlMatch = content.match(/url\\s*=\\s*['"]?([^'"]+)/i);
-                            if (urlMatch) {
-                                let target = urlMatch[1];
-                                if (target.startsWith('/')) target = window.location.origin + target;
-                                return target;
-                            }
-                        }
-                        return null;
-                    })()
-                """, config)
-                if redirect_url and isinstance(redirect_url, str) and redirect_url.startswith("http"):
-                    log.info(f"   [{publisher}] manually following redirect to {redirect_url[:80]}")
-                    navigate_tab(tab_id, redirect_url, config, timeout=30.0)
-                    time.sleep(5)
-
-            # Wait for the final page to fully render
-            time.sleep(3)
-
-        # Get page HTML
-        html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or ""
-
-        # Check for anti-bot challenges
-        if _is_challenge_page(html):
-            visible = not bool(config.get("scihub_browser_headless", config.get("browser_headless", False)))
-            # Headless: a short grace for auto-resolving challenges. Visible:
-            # the user can click it in this very window — wait for them instead
-            # of closing it and opening the visible fallback (a second window).
-            max_wait = 150 if visible else 8
-            log.info(f"   [{publisher}] challenge detected, waiting "
-                     + ("(usually resolves by itself; click it only if a checkbox appears)..."
-                        if visible else "for auto-resolve..."))
-            waited = 0
-            while True:
-                time.sleep(3 if visible else 8)
-                waited += 3 if visible else 8
-                if visible:
-                    _user_waiting()
-                html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or ""
-                if not _is_challenge_page(html) or waited >= max_wait:
-                    break
-                if _is_challenge_dead_end(html):
-                    log.info(f"   [{publisher}] the check cannot run in this browser; giving up on the site")
-                    break
-            if _is_challenge_page(html):
-                log.info(f"   [{publisher}] challenge did not resolve")
-                _set_error("cloudflare_blocked", "use_proxy_or_browser")
-                return False
-            # Past the challenge: the real article page is now loaded — take its
-            # own PDF link first, as for a page that loaded without a challenge.
-            _page = _resolve_tab(tab_id)
-            if _page is not None:
-                # Poll for the link while the article page is still loading
-                # rather than first waiting for its URL to stop changing (slow
-                # Silverchair pages took ~30 s to "settle" after the challenge).
-                # 45 s: the old settle wait (<=45 s) + 10 s link poll, minus the
-                # time a fast page no longer spends waiting for a stable URL.
-                _href = find_page_pdf_link(_page, max_wait_s=45, doi=doi)
-                if _href:
-                    from .browser_pdf import capture_pdf_via_cdp
-                    log.info(f"   [{publisher}] page PDF link after challenge: {_href[:80]}")
-                    progress_reporter.item_stage(doi, _found_text)
-                    _body = capture_pdf_via_cdp(_page.context, _page, _href)
-                    if _body:
-                        output_path.parent.mkdir(parents=True, exist_ok=True)
-                        output_path.write_bytes(_body)
-                        from .pdf_utils import success
-                        if is_pdf_file(output_path):
-                            close_tab(tab_id, config)
-                            return success(doi, output_path, f"{publisher}(Browser)")
-                    pdf_refused = True
-                    wait_url_stable(_page)  # the refused PDF navigates back to the article
-                html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or html
-
-        # Check for paywall AFTER challenge resolution
-        if pdf_refused:
-            log.info(f"   [{publisher}] PDF refused — no access with the current session")
-            progress_reporter.item_stage(doi, f"{publisher + ' ' if _known else '出版商官网'}拒绝下载 PDF，可能没有权限，正在尝试登录")
-        if pdf_refused or _detect_paywall(html):
-            log.info(f"   [{publisher}] paywall detected — trying institutional login...")
-            if _try_institutional_login(tab_id, config, publisher):
-                # Login succeeded. The IdP may return to the site's homepage, so
-                # reopen the article, then take its own PDF link if it now has one.
-                navigate_tab(tab_id, article_url, config, timeout=60.0)
-                _page = _resolve_tab(tab_id)
-                if _page is not None:
-                    wait_url_stable(_page)
-                    _href = find_page_pdf_link(_page, max_wait_s=10, doi=doi)
-                    if _href:
-                        from .browser_pdf import capture_pdf_via_cdp
-                        log.info(f"   [{publisher}] page PDF link after login: {_href[:80]}")
-                        _body = capture_pdf_via_cdp(_page.context, _page, _href)
-                        if _body:
-                            output_path.parent.mkdir(parents=True, exist_ok=True)
-                            output_path.write_bytes(_body)
-                            from .pdf_utils import success
-                            if is_pdf_file(output_path):
-                                close_tab(tab_id, config)
-                                return success(doi, output_path, f"{publisher}(Browser)")
-                html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or html
-                current_url = evaluate_js(tab_id, "window.location.href", config) or article_url
-                if _detect_paywall(html):
-                    # Logged in, yet no full text: the institution does not
-                    # subscribe to this content. Asking to log in again (the
-                    # visible-browser fallback) would only loop.
-                    log.info(f"   [{publisher}] still behind paywall after login — institution not entitled")
-                    _set_error("not_entitled", "no_subscription")
-                    return False
-            else:
-                # Keep a more specific reason (login_abandoned: the user was
-                # already asked to log in — don't reopen another window).
-                if not get_last_error()[0]:
-                    _set_error("paywall", "login_required")
-                return False
-
-        # Also detect paywall by absence of PDF links (Cell Press pattern)
-        if publisher == "Elsevier" and "cell.com" in str(evaluate_js(tab_id, "window.location.href", config) or ""):
-            has_showpdf = evaluate_js(tab_id, """
-                (() => {
-                    return document.querySelectorAll('a[href*="showPdf"], a[href*="pdfExtended"]').length;
-                })()
-            """, config)
-            # Use JS to check for institutional access links (HTML can be 500K+)
-            has_institutional = evaluate_js(tab_id, """
-                (() => {
-                    const links = document.querySelectorAll('a[href*="institution"], a[href*="subscribe"]');
-                    for (const a of links) {
-                        const text = (a.innerText || '').toLowerCase();
-                        const href = (a.href || '').toLowerCase();
-                        if (text.includes('institutional access') || text.includes('access through your institution')
-                            || text.includes('subscribe') || text.includes('purchase')) return true;
-                    }
-                    return false;
-                })()
-            """, config)
-            if has_institutional and not has_showpdf:
-                log.info(f"   [{publisher}] Cell Press paywall detected (institutional links present, no PDF links)")
-                _set_error("paywall", "login_required")
-                return False
-
-        # Elsevier-specific: detect crasolve
-        if publisher == "Elsevier":
-            current_url = evaluate_js(tab_id, "window.location.href", config) or article_url
-            if _is_elsevier_crasolve(str(current_url), html):
-                log.info(f"   [{publisher}] crasolve shell detected, waiting...")
-                time.sleep(5)
-                html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or ""
-
-        # AIP-specific: check for loading page
-        if publisher == "AIP" and _is_aip_loading_page(html):
-            log.info(f"   [{publisher}] loading page detected, waiting...")
-            time.sleep(10)
-            html = evaluate_js(tab_id, "document.documentElement.outerHTML", config) or ""
-
-        # Get current URL after potential redirects
-        current_url = evaluate_js(tab_id, "window.location.href", config) or article_url
-
-        # Try to extract PDF link from page
-        pdf_url = _extract_pdf_from_page(html, str(current_url), publisher)
-
-        if pdf_url:
-            log.info(f"   [{publisher}] found PDF link: {pdf_url[:80]}")
-
-            # Strategy 1: Network response capture (navigate and intercept PDF at network layer)
-            captured = fetch_url(tab_id, pdf_url, config, timeout=30.0)
-            if captured and captured.get("data"):
-                pdf_data = captured["data"]
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                output_path.write_bytes(pdf_data)
-                log.info(f"   [{publisher}] downloaded {len(pdf_data)} bytes via network capture")
-                close_tab(tab_id, config)
-                from .pdf_utils import is_pdf_file, success
-                if is_pdf_file(output_path):
-                    return success(doi, output_path, f"{publisher}(Network)")
-                return True
-
-            # Strategy 2: Check any already-captured responses
-            captured_resps = get_captured_responses(tab_id, config, consume=True)
-            import base64 as _b64_net
-            for resp in captured_resps:
-                data = resp.get("dataBase64", "")
-                if data:
-                    pdf_bytes = _b64_net.b64decode(data)
-                    if pdf_bytes[:5] == b"%PDF-" and len(pdf_bytes) > 5000:
-                        output_path.parent.mkdir(parents=True, exist_ok=True)
-                        output_path.write_bytes(pdf_bytes)
-                        log.info(f"   [{publisher}] downloaded {len(pdf_bytes)} bytes from captured response")
-                        close_tab(tab_id, config)
-                        from .pdf_utils import is_pdf_file, success
-                        if is_pdf_file(output_path):
-                            return success(doi, output_path, f"{publisher}(Network)")
-                        return True
-
-            # Strategy 3: Try in-browser fetch for the PDF URL
-            # This bypasses Cloudflare because the request comes from the browser context
-            import base64 as _b64
-            from urllib.parse import urlparse as _urlparse
-
-            parsed = _urlparse(pdf_url)
-            fetch_paths = [parsed.path]
-            # Also try pdfdirect variant
-            if "/doi/pdf/" in parsed.path:
-                fetch_paths.append(parsed.path.replace("/doi/pdf/", "/doi/pdfdirect/"))
-            elif "/doi/epdf/" in parsed.path:
-                fetch_paths.append(parsed.path.replace("/doi/epdf/", "/doi/pdfdirect/"))
-
-            for fetch_path in fetch_paths:
-                log.info(f"   [{publisher}] trying in-browser fetch {fetch_path[:60]}")
-                pdf_b64 = evaluate_js(tab_id, f"""
-                    (async () => {{
-                        try {{
-                            const resp = await fetch('{fetch_path}', {{
-                                credentials: 'include',
-                                headers: {{'Accept': 'application/pdf,*/*'}}
-                            }});
-                            if (!resp.ok) return 'status:' + resp.status;
-                            const ct = resp.headers.get('content-type') || '';
-                            if (!ct.includes('pdf') && !ct.includes('octet')) return 'ct:' + ct;
-                            const blob = await resp.blob();
-                            return new Promise((resolve) => {{
-                                const reader = new FileReader();
-                                reader.onload = () => resolve(reader.result);
-                                reader.readAsDataURL(blob);
-                            }});
-                        }} catch(e) {{
-                            return 'error:' + e.message;
-                        }}
-                    }})()
-                """, config, timeout=45.0)
-
-                if isinstance(pdf_b64, str) and pdf_b64.startswith("data:"):
-                    header, data = pdf_b64.split(",", 1)
-                    pdf_bytes = _b64.b64decode(data)
-                    if pdf_bytes[:5] == b"%PDF-" and len(pdf_bytes) > 5000:
-                        output_path.parent.mkdir(parents=True, exist_ok=True)
-                        output_path.write_bytes(pdf_bytes)
-                        log.info(f"   [{publisher}] downloaded {len(pdf_bytes)} bytes via in-browser fetch")
-                        close_tab(tab_id, config)
-                        from .pdf_utils import is_pdf_file, success
-                        if is_pdf_file(output_path):
-                            return success(doi, output_path, f"{publisher}(Browser)")
-                        return True
-                elif isinstance(pdf_b64, str) and "status:403" in pdf_b64:
-                    log.info(f"   [{publisher}] PDF fetch returned 403 — trying institutional login...")
-                    if _try_institutional_login(tab_id, config, publisher):
-                        # Retry fetch after login
-                        pdf_b64_retry = evaluate_js(tab_id, f"""
-                            (async () => {{
-                                try {{
-                                    const resp = await fetch('{fetch_path}', {{
-                                        credentials: 'include',
-                                        headers: {{'Accept': 'application/pdf,*/*'}}
-                                    }});
-                                    if (!resp.ok) return 'status:' + resp.status;
-                                    const ct = resp.headers.get('content-type') || '';
-                                    if (!ct.includes('pdf') && !ct.includes('octet')) return 'ct:' + ct;
-                                    const blob = await resp.blob();
-                                    return new Promise((resolve) => {{
-                                        const reader = new FileReader();
-                                        reader.onload = () => resolve(reader.result);
-                                        reader.readAsDataURL(blob);
-                                    }});
-                                }} catch(e) {{
-                                    return 'error:' + e.message;
-                                }}
-                            }})()
-                        """, config, timeout=45.0)
-                        if isinstance(pdf_b64_retry, str) and pdf_b64_retry.startswith("data:"):
-                            _, data = pdf_b64_retry.split(",", 1)
-                            pdf_bytes = _b64.b64decode(data)
-                            if pdf_bytes[:5] == b"%PDF-" and len(pdf_bytes) > 5000:
-                                output_path.parent.mkdir(parents=True, exist_ok=True)
-                                output_path.write_bytes(pdf_bytes)
-                                log.info(f"   [{publisher}] downloaded {len(pdf_bytes)} bytes after institutional login")
-                                close_tab(tab_id, config)
-                                from .pdf_utils import is_pdf_file, success
-                                if is_pdf_file(output_path):
-                                    return success(doi, output_path, f"{publisher}(Institutional)")
-                                return True
-                    _set_error("paywall", "login_required")
-                elif isinstance(pdf_b64, str) and "status:401" in pdf_b64:
-                    log.info(f"   [{publisher}] PDF fetch returned 401 — trying institutional login...")
-                    if not _try_institutional_login(tab_id, config, publisher):
-                        _set_error("paywall", "login_required")
-                elif isinstance(pdf_b64, str) and pdf_b64.startswith("ct:text/html"):
-                    log.info(f"   [{publisher}] PDF fetch returned HTML — trying institutional login...")
-                    if not _try_institutional_login(tab_id, config, publisher):
-                        _set_error("paywall", "login_required")
-
-            close_tab(tab_id, config)
-
-            # Fall back to HTTP download
-            if _try_http_download(pdf_url, output_path, config):
-                return True
-
-            # Fall back to full browser download
-            return download_pdf_via_browser(pdf_url, output_path, config)
-
-        # For Elsevier/Cell Press: try specific PDF link patterns
-        if publisher == "Elsevier":
-            pdf_url = evaluate_js(tab_id, """
-                (() => {
-                    // Cell Press: showPdf link
-                    for (const a of document.querySelectorAll('a[href*="showPdf"]')) {
-                        if (a.href) return a.href;
-                    }
-                    // ScienceDirect: click View PDF button
-                    const btn = document.querySelector('a[aria-label*="View PDF" i], a.pdf-download-btn-link');
-                    if (btn && btn.href) return btn.href;
-                    // Check for pdfft links (PDF viewer)
-                    for (const a of document.querySelectorAll('a[href*="pdfft"]')) {
-                        if (a.href) return a.href;
-                    }
-                    return null;
-                })()
-            """, config)
-
-            if pdf_url and isinstance(pdf_url, str):
-                log.info(f"   [{publisher}] Elseviewer PDF button: {pdf_url[:80]}")
-                close_tab(tab_id, config)
-                if _try_http_download(pdf_url, output_path, config):
-                    return True
-                return download_pdf_via_browser(pdf_url, output_path, config)
-
-        # For Wiley: specifically look for pdfdirect
-        if publisher == "Wiley":
-            pdf_url = evaluate_js(tab_id, """
-                (() => {
-                    for (const a of document.querySelectorAll('a[href*="pdfdirect"]')) {
-                        if (a.href) return a.href;
-                    }
-                    // Filter out supplement links
-                    for (const a of document.querySelectorAll('a[href*="/doi/pdf/"]')) {
-                        const href = a.href.toLowerCase();
-                        if (!href.includes('supplement') && !href.includes('supporting')) {
-                            return a.href;
-                        }
-                    }
-                    return null;
-                })()
-            """, config)
-
-            if pdf_url and isinstance(pdf_url, str):
-                log.info(f"   [{publisher}] Wiley PDFDirect: {pdf_url[:80]}")
-                close_tab(tab_id, config)
-                if _try_http_download(pdf_url, output_path, config):
-                    return True
-                return download_pdf_via_browser(pdf_url, output_path, config)
-
-        # For IEEE: look for stamp URL
-        if publisher == "IEEE":
-            pdf_url = evaluate_js(tab_id, """
-                (() => {
-                    for (const a of document.querySelectorAll('a[href*="/stamp/"], a[href*="getPDF"]')) {
-                        if (a.href) return a.href;
-                    }
-                    const btn = document.querySelector('a.xpl-pdf-btn');
-                    if (btn && btn.href) return btn.href;
-                    return null;
-                })()
-            """, config)
-
-            if pdf_url and isinstance(pdf_url, str):
-                log.info(f"   [{publisher}] IEEE stamp: {pdf_url[:80]}")
-                close_tab(tab_id, config)
-                return download_pdf_via_browser(pdf_url, output_path, config)
-
-        # SAGE's China platform (sage.cnpereading.com, where a DOI lands from
-        # Chinese networks): the PDF button has no href; the file's path sits in
-        # the page data as /storage/.../<doi with _ for />.pdf (seen 2026-10-17).
-        pdf_url = evaluate_js(tab_id, """
-            (() => {
-                if (!location.hostname.endsWith('cnpereading.com')) return null;
-                const m = document.documentElement.outerHTML.match(/\\/storage\\/[^"'\\\\\\s<>]+?\\.pdf/);
-                return m ? location.origin + m[0] : null;
-            })()
-        """, config)
-        if pdf_url and isinstance(pdf_url, str) and doi.replace("/", "_").lower() in pdf_url.lower():
-            log.info(f"   [{publisher}] page data PDF: {pdf_url[:80]}")
-            progress_reporter.item_stage(doi, _found_text)
-            close_tab(tab_id, config)
-            if _try_http_download(pdf_url, output_path, config):
-                return True
-            return download_pdf_via_browser(pdf_url, output_path, config)
-
-        log.info(f"   [{publisher}] no PDF link found on page")
-        if not get_last_error()[0]:
-            _set_error("no_pdf_found", "try_other_source")
-        return False
-    finally:
-        close_tab(tab_id, config)
-
-
 def _browser_download_with_fallback(
     doi: str,
     article_url: str,
@@ -2596,52 +1630,47 @@ def _browser_download_with_fallback(
     *,
     wait_for_loading: float = 0,
 ) -> bool:
-    """Try headless browser download, fallback to visible browser if paywall detected."""
+    """The publisher's site, in its own window (persistent profile per publisher).
+
+    2026-10-20: the first pass in the shared browser is gone. It judged pages
+    too early, failed to open some sites the window opens, and could not keep a
+    passed human check between papers (40-60 s per paper on T&F and ACS); the
+    window's profile keeps it. The window starts minimized and comes up only
+    when the user has to log in or pass a check (``_show_window_for_user``).
+    """
+    from .browser_engine import _is_pdf_url, is_available
+    from .pdf_utils import is_pdf_file, success
+    _clear_error()
     if article_url.startswith("https://doi.org/"):
         article_url = _known_landing_url(doi) or article_url
-    result = _browser_download(doi, article_url, output_path, config, publisher,
-                               wait_for_loading=wait_for_loading)
-    if result:
-        return True
-
-    err_type, err_action = get_last_error()
-
-    # browser service offline + CloakBrowser available → launch visible browser directly
-    global _visible_browser_active
-    if err_type == "browser_unavailable" and _HAS_CLOAKBROWSER:
-        if _visible_browser_lock.acquire(blocking=False):
-            try:
-                if _visible_browser_active:
-                    log.info(f"   [{publisher}] visible browser already active, skipping")
-                    return False
-                _visible_browser_active = True
-                log.info(f"   [{publisher}] browser service offline, launching CloakBrowser directly")
-                if _browser_download_visible(doi, article_url, output_path, config, publisher):
-                    return True
-            except Exception as e:
-                log.info(f"   [{publisher}] visible browser error: {e}")
-            finally:
-                _visible_browser_active = False
-                _visible_browser_lock.release()
-        else:
-            log.info(f"   [{publisher}] visible browser busy, skipping")
-
-    # Paywall/navigate failure → try visible browser with SSO login
-    elif err_type in ("paywall", "navigate_failed", "cloudflare_blocked") and config.get("carsi_idp_name"):
-        log.info(f"   [{publisher}] headless failed ({err_type}), trying visible browser fallback...")
-        try:
-            from . import progress_reporter as _pr
-            _pr.item_stage(doi, f"正在用浏览器窗口打开 {publisher}" if publisher not in ("", "Unknown") else "正在用浏览器窗口打开出版商官网")
-        except Exception:
-            pass
-        try:
-            vbd_result = _visible_browser_download(doi, article_url, output_path, config, publisher)
-            if vbd_result:
-                return True
-        except Exception as e:
-            log.info(f"   [{publisher}] visible browser fallback error: {e}")
-
-    return False
+    # A PDF URL and saved publisher cookies: try it without a browser first.
+    if _has_publisher_cookies(config) and _is_pdf_url(article_url):
+        log.info(f"   [{publisher}] trying HTTP with cookies first (fast-path)")
+        if _try_http_download(article_url, output_path, config) and is_pdf_file(output_path):
+            return success(doi, output_path, f"{publisher}(HTTP)")
+    if not is_available(config):
+        log.info(f"   [{publisher}] browser not available, skipping browser strategy")
+        _set_error("browser_unavailable", "start_browser")
+        return False
+    try:
+        from . import progress_reporter as _pr
+        _pr.item_stage(doi, f"正在打开 {publisher} 的页面" if publisher not in ("", "Unknown") else "正在打开出版商官网")
+    except Exception:
+        pass
+    try:
+        from .sources import SourceWaived
+    except Exception:  # pragma: no cover
+        SourceWaived = ()  # type: ignore[assignment]
+    try:
+        return bool(_visible_browser_download(doi, article_url, output_path, config, publisher,
+                                              wait_for_loading=wait_for_loading))
+    except SourceWaived:
+        raise
+    except Exception as e:
+        log.info(f"   [{publisher}] publisher window error: {e}")
+        if not get_last_error()[0]:
+            _set_error("navigate_failed", "site_unreachable")
+        return False
 
 
 # ============================================================

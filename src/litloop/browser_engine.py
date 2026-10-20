@@ -856,7 +856,6 @@ def download_pdf_via_browser(
 
 
 # Backward-compat alias
-download_pdf_via_camofox = download_pdf_via_browser
 
 
 def _is_pdf_url(url: str) -> bool:
