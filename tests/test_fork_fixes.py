@@ -373,12 +373,6 @@ def test_browser_errors_are_per_thread():
     core._clear_error()
 
 
-def test_school_login_hosts_are_not_tsinghua_only():
-    from litloop.publisher_batch import _is_school_login_host as f
-    assert f("sso.buaa.edu.cn") and f("idp.tsinghua.edu.cn")
-    assert not f("ds.carsi.edu.cn") and not f("www.science.org")
-
-
 def test_science_check_access_is_a_paywall():
     from litloop._publisher_strategies_core import _detect_paywall
     assert _detect_paywall('<button>CHECK ACCESS</button>')

@@ -32,12 +32,7 @@
      - 结论：多数浪费出在第一轮共用浏览器（判断过早、打不开、验证慢且每篇重验），随第 2 条一起解决；改完连续下几篇同一出版商，确认专用窗口能留住验证记录。
    - 跳过 SSRN 前，整条路是：第一轮共用浏览器打不开 `doi.org` 和 `ssrn.com`（各重试一次，200 秒）→ 学校通道 → WebVPN 登录过期弹登录（50 秒）→ WebVPN 下载卡住。换了保存位置后，下载缓存把旧位置的文件当成“已完成”（新位置里没有文件；2026-10-20 已改：缓存里的文件不在当前保存位置时复制过来，不重新下载）；粘贴 DOI 时“已下载过”的提示把“下载记录里有”和“文件还在”混在一起（2026-10-20 已改：提示只算保存位置里还有文件的，写「已在保存位置中，不会重复下载」）；Elsevier 第一轮页面 7 秒就“安静”、权限还没查完就判成需要订阅（随第 2 条解决）。
 5. [ ] **查开放获取一轮 110 秒花在哪**（查 OA 链接、Wiley 浏览器兜底），以及 about:blank 久等。用第 1 条的日志查。
-6. [ ] **去掉 `publisher_batch` 这条路**（2026-10-19 用户同意，原因见 DECISIONS「publisher-batch 验收」）：
-   - MCP 批量下载非车道模式的第二阶段（`sources._batch_institutional_phase`）改用 app 在用的下载引擎（学校通道、登录状态、失败原因都能用上）；
-   - `litloop publisher-batch` 改为调用同一引擎或删除；
-   - 一并删：`publisher_batch.py`、`institutional/instsci_bridge.py`、`institutional/sources/elsevier_api.py`、`institutional/publisher_pdf_router.py`、`institutional/publisher_profiles.py`（约 1200 行），删前照「删除没人用的代码」的做法核实；
-   - 再查 `institutional/` 里剩下的与根目录同名模块（`session_broker.py`、`cloakbrowser_compat.py`、`config_adapter.py`、`fetcher.py`、`profile_health.py`）哪些还要；
-   - 验收：全部测试，加 MCP 真实批量下载几篇（含一篇 Elsevier 订阅论文），要用户配合登录。
+6. [x] **去掉 `publisher_batch` 这条路**（2026-10-20 已改，见 DECISIONS「去掉 publisher_batch」）。待验收：MCP 真实批量下载几篇（含一篇 Elsevier 订阅论文），要用户配合登录。
 7. [ ] **大清单（>30 篇）分队列**：先摸底分组（开放获取 / Sci-Hub 有 / 需学校权限，后者按出版商细分），app 里分成几个队列，每个队列写明怎么下，用户逐个队列点下载。
 8. [ ] **实测 app 里的其余功能**（要用户配合）：
    - app 里发起检索：已走通“发起 → 失败提示”，真实检索要用户先重新登录 `claude` 命令行；

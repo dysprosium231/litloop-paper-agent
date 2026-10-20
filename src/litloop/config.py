@@ -38,7 +38,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "output_dir": str(DATA_DIR / "papers"),
     "cache_dir": str(DATA_DIR / "cache"),
     "network_proxy": "",
-    "proxy_pool": "",  # 逗号分隔的代理列表；非空时批量下载按代理轮换出口 IP
+    "proxy_pool": "",  # 逗号分隔的代理列表；按代理轮换出口 IP 的批量下载（publisher_batch）已于 2026-10-20 删除，现在不起作用
     "download_strategy": "fastest",  # fastest / grey_only(all 3 grey) / scihub_only(Sci-Hub only) / scihub_first / oa_first / legal_only
     "race_mode": "hedge",  # hedge: score-ordered staggered cascade (fewer requests, less anti-bot heat) / full: flat parallel race
     "hedge_delay_seconds": 1.5,  # hedged cascade: wait this long before widening to the next lane

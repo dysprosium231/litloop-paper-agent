@@ -62,42 +62,6 @@ def test_challenge_wait_publishes_and_clears_attention(tmp_path, monkeypatch):
     assert progress_reporter.read_state()["attention"] == {}
 
 
-def test_publisher_challenge_wait_uses_the_same_attention_channel(tmp_path, monkeypatch):
-    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
-    progress_reporter.start_task("出版商下载", total=1)
-
-    from litloop.publisher_batch import DownloadResult, PublisherBatchDownloader
-
-    downloader = PublisherBatchDownloader.__new__(PublisherBatchDownloader)
-    events = []
-    downloader.login_timeout_sec = 0
-    downloader._event = lambda result, kind, detail: events.append(kind)
-
-    class FakePage:
-        url = "https://example.test/article"
-
-        def __init__(self):
-            self.calls = 0
-            self.attention_seen = False
-
-    page = FakePage()
-
-    def is_challenge(_page):
-        page.calls += 1
-        page.attention_seen |= bool(progress_reporter.read_state()["attention"])
-        return page.calls == 1
-
-    downloader._is_challenge_page = is_challenge
-    monkeypatch.setattr("litloop.publisher_batch.time.sleep", lambda _seconds: None)
-    result = DownloadResult(doi="10.1000/a", status="failed")
-    assert downloader._wait_for_challenge(page, result)
-
-    assert page.attention_seen
-    assert "challenge_manual_wait" in events
-    assert "challenge_resolved" in events
-    assert progress_reporter.read_state()["attention"] == {}
-
-
 def test_attention_keeps_the_time_it_first_appeared(tmp_path, monkeypatch):
     """A waiting source repeats its notice on every poll; "since" must stay put
     (2026-10-19: it moved, which made a prompt notice look 36 s late)."""

@@ -89,3 +89,8 @@ def test_supplements_and_non_pdf_links_are_not_candidates():
         "",
     ])
     assert got == list(P["wiley"].pdf_urls("10.1002/x"))  # only the profile's own routes
+
+
+def test_optica_profile_is_in_the_one_registry():
+    from litloop.publisher_profiles import infer_publisher_profile
+    assert infer_publisher_profile("10.1364/ol.47.013297").name == "Optica"

@@ -60,7 +60,6 @@ _INSTSCI_DELAY_MIN = 2.0
 _INSTSCI_DELAY_MAX = 5.0
 
 
-
 def _instsci_rate_limit() -> None:
     global _last_instsci_time
     now = time.time()
@@ -1249,33 +1248,6 @@ def _try_instsci_http(doi: str, output_path: Path, config: dict[str, Any]) -> di
     except Exception as e:
         log.info(f"   [WebVPN] {e}")
 
-    return None
-
-
-def _try_carsi(doi: str, resolved_url: str, output_path: Path, config: dict[str, Any]) -> dict[str, Any] | None:
-    """Try downloading via CARSI federated auth (browser-based)."""
-    if not config.get("carsi_enabled", False):
-        return None
-    try:
-        from .carsi import CARSIClient, detect_publisher
-        publisher = detect_publisher(resolved_url)
-        if not publisher:
-            return None
-        client = CARSIClient(config)
-
-        # Try stealth browser first (stealth browser, handles Cloudflare)
-        log.info(f"   [CARSI] Trying browser download for {doi}...")
-        result = client.download_via_browser(doi, resolved_url, output_path)
-        if result:
-            return result
-
-        # Fallback to browser download
-        log.info(f"   [CARSI] Trying browser download for {doi}...")
-        result = client.download_via_browser(doi, resolved_url, output_path)
-        if result:
-            return result
-    except Exception as e:
-        log.info(f"   [CARSI] {e}")
     return None
 
 

@@ -46,15 +46,6 @@ from .unpaywall import try_unpaywall
 from .vpnsci import try_vpnsci
 from .ezproxy import try_ezproxy
 
-# Institutional bridge — uses instsci PaperFetcher when available
-def _try_institutional_bridge(doi: str, output_path: Path, config: dict) -> dict | None:
-    """Lazy-loaded instsci institutional bridge."""
-    try:
-        from ..institutional.instsci_bridge import try_institutional
-        return try_institutional(doi, output_path, config)
-    except ImportError:
-        return None
-
 # Global semaphore to limit concurrent browser-based sources across all DOI
 # Prevents batch_workers × browser_sources_per_DOI explosion of Chrome windows
 _browser_semaphore: threading.Semaphore | None = None
@@ -104,7 +95,6 @@ def _neg_blocked(label: str, doi: str) -> bool:
             _NEG_CACHE.pop(k, None)
         pub = _publisher_of(doi)
         return (label, pub) in _NEG_CACHE or (label, "*") in _NEG_CACHE
-
 
 
 def _get_browser_semaphore(config: dict[str, Any]) -> threading.Semaphore:
@@ -1187,6 +1177,7 @@ def download(
     strategy: str | None = None,
     _batch: bool = False,
     _scihub_http_only: bool = False,
+    _school_only: bool = False,
 ) -> dict[str, Any]:
     key = identifier.strip()
     if not is_arxiv_identifier(key):
@@ -1226,6 +1217,7 @@ def download(
             strategy=strategy,
             _batch=_batch,
             _scihub_http_only=_scihub_http_only,
+            _school_only=_school_only,
         )
         att = _attempt.get(key)
         steps = list(att.steps) if att is not None else []
@@ -1278,6 +1270,7 @@ def _download_impl(
     strategy: str | None = None,
     _batch: bool = False,
     _scihub_http_only: bool = False,
+    _school_only: bool = False,
 ) -> dict[str, Any]:
     race_failures: list[dict[str, str]] = []
     config = load_config()
@@ -1433,7 +1426,8 @@ def _download_impl(
     # Phase 1: Free sources (OA + grey) — parallel race
     t_phase = time.time()
     p_phase = time.perf_counter()  # close_browsers_since's clock
-    free_sources = _build_free_sources(doi, config)
+    # _school_only: a batch's second pass; its first pass already tried these.
+    free_sources = [] if _school_only else _build_free_sources(doi, config)
     log.info(f"   [timing] phase 1 sources built: {time.time() - t_phase:.1f}s")
     if free_sources:
         result = _run_tiers_parallel(
@@ -1699,156 +1693,46 @@ def _clear_progress(batch_id: str) -> None:
             pass
 
 
-def _publisher_result_to_standard(
-    result: Any, doi: str, output_dir: Path, publisher_name: str
-) -> dict[str, Any]:
-    """Convert a PublisherBatchDownloader DownloadResult to the standard result format."""
-    if result.ok and result.pdf_path:
-        src = Path(result.pdf_path)
-        dst = output_dir / f"{safe_filename(doi)}.pdf"
-        try:
-            if src != dst:
-                output_dir.mkdir(parents=True, exist_ok=True)
-                if dst.exists():
-                    dst.unlink()
-                src.rename(dst)
-        except OSError:
-            dst = src
-        return {
-            "success": True, "doi": doi, "identifier": doi,
-            "file": str(dst), "source": f"institutional:browser:{publisher_name}",
-            "full_text_length": result.text_length,
-        }
-    return fail(doi, result.reason or "institutional download failed")
-
-
 def _batch_institutional_phase(
     failed_dois: list[str],
     output_dir: Path,
     config: dict[str, Any],
     batch_id: str,
     results_map: dict[str, dict[str, Any]],
+    batch_gen: int | None = None,
 ) -> None:
-    """Phase 2 for batch downloads: group DOIs by publisher, batch-download per group.
+    """Phase 2 of a batch: the school routes (WebVPN, CARSI), one paper at a time.
 
-    Modifies results_map in-place with successful results.
+    Through the same engine as single downloads (2026-10-20: the per-publisher
+    PublisherBatchDownloader is gone), so session self-healing, failure reasons,
+    skip and cancel work here too. Phase 1 already tried the free sources and
+    the publisher's own site, so only the school routes run. Modifies
+    results_map in place.
     """
+    prev_gen = getattr(_DL_TLS, "gen", None)
+    if batch_gen is not None:
+        _DL_TLS.gen = batch_gen  # the downloads below belong to the batch: its cancel stops them
     try:
-        from ..publisher_profiles import infer_publisher_profile
-        from ..publisher_batch import DownloadResult, PaperRecord, PublisherBatchDownloader
-    except ImportError:
-        log.info("   [Batch] publisher_batch not available, skipping institutional phase")
-        return
+        _school_routes_each(failed_dois, output_dir, config, batch_id, results_map, batch_gen)
+    finally:
+        _DL_TLS.gen = prev_gen
 
-    try:
-        from ..browser_backend import launch_persistent_context  # noqa: F401
-        from ..browser_backend import is_available as _browser_backend_available
-        if not _browser_backend_available():
-            log.info("   [Batch] no browser backend available, skipping institutional phase")
-            return
-    except ImportError:
-        log.info("   [Batch] no browser backend available, skipping institutional phase")
-        return
 
-    # Group DOIs by publisher profile
-    grouped: dict[str, list[str]] = {}  # profile_name -> [doi, ...]
-    ungrouped: list[str] = []
+def _school_routes_each(failed_dois, output_dir, config, batch_id, results_map, batch_gen) -> None:
     for doi in failed_dois:
-        profile = infer_publisher_profile(doi)
-        if profile:
-            grouped.setdefault(profile.name, []).append(doi)
-        else:
-            ungrouped.append(doi)
-
-    if not grouped and not ungrouped:
-        return
-
-    institution_query = config.get("vpnsci_school", "")
-    login_timeout = config.get("browser_login_timeout", 300)
-
-    # Process each publisher group
-    for profile_name, dois in grouped.items():
-        profile = infer_publisher_profile(dois[0])
-        if not profile:
-            ungrouped.extend(dois)
-            continue
-
-        log.info(f"   [Batch] Phase 2: {len(dois)} DOIs via {profile_name} (one login)")
-
-        records = [PaperRecord(doi=doi) for doi in dois]
-        run_dir = output_dir / ".publisher_runs" / profile_name
-        run_dir.mkdir(parents=True, exist_ok=True)
-
-        downloader = PublisherBatchDownloader(
-            config=config,
-            profile=profile,
-            institution_query=institution_query,
-            login_timeout_sec=login_timeout,
-            pdf_timeout_sec=60,
-            post_login_hold_sec=config.get("post_login_hold", 0),
-            post_run_hold_sec=0,
-        )
-
-        try:
-            summary = downloader.run_records(records, run_dir, retry_failed=True)
-        except Exception as e:
-            log.info(f"   [Batch] {profile_name} batch failed: {e}")
-            ungrouped.extend(dois)
-            continue
-
-        # Map DOIs to results from the manifest
-        manifest_path = run_dir / "complete" / "manifest.json"
-        if manifest_path.exists():
-            try:
-                import json
-                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                doi_to_manifest = {entry.get("doi", ""): entry for entry in manifest}
-                for doi in dois:
-                    entry = doi_to_manifest.get(doi, {})
-                    if entry.get("status") == "success":
-                        pdf_path = entry.get("pdf_path", "")
-                        if pdf_path and Path(pdf_path).exists():
-                            result = _publisher_result_to_standard(
-                                type("R", (), {"ok": True, "pdf_path": pdf_path, "text_length": 0})(),
-                                doi, output_dir, profile_name,
-                            )
-                            # Phase 1 renames inside download(); phase-2 files
-                            # were left as <doi>.pdf.
-                            _auto_rename(result, doi, config, doi=doi, target_dir=output_dir)
-                        else:
-                            result = fail(doi, "PDF not found after batch download")
-                    else:
-                        result = fail(doi, entry.get("reason", "institutional download failed"))
-                    results_map[doi] = result
-                    _save_progress(batch_id, doi, result)
-            except Exception as e:
-                log.info(f"   [Batch] Failed to parse manifest for {profile_name}: {e}")
-                ungrouped.extend(dois)
-        else:
-            log.info(f"   [Batch] No manifest found for {profile_name}")
-            ungrouped.extend(dois)
-
-    # Fallback: ungrouped DOIs get per-DOI institutional access
-    for doi in ungrouped:
         if doi in results_map and results_map[doi].get("success"):
             continue
-        # Check if a PDF already exists on disk (from prior run, doi_index, or partial download)
-        safe_name = safe_filename(doi)
-        existing = None
-        for p in output_dir.glob(f"{safe_name}*.pdf"):
-            if p.stat().st_size > 5000:
-                existing = p
-                break
+        if batch_gen is not None and _CANCEL_GEN[0] != batch_gen:
+            log.info(f"Batch {batch_id}: cancelled — stopping phase 2")
+            break
+        # A PDF already on disk (an earlier run, a partial download)
+        existing = next((p for p in output_dir.glob(f"{safe_filename(doi)}*.pdf") if p.stat().st_size > 5000), None)
         if existing:
-            result = {
-                "success": True, "doi": doi, "identifier": doi,
-                "file": str(existing), "source": "local_cache",
-            }
-            results_map[doi] = result
-            _save_progress(batch_id, doi, result)
-            continue
-        log.info(f"   [Batch] Phase 2 fallback: {doi}")
-        result = download(doi, output_dir, scihub_enabled=config.get("scihub_enabled", True), use_vpnsci=True, _institutional=True, _batch=True)
+            result = {"success": True, "doi": doi, "identifier": doi, "file": str(existing), "source": "local_cache"}
+        else:
+            log.info(f"   [Batch] Phase 2 (school routes): {doi}")
+            result = download(doi, output_dir, scihub_enabled=config.get("scihub_enabled", True), use_vpnsci=True,
+                              _institutional=True, _batch=True, _school_only=True)
         results_map[doi] = result
         _save_progress(batch_id, doi, result)
 
@@ -2148,7 +2032,7 @@ def batch_download(
         failed_phase1 = []
     if failed_phase1:
         log.info(f"Batch {batch_id}: Phase 1 failed for {len(failed_phase1)} DOIs, starting Phase 2...")
-        _batch_institutional_phase(failed_phase1, Path(config["output_dir"]) if not output_dir else Path(output_dir), config, batch_id, phase1_results)
+        _batch_institutional_phase(failed_phase1, Path(config["output_dir"]) if not output_dir else Path(output_dir), config, batch_id, phase1_results, batch_gen)
         # Update results list with Phase 2 outcomes from progress file
         phase2_progress = _load_progress(batch_id)
         for i, ident in enumerate(pending_identifiers):

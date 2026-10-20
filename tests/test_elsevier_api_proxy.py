@@ -110,19 +110,6 @@ class FetchPdfProxyTests(unittest.TestCase):
             self.assertEqual(s.proxies, {})
 
 
-class InstitutionalMirrorTests(unittest.TestCase):
-    def test_fetch_pdf_applies_config_proxy(self):
-        from litloop.institutional.sources import elsevier_api as inst
-
-        _FakeSession.instances = []
-        with patch.object(inst.requests, "Session", _FakeSession):
-            inst.fetch_pdf("10.1016/j.aaa.2023.01.001", "KEY",
-                           config={"network_proxy": CAMPUS_PROXY})
-        self.assertTrue(_FakeSession.instances)
-        for s in _FakeSession.instances:
-            self.assertEqual(s.proxies.get("http"), CAMPUS_PROXY)
-
-
 class ProbeEnvProxyTests(unittest.TestCase):
     """权限探测与下载器必须同一代理语义（env 优先），否则诊断与实际出口脱节。"""
 

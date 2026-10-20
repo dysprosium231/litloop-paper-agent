@@ -52,50 +52,6 @@ class TestIsSuspiciousPdf:
         assert is_suspicious_pdf(p) is True
 
 
-class TestInstsciElsevierPreview:
-    def test_try_elsevier_api_rejects_single_page_preview(self, tmp_path: Path):
-        from litloop.institutional import instsci_bridge
-
-        class _Resp:
-            status_code = 200
-            content = _make_pdf(1, min_size=150_000)
-
-        out = tmp_path / "10.1016_j.fake.1.pdf"
-        with patch("requests.get", return_value=_Resp()):
-            result = instsci_bridge._try_elsevier_api(
-                "10.1016/j.fake.1", out, {"elsevier_api_key": "k"}
-            )
-        assert result is None
-        assert not out.exists(), "preview bytes must not be written to disk"
-
-    def test_try_elsevier_api_accepts_full_text(self, tmp_path: Path):
-        from litloop.institutional import instsci_bridge
-
-        class _Resp:
-            status_code = 200
-            content = _make_pdf(5, min_size=150_000)
-
-        out = tmp_path / "10.1016_j.fake.2.pdf"
-        with patch("requests.get", return_value=_Resp()):
-            result = instsci_bridge._try_elsevier_api(
-                "10.1016/j.fake.2", out, {"elsevier_api_key": "k"}
-            )
-        assert result is not None and result["success"] is True
-        assert result["source"] == "institutional:elsevier_api"
-
-    def test_institutional_fetch_pdf_rejects_single_page(self):
-        """The second institutional Elsevier PDF path must reject previews too."""
-        from litloop.institutional.sources import elsevier_api as inst_api
-
-        class _Resp:
-            status_code = 200
-            headers = {"content-type": "application/pdf"}
-            content = _make_pdf(1, min_size=150_000)
-
-        with patch("requests.Session.get", return_value=_Resp()):
-            assert inst_api.fetch_pdf("10.1016/j.fake.3", "k") is None
-
-
 class TestRacingElsevierPreview:
     def test_valid_pdf_bytes_rejects_single_page(self):
         from litloop.sources.elsevier_api import _valid_pdf_bytes

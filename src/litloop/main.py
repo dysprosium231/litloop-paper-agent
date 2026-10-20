@@ -19,7 +19,6 @@ class ServerMode(str, Enum):
     WEB = "web"
 
 
-
 def _default_output_dir(output: str) -> str:
     """CLI downloads land where MCP downloads do (config output_dir), not in the cwd."""
     if output:
@@ -756,61 +755,6 @@ def federated_login(
         print(f"  Login failed for {publisher}.")
         raise typer.Exit(1)
     client.close()
-
-
-@app.command("publisher-batch")
-def publisher_batch_cmd(
-    input_file: str = typer.Argument(help="File with one DOI per line"),
-    publisher: str = typer.Option("", help="Publisher key (auto-detected if omitted)"),
-    output: str = typer.Option("", help="Output directory (default: output_dir in config, ~/.litloop/papers)"),
-    max_workers: str = typer.Option("1", help="Number of parallel workers"),
-) -> None:
-    """Batch download papers via publisher-specific workflows."""
-    output = _default_output_dir(output)
-    from .config import load_config
-
-    dois = [
-        line.strip() for line in Path(input_file).read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.startswith("#")
-    ]
-    if not dois:
-        print("  No DOIs found in input file.")
-        return
-
-    config = load_config()
-    config["output_dir"] = output
-
-    print(f"  Batch: {len(dois)} DOIs")
-    print(f"  Publisher: {publisher or 'auto-detect'}")
-    print()
-
-    # Use the existing publisher batch infrastructure
-    from .publisher_batch import PaperRecord, PublisherBatchDownloader
-    from .publisher_profiles import _PROFILE_ALIASES, list_publisher_profiles
-    from .sources.publishers import get_publisher
-
-    key = (publisher or "").strip().lower()
-    if not key and dois:
-        key = get_publisher(dois[0]).lower()
-    profile = _PROFILE_ALIASES.get(key)
-    if profile is None:
-        raise SystemExit(
-            f"Unknown/unresolved publisher '{publisher or key or '(auto)'}'. "
-            f"Pass --publisher with one of: {', '.join(list_publisher_profiles())}")
-    # Pick the school on the publisher's institution page, as the other routes do
-    # (searched in English: "Beihang", not the configured Chinese name).
-    school = config.get("carsi_idp_name") or config.get("vpnsci_school") or ""
-    try:
-        from ._publisher_strategies_core import _IDP_MAP
-        school = _IDP_MAP.get(school, school)
-    except Exception:
-        pass
-    downloader = PublisherBatchDownloader(config, profile=profile, institution_query=school)
-    records = [PaperRecord(doi=d) for d in dois]
-    summary = downloader.run_records(records, output)
-    # run_records returns counts (count, success, missing, ...), not the results themselves.
-    success = int(summary.get("success") or 0) if isinstance(summary, dict) else 0
-    print(f"\n  Results: {success}/{len(dois)} downloaded")
 
 
 @app.command("search")

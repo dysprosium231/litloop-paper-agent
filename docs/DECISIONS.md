@@ -3,6 +3,16 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-20：去掉 publisher_batch
+
+- 起因：2026-10-19「publisher-batch 验收」用户同意整条路去掉（它有自己的一套浏览器、登录和状态记录，与 app 的下载引擎重复，登录状态、失败原因、跳过和取消都用不上）。
+- MCP 批量下载（非车道模式）的第二阶段 `sources._batch_institutional_phase`：原来按出版商分组交给 `PublisherBatchDownloader`，现在逐篇调用 app 的下载引擎，只走学校通道（新参数 `_school_only`：第一阶段已试过开放获取和出版商窗口，不重跑）；批量任务被取消时第二阶段停下。
+- 删除（共约 6400 行，`git rm`，历史里可找回）：`publisher_batch.py`、`acs_batch.py`、根目录 `session_broker.py`、`institutional/` 下的 `instsci_bridge.py`、`session_broker.py`、`publisher_pdf_router.py`、`publisher_profiles.py`（转接）、`sources/elsevier_api.py`；`sources._try_institutional_bridge`（早已无人调用）、`_publisher_result_to_standard`、`sources/instsci._try_carsi`（早已无人调用，只因 `instsci_bridge` 有同名函数才看似有引用）；命令行的 `publisher-batch`（`main.py`、`_cli_core.py` 各一个）、`est-batch`、`papers`、`session-broker-status/stop/run`；只测这些代码的测试（`test_browser_restart`、`test_ip_block_detection`、`test_publisher_batch_merge`、`test_session_broker`，及另外五个文件里的几项；`proxy_pool` 按代理轮换出口 IP 只有它用，设置项保留但已不起作用）。技能文档去掉 `litloop publisher-batch` 一行。
+- 核对：删前删后各扫一遍 `src/` 里没人引用的顶层定义，删后新增的只有上面的 `_try_carsi`（已一并删）。保留：`institutional/fetcher.py`、`config_adapter.py`（`fetch`、`batch` 命令和车道模式在用）、`cloakbrowser_compat.py`（`browser_engine` 在用）、`profile_health.py`（`session-doctor` 在用）；根目录 `publisher_profiles.py`、`publisher_pdf_router.py`（车道模式的 `fetcher` 在用，今天补了测试）。
+- 失去的：同一出版商几篇只登录一次（学校通道的登录状态由会话自愈和保存的 cookie 保留）、“已尝试就跳过”的记录、清华专用的选机构规则。
+- Antigravity 两次评估（高强度模式）都没有返回结果，未采用；按用户选的 B 方案自己核对。
+- 待验收：MCP 真实批量下载几篇（含一篇 Elsevier 订阅论文），要用户配合登录。
+
 ## 2026-10-20：`carsi.edu.cn`、`export.arxiv.org` 不加进走代理的名单
 
 - 2026-10-19 的连通性测试里两者“校园网直连不通、代理可达”。复查：`ds.carsi.edu.cn` 有 IPv6 地址，本机走 IPv6 连它超时（别的网站 IPv6 正常），curl 默认先试 IPv6 就卡住；强制 IPv4 直连 1.3 秒返回 200。LitLoop 的 Python 请求按系统顺序先用 IPv4（1.5 秒），Chrome 会自动换用能通的地址，都不受影响。`export.arxiv.org` 只有 IPv4，复查时直连 2 秒正常，上次多半是偶发。

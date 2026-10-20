@@ -46,7 +46,6 @@ litloop fetch <DOI> [--output DIR]   # 7 步机构级联
 litloop batch dois.txt --output <dir>            # 默认车道调度(见下)
 litloop batch dois.txt --no-lanes                # 退回逐篇对冲竞速
 litloop batch dois.txt --scihub                  # 灰源竞速引擎(scihub_only/grey_only/scihub_first 策略自动走此路)
-litloop publisher-batch f.txt --publisher elsevier
 ```
 
 **车道调度是批量默认**(CLI 默认开,MCP `batch_download` 对 ≥3 条标识符自动启用;`config set batch_default_lanes false` 全局关闭):先 **S2 批量预嗅探**(500 DOI/请求,直接拿到 OA PDF 直链,≥`lane_s2_batch_min`(10) 条才启用)→ **快车道并行 HTTP**(OA 直链 + Elsevier API + MDPI CDN 规律构造 `lane_mdpi_cdn`)→ 失败溢流 **灰色源竞速** → **机构级联**,最后瞬时失败冷却重试。MDPI(`10.3390`)走 mdpi-res.com CDN 直连(94% 命中,绕开主站反爬),不消耗嗅探请求。车道模式忽略 `batch_id` 断点(灰色道内部仍保留断点);需要断点续传用 `--no-lanes`。
