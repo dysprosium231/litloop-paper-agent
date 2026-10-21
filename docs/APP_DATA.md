@@ -83,7 +83,7 @@ with store.update(screening_dir() / f"{session}.json", indent=2) as data:
 | `ranked_by` | `formula`（开头几批）或 `model`（之后） |
 | `seeds` | 当前种子篇数（原始种子加评为高的） |
 | `batches` | 每批：`batch` 序号、`size`、`rated`，以及 `高`、`中`、`低`、`不相关` 各几篇；每批高相关比例由此算 |
-| `rounds` | 每轮：`time`、`event`（`start` / `next`）、`new_seeds`、`pool_added`、`expand_seconds`、`rank_seconds`、`openalex_credits`、`seconds` |
+| `rounds` | 每轮：`time`、`event`（`start` / `next`）、`new_seeds`、`pool_added`、`expand_seconds`、`rank_seconds`、`openalex_credits`、`seconds`；`next` 轮另有 `abstracts_asked`、`abstracts_found`、`abstracts_wait_seconds`（补摘要与扩展同时进行，这是扩展结束后还要再等的秒数；2026-10-20 起） |
 | `stop_suggested`、`stop_reason` | 停止建议 |
 | `remaining_estimate` | 按每批“高”的比例下降趋势粗略外推：`next_batch`（下一批约几篇高）、`remaining`（继续读下去约还有几篇高；比例不降时没有此项）、`batches`（用了几批）、`decay`（每批比例的衰减系数）；不足三批评分时为 `null` |
 | `coverage` | 必找文章：`doi`、`status`（`screened` 已评，带 `relevance`；`seed` 已是种子；`in_pool` 在候选池，带当前排名 `rank`；`not_found` 没找到） |

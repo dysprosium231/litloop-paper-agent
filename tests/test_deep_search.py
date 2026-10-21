@@ -410,3 +410,40 @@ def test_only_the_session_in_use_keeps_its_token_cache():
     assert deep_search._CACHES["s-a"]["tokens"] == {} and deep_search._CACHES["s-a"]["hits"]
     assert deep_search._CACHES["s-b"]["tokens"]
     assert deep_search._session_lock("s-a") is deep_search._session_lock("s-a")
+
+
+def test_next_round_fetches_abstracts_while_it_expands(net, monkeypatch):
+    import threading
+    import time
+    out = deep_search.start("q", ["pressureless infiltration SiC aluminum"], ["10.1/seed"], ["aluminum"],
+                            batch_size=2)
+    sid = out["session"]
+    state = deep_search._load(sid)
+    state["pool"]["10.1/keyword"]["refs"] = ["R7"]
+    deep_search._save(state)
+    screening.save("q", [{"doi": "10.1/coupled", "title": "t", "relevance": "中", "reason": "r"},
+                         {"doi": "10.1/keyword", "title": "t", "relevance": "高", "reason": "r"}], session=sid)
+    events, filling = [], threading.Event()
+
+    def fetch(todo):
+        events.append("fetch start")
+        filling.set()
+        time.sleep(0.2)
+        events.append("fetch end")
+        return 0
+
+    real_expand = deep_search._expand
+
+    def expand(state, keys):
+        assert filling.wait(2), "abstracts were not being fetched during the expansion"
+        events.append("expand")
+        return real_expand(state, keys)
+
+    monkeypatch.setattr(deep_search, "_prefill_fetch", fetch)
+    monkeypatch.setattr(deep_search, "_expand", expand)
+    monkeypatch.setattr(deep_search, "_prefill_abstracts",
+                        lambda *a: (_ for _ in ()).throw(AssertionError("abstracts fetched twice")))
+    deep_search.next_batch(sid)
+    assert events == ["fetch start", "expand", "fetch end"]
+    rnd = deep_search._load(sid)["rounds"][-1]
+    assert rnd["abstracts_asked"] >= 1 and "abstracts_wait_seconds" in rnd

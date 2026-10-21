@@ -489,12 +489,21 @@ def _prefill_abstracts(state: dict[str, Any], rated: dict[str, str]) -> int:
     Ranking reads abstracts, so a paper without one used to sink and never
     reach a batch, which is where its abstract would have been fetched.
     """
-    from .abstracts import fill_abstracts
+    return _prefill_fetch(_prefill_pick(state, rated))
+
+
+def _prefill_pick(state: dict[str, Any], rated: dict[str, str]) -> list[dict[str, Any]]:
+    """The PREFILL best-ranked unscreened records that still lack an abstract."""
     # Pick among the papers that lack one: they rank low for that very reason, so
     # taking the overall top PREFILL would reach almost none of them.
     todo = [r for k in _ranked(state) if k not in rated
             for r in [state["pool"][k]] if not r.get("abstract") and not r.get("abstract_tried") and r.get("doi")]
-    todo = todo[:PREFILL]
+    return todo[:PREFILL]
+
+
+def _prefill_fetch(todo: list[dict[str, Any]]) -> int:
+    """Fill abstracts into these records in place; returns how many were found."""
+    from .abstracts import fill_abstracts
     if not todo:
         return 0
     _phase("abstracts", len(todo))
@@ -666,16 +675,31 @@ def _next_round(session: str, force: bool = False) -> dict[str, Any]:
     state = _load(session)
     rated = _ratings(state)
     new_seeds = [k for k, rel in rated.items() if rel == "高" and k in state["pool"] and k not in state["seeds"]]
-    added = 0
-    if new_seeds:
-        added = _expand(state, new_seeds)
+    # Abstracts for the best-ranked papers without one, fetched while the pool is
+    # expanded (2026-10-20: the two ran one after the other, 12-25 s + ~50 s a
+    # round). Picked from last round's ranking, so papers this expansion adds
+    # get theirs next round.
+    todo = _prefill_pick(state, rated) if force or not _stop(state, rated)["stop_suggested"] else []
+    added, found = 0, 0
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        filling = ex.submit(_prefill_fetch, todo) if todo else None
+        if new_seeds:
+            added = _expand(state, new_seeds)
+        t_exp = time.time()
+        if filling is not None:
+            if not filling.done():
+                _phase("abstracts", len(todo))
+            found = filling.result()
+    if added or found:
         _score(state)
     t1 = time.time()
     rnd = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "event": "next", "new_seeds": len(new_seeds),
-           "pool_added": added, "expand_seconds": round(t1 - t0, 1)}
+           "pool_added": added, "expand_seconds": round(t_exp - t0, 1),
+           "abstracts_asked": len(todo), "abstracts_found": found,
+           "abstracts_wait_seconds": round(t1 - t_exp, 1)}  # beyond the expansion
     state["rounds"].append(rnd)
     _save(state)
-    out = _next_batch(state, rated, force)
+    out = _next_batch(state, rated, force, prefilled=True)
     rnd["rank_seconds"] = round(time.time() - t1, 1)  # abstracts, model, journal ranks
     rnd["openalex_credits"] = quota.spent("openalex") - credits0
     rnd["api_budget"] = {k: {f: v.get(f) for f in ("remaining", "limit", "resets_at")}
@@ -929,7 +953,8 @@ def _write_summary(state: dict[str, Any], rated: dict[str, str], stop: dict[str,
         logger.warning("deep search: could not write the session summary (%s)", exc)
 
 
-def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None, force: bool = False) -> dict[str, Any]:
+def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None, force: bool = False,
+                prefilled: bool = False) -> dict[str, Any]:
     from .abstracts import clean_abstract, fill_abstracts
     from .search import _add_journal_rank, _flag_retractions
     rated = rated if rated is not None else _ratings(state)
@@ -937,7 +962,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None, forc
     _log_stop(state, rated, stop)
     go_on = force or not stop["stop_suggested"]
     if go_on:
-        if _prefill_abstracts(state, rated):
+        if not prefilled and _prefill_abstracts(state, rated):
             _score(state)
         _phase("rank")
         state["ranked_by"] = _rerank(state, rated)
