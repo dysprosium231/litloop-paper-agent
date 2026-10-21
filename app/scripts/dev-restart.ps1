@@ -31,7 +31,13 @@ while ((Get-NetTCPConnection -LocalPort 1420 -ErrorAction SilentlyContinue | Whe
 }
 
 if ($env:CARGO_HOME) { $env:PATH = (Join-Path $env:CARGO_HOME "bin") + ";" + $env:PATH }
-if (Test-Path $Log) { Remove-Item $Log -Force }
+# Keep the previous run's log (a download test's timings were lost twice when a
+# restart overwrote it): .dev.log.bak-<time>, the newest 5 kept (gitignored).
+if (Test-Path $Log) {
+    Move-Item $Log (Join-Path $App (".dev.log.bak-" + (Get-Date -Format "yyyyMMdd-HHmmss"))) -Force
+    Get-ChildItem $App -Filter ".dev.log.bak-*" | Sort-Object Name -Descending |
+        Select-Object -Skip 5 | Remove-Item -Force -ErrorAction SilentlyContinue
+}
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm run tauri dev > .dev.log 2>&1" `
     -WorkingDirectory $App -WindowStyle Hidden
 
