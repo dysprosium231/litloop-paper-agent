@@ -70,7 +70,9 @@ def check_deps() -> None:
 
 @app.command("web")
 def web_server(
-    host: str = typer.Option("0.0.0.0", help="Web server host"),
+    # It downloads with the user's school session and has no login: never on
+    # every interface by default (2026-10-23 review).
+    host: str = typer.Option("127.0.0.1", help="Web server host (default localhost; bind 0.0.0.0 only behind auth)"),
     port: int = typer.Option(8080, help="Web server port"),
 ) -> None:
     """Start the LitLoop web UI for browser-based paper downloading."""

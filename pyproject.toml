@@ -19,6 +19,9 @@ dependencies = [
     "openpyxl>=3.1",
     "pymupdf4llm>=0.0.17",
     "filelock>=3.12",
+    # WebVPN's address encoding; fetcher imports it at the top, so every
+    # download needs it (2026-10-23: a base install could not download).
+    "pycryptodome>=3.20",
 ]
 
 [project.urls]
@@ -29,8 +32,8 @@ Upstream = "https://github.com/Rimagination/scansci-pdf"
 
 [project.optional-dependencies]
 fast = ["lxml>=4.9"]
-# vpnsci is the canonical extra (v1.7.0+). instsci is kept as a legacy alias
-# so existing `pip install litloop[instsci]` commands keep working.
+# vpnsci and instsci are kept so existing `pip install litloop[vpnsci]` commands
+# keep working; pycryptodome is a base dependency since 2026-10-23.
 vpnsci = ["pycryptodome>=3.20"]
 instsci = ["pycryptodome>=3.20"]
 cloakbrowser = ["cloakbrowser>=0.5.9"]

@@ -34,6 +34,23 @@ jobs:
       - name: Check release consistency
         run: python scripts/check_release_consistency.py
 
+  base-install:
+    # Only the base dependencies, as `pip install litloop` gives them: every
+    # module a download goes through must import (the test job installs extras,
+    # which hid a missing pycryptodome until 2026-10-23).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: Import smoke test
+        run: python scripts/import_smoke.py
+
   app:
     # The desktop app: TypeScript types, the UI copy rules (docs/UI_COPY.md) and
     # the Rust shell. Windows, as the app's users are; it needs no extra system

@@ -3,6 +3,13 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-23：外部代码审查（用户转来的一份审查意见）
+
+审查在 Linux / Python 3.13 上跑了全量测试，列出 9 条意见。第 1～7 条逐条核实，都属实；第 8、9 条是判断。
+
+1. **只装基础依赖时下载导入失败**：`fetcher` 在顶部导入 `auth`，`auth` 又在顶部 `from Crypto.Cipher import AES`，而 pycryptodome 只在可选依赖 `vpnsci` 里；CI 一直装着 `[dev,vpnsci,fast]`，没暴露。改：pycryptodome 进基础依赖（`vpnsci`、`instsci` 保留为空壳，旧安装命令照常可用）；CI 加 `base-install` 任务，只装基础依赖后运行 `scripts/import_smoke.py`，导入下载要经过的 13 个模块。本机模拟没装 pycryptodome 时，它报出 `fetcher`、`auth` 两个模块。
+3. **`litloop web` 默认监听 0.0.0.0、没有认证**：它用用户的学校会话下载并返回 PDF，同一网络里的人都能借用。改：默认 `127.0.0.1`（和 `litloop run` 一致）。
+
 ## 2026-10-23：下载前确认 DOI 存在；首次引导加「可选组件」
 
 - **DOI 检查**：`sources.download` 开头问一次 doi.org 的 Handle 接口（`doi_check.py`）。这个接口认得所有注册机构的 DOI，不只 Crossref。
