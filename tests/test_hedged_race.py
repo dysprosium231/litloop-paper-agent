@@ -18,11 +18,6 @@ import litloop.sources as sources
 from litloop.sources import _run_tiers_parallel
 
 
-@pytest.fixture(autouse=True)
-def _pure_python_race(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(sources, "_HAS_COMPILED_CORE", False)
-
-
 def _pdf_bytes(pages: int = 3, min_size: int = 120_000) -> bytes:
     """A real multi-page PDF padded past the size heuristics."""
     import fitz

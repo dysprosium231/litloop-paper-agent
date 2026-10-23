@@ -10,7 +10,6 @@ _DEFAULT_KEY = b"wrdvpnisthebest!"
 
 _DATA_DIR = Path(__file__).parent / "data"
 _DATA_FILE = _DATA_DIR / "webvpn.json"
-_DATA_FILE_ENCRYPTED = _DATA_DIR / "webvpn.dat"
 
 
 _schools_cache: list["SchoolEntry"] | None = None
@@ -28,16 +27,6 @@ class SchoolEntry:
 
 
 def _load_db() -> dict:
-    # Try encrypted .dat first (production)
-    if _DATA_FILE_ENCRYPTED.exists():
-        try:
-            from ._core.instsci_core import decrypt_data
-            encrypted = _DATA_FILE_ENCRYPTED.read_bytes()
-            return json.loads(decrypt_data(encrypted))
-        except Exception:
-            pass  # Fall through to plaintext
-
-    # Fallback to plaintext .json (development)
     if _DATA_FILE.exists():
         return json.loads(_DATA_FILE.read_text(encoding="utf-8"))
 

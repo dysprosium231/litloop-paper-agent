@@ -8,11 +8,12 @@
 审查在 Linux / Python 3.13 上跑了全量测试，列出 9 条意见。第 1～7 条逐条核实，都属实；第 8、9 条是判断。
 
 1. **只装基础依赖时下载导入失败**：`fetcher` 在顶部导入 `auth`，`auth` 又在顶部 `from Crypto.Cipher import AES`，而 pycryptodome 只在可选依赖 `vpnsci` 里；CI 一直装着 `[dev,vpnsci,fast]`，没暴露。改：pycryptodome 进基础依赖（`vpnsci`、`instsci` 保留为空壳，旧安装命令照常可用）；CI 加 `base-install` 任务，只装基础依赖后运行 `scripts/import_smoke.py`，导入下载要经过的 13 个模块。本机模拟没装 pycryptodome 时，它报出 `fetcher`、`auth` 两个模块。
+2. **`setup.py` 的“加密保护”不起作用**：AES 密钥写在公开的 `setup.py` 里，`webvpn.json` 明文早已进了仓库；`schools.py` 解密时导入 `instsci_core`，编译的却是 `vpnsci_core`，名字对不上；三个 Cython 模块的 `.pyx` 不在仓库（`_core/.gitignore` 写着上游把它们当私有代码），这个分支从没构建过，所有 `_HAS_COMPILED_CORE` 分支都是死代码。改：删 `setup.py` 和 `_core/`，`sources/__init__.py`、`sources/scihub.py`、`sources/instsci.py` 只留纯 Python 那一支，`schools.py` 只读 `webvpn.json`，构建依赖去掉 pycryptodome、去掉 `compile` 可选依赖；三个测试里“强制走纯 Python”的替身随之删掉。（Antigravity 做了大部分，最后两处删除和 cookie 权限我补的。）
 3. **`litloop web` 默认监听 0.0.0.0、没有认证**：它用用户的学校会话下载并返回 PDF，同一网络里的人都能借用。改：默认 `127.0.0.1`（和 `litloop run` 一致）。
 4. **Docker 这条路已经坏了**：`.[tor]` 这个可选依赖不存在；启动命令没传 `--host`，容器外访问不到；compose 把 Tor 的 SOCKS 端口暴露在所有网卡上。而且容器里没法让用户在浏览器里登录、点人机验证。删掉 `Dockerfile`、`docker-compose.yml`、`.dockerignore`、`tor/`；安装检查（`setup.setup_check`）不再查 Docker，原来会把“没装 Docker”报成问题；AGENT.md 去掉 `docker compose` 一行。
 5. **大量吞掉异常**：源码里有 360 处 `except Exception:`，其中 192 处下一行就是 `pass`。修了审查点名的那一处：`browser_engine.py` 的 `from ..institutional…` 越出了包，必然失败，靠第二次导入兜底，现在改成一次正确导入，失败时写 debug 日志。其余的不一次全改：`check_release_consistency.py` 加了上限（`SWALLOWED_EXCEPTIONS_MAX`，现为 190），`except Exception:` 紧跟 `pass` 的数量只许减不许增；下次下载实测时，在日志里看到的地方顺手改。
 6. **死代码和遗留文件**：删 `institutional/extractors/`（`extractors/` 的旧副本，没有地方引用），以及仓库根目录的 `guan_dabo_top20.txt`、`test_dois.txt`、`test_download_results.json`（含上游作者的本机路径）和 `tests/sso_test_report.json`。最后这个是手动脚本 `tests/test_sso_publishers.py` 的输出，已加进 `.gitignore`。`_cli_core.py` 的说明文字不再写 InstSci。
-7. **cookie 明文存在磁盘上、没设权限**：新增 `session_store.keep_private`，macOS / Linux 上把 cookie 文件设为 0600（Windows 的用户目录本来就只归本人）。写 cookie 的地方都调用它：`CookieStore.save`、`browser_cookies`、`browser_login`（`sources/instsci` 的两处随第 2 条一起改）。文件内容仍是明文：加密后密钥也得放在本机，挡不住能读这些文件的人。
+7. **cookie 明文存在磁盘上、没设权限**：新增 `session_store.keep_private`，macOS / Linux 上把 cookie 文件设为 0600（Windows 的用户目录本来就只归本人）。写 cookie 的地方都调用它：`CookieStore.save`、`browser_cookies`、`browser_login`、`sources/instsci`。文件内容仍是明文：加密后密钥也得放在本机，挡不住能读这些文件的人。
 8. **测试集太小**（判断）：README 的“验收结果”改为“自测结果”，写明只有 3 个测试集、目标和评分的来源，不代表一般水平；功能表里去掉 17/19、24/26。用公开数据集 SYNERGY 离线评测记进 TODO 的待办池。已核对其 README：规模、许可和审查说的一致；但“部分是工程类”不准确，26 个综述以医学、心理学为主，另有 3 个计算机科学，没有材料或工程。它适合评排序和停止规则，评不了建候选池。
 9. **法律风险**（推测）：Sci-Hub、LibGen、Tor 接入和自动化 WebVPN 登录放在用实名账号公开的仓库里。审查建议把这几个来源拆成单独的插件。这件事要用户决定，记进 TODO 的待办池。
 

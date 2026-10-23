@@ -44,13 +44,12 @@ patchright = ["patchright>=1.61"]
 # extra just puts it in the same environment.
 zotero = ["zotero-mcp-server>=0.14.1"]
 dev = ["pytest>=8.0"]
-compile = ["cython>=3.0"]
 
 [project.scripts]
 litloop = "litloop.main:main"
 
 [build-system]
-requires = ["setuptools>=68.0", "pycryptodome>=3.20"]
+requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

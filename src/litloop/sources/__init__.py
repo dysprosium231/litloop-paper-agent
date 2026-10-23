@@ -18,15 +18,6 @@ from ..log import get_logger
 from ..pdf_utils import fail
 from ..rename import rename_pdf, generate_filename as rename_pdf_generate_filename
 
-# Import compiled core functions if available (Cython .pyd/.so)
-try:
-    from .._core.racing import (
-        run_parallel_race as _run_parallel_race_compiled,
-    )
-    _HAS_COMPILED_CORE = True
-except ImportError:
-    _HAS_COMPILED_CORE = False
-
 log = get_logger()
 
 from .arxiv import try_arxiv
@@ -529,31 +520,6 @@ def _run_tiers_parallel(
     # without going through download(), so clear any earlier "settled" mark here
     # or every result of this race would be discarded as a late finisher.
     _SETTLED.discard(normalize_doi(doi) if not is_arxiv_identifier(doi) else doi)
-    # Delegate to the compiled racing engine only for the flat race: the
-    # hedged cascade needs staggered submission, which the compiled engine
-    # does not model.
-    race_mode = str(config.get("race_mode", "hedge")).lower()
-    if _HAS_COMPILED_CORE and race_mode == "full":
-        all_sources = []
-        for tier_sources, tier_label, tier_timeout in tiers:
-            for fn, label in tier_sources:
-                all_sources.append((fn, label, tier_label, tier_timeout))
-
-        def _try_source_recorded(source_fn, doi_, out_path, config_, label_,
-                                 use_tor=False):
-            # Same recording contract as the pure-Python race below: the
-            # compiled engine only manages threading, it still calls back
-            # into _try_source for every lane (with use_tor as a keyword —
-            # see racing.pyx).
-            result = _try_source(source_fn, doi_, out_path, config_, label_,
-                                 use_tor=use_tor)
-            _record_source_failure(failures, label_, result)
-            return result
-
-        return _run_parallel_race_compiled(
-            all_sources, doi, target_dir, output_path, config,
-            use_tor, overall_timeout, _try_source_recorded, safe_filename, log,
-        )
     if not tiers:
         return None
 
@@ -643,7 +609,8 @@ def _run_tiers_parallel(
     # Launch the best first and only widen when it fails to answer within
     # hedge_delay_seconds — cuts request volume and anti-bot heat vs a flat
     # race while keeping tail latency close. race_mode=full restores the
-    # flat all-at-once race (compiled engine eligible again).
+    # flat all-at-once race.
+    race_mode = str(config.get("race_mode", "hedge")).lower()
     hedge_delay = max(0.0, float(config.get("hedge_delay_seconds", 1.5)))
     if race_mode == "full":
         hedge_delay = 0.0

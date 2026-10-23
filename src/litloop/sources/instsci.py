@@ -31,17 +31,6 @@ from ..pdf_utils import (
     success,
 )
 
-# Import compiled core functions if available (Cython .pyd/.so)
-try:
-    from .._core.instsci_core import (
-        convert_url as _convert_url_compiled,
-        construct_publisher_pdf_url as _construct_publisher_pdf_url_compiled,
-        find_pdf_link_in_html as _find_pdf_link_compiled,
-    )
-    _HAS_COMPILED_CORE = True
-except ImportError:
-    _HAS_COMPILED_CORE = False
-
 log = get_logger()
 
 # Config key migration: v1.7.0 renamed instsci_* → vpnsci_*.  Prefer the new
@@ -134,9 +123,6 @@ def convert_url(url: str, webvpn_base: str, config: dict[str, Any] | None = None
     Uses per-school encryption keys when config is provided.
     """
     key, iv = _get_school_keys(config) if config else (b"wrdvpnisthebest!", b"wrdvpnisthebest!")
-
-    if _HAS_COMPILED_CORE:
-        return _convert_url_compiled(url, webvpn_base, key, iv)
 
     parsed = urllib.parse.urlparse(url)
     scheme = parsed.scheme.lower()
@@ -377,8 +363,6 @@ def _construct_publisher_pdf_url(doi: str, resolved_url: str) -> str | None:
     tf = _taylorfrancis_book_pdf_url(doi, resolved_url)
     if tf:
         return tf
-    if _HAS_COMPILED_CORE:
-        return _construct_publisher_pdf_url_compiled(doi, resolved_url)
 
     parsed = urllib.parse.urlparse(resolved_url)
     hostname = parsed.netloc.lower()
@@ -415,9 +399,6 @@ def _find_pdf_link(html: str, base_url: str) -> str | None:
     Tries: citation_pdf_url meta, <a> tags with PDF text/class,
     and publisher-specific URL patterns.
     """
-    if _HAS_COMPILED_CORE:
-        return _find_pdf_link_compiled(html, base_url)
-
     try:
         soup = BeautifulSoup(html, "lxml")
     except Exception:
@@ -884,8 +865,10 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
                             {"name": c["name"], "value": c["value"], "domain": c.get("domain", ""), "path": c.get("path", "/")}
                             for c in cookies
                         ]
+                        from ..session_store import keep_private
                         (cache_dir / "instsci-cookies.json").write_text(
                             json.dumps(cookie_data, indent=2, ensure_ascii=False), encoding="utf-8")
+                        keep_private(cache_dir / "instsci-cookies.json")
                         lines = ["# Netscape HTTP Cookie File\n"]
                         for c in cookies:
                             d = c.get("domain", "")
@@ -895,6 +878,7 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
                             exp = str(int(c.get("expires", 0)))
                             lines.append(f"{d}\t{flag}\t{p}\t{sec}\t{exp}\t{c['name']}\t{c['value']}\n")
                         (cache_dir / "instsci-cookies.txt").write_text("".join(lines), encoding="utf-8")
+                        keep_private(cache_dir / "instsci-cookies.txt")
                         log.info(f"   [WebVPN-Browser] Saved {len(cookies)} cookies")
                     except Exception as e:
                         log.info(f"   [WebVPN-Browser] Cookie save warning: {e}")

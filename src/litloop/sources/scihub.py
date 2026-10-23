@@ -29,19 +29,6 @@ from . import scihub_speed
 from ..network import fetch, proxy_dict, select_proxy_for_url, _is_cloudflare_block, USER_AGENT
 from ..pdf_utils import extract_pdf_url_from_html, is_pdf_file, success, _response_looks_pdf
 
-# Import compiled core functions if available (Cython .pyd/.so)
-try:
-    from .._core.scihub_core import (
-        domain_score as _domain_score_compiled,
-        filter_cooldown_domains as _filter_cooldown_compiled,
-        rank_domains as _rank_domains_compiled,
-        record_domain_result as _record_domain_result_compiled,
-        select_domains_for_attempt as _select_domains_compiled,
-    )
-    _HAS_COMPILED_CORE = True
-except ImportError:
-    _HAS_COMPILED_CORE = False
-
 log = get_logger()
 
 # Track domains that require browser bypass (in-memory, per session)
@@ -1135,53 +1122,49 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
     _any_browser_tried = False
     fail_notes: list[str] = []
 
+    now = time.time()
+    cooldown_domains = []
+    for d in all_domains:
+        if _wall_guard(d, config):
+            continue  # persistent verification wall — pacing cooldown
+        d_stats = stats.get(d, {})
+        last_fail = d_stats.get("last_fail_time", 0)
+        fail_streak = d_stats.get("fail_streak", 0)
+        reachable = d_stats.get("reachable")
+        # Skip domains with many consecutive failures
+        if fail_streak >= 10 and (now - last_fail) < 300:
+            continue
+        # Skip domains that are unreachable (from recent probe)
+        if reachable is False and (now - last_fail) < 600:
+            continue
+        cooldown_domains.append(d)
 
-    if _HAS_COMPILED_CORE:
-        domains = _select_domains_compiled(all_domains, stats, _is_browser_domain)
-    else:
-        now = time.time()
-        cooldown_domains = []
+    if not cooldown_domains:
         for d in all_domains:
-            if _wall_guard(d, config):
-                continue  # persistent verification wall — pacing cooldown
-            d_stats = stats.get(d, {})
-            last_fail = d_stats.get("last_fail_time", 0)
-            fail_streak = d_stats.get("fail_streak", 0)
-            reachable = d_stats.get("reachable")
-            # Skip domains with many consecutive failures
-            if fail_streak >= 10 and (now - last_fail) < 300:
-                continue
-            # Skip domains that are unreachable (from recent probe)
-            if reachable is False and (now - last_fail) < 600:
-                continue
-            cooldown_domains.append(d)
+            stats[d] = {"success": 0, "fail": 0, "last_fail_time": 0, "fail_streak": 0}
+        cooldown_domains = all_domains
 
-        if not cooldown_domains:
-            for d in all_domains:
-                stats[d] = {"success": 0, "fail": 0, "last_fail_time": 0, "fail_streak": 0}
-            cooldown_domains = all_domains
+    def _domain_score(d: str) -> float:
+        s = stats.get(d, {})
+        successes = s.get("success", 0)
+        failures = s.get("fail", 0)
+        reachable = s.get("reachable")
+        total = successes + failures
+        # Unreachable domains get lowest score
+        if reachable is False:
+            return -99999
+        if total == 0:
+            return 0.5
+        success_rate = successes / total
+        avg_latency = s.get("avg_latency_ms", 5000)
+        score = success_rate * 1000 - avg_latency / 1000
+        # Boost browser-accessible domains (bypasses Cloudflare)
+        if _is_browser_available(config) and _is_browser_domain(d):
+            score += 5000
+        return score
 
-        def _domain_score(d: str) -> float:
-            s = stats.get(d, {})
-            successes = s.get("success", 0)
-            failures = s.get("fail", 0)
-            reachable = s.get("reachable")
-            total = successes + failures
-            # Unreachable domains get lowest score
-            if reachable is False:
-                return -99999
-            if total == 0:
-                return 0.5
-            success_rate = successes / total
-            avg_latency = s.get("avg_latency_ms", 5000)
-            score = success_rate * 1000 - avg_latency / 1000
-            # Boost browser-accessible domains (bypasses Cloudflare)
-            if _is_browser_available(config) and _is_browser_domain(d):
-                score += 5000
-            return score
-
-        cooldown_domains.sort(key=_domain_score, reverse=True)
-        domains = cooldown_domains[:3]
+    cooldown_domains.sort(key=_domain_score, reverse=True)
+    domains = cooldown_domains[:3]
     # The batch's speed test picked a mirror: ask it first (the others follow).
     fastest = scihub_speed.preferred_mirror()
     if fastest and fastest in all_domains and not _wall_guard(fastest, config):

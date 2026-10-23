@@ -41,12 +41,6 @@ def _make_source(delay: float, ok: bool, label: str):
     return src
 
 
-@pytest.fixture(autouse=True)
-def _force_pure_python_race(monkeypatch: pytest.MonkeyPatch):
-    """The compiled core is a dev-only artifact; PyPI wheels ship pure Python."""
-    monkeypatch.setattr("litloop.sources._HAS_COMPILED_CORE", False)
-
-
 def _race(tiers, overall_timeout: int, tmp_path: Path):
     t0 = time.monotonic()
     result = _run_tiers_parallel(tiers, "10.1000/test", tmp_path,

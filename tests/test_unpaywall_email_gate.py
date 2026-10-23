@@ -90,7 +90,6 @@ class TestRaceFailureCollector:
                                                monkeypatch: pytest.MonkeyPatch):
         import litloop.sources as sources
 
-        monkeypatch.setattr(sources, "_HAS_COMPILED_CORE", False)
         failures: list = []
 
         def failing_src(doi, out_path, config):
@@ -116,7 +115,6 @@ class TestRaceFailureCollector:
 
         import litloop.sources as sources
 
-        monkeypatch.setattr(sources, "_HAS_COMPILED_CORE", False)
         failures: list = []
 
         def slow_fail(doi, out_path, config):
