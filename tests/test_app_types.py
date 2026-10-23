@@ -36,12 +36,13 @@ def test_download_item_type_covers_the_download_job_items(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "load_config", lambda: {"output_dir": str(tmp_path), "zotero_auto_push": False})
 
     class _SyncThread:
-        def __init__(self, target, args=(), **kwargs):
+        def __init__(self, target, args=(), kwargs=None, **_):
             self.target = target
             self.args = args
+            self.kwargs = kwargs or {}
 
         def start(self):
-            self.target(*self.args)
+            self.target(*self.args, **self.kwargs)
 
     monkeypatch.setattr(threading, "Thread", _SyncThread)
 
@@ -55,7 +56,7 @@ def test_download_item_type_covers_the_download_job_items(tmp_path, monkeypatch)
             "attempts": [{"source": "cr", "route": "free", "seconds": 1.5, "ok": True, "why": None}],
         }]
     }
-    monkeypatch.setattr(server, "_batch_download_impl", lambda dois, batch_id, keep_attempts=False: json.dumps(mock_batch))
+    monkeypatch.setattr(server, "_batch_download_impl", lambda dois, batch_id, keep_attempts=False, **kw: json.dumps(mock_batch))
     monkeypatch.setattr(zotero, "ensure_collection", lambda col, cfg: {"success": True, "key": "k"})
     monkeypatch.setattr(zotero, "push_via_zotero_mcp", lambda doi, path, cfg, **k: {"success": True, "zotero_key": "zk", "pdf_attached": True})
 

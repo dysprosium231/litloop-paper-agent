@@ -139,9 +139,9 @@ app 发起的下载，每次一个文件，由 app 后台的 `download_jobs.py` 
 }
 ```
 
-- `state`：`running` → `done` / `cancelled` / `failed`（引擎本身出错，原因在 `error`）。文件里仍是 `running`、但当前后台并没有在跑它（app 中途关闭），读出时当作 `interrupted`。
+- `state`：`running` → `done` / `queued` / `cancelled` / `failed`（引擎本身出错，原因在 `error`）。`queued`：长清单还有文献在出版商队列里等用户开始（2026-10-23 起）。文件里仍是 `running`、但当前后台并没有在跑它（app 中途关闭），读出时当作 `interrupted`。
 - `items[].note`：给用户看的说明（如 T&F 章节下载的是整本书、本章所在页码），没有时为空。
-- `items[].status`：`waiting` → `done` / `failed`。每篇一出结果就写入 `source`、`file`、`error`（逐篇下载的短清单；批量车道在整批结束时填入）。
+- `items[].status`：`waiting` → `done` / `failed` / `queued`。超过 `batch_small_max`（30）篇的清单只跑开放获取和 Sci-Hub 两轮，没下到的标为 `queued`，按 `items[].publisher`（出版商，取自 OpenAlex，去掉 BV、Ltd 这类公司后缀；不知道时为 `null`，归入「其他出版商」）分成队列；用户开始某个队列（`POST /api/downloads/<job>/queue`），它的文献变回 `waiting`，逐篇走出版商官网和学校通道；中途取消的回到 `queued`。`GET /api/downloads/<job>` 另给出 `queues`（`[{publisher, count}]`，篇数多的在前），不存进文件。每篇一出结果就写入 `source`、`file`、`error`（逐篇下载的短清单；批量车道在整批结束时填入）。
 - `items[].error`：失败的原始原因。几条路都失败时取最说明问题的一条（没有订阅 > 学校登录未完成 > 人机验证 > 打不开 > 超时 > 付费墙 > 没找到），不再是笼统的“所有来源都失败”；app 显示时由后台换成中文 `error_text`。
 - `items[].attempts`：这篇走过的路，`[{source, route, seconds, ok, why}]`。`route` 为 `free`（免费来源和出版商官网）或 `school`（学校通道）；`why` 是失败原因的中文说法。不到 1 秒就答复“没有”的接口查询不列入；没有时为空。（2026-10-18 起）
 - 同一时间只运行一个任务：引擎的进度报告和取消开关是整个进程共用的。运行中的实时信息（正在处理哪篇、需要用户处理的验证码或登录提示）不存进这个文件，app 通过 `/api/downloads` 读取 `progress_reporter` 的报告。Agent（MCP）或命令行在别的进程里下载时，`/api/downloads` 的 `external` 给出它的报告（进度文件 `progress/current.json`，`status` 为 running 且写它的进程 `pid` 还活着），下载页只显示、不能跳过或取消。

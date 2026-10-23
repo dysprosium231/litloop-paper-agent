@@ -23,8 +23,11 @@ class FakeBatch:
         self.block_event: threading.Event | None = None
         self.entered_event: threading.Event | None = None
         self.exception_to_raise: Exception | None = None
+        self.calls: list[tuple[str, list[str]]] = []
 
-    def __call__(self, dois: list[str], batch_id: str | None = None, keep_attempts: bool = False) -> str:
+    def __call__(self, dois: list[str], batch_id: str | None = None, keep_attempts: bool = False,
+                 rounds: str = "all") -> str:
+        self.calls.append((rounds, list(dois)))
         if self.entered_event:
             self.entered_event.set()
         if self.block_event:
@@ -34,7 +37,9 @@ class FakeBatch:
 
         results = []
         for doi in dois:
-            if "fail" in doi.lower():
+            if rounds == "free" and "paywall" in doi.lower():  # left for the user's queues
+                results.append({"doi": doi, "success": False, "queued": True})
+            elif "fail" in doi.lower():
                 progress_reporter.advance(False, current=doi)
                 results.append({
                     "doi": doi,
@@ -1375,7 +1380,7 @@ def test_a_pasted_list_gets_its_years_for_the_scihub_rule(tmp_path, monkeypatch)
         return {"results": [{"doi": "https://doi.org/10.1016/j.jallcom.2025.179147", "publication_year": 2025}]}
 
     monkeypatch.setattr(deep_search, "_get", fake_get)
-    download_jobs._real_fill_years(path)
+    download_jobs._real_fill_meta(path)
     items = store.read_json(path)["items"]
     assert [i["year"] for i in items] == [2025, 1999, None]
     assert asked == ["doi:10.1016/j.jallcom.2025.179147|10.1016/j.nothere.2020.1"]  # only the missing ones
@@ -1392,5 +1397,73 @@ def test_a_failed_year_lookup_does_not_hold_the_job(tmp_path, monkeypatch):
         raise RuntimeError("OpenAlex daily budget used up")
 
     monkeypatch.setattr(deep_search, "_get", boom)
-    download_jobs._real_fill_years(path)
+    download_jobs._real_fill_meta(path)
     assert store.read_json(path)["items"][0]["year"] is None
+
+
+def _long_list(monkeypatch):
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "batch_small_max", 2)
+    papers = [{"doi": "10.1000/oa-1", "title": "A"},
+              {"doi": "10.1016/paywall-1", "title": "B", "publisher": "Elsevier"},
+              {"doi": "10.1016/paywall-2", "title": "C"},
+              {"doi": "10.1002/paywall-3", "title": "D"}]
+    job = download_jobs.start(papers, title="Long")["job"]
+    wait_job(job)
+    # The job's OpenAlex lookup is off in tests: give the papers their publishers.
+    with store.update(download_jobs.job_path(job), indent=1) as data:
+        for it in data["items"]:
+            it["publisher"] = {"10.1016": "Elsevier", "10.1002": "Wiley"}.get(it["doi"][:7])
+    return job
+
+
+def test_a_long_list_runs_the_free_rounds_and_queues_the_rest_by_publisher(client, fake_batch, monkeypatch):
+    job = _long_list(monkeypatch)
+    assert fake_batch.calls[0][0] == "free"
+    data = client.get(f"/api/downloads/{job}").json()
+    assert data["state"] == "queued"
+    assert {i["doi"]: i["status"] for i in data["items"]}["10.1000/oa-1"] == "done"
+    assert data["queues"] == [{"publisher": "Elsevier", "count": 2}, {"publisher": "Wiley", "count": 1}]
+    listed = next(j for j in client.get("/api/downloads").json()["jobs"] if j["job"] == job)
+    assert (listed["state"], listed["queued"]) == ("queued", 3)
+
+
+def test_starting_a_queue_downloads_only_that_publisher_one_by_one(client, fake_batch, monkeypatch):
+    job = _long_list(monkeypatch)
+    resp = client.post(f"/api/downloads/{job}/queue", json={"publisher": "Elsevier"})
+    assert resp.status_code == 200 and resp.json()["state"] == "running"
+    data = wait_job(job)
+    assert fake_batch.calls[-1] == ("single", ["10.1016/paywall-1", "10.1016/paywall-2"])
+    assert data["state"] == "queued"  # Wiley still waits
+    assert data["queues"] == [{"publisher": "Wiley", "count": 1}]
+    client.post(f"/api/downloads/{job}/queue", json={"publisher": "Wiley"})
+    assert wait_job(job)["state"] == "done"
+    assert client.post(f"/api/downloads/{job}/queue", json={"publisher": "Wiley"}).status_code == 400
+
+
+def test_queued_papers_are_not_offered_again(fake_batch, monkeypatch):
+    job = _long_list(monkeypatch)
+    assert "10.1016/paywall-1" in download_jobs.queued_dois()
+    assert "10.1000/oa-1" not in download_jobs.queued_dois()
+    assert job
+
+
+def test_publisher_names_lose_their_company_form():
+    assert download_jobs.publisher_name("Elsevier BV") == "Elsevier"
+    assert download_jobs.publisher_name("American Chemical Society (ACS)") == "American Chemical Society"
+    assert download_jobs.publisher_name("Springer-Verlag") == "Springer-Verlag"
+    assert download_jobs.publisher_name("Wiley") == "Wiley"
+    assert download_jobs.publisher_name(None) == ""
+
+
+def test_the_job_lookup_also_names_each_papers_publisher(tmp_path, monkeypatch):
+    from litloop import deep_search
+    path = tmp_path / "job.json"
+    store.write_json(path, {"items": [{"doi": "10.1016/j.a.2020.1", "year": 2020},
+                                      {"doi": "10.1/unknown", "year": 2020}]})
+    monkeypatch.setattr(deep_search, "_get", lambda params, tries=6: {"results": [
+        {"doi": "https://doi.org/10.1016/j.a.2020.1", "publication_year": 2020,
+         "primary_location": {"source": {"host_organization_name": "Elsevier BV"}}}]})
+    download_jobs._real_fill_meta(path, publishers=True)
+    items = store.read_json(path)["items"]
+    assert items[0]["publisher"] == "Elsevier"
+    assert "publisher" not in items[1]  # OpenAlex does not know it: asked again next time

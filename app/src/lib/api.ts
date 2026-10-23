@@ -246,7 +246,10 @@ export interface DownloadItem {
   title: string
   year?: number | null
   journal?: string | null
-  status: "waiting" | "done" | "failed"
+  /** "queued": in its publisher's queue of a long list, until the user starts that queue. */
+  status: "waiting" | "queued" | "done" | "failed"
+  /** Names the paper's queue in a long list (from OpenAlex). */
+  publisher?: string | null
   /** A lane did not get it; the next lane is trying (download_jobs). */
   retrying?: boolean
   /** Where it is now, while the job runs ("Sci-Hub 有下载链接，正在核对"). */
@@ -272,7 +275,8 @@ export interface DownloadStep {
   why?: string | null
 }
 
-export type JobState = "running" | "done" | "cancelled" | "failed" | "interrupted"
+/** "queued": a long list whose papers wait in publisher queues for the user to start. */
+export type JobState = "running" | "queued" | "done" | "cancelled" | "failed" | "interrupted"
 
 export interface DownloadJobEntry {
   job: string
@@ -284,9 +288,11 @@ export interface DownloadJobEntry {
   total: number
   done: number
   failed: number
+  /** Papers waiting in the list's publisher queues. */
+  queued?: number
 }
 
-export interface DownloadJob extends Omit<DownloadJobEntry, "total" | "done" | "failed"> {
+export interface DownloadJob extends Omit<DownloadJobEntry, "total" | "done" | "failed" | "queued"> {
   output_dir: string
   error?: string | null
   /** Shown in the app (docs/UI_COPY.md section 7); the raw error goes in the tooltip. */
@@ -295,6 +301,8 @@ export interface DownloadJob extends Omit<DownloadJobEntry, "total" | "done" | "
   zotero?: { state: "running" | "done" | "failed" | "interrupted"; collection: string; error?: string | null; error_text?: string | null } | null
   /** Where a push goes unless another collection is chosen. */
   zotero_default: string
+  /** A long list's papers left for the user, one queue per publisher, the largest first. */
+  queues?: { publisher: string; count: number }[]
 }
 
 export interface ZoteroCollection { key: string; name: string; parent: string | null; path: string }
@@ -418,6 +426,8 @@ export const downloadsApi = {
   resolve: (lines: string[]) => call<{ results: ResolvedLine[] }>("/api/downloads/resolve", { lines }),
   cancel: () => call<{ cancelled: boolean }>("/api/downloads/cancel", {}),
   skip: (doi: string) => call<{ skipped: boolean }>("/api/downloads/skip", { doi }),
+  startQueue: (job: string, publisher: string) =>
+    call<DownloadJob>(`/api/downloads/${encodeURIComponent(job)}/queue`, { publisher }),
   open: (path: string) => call<{ opened: string }>("/api/open", { path }),
   push: (job: string, collection: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(job)}/zotero`, { collection, tags: [] }),
   collections: () => call<ZoteroCollection[]>("/api/zotero/collections"),

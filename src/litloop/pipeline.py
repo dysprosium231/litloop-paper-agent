@@ -542,6 +542,7 @@ def run_scihub_then_single(
     config: dict[str, Any] | None = None,
     allow_grey: bool = True,
     workers: int = 1,
+    rounds: str = "all",
 ) -> list[dict[str, Any]]:
     """A short list (up to batch_small_max papers): open-access links, then
     Sci-Hub for every paper at once, then a full single download for each miss.
@@ -556,6 +557,10 @@ def run_scihub_then_single(
     need the browser, there is one, and a paper queuing for it would run out
     its race clock while it waits. (The lanes in run_lanes
     serialize stage by stage, which costs minutes on a dozen papers.)
+
+    rounds: "all"; "free" stops after round 1 (the app's long lists: what is
+    left waits in per-publisher queues the user starts, each paper of it then
+    a ``{"queued": True}`` row); "single" is round 2 alone (such a queue).
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -578,6 +583,8 @@ def run_scihub_then_single(
         logger.info(f"[timing] {what}: {time.time() - t:.1f}s (total {time.time() - t_all:.0f}s)")
         t = time.time()
 
+    if rounds == "single":
+        entries = []  # rounds 0 and 1 were run for these papers: straight to round 2
     _enrich_oa_urls(entries, config)
     _lap("open-access links looked up")
     springer_key = str(config.get("springer_api_key", "") or "")
@@ -618,7 +625,7 @@ def run_scihub_then_single(
         return r
 
     from .sources.scihub import too_new
-    grey_ids = [i for i in ids if i not in results and not too_new(i, config)]
+    grey_ids = [] if rounds == "single" else [i for i in ids if i not in results and not too_new(i, config)]
     if grey_ids and allow_grey and grey_allowed(config):
         # Which mirror and route (proxy or direct) is fastest right now: the
         # whole round uses it (scihub_route; a no-op for "direct").
@@ -648,6 +655,10 @@ def run_scihub_then_single(
         _lap(f"Sci-Hub round, {sum(1 for i in grey_ids if i in results)}/{len(grey_ids)} papers")
 
     left = [i for i in ids if i not in results]
+    if rounds == "free":
+        left, queued = [], left
+        for i in queued:
+            results[i] = {"success": False, "doi": i, "identifier": i, "queued": True, "error_type": "queued"}
     if left:
         _progress.update(phase="逐篇下载")
         use_vpnsci = bool(config.get("vpnsci_enabled") or config.get("ezproxy_enabled"))

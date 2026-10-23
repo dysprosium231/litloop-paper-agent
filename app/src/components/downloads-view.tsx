@@ -24,7 +24,7 @@ import { cn, duration } from "@/lib/utils"
 export const OVERVIEW = "overview"
 
 const STATE: Record<JobState, string> = {
-  running: "进行中", done: "已完成", cancelled: "已取消", failed: "失败", interrupted: "已中断",
+  running: "进行中", queued: "待继续", done: "已完成", cancelled: "已取消", failed: "失败", interrupted: "已中断",
 }
 
 /** Jobs, papers waiting to be downloaded and the live report; polls faster while a job runs. */
@@ -341,9 +341,10 @@ export function DownloadsOverview({ jobs, pending, outputDir, external, busy, ru
                         {j.state === "running" && <LoaderIcon className="size-3 animate-spin" />}
                         {STATE[j.state]}
                       </span>
-                      <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                      <span className="w-36 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
                         {j.done}/{j.total}
                         {j.failed ? <span className="text-destructive"> · 失败 {j.failed}</span> : null}
+                        {j.queued ? <span> · 排队 {j.queued}</span> : null}
                       </span>
                       <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{j.created.slice(5, 16)}</span>
                     </button>
@@ -411,12 +412,13 @@ function ZoteroPanel({ job, onPushed }: { job: DownloadJob; onPushed: () => void
 function StatusIcon({ item, running }: { item: DownloadItem; running: boolean }) {
   if (item.status === "done") return <CheckCircle2Icon className="size-4 text-emerald-600 dark:text-emerald-400" />
   if (item.status === "failed") return <XCircleIcon className="size-4 text-destructive" />
+  if (item.status === "queued") return <CircleDashedIcon className="size-4 text-muted-foreground" />
   return running ? <LoaderIcon className="size-4 animate-spin text-muted-foreground" /> : <CircleDashedIcon className="size-4 text-muted-foreground" />
 }
 
 /** One job: progress, what needs the user (captcha, sign-in), and every paper's result. */
-export function JobPane({ id, live, onChanged, onStarted, onBack }: {
-  id: string; live: LiveDownload | null; onChanged: () => void; onStarted: (job: string) => void
+export function JobPane({ id, live, busy, onChanged, onStarted, onBack }: {
+  id: string; live: LiveDownload | null; busy: boolean; onChanged: () => void; onStarted: (job: string) => void
   onBack: () => void
 }) {
   const [job, setJob] = React.useState<DownloadJob | null>(null)
@@ -454,7 +456,8 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
   const done = job.items.filter((i) => i.status === "done").length
   const failed = job.items.filter((i) => i.status === "failed")
   const finished = done + failed.length
-  const missing = job.items.filter((i) => i.status !== "done")  // failed, or never reached (cancelled, interrupted)
+  const missing = job.items.filter((i) => i.status !== "done" && i.status !== "queued")  // failed, or never reached (cancelled, interrupted)
+  const queued = job.items.filter((i) => i.status === "queued").length
   const attention = running ? Object.entries(live?.attention ?? {}) : []
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -506,6 +509,27 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
         {error && <p className="text-sm text-destructive">{error}</p>}
         {done > 0 && <ZoteroPanel job={job} onPushed={onChanged} />}
       </Card>
+      {job.queues && job.queues.length > 0 && (
+        <Card className="space-y-3 p-5">
+          <div>
+            <div className="text-sm font-medium">需要学校权限的文献 · {queued} 篇</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              开放获取和 Sci-Hub 没有下到。按出版商分组，逐篇打开出版商官网，不行再走学校通道，可能需要你登录学校账号或完成人机验证。有空时逐个开始，同一出版商的登录和验证会集中在一起。
+            </p>
+          </div>
+          <ul className="divide-y rounded-md border">
+            {job.queues.map((q) => (
+              <li key={q.publisher} className="flex items-center gap-3 px-4 py-2 text-sm">
+                <span className="min-w-0 flex-1 truncate">{q.publisher}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{q.count} 篇</span>
+                <Button size="sm" variant="outline" disabled={running || busy}
+                  onClick={() => act(() => downloadsApi.startQueue(job.job, q.publisher))}>开始下载</Button>
+              </li>
+            ))}
+          </ul>
+          {busy && !running && <p className="text-xs text-muted-foreground">另一个下载任务完成后才能开始。</p>}
+        </Card>
+      )}
       <Card>
       <ul className="divide-y">
         {job.items.map((it, i) => (
@@ -530,6 +554,7 @@ export function JobPane({ id, live, onChanged, onStarted, onBack }: {
               {it.status === "done" && it.note && <div className="mt-0.5 text-xs text-muted-foreground">{it.note}</div>}
               {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90" title={it.error}>{it.error_text ?? it.error}</div>}
               {it.status === "failed" && it.attempts && it.attempts.length > 0 && <Attempts steps={it.attempts} />}
+              {it.status === "queued" && <div className="mt-0.5 text-xs text-muted-foreground">排队中 · {it.publisher || "其他出版商"}</div>}
               {it.zotero && (
                 <div className={cn("mt-0.5 text-xs", it.zotero.status === "failed" ? "text-destructive/90" : it.zotero.status === "no_pdf" ? "text-warning-foreground" : "text-muted-foreground")}
                   title={it.zotero.error ?? undefined}>

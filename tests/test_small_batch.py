@@ -100,3 +100,29 @@ def test_queued_papers_say_why_they_wait(calls, monkeypatch, tmp_path: Path):
     pipeline.run_scihub_then_single(entries, tmp_path, config={"scihub_skip_from_year": 2024})
     assert stages["10.1/subscription"] == "等待中：Sci-Hub 上没有，接下来逐篇查找"
     assert stages["10.1016/j.jallcom.2025.179147"] == "等待中：发表较新，不查 Sci-Hub，接下来逐篇查找"
+
+
+def test_free_rounds_stop_before_the_single_downloads_and_queue_the_rest(calls, tmp_path: Path):
+    """The app's long lists: open access and Sci-Hub only; the rest waits in the user's queues."""
+    results = pipeline.run_scihub_then_single(ENTRIES, tmp_path, config={}, rounds="free")
+    assert all(c[1] == "scihub_only" for c in calls)
+    by = {r["doi"]: r for r in results}
+    assert by["10.1/in-scihub"]["success"]
+    assert by["10.1/subscription"]["queued"] and by["10.1/nowhere"]["queued"]
+
+
+def test_single_rounds_skip_open_access_and_scihub(calls, monkeypatch, tmp_path: Path):
+    """A publisher queue: those rounds were run already, each paper goes straight to a full download."""
+    monkeypatch.setattr(pipeline, "_run_fast_lane", lambda *a, **k: pytest.fail("open-access round ran again"))
+    entries = [QueueEntry(identifier="10.1/subscription", oa_url="https://example.org/a.pdf")]
+    results = pipeline.run_scihub_then_single(entries, tmp_path, config={}, rounds="single")
+    assert [c[1] for c in calls] == [None] and results[0]["success"]
+
+
+def test_batch_tool_keeps_the_rounds_asked_for_on_a_long_list(monkeypatch, tmp_path: Path):
+    used = []
+    monkeypatch.setattr(pipeline, "run_scihub_then_single", lambda e, *a, **k: used.append(k.get("rounds")) or [])
+    monkeypatch.setattr(pipeline, "run_lanes", lambda e, *a, **k: used.append("lanes") or [])
+    monkeypatch.setattr(server, "load_config", lambda: {"batch_small_max": 2, "output_dir": str(tmp_path)})
+    server._batch_download_impl(["10.1000/a", "10.1000/b", "10.1000/c"], output_dir=str(tmp_path), rounds="free")
+    assert used == ["free"]

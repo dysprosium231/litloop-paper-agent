@@ -343,7 +343,8 @@ export default function App() {
               ? <DownloadsOverview jobs={downloads.jobs} pending={downloads.pending} outputDir={downloads.outputDir} external={downloads.external}
                   busy={Boolean(downloads.running)} running={downloads.running} onStarted={startedJob} onOpen={setDownloadView}
                   onChanged={downloads.refresh} />
-              : <JobPane key={downloadView} id={downloadView} live={downloads.live} onChanged={downloads.refresh} onStarted={startedJob}
+              : <JobPane key={downloadView} id={downloadView} live={downloads.live} busy={Boolean(downloads.running)}
+                  onChanged={downloads.refresh} onStarted={startedJob}
                   onBack={() => setDownloadView(OVERVIEW)} />
           ) : section === "settings" ? (
             <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup} onGuide={openGuide}

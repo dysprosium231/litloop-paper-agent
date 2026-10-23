@@ -133,6 +133,7 @@ def _batch_download_impl(
     lanes: bool | None = None,
     ctx: Any = None,
     keep_attempts: bool = False,
+    rounds: str = "all",
 ) -> str:
     """Download multiple papers by DOI or arXiv ID.
 
@@ -151,6 +152,9 @@ def _batch_download_impl(
             grey lane keeps its own resume). Set false for per-item racing.
         keep_attempts: keep each paper's ``attempts`` (the app's download jobs
             show them); the MCP tool leaves them out to keep its answer small.
+        rounds: "free" or "single" run that part of the short-list rounds
+            whatever the list's length (``pipeline.run_scihub_then_single``;
+            the app's long lists and their publisher queues).
     """
     from .log import get_logger
     _log = get_logger()
@@ -185,11 +189,11 @@ def _batch_download_impl(
         dropped = [e for e in all_entries if e.unresolved or not e.identifier]
         allow_grey = (scihub_enabled is not False) and grey_allowed(cfg)
         out_dir = output_dir or cfg.get("output_dir") or str(Path.cwd())
-        if len(entries) <= int(cfg.get("batch_small_max", 30) or 0):
+        if rounds != "all" or len(entries) <= int(cfg.get("batch_small_max", 30) or 0):
             from .pipeline import run_scihub_then_single
-            _log.info(f"Short list ({len(entries)} items): Sci-Hub for all, then a full single download for each miss")
+            _log.info(f"Short list ({len(entries)} items, rounds {rounds}): Sci-Hub for all, then a full single download for each miss")
             raw = run_scihub_then_single(entries, out_dir, config=cfg, allow_grey=allow_grey,
-                                         workers=int(cfg.get("batch_small_workers", 1) or 1))
+                                         workers=int(cfg.get("batch_small_workers", 1) or 1), rounds=rounds)
         else:
             _log.info(f"Lane scheduling {len(entries)} items: pretriage -> fast HTTP -> grey -> institutional")
             raw = run_lanes(entries, out_dir, config=cfg, allow_grey=allow_grey)

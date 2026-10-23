@@ -59,6 +59,10 @@ class SkipPaper(BaseModel):
     doi: str
 
 
+class StartQueue(BaseModel):
+    publisher: str
+
+
 class NewSearch(BaseModel):
     """The app's search form; agent_runner.build_prompt turns it into the message."""
     question: str
@@ -393,9 +397,10 @@ def create_app(token: str) -> FastAPI:
 
     @app.get("/api/downloads/pending")
     def downloads_pending() -> list[dict[str, Any]]:
-        """Papers picked 选中下载 in screening that no job has downloaded yet, by session."""
+        """Papers picked 选中下载 in screening that no job has downloaded yet (or holds in a queue), by session."""
         from . import download_jobs
-        got = {k for d in download_jobs.downloaded_dois() for k in download_jobs.same_paper(d)}
+        got = {k for d in download_jobs.downloaded_dois() | download_jobs.queued_dois()
+               for k in download_jobs.same_paper(d)}
         out = []
         for s in screening.list_sessions(200):  # newest first: a paper picked twice shows in the newest
             if not s["selected"]:
@@ -433,6 +438,21 @@ def create_app(token: str) -> FastAPI:
             _explain(it)
             _explain(it.get("zotero"), "推送")
         return d
+
+    @app.post("/api/downloads/{job}/queue")
+    def download_queue(job: str, body: StartQueue) -> dict[str, Any]:
+        """Start one publisher's queue of a long list (download_jobs.start_queue)."""
+        from . import download_jobs
+        if not re.fullmatch(r"[\w-]{1,40}", job):
+            raise HTTPException(400, "无法开始：任务编号不正确")
+        try:
+            return download_jobs.start_queue(job, body.publisher)
+        except FileNotFoundError as exc:
+            raise HTTPException(404, "无法开始：此下载任务已不存在") from exc
+        except download_jobs.Busy as exc:
+            raise HTTPException(409, "已有下载任务在进行，完成后再开始新的下载") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     @app.post("/api/downloads/{job}/zotero")
     def download_push(job: str, body: ZoteroPush) -> dict[str, Any]:
