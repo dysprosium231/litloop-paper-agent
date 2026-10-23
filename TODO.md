@@ -56,7 +56,7 @@
 - [ ] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。
 
 ### app
-- [ ] 安装包与自动更新（评审 12）：`tauri.conf.json` 的 updater 为空；按 CHARTER 定的 PyInstaller sidecar + 安装包 + 自动更新做，不换方案。
+- [ ] 安装包与自动更新（评审 12）：`tauri.conf.json` 的 updater 为空；按 CHARTER 定的 PyInstaller sidecar + 安装包 + 自动更新做，不换方案。系统通知必须显示 LitLoop 自己的名称和图标（用户 2026-10-23 要求；开发模式下借用的是 PowerShell 的），装好后核对一次。
 - [ ] 深度链接、完成通知。
 - [ ] 首次引导里“可选组件”一步（一直没做）：可用现成的 `deps.is_feature_available` / `warn_missing`、`embedded_tor.is_tor_installed`。
 - [x] 下载页“Agent 或命令行正在下载”加已用时间（2026-10-20：按进度文件的 `started_at` 算，显示「3/6 · 用时 1 分 20 秒」；时长格式统一到 `lib/utils.duration`，补上「1 小时 5 分」）。
