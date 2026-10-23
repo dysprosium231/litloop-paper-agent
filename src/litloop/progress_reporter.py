@@ -292,6 +292,25 @@ def running_elsewhere() -> dict[str, Any] | None:
     return state
 
 
+def latest_notice() -> dict[str, Any] | None:
+    """The latest download report, running or finished, whichever process wrote
+    it: what the desktop app's system notifications need (a new request for the
+    user's action, a finished list). None when there is none, or when a running
+    report's writer has died."""
+    state = read_state()
+    if not state:
+        return None
+    if state.get("status") == "running":
+        try:
+            pid = int(state.get("pid") or 0)
+        except (TypeError, ValueError):
+            pid = 0
+        if pid and pid != os.getpid() and not _pid_alive(pid):
+            return None
+    keys = ("task", "status", "total", "done", "success", "failed", "started_at", "finished_at", "attention")
+    return {k: state.get(k) for k in keys}
+
+
 def read_state() -> dict[str, Any] | None:
     """Reader side: latest report, or None when absent/stale."""
     try:

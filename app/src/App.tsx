@@ -13,6 +13,7 @@ import { Onboarding } from "@/components/onboarding"
 import { HistoryPage } from "@/components/history-view"
 import { SearchPage } from "@/components/search-view"
 import { ProgressStrip } from "@/components/progress-strip"
+import { useSystemNotices } from "@/hooks/use-system-notices"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import {
   DropdownMenu,
@@ -191,6 +192,7 @@ export default function App() {
   const [groups, setGroups] = React.useState<SettingGroup[]>([])
   const [settingsGroup, setSettingsGroup] = React.useState("sources")
   const downloads = useDownloads(section === "download")
+  useSystemNotices()
   const [downloadView, setDownloadView] = React.useState(OVERVIEW)
   const startedJob = (job: string) => { setDownloadView(job); downloads.refresh() }
   const zotero = useZotero(section === "zotero")

@@ -74,6 +74,7 @@ pub fn run() {
     let (info, child) = start_backend();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Backend {
             info,

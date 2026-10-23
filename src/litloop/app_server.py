@@ -385,6 +385,12 @@ def create_app(token: str) -> FastAPI:
                 "external": external,
                 "pushing": download_jobs.pushing(), "output_dir": str(load_config().get("output_dir") or "")}
 
+    @app.get("/api/downloads/notice")
+    def downloads_notice() -> dict[str, Any] | None:
+        """Polled on every page for the system notifications (the app's own jobs and the agent's)."""
+        from . import progress_reporter
+        return progress_reporter.latest_notice()
+
     @app.get("/api/downloads/pending")
     def downloads_pending() -> list[dict[str, Any]]:
         """Papers picked 选中下载 in screening that no job has downloaded yet, by session."""

@@ -314,6 +314,19 @@ export interface LiveDownload {
   started_at?: string
 }
 
+/** The latest download report, running or finished, from any process (system notifications). */
+export interface DownloadNotice {
+  task?: string
+  status: "running" | "done"
+  total: number
+  done: number
+  success: number
+  failed: number
+  started_at?: string
+  finished_at?: string
+  attention?: Record<string, { message: string; current?: string }>
+}
+
 export interface PendingGroup {
   session: string
   question: string
@@ -397,6 +410,7 @@ export interface ResolvedLine {
 export const downloadsApi = {
   list: () => call<{ jobs: DownloadJobEntry[]; running: string | null; live: LiveDownload | null; external: LiveDownload | null; pushing: string | null; output_dir: string }>("/api/downloads"),
   pending: () => call<PendingGroup[]>("/api/downloads/pending"),
+  notice: () => call<DownloadNotice | null>("/api/downloads/notice"),
   job: (id: string) => call<DownloadJob>(`/api/downloads/${encodeURIComponent(id)}`),
   start: (papers: PendingGroup["papers"], title: string, session?: string, zoteroTarget?: string) =>
     call<DownloadJob>("/api/downloads", { papers, title, session: session ?? null, zotero_target: zoteroTarget ?? null }),

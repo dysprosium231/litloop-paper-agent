@@ -92,3 +92,26 @@ def test_the_app_sees_a_download_another_process_runs(tmp_path, monkeypatch):
     monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
     write({**state, "pid": os.getppid(), "status": "done"})
     assert progress_reporter.running_elsewhere() is None
+
+
+def test_latest_notice_keeps_finished_reports_and_drops_dead_writers(tmp_path, monkeypatch):
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
+    assert progress_reporter.latest_notice() is None
+
+    progress_reporter.start_task("文献下载", total=2)
+    progress_reporter.set_attention("wait:10.1000/a", "请在弹出的浏览器窗口中登录学校账号")
+    notice = progress_reporter.latest_notice()
+    assert notice["status"] == "running"
+    assert set(notice["attention"]) == {"wait:10.1000/a"}
+    assert "pid" not in notice
+
+    progress_reporter.advance(True)
+    progress_reporter.finish()
+    notice = progress_reporter.latest_notice()
+    assert (notice["status"], notice["success"], notice["total"]) == ("done", 1, 2)
+    assert notice["finished_at"]
+
+    # A running report whose process has died is not a download any more.
+    progress_reporter.start_task("文献下载", total=1, pid=999999)
+    monkeypatch.setattr(progress_reporter, "_pid_alive", lambda pid: False)
+    assert progress_reporter.latest_notice() is None
