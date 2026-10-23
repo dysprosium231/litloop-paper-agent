@@ -49,3 +49,16 @@ def test_load_into_a_requests_session(tmp_path):
     assert store.load_into(s, now=NOW)
     assert s.cookies.get("wengine_vpn_ticket", domain="webvpn.test") == "t"
     assert not CookieStore(tmp_path / "empty.json").load_into(requests.Session())
+
+
+def test_cookie_files_are_readable_by_the_user_alone(tmp_path, monkeypatch):
+    """On macOS and Linux a saved login session gets mode 0600; Windows is left alone."""
+    from litloop import session_store
+    modes = []
+    monkeypatch.setattr(session_store.os, "chmod", lambda p, m: modes.append(m))
+    monkeypatch.setattr(session_store, "_WINDOWS", False)
+    session_store.CookieStore(tmp_path / "c.json").save([{"name": "a", "value": "1", "domain": ".x.org"}])
+    assert modes == [0o600]
+    monkeypatch.setattr(session_store, "_WINDOWS", True)
+    session_store.keep_private(tmp_path / "c.json")
+    assert modes == [0o600]

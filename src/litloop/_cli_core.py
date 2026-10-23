@@ -1,4 +1,4 @@
-"""CLI interface for InstSci."""
+"""LitLoop command line: the `litloop` commands besides the server (main.py)."""
 
 import json
 import logging

@@ -140,7 +140,9 @@ class PersistentBrowser:
 
             state = {"cookies": cookies, "localStorage": localStorage}
             state_file = cache_dir / "browser_state.json"
+            from .session_store import keep_private
             state_file.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+            keep_private(state_file)
 
             cookie_file = cache_dir / "instsci-cookies.json"
             cookie_data = [
@@ -148,10 +150,12 @@ class PersistentBrowser:
                 for c in cookies
             ]
             cookie_file.write_text(json.dumps(cookie_data, indent=2, ensure_ascii=False), encoding="utf-8")
+            keep_private(cookie_file)
 
             netscape_file = cache_dir / "instsci-cookies.txt"
             from .browser_cookies import cookies_to_netscape
             netscape_file.write_text(cookies_to_netscape(cookies), encoding="utf-8")
+            keep_private(netscape_file)
 
             self._cookies_saved = True
             log.info(f"   [browser] Saved {len(cookies)} cookies + {len(localStorage)} localStorage origins")
@@ -186,11 +190,13 @@ def _save_cookies_json(cookies: list[dict[str, Any]], cookie_file: Path) -> None
         {"name": c["name"], "value": c["value"], "domain": c.get("domain", ""), "path": c.get("path", "/")}
         for c in cookies
     ]
+    from .session_store import keep_private
     cookie_file.parent.mkdir(parents=True, exist_ok=True)
     cookie_file.write_text(
         json.dumps(cookie_data, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    keep_private(cookie_file)
     # Also sync to legacy webvpn-cookies.json for PaperFetcher.auth compatibility
     # — WebVPN logins only: CARSI/publisher logins save through here too and
     # would overwrite the WebVPN session with unrelated cookies.
@@ -204,6 +210,7 @@ def _save_cookies_json(cookies: list[dict[str, Any]], cookie_file: Path) -> None
             json.dumps(cookie_data, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+        keep_private(auth_cookie_path)
     except Exception:
         pass
 
@@ -212,7 +219,9 @@ def _save_cookies_json(cookies: list[dict[str, Any]], cookie_file: Path) -> None
 def _save_cookies_netscape(cookies: list[dict[str, Any]], cookie_file: Path) -> None:
     """Save cookies in Netscape format (CloakBrowser import compatible)."""
     from .browser_cookies import cookies_to_netscape
+    from .session_store import keep_private
     cookie_file.write_text(cookies_to_netscape(cookies), encoding="utf-8")
+    keep_private(cookie_file)
 
 
 def _import_to_browser(cookie_file: Path, config: dict[str, Any]) -> int:

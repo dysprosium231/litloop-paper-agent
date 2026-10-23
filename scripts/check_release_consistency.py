@@ -124,6 +124,31 @@ def _check_skill_docs() -> list[str]:
     return problems
 
 
+# ``except Exception:`` followed directly by ``pass`` hides why something failed
+# (the 101-second skip of 2026-10-19 was one). Too many to rewrite at once, so
+# the count may only go down (2026-10-23 external review); lower it as they go.
+SWALLOWED_EXCEPTIONS_MAX = 190
+
+
+def _count_swallowed_exceptions() -> int:
+    import re
+    n = 0
+    for path in (ROOT / "src" / "litloop").rglob("*.py"):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for i, line in enumerate(lines[:-1]):
+            if re.match(r"\s*except Exception\s*:\s*$", line) and lines[i + 1].strip() == "pass":
+                n += 1
+    return n
+
+
+def _check_swallowed_exceptions() -> list[str]:
+    n = _count_swallowed_exceptions()
+    if n > SWALLOWED_EXCEPTIONS_MAX:
+        return [f"`except Exception: pass` grew to {n} (at most {SWALLOWED_EXCEPTIONS_MAX}): "
+                "log the error (log.debug(..., exc_info=True)) instead of passing"]
+    return []
+
+
 def _check_source_hygiene() -> list[str]:
     sys.path.insert(0, str(ROOT / "src"))
     from litloop._source_hygiene import check_source_hygiene
@@ -149,6 +174,7 @@ def main() -> int:
     problems += _check_mcp_tool_count()
     problems += _check_skill_docs()
     problems += _check_source_hygiene()
+    problems += _check_swallowed_exceptions()
 
     if problems:
         print("RELEASE CONSISTENCY FAILED:")

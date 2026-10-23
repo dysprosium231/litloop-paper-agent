@@ -5,7 +5,6 @@ from __future__ import annotations
 import platform
 import shutil
 import socket
-import subprocess
 from typing import Any
 
 
@@ -63,42 +62,6 @@ def check_tor() -> dict[str, Any]:
     return result
 
 
-def check_docker() -> dict[str, Any]:
-    """Check Docker installation and status."""
-    result: dict[str, Any] = {"installed": False, "running": False}
-
-    docker_path = shutil.which("docker")
-    if not docker_path:
-        return result
-
-    result["installed"] = True
-    result["path"] = docker_path
-
-    try:
-        version_out = subprocess.run(
-            [docker_path, "version", "--format", "{{.Server.Version}}"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if version_out.returncode == 0:
-            result["version"] = version_out.stdout.strip()
-            result["running"] = True
-    except Exception:
-        pass
-
-    # Check docker compose
-    compose_path = shutil.which("docker-compose") or shutil.which("docker")
-    if compose_path:
-        try:
-            cmd = [compose_path, "compose", "version"] if compose_path == docker_path else [compose_path, "version"]
-            out = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            if out.returncode == 0:
-                result["compose_available"] = True
-        except Exception:
-            pass
-
-    return result
-
-
 def check_browser() -> dict[str, Any]:
     """Check CloakBrowser connectivity."""
     result: dict[str, Any] = {"running": False}
@@ -111,7 +74,7 @@ def check_browser() -> dict[str, Any]:
     return result
 
 
-def get_install_commands(sys_info: dict[str, Any], tor: dict, docker: dict) -> dict[str, Any]:
+def get_install_commands(sys_info: dict[str, Any], tor: dict) -> dict[str, Any]:
     """Return system-specific installation commands for missing components."""
     os_name = sys_info["os"]
     commands: dict[str, Any] = {}
@@ -129,11 +92,6 @@ def get_install_commands(sys_info: dict[str, Any], tor: dict, docker: dict) -> d
             "bridges": "在受限网络中，使用 litloop_tor_start(use_bridges=true) 启用 obfs4 桥接",
             "alternatives": [],
         }
-        if docker["installed"]:
-            commands["tor"]["alternatives"].append({
-                "method": "docker",
-                "steps": ["docker compose up -d tor (image: shahradel/torproxy:latest)"],
-            })
         if os_name == "Darwin":
             commands["tor"]["alternatives"].append({
                 "method": "homebrew",
@@ -150,54 +108,32 @@ def get_install_commands(sys_info: dict[str, Any], tor: dict, docker: dict) -> d
                 "steps": ["下载 Tor Expert Bundle: https://www.torproject.org/download/tor/"],
             })
 
-    if not docker["installed"]:
-        if os_name == "Windows":
-            commands["docker"] = {
-                "url": "https://www.docker.com/products/docker-desktop/",
-                "note": "下载 Docker Desktop for Windows (WSL2 backend)",
-            }
-        elif os_name == "Darwin":
-            commands["docker"] = {
-                "url": "https://www.docker.com/products/docker-desktop/",
-                "note": "下载 Docker Desktop for Mac (Apple Silicon 或 Intel)",
-            }
-        else:
-            commands["docker"] = {
-                "steps": [
-                    "curl -fsSL https://get.docker.com | sh",
-                    "sudo usermod -aG docker $USER",
-                ],
-            }
-
     return commands
 
 
 def setup_check() -> dict[str, Any]:
-    """Full setup diagnostic."""
+    """Full setup diagnostic. (Docker is not checked: the Docker setup was removed
+    on 2026-10-23, as a container cannot show the user the browser to log in.)"""
     sys_info = detect_system()
     tor = check_tor()
-    docker = check_docker()
     browser = check_browser()
 
-    commands = get_install_commands(sys_info, tor, docker)
+    commands = get_install_commands(sys_info, tor)
 
     # Overall readiness
     issues = []
-    if not tor["running"] and not docker.get("running"):
-        issues.append("Tor 未运行且 Docker 未安装，Sci-Hub/LibGen 通过 Tor 访问受限")
-    if not docker.get("installed"):
-        issues.append("Docker 未安装，无法使用 Tor 容器化部署")
+    if not tor["running"]:
+        issues.append("Tor 未运行，Sci-Hub/LibGen 通过 Tor 访问受限")
     if not browser["running"]:
         issues.append("CloakBrowser 未运行，Cloudflare 防护可能无法绕过")
 
     readiness = "ready" if not issues else "partial"
-    if not tor["running"] and not docker.get("running") and not browser["running"]:
+    if not tor["running"] and not browser["running"]:
         readiness = "limited"
 
     return {
         "system": sys_info,
         "tor": tor,
-        "docker": docker,
         "browser": browser,
         "install_commands": commands,
         "issues": issues,

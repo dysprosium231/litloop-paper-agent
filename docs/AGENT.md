@@ -49,12 +49,11 @@ LitLoop 是一个面向 Claude Code、Codex、ZCode 等 Agent 的 MCP 服务器�
 - **ZCode**：[`zcode-plugin/`](../zcode-plugin/)，包含技能和 `/litloop` 快捷命令；
 - **Claude Code**：`.claude/skills/` 加上面的 MCP 配置。
 
-### 其他运行方式（HTTP 远程 / Web UI / Docker）
+### 其他运行方式（HTTP 远程 / Web UI）
 
 ```bash
 litloop run --mode streamable_http --host 127.0.0.1 --port 8000   # HTTP 模式，默认只监听本机
-litloop web --port 8080                                           # Web UI：http://localhost:8080
-docker compose up -d                                              # MCP 服务器 + Tor，数据卷持久化
+litloop web --port 8080                                           # Web UI：http://localhost:8080，默认只监听本机
 ```
 
 ## 怎么用

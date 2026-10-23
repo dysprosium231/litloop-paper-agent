@@ -263,14 +263,10 @@ def _get_shared_browser(config: dict[str, Any] | None = None):
     # Platform compat shim + kernel override only apply to CloakBrowser
     if backend == BACKEND_CLOAKBROWSER:
         try:
-            from ..institutional.cloakbrowser_compat import ensure_cloakbrowser_platform_compatible
+            from .institutional.cloakbrowser_compat import ensure_cloakbrowser_platform_compatible
             ensure_cloakbrowser_platform_compatible()
         except Exception:
-            try:
-                from .institutional.cloakbrowser_compat import ensure_cloakbrowser_platform_compatible
-                ensure_cloakbrowser_platform_compatible()
-            except Exception:
-                pass
+            logger.debug("CloakBrowser platform shim not applied", exc_info=True)
         binary = resolve_browser_binary(config)
         if binary:
             os.environ["CLOAKBROWSER_BINARY_PATH"] = binary

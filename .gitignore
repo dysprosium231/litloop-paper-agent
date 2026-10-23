@@ -77,3 +77,6 @@ segmentation_platform/
 
 # Download tests point the save folder here (2026-10-19)
 test-downloads/
+
+# Written by the manual CARSI script tests/test_sso_publishers.py
+tests/sso_test_report.json

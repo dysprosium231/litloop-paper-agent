@@ -4,11 +4,25 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+_WINDOWS = os.name == "nt"
+
+
+def keep_private(path: str | Path) -> None:
+    """A cookie file is the user's school or publisher login: readable by the
+    user alone (0600 on macOS and Linux; a Windows profile folder is the
+    user's own already). 2026-10-23 review: they were written world-readable."""
+    if _WINDOWS:
+        return
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        logger.debug("could not restrict %s", path, exc_info=True)
 
 
 class CookieStore:
@@ -49,6 +63,7 @@ class CookieStore:
 
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(valid, indent=2, ensure_ascii=False), encoding="utf-8")
+        keep_private(self.path)
         return valid
 
     def load_into(self, session: Any, *, now: float | None = None) -> bool:

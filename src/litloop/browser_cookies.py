@@ -65,8 +65,10 @@ PUBLISHER_LOGIN_URLS = {
 
 
 def _save_cookies_json(cookies: list[dict[str, Any]], output_path: Path) -> None:
+    from .session_store import keep_private
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(cookies, indent=2, ensure_ascii=False), encoding="utf-8")
+    keep_private(output_path)
 
 
 def cookies_to_netscape(cookies: list[dict[str, Any]]) -> str:
@@ -85,7 +87,9 @@ def cookies_to_netscape(cookies: list[dict[str, Any]]) -> str:
 
 
 def _save_cookies_netscape(cookies: list[dict[str, Any]], output_path: Path) -> None:
+    from .session_store import keep_private
     output_path.write_text(cookies_to_netscape(cookies), encoding="utf-8")
+    keep_private(output_path)
 
 
 def _is_publisher_cookie(cookie: dict[str, Any]) -> bool:
