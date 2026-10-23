@@ -1182,6 +1182,10 @@ def download(
     key = identifier.strip()
     if not is_arxiv_identifier(key):
         key = normalize_doi(key)
+        from ..doi_check import registered
+        if registered(key) is False:  # a typo: no source can have it
+            return fail(key, "DOI is not registered at doi.org", error_type="doi_not_found",
+                        action="check the DOI for typos")
     gen = getattr(_DL_TLS, "gen", None)
     with _INFLIGHT_LOCK:
         if _attempt.get(key) is not None:

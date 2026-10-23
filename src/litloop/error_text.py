@@ -18,6 +18,7 @@ import re
 # case-insensitively; the first hit wins. Keep the most specific first.
 _RULES: list[tuple[str, str, str]] = [
     (r"\bcancel", "已取消", ""),
+    (r"DOI is not registered", "这个 DOI 不存在", "检查 DOI 是否抄错"),
     (r"skipped by user", "已跳过", "可在任务结束后重试未完成项"),
     (r"the school does not subscribe", "学校没有订阅：已用学校身份登录出版商网站，仍没有全文",
      "学校认证最终也到同一出版商，已跳过。可通过图书馆文献传递获取"),

@@ -104,6 +104,10 @@ GROUPS: list[dict[str, Any]] = [
         ],
     },
     {
+        # Nothing to set: what is installed, checked on opening (TESTS["components"]).
+        "id": "components", "title": "可选组件", "test": "components", "fields": [],
+    },
+    {
         "id": "zotero", "title": "Zotero", "test": "zotero",
         "fields": [
             {"key": "zotero_mcp_python", "label": "zotero-mcp 的 Python", "type": "path", "pick": "file", "placeholder": "留空自动查找"},
@@ -126,6 +130,8 @@ STEPS = [
     {"group": "downloads", "intro": "设置 PDF 的保存位置和文件名。Sci-Hub、LibGen 等来源可能违反出版商条款或学校规定，默认不使用，是否开启由你决定。"},
     {"group": "network", "intro": "开启代理软件时，学校认证的流量需要直连，否则学校无法识别你的身份。选择「检测」查看当前网络和需要的设置。"},
     {"group": "school", "intro": "下载学校订阅的期刊需要学校认证。填写学校代号并选择认证方式；不在校园网时会弹出浏览器让你登录一次。"},
+    {"group": "components", "intro": "下面这些组件不装也能检索和下载开放获取文献，缺了只影响列出的功能。"
+                                     "装好后选择「检测」再看一次。"},
     {"group": "zotero", "intro": "下载的文献可推送到 Zotero。需要 Zotero 7 以上和 zotero-mcp；推荐授权本地写入，速度最快。"},
 ]
 _CONFIGURED = ("openalex_api_key", "elsevier_api_key", "springer_meta_api_key")
@@ -450,8 +456,35 @@ def test_screening() -> list[dict[str, Any]]:
     return [_result(label, True, f"可用，示例译文：{out}")]
 
 
+def test_components() -> list[dict[str, Any]]:
+    """What is installed, and what a missing piece costs (deps, embedded_tor)."""
+    import shutil
+
+    from . import browser_backend, deps, embedded_tor
+    cfg = _config.load_config()
+    out = []
+    if not browser_backend.is_available():
+        out.append(_result("浏览器组件", False, "未安装 patchright：出版商官网和学校登录不可用。运行 pip install patchright"))
+    else:
+        info = browser_backend.browser_info(cfg)
+        if info.get("binary") == "channel=chrome":
+            out.append(_result("浏览器组件", False, "找不到 Chrome：出版商官网和学校登录不可用。安装 Chrome 后重新检测"))
+        else:
+            out.append(_result("浏览器组件", True, f"Chrome {info.get('version') or ''}".strip()))
+    out.append(_result("WebVPN 加密", True, "已安装") if deps.check_dependency("Crypto")
+               else _result("WebVPN 加密", False, "未安装 pycryptodome：WebVPN 不可用。运行 pip install pycryptodome"))
+    out.append(_result("SOCKS 代理", True, "已安装") if deps.check_dependency("socks")
+               else _result("SOCKS 代理", None, "未安装：不能使用 SOCKS 代理和 Tor。运行 pip install \"requests[socks]\""))
+    out.append(_result("Tor", True, "已安装") if embedded_tor.is_tor_installed(cfg)
+               else _result("Tor", None, "未安装：只在经 Tor 访问 Sci-Hub、LibGen 时需要"))
+    cmd = str(cfg.get("agent_command") or "claude").strip()
+    out.append(_result("Agent 命令", True, f"找到 {cmd}") if shutil.which(cmd)
+               else _result("Agent 命令", None, f"找不到 {cmd}：在 app 里发起检索需要它，可在「设置 → Agent」中修改"))
+    return out
+
+
 TESTS = {"sources": test_sources, "downloads": test_downloads, "network": test_network, "zotero": test_zotero,
-         "screening": test_screening}
+         "screening": test_screening, "components": test_components}
 
 
 def run_test(group: str) -> dict[str, Any]:

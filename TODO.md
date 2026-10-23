@@ -43,7 +43,7 @@
 
 ### 下载
 - [ ] 批量引擎（车道）：浏览器下载超过竞速时限后“迟到的成功”没算进车道结果，冷却重试又下了一遍（ceramint.2024.08.002）。
-- [ ] 下载慢的几处：开始前用 Crossref / doi.org 验证 DOI（不存在的 DOI 跑完了所有车道）；车道不必等整批走完；Sci-Hub 镜像找到 PDF 但传输慢时被 45 秒窗口判失败；arXiv 进度用编号汇报、下载任务对不上 DOI。
+- [ ] 下载慢的几处（开始前验证 DOI 已于 2026-10-23 做完，见 DECISIONS）：车道不必等整批走完；Sci-Hub 镜像找到 PDF 但传输慢时被 45 秒窗口判失败；arXiv 进度用编号汇报、下载任务对不上 DOI。
 
 ### 检索
 - [ ] 阶段 2 剩余：速度（2026-10-20：扩展与补摘要已改为同时进行，每轮记下补摘要各项用时，见 DECISIONS；下次真实检索看 `rounds` 里的 `abstracts_wait_seconds` 再定要不要做 OpenAlex 按参考文献缓存）；深度检索 → 批量下载 → 按分类推送 Zotero 走通一次。
@@ -58,7 +58,7 @@
 ### app
 - [ ] 安装包与自动更新（评审 12）：`tauri.conf.json` 的 updater 为空；按 CHARTER 定的 PyInstaller sidecar + 安装包 + 自动更新做，不换方案。系统通知必须显示 LitLoop 自己的名称和图标（用户 2026-10-23 要求；开发模式下借用的是 PowerShell 的），装好后核对一次。
 - [ ] 深度链接、完成通知。
-- [ ] 首次引导里“可选组件”一步（一直没做）：可用现成的 `deps.is_feature_available` / `warn_missing`、`embedded_tor.is_tor_installed`。
+- [x] 首次引导里“可选组件”一步（2026-10-23：设置里新增「可选组件」，打开即检测，引导在 Zotero 之前加这一步，见 DECISIONS）。
 - [x] 下载页“Agent 或命令行正在下载”加已用时间（2026-10-20：按进度文件的 `started_at` 算，显示「3/6 · 用时 1 分 20 秒」；时长格式统一到 `lib/utils.duration`，补上「1 小时 5 分」）。
 
 ### 测试

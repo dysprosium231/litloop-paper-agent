@@ -176,6 +176,12 @@ LitLoop 在两处控制请求节奏：检索和补摘要走 `quota.py`（按服�
 - **Europe PMC 官方限额**：**官方没有公布数字**。[RESTful Web Service 页](https://europepmc.org/RestfulWebService)（2026-10-17 用户代为读取，该站有人机验证，自动读取被拒）只写了用法、排序、返回格式和隐私说明，没有请求频率、并发、每页条数或每日上限；细节在其 Web Service Reference Guide（PDF，未读）。EMBL-EBI 通用[使用条款](https://www.ebi.ac.uk/about/terms-of-use)（2026-10-14 修订）也没有数字，只说用量影响到为他人提供服务时会被封禁。
 - **LitLoop 怎么控制**：Europe PMC（`europepmc.org`、`www.ebi.ac.uk`）和 DOAJ 并发 3 个（继承，**非官方**）；同一域名间隔至少 0.5 秒，DOAJ 因此平均不超过每秒 2 次，在官方限额内（并发 3 个也在 5 个排队之内）。
 
+### doi.org（Handle 接口）
+
+- **用途**：下载前确认 DOI 存在（`doi_check.py`，`/api/handles/<doi>`），抄错的 DOI 立即判失败，不再把所有来源跑一遍。
+- **官方限额**：**未核对**（2026-10-23 没有查官方文档）。
+- **LitLoop 怎么控制**：每篇下载前问一次，单次 6 秒超时；答案记在内存里，同一 DOI 第二次（如 Sci-Hub 一轮后的逐篇下载）不再问；问不到时照常下载。
+
 ## 二、出版商网站与机构通道
 
 - **出版商网站**（ACS、Wiley、ScienceDirect、Science、Nature、IOP、IEEE、AIP、RSC、Taylor & Francis、SAGE、OUP 等约 30 家）：

@@ -43,3 +43,14 @@ def _no_job_year_lookup(monkeypatch):
     real = download_jobs._fill_meta
     monkeypatch.setattr(download_jobs, "_fill_meta", lambda path, **kw: None)
     download_jobs._real_fill_meta = real
+
+
+@pytest.fixture(autouse=True)
+def _no_doi_check(monkeypatch):
+    """Every download first asks doi.org whether the DOI exists (doi_check);
+    tests' made-up DOIs must not reach the network, nor fail as unregistered.
+    A test of the check itself uses doi_check._real_registered."""
+    from litloop import doi_check
+    real = doi_check.registered
+    monkeypatch.setattr(doi_check, "registered", lambda doi, timeout=6.0: None)
+    doi_check._real_registered = real

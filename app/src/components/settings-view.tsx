@@ -1,6 +1,7 @@
 import * as React from "react"
 import {
   BookMarkedIcon,
+  BotIcon,
   CheckCircle2Icon,
   CircleDashedIcon,
   DatabaseIcon,
@@ -10,6 +11,7 @@ import {
   GaugeIcon,
   GlobeIcon,
   GraduationCapIcon,
+  PuzzleIcon,
   LanguagesIcon,
   LoaderIcon,
   SearchIcon,
@@ -37,7 +39,7 @@ export const QUOTA = "quota"
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   sources: DatabaseIcon, downloads: DownloadIcon, network: GlobeIcon, school: GraduationCapIcon,
-  zotero: BookMarkedIcon, screening: LanguagesIcon, [QUOTA]: GaugeIcon,
+  zotero: BookMarkedIcon, screening: LanguagesIcon, [QUOTA]: GaugeIcon, agent: BotIcon, components: PuzzleIcon,
 }
 
 // Groups of the settings list; ids the backend adds later fall into the last one.
@@ -55,6 +57,7 @@ const ABOUT: Record<string, string> = {
   zotero: "推送到 Zotero 的方式和默认分类。",
   screening: "摘要翻译的范围和翻译服务。",
   [QUOTA]: "各检索接口今日的用量和剩余额度。",
+  components: "浏览器、WebVPN、代理等可选组件是否已安装。",
 }
 
 /** The settings list: a search box and the groups, inside the page (left of the content). */
@@ -253,6 +256,8 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
       setTesting(false)
     }
   }
+  // A group with nothing to set is only its check: run it on opening.
+  React.useEffect(() => { if (group.test && group.fields.length === 0) test() }, [group.id])
   const action = group.test && (
     <Button variant="outline" size="sm" onClick={test} disabled={testing}>
       {testing && <LoaderIcon className="animate-spin" />}检测
@@ -288,7 +293,7 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
           ))}
         </Card>
       )}
-      <Card>{group.fields.map((f) => <Field key={f.key} field={f} onSaved={onSaved} />)}</Card>
+      {group.fields.length > 0 && <Card>{group.fields.map((f) => <Field key={f.key} field={f} onSaved={onSaved} />)}</Card>}
     </Page>
   )
 }
