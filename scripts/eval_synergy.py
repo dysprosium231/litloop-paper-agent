@@ -42,6 +42,7 @@ import argparse
 import json
 import random
 import statistics
+import subprocess
 import sys
 from pathlib import Path
 
@@ -80,9 +81,10 @@ def _fetch(name: str, raw: Path) -> None:
         fn = f["dataFile"]["filename"]
         if fn != "labels.csv" and not fn.startswith("works_"):
             continue
-        r = requests.get(f"{DATAVERSE}/access/datafile/{f['dataFile']['id']}", timeout=600)
-        r.raise_for_status()
-        (raw / fn).write_bytes(r.content)
+        # Through curl (on Windows since 10): the files redirect to objectstore.surf.nl,
+        # where Python's downloads hung here while curl took seconds (2026-10-24).
+        subprocess.run(["curl", "-sS", "-L", "--fail", "--max-time", "900", "-o", str(raw / fn),
+                        f"{DATAVERSE}/access/datafile/{f['dataFile']['id']}"], check=True)
 
 
 def _abstract(inverted: dict | None) -> str:
@@ -130,7 +132,7 @@ def _load(path: Path) -> list[dict]:
 
 
 def simulate(name: str, recs: list[dict], n_seeds: int, batch: int, rng: random.Random, rep: int,
-             max_read: int = 1000, patience: int = 1) -> dict:
+             max_read: int = 1000, patiences: tuple[int, ...] = (1, 2, 3)) -> dict:
     """One simulated deep search of at most ``max_read`` papers; returns the reading
     order and the first stop. (A real one reads about 200: reading on retrains the
     model on every rating each batch, which takes long in pure Python.)"""
@@ -146,7 +148,10 @@ def simulate(name: str, recs: list[dict], n_seeds: int, batch: int, rng: random.
     labels = {r["id"]: r["label"] for r in recs}
     rated: dict[str, str] = {}
     order: list[str] = []
-    stop_at, stop_rule, streak = None, "", 0  # streak: batches in a row the rule said stop
+    # Where the stop rule fires as LitLoop has it (patience 1) and if it had to
+    # say so for 2, 3 batches in a row: one simulation gives them all.
+    stops: dict[int, tuple[int, str]] = {}
+    streak = 0
     ds._score(state)
     while len(order) < min(max_read, len(pool) - len(seeds)):
         ds._rerank(state, rated)
@@ -162,17 +167,17 @@ def simulate(name: str, recs: list[dict], n_seeds: int, batch: int, rng: random.
             state["seeds"] += new_seeds
             state["seed_refs"] = sorted(set(state["seed_refs"]) | {x for k in new_seeds for x in pool[k]["refs"]})
             ds._score(state)
-        if stop_at is None:
-            stop = ds._stop(state, rated)
-            streak = streak + 1 if stop["stop_suggested"] else 0
-            if streak >= patience:  # patience 1 is the rule as LitLoop has it
-                stop_at, stop_rule = len(order), ds._stop_rule(stop)
+        stop = ds._stop(state, rated)
+        streak = streak + 1 if stop["stop_suggested"] else 0
+        for pt in patiences:
+            if pt not in stops and streak >= pt:
+                stops[pt] = (len(order), ds._stop_rule(stop))
         # Every target read: the rest of the order changes nothing that is
-        # reported, once the stop rule has spoken (or past the last recall@N).
-        if all(k in rated for k in included if k not in seeds) and stop_at:
+        # reported, once every stop variant has spoken.
+        if all(k in rated for k in included if k not in seeds) and len(stops) == len(patiences):
             break
     targets = [k for k in included if k not in seeds]
-    return {"order": order, "targets": set(targets), "stop_at": stop_at, "stop_rule": stop_rule,
+    return {"order": order, "targets": set(targets), "stops": stops,
             "pool": len(pool) - len(seeds), "max_read": max_read}
 
 
@@ -189,16 +194,18 @@ def _metrics(run: dict) -> dict:
     if read95:  # 95% reached within the papers read
         out["wss@95"] = (run["pool"] - read95) / run["pool"] - 0.05
         out["read@95"] = read95
-    if run["stop_at"]:
-        out["stop_at"] = run["stop_at"]
-        out["stop_rule"] = run.get("stop_rule", "")
-        out["recall_at_stop"] = curve[run["stop_at"] - 1] / total
+    for pt, (at, rule) in run["stops"].items():
+        out[f"stop{pt}"] = at
+        out[f"stop{pt}_rule"] = rule
+        out[f"recall_at_stop{pt}"] = curve[at - 1] / total
     return out
 
 
 def run(names: list[str], data: Path, n_seeds: int, repeats: int, batch: int, max_read: int = 1000,
-        patience: int = 1) -> None:
+        patiences: tuple[int, ...] = (1, 2, 3)) -> None:
+    """Simulate each review ``repeats`` times; print each run, then a summary of all reviews."""
     import time
+    summary = []
     for name in names:
         recs = _load(data / f"{name}.jsonl")
         n_inc = sum(r["label"] for r in recs)
@@ -207,21 +214,30 @@ def run(names: list[str], data: Path, n_seeds: int, repeats: int, batch: int, ma
         rows = []
         for rep in range(repeats):
             t0 = time.time()
-            m = _metrics(simulate(name, recs, n_seeds, batch, random.Random(rep), rep, max_read, patience))
+            m = _metrics(simulate(name, recs, n_seeds, batch, random.Random(rep), rep, max_read, patiences))
             rows.append(m)
-            print(f"  run {rep + 1}: read@95 {m.get('read@95', '-')}, stop at {m.get('stop_at', '-')} "
-                  f"({m.get('stop_rule') or '-'}, recall {m.get('recall_at_stop', 0):.2f}), "
-                  f"{time.time() - t0:.0f}s", flush=True)
-        keys = [f"recall@{n}" for n in RECALL_AT] + ["wss@95", "read@95", "stop_at", "recall_at_stop"]
-        for k in keys:
-            vals = [r[k] for r in rows if k in r]
-            if not vals:
-                print(f"  {k:15s} -")
-                continue
-            fmt = (lambda v: f"{v:.0f}") if k in ("read@95", "stop_at") else (lambda v: f"{v:.2f}")
-            spread = f"  ({fmt(min(vals))}-{fmt(max(vals))})" if len(vals) > 1 else ""
-            note = f"  [fired in {len(vals)}/{len(rows)} runs]" if k == "stop_at" else ""
-            print(f"  {k:15s} {fmt(statistics.mean(vals))}{spread}{note}")
+            stops = ", ".join(f"{pt}: {m[f'stop{pt}']} ({m[f'recall_at_stop{pt}']:.2f})" if f"stop{pt}" in m
+                              else f"{pt}: -" for pt in patiences)
+            print(f"  run {rep + 1}: read@95 {m.get('read@95', '-')}, stops [{stops}], {time.time() - t0:.0f}s",
+                  flush=True)
+        summary.append((name, len(recs), n_inc, rows))
+
+    def mean(rows: list[dict], k: str, fmt: str) -> str:
+        vals = [r[k] for r in rows if k in r]
+        if not vals:
+            return "-"
+        s = format(statistics.mean(vals), fmt)
+        return s if len(vals) == len(rows) else f"{s} ({len(vals)}/{len(rows)})"
+
+    print("\nSummary (means over runs; (k/n): only k of n runs got there)")
+    head = ["review", "records", "incl", "read@95", "wss@95", "recall@200"] + \
+        [f"stop x{pt} / recall" for pt in patiences]
+    print(" | ".join(head))
+    for name, n, inc, rows in summary:
+        cells = [name, str(n), str(inc), mean(rows, "read@95", ".0f"), mean(rows, "wss@95", ".2f"),
+                 mean(rows, "recall@200", ".2f")]
+        cells += [f"{mean(rows, f'stop{pt}', '.0f')} / {mean(rows, f'recall_at_stop{pt}', '.2f')}" for pt in patiences]
+        print(" | ".join(cells))
 
 
 def main() -> int:
@@ -237,8 +253,9 @@ def main() -> int:
     r.add_argument("--repeats", type=int, default=5, help="runs with different seeds (default 5)")
     r.add_argument("--batch", type=int, default=30, help="papers per batch (default 30)")
     r.add_argument("--max", type=int, default=1000, help="papers read at most per run (default 1000)")
-    r.add_argument("--patience", type=int, default=1,
-                   help="stop only after the rule says so for this many batches in a row (default 1, as LitLoop)")
+    r.add_argument("--patience", type=int, nargs="+", default=[1, 2, 3],
+                   help="report where the stop rule fires if it has to say so this many batches in a row "
+                        "(default 1 2 3; 1 is the rule as LitLoop has it)")
     r.add_argument("--knee", type=float, help="try another knee ratio for the stop rule (deep_search.KNEE_RATIO)")
     a = ap.parse_args()
     if a.cmd == "export":
@@ -248,7 +265,7 @@ def main() -> int:
             from litloop import deep_search
             deep_search.KNEE_RATIO = a.knee
             print(f"stop rule knee ratio set to 1/{a.knee:g} for this run")
-        run(a.names, _data_dir(a.data), a.seeds, a.repeats, a.batch, a.max, a.patience)
+        run(a.names, _data_dir(a.data), a.seeds, a.repeats, a.batch, a.max, tuple(a.patience))
     return 0
 
 
