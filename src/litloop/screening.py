@@ -17,7 +17,6 @@ from typing import Any
 
 from . import config as _config
 from . import store
-from .identifiers import canonical_doi
 
 RELEVANCE = ("高", "中", "低", "不相关")
 ABSTRACT_CHARS = 1200  # as much as a deep-search batch shows
@@ -37,8 +36,8 @@ def _slug(text: str) -> str:
 
 
 def _key(item: dict[str, Any]) -> str:
-    doi = canonical_doi(item.get("doi"))
-    return doi or "title:" + re.sub(r"[^a-z0-9]+", "", str(item.get("title") or "").lower())
+    from .text import paper_key
+    return paper_key(item)
 
 
 def _norm_relevance(value: Any) -> str:

@@ -423,14 +423,13 @@ def _orig_seeds(state: dict[str, Any]) -> list[str]:
 # 56] by the model (TODO.md, 2026-10-15).
 
 _WORD = re.compile(r"[a-z][a-z0-9]+")
-_STOP = set("the and of in for with by on to a an is are was were from as at this that these be or its "
-            "their which we our into than also".split())
 
 
 def _tokens(rec: dict[str, Any]) -> Counter:
     from .spelling import to_us
-    text = (rec.get("title") or "") + " " + (rec.get("abstract") or "")
-    return Counter(w[:7] for w in _WORD.findall(to_us(text)) if w not in _STOP)
+    from .text import STOPWORDS, stem
+    words = (rec.get("title") or "") + " " + (rec.get("abstract") or "")
+    return Counter(stem(w) for w in _WORD.findall(to_us(words)) if w not in STOPWORDS)
 
 
 def _features(state: dict[str, Any]) -> dict[str, dict[str, float]]:

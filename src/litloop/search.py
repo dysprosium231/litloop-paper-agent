@@ -12,6 +12,7 @@ from typing import Any
 
 import requests
 
+from . import text
 from .config import load_config
 from .network import user_agent
 
@@ -323,7 +324,7 @@ def _take_in_turns(runs: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
         for run in runs:
             if i < len(run):
                 r = run[i]
-                key = str(r.get("doi") or "").lower() or "title:" + re.sub(r"[^a-z0-9]+", "", str(r.get("title") or "").lower())
+                key = text.paper_key(r)
                 if key not in seen:
                     seen.add(key)
                     out.append(r)
@@ -489,7 +490,7 @@ def _dedupe_titles(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     seen: dict[str, dict[str, Any]] = {}
     out = []
     for r in results:
-        key = re.sub(r"[^a-z0-9]+", "", str(r.get("title") or "").lower())
+        key = text.title_key(r.get("title"))
         if len(key) < 20:  # too short to be sure
             out.append(r)
             continue
@@ -626,10 +627,8 @@ def _quick_sources() -> list[str]:
     return sources
 
 
-_STOPWORDS = frozenset(
-    "a an and the of in on for to with by from at as or via its their into using based "
-    "study studies effect effects analysis review".split()
-)
+_D = re.escape(text.DASHES)
+_QUERY_WORD = re.compile(rf"[A-Za-z0-9%]+(?:[{_D}][A-Za-z0-9%]+)*")
 
 
 def _query_terms(query: str) -> list[str]:
@@ -637,34 +636,22 @@ def _query_terms(query: str) -> list[str]:
 
     Hyphenated concepts stay whole ("polymer derived"); chemical systems and
     terms with digits are split into their parts, since papers write Al-Si-Mg
-    as Al-Mg-Si or AlSiMg. Long words are cut to a crude stem so
-    "infiltration" also matches "infiltrated"."""
-    from .spelling import to_us
+    as Al-Mg-Si or AlSiMg. Words are made singular and long ones cut to a
+    crude stem (``text.singular``, ``text.stem``), so "ceramics" matches
+    "ceramic" and "infiltration" matches "infiltrated"."""
     terms = []
-    for word in re.findall(r"[A-Za-z0-9%]+(?:-[A-Za-z0-9%]+)*", query or ""):
-        parts = word.split("-")
-        if len(parts) > 1 and (any(ch.isdigit() for ch in word) or all(_ELEMENT.match(p) for p in parts)):
-            pieces = [p.lower() for p in parts]
+    for word in _QUERY_WORD.findall(query or ""):
+        if any(ch.isdigit() for ch in word) or text.is_chemical_system(word):
+            pieces = [p for p in re.split(rf"[{_D}]", word) if p]
         else:
-            pieces = [word.lower()]
-        for w in pieces:
-            w = to_us(w.strip("%"))
-            if w in _STOPWORDS or len(w) < 2:
+            pieces = [word]
+        for piece in pieces:
+            words = text.plain(piece.strip("%")).split()
+            if not words or (len(words) == 1 and (words[0] in text.STOPWORDS or len(words[0]) < 2)):
                 continue
-            w = w.replace("-", " ")
-            # crude singular so "ceramics" matches "ceramic" (a substring test)
-            if len(w) > 4 and w.endswith("s") and not w.endswith("ss"):
-                w = w[:-1]
-            if " " not in w and len(w) > 7:
-                w = w[:max(6, len(w) - 3)]
-            terms.append(w)
+            words[-1] = text.singular(words[-1])
+            terms.append(" ".join(words) if len(words) > 1 else text.stem(words[0]))
     return list(dict.fromkeys(terms))
-
-
-def _plain(text: str) -> str:
-    """Lower case, American spelling, every kind of dash read as a space."""
-    from .spelling import to_us
-    return re.sub(r"[\-‐-―]", " ", to_us(text))
 
 
 def _match_tier(results: list[dict[str, Any]], query: str,
@@ -696,10 +683,10 @@ def _match_tier(results: list[dict[str, Any]], query: str,
     for pos, r in enumerate(results):
         tier = 0
         if not r.pop("_matched", False):
-            text = _plain(f"{r.get('title') or ''} {r.get('abstract') or ''}")
-            squashed = _squash(f"{r.get('title') or ''} {r.get('abstract') or ''}")
+            words = f"{r.get('title') or ''} {r.get('abstract') or ''}"
+            plain, squashed = text.plain(words), text.squash(words)
             judged_on_title = len(r.get("abstract") or "") < 300
-            tier = min(_tier(terms, need, compounds, text, squashed, judged_on_title, bool(r.get("abstract")))
+            tier = min(_tier(terms, need, compounds, plain, squashed, judged_on_title, bool(r.get("abstract")))
                        for terms, need, compounds in specs)
         tiered.append((tier, pos, r))
     tiered.sort(key=lambda x: (x[0], x[1]))
@@ -708,22 +695,15 @@ def _match_tier(results: list[dict[str, Any]], query: str,
     return [r for _, _, r in tiered]
 
 
-def _tier(terms: list[str], need: int, compounds: set[str], text: str, squashed: str,
+def _tier(terms: list[str], need: int, compounds: set[str], plain: str, squashed: str,
           judged_on_title: bool, has_abstract: bool) -> int:
     """One record's tier against one wording of the query (see ``_match_tier``)."""
-    if need and sum(1 for t in terms if t in text) < need:
+    if need and sum(1 for t in terms if t in plain) < need:
         # A title alone rarely carries every term: too little to call it off-topic.
         return 1 if judged_on_title else 2
     if compounds and has_abstract and not all(c in squashed for c in compounds):
         return 1
     return 0
-
-
-def _squash(text: str) -> str:
-    return re.sub(r"[\s\-‐-―/]+", "", text.lower())
-
-
-_ELEMENT = re.compile(r"^[A-Z][a-z]?$")
 
 
 def _query_compounds(query: str) -> set[str]:
@@ -733,11 +713,10 @@ def _query_compounds(query: str) -> set[str]:
     the elements in any order or run them together, and so are terms with
     digits (3D-SiC, Al-12%Si), which are written in too many ways."""
     out = set()
-    for c in re.findall(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+", query or ""):
-        parts = c.split("-")
-        if any(ch.isdigit() for ch in c) or all(_ELEMENT.match(p) for p in parts):
+    for c in re.findall(rf"[A-Za-z0-9]+(?:[{_D}][A-Za-z0-9]+)+", query or ""):
+        if any(ch.isdigit() for ch in c) or text.is_chemical_system(c):
             continue
-        squashed = _squash(c)
+        squashed = text.squash(c)
         if len(squashed) >= 4:
             out.add(squashed)
     return out

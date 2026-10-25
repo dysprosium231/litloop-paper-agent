@@ -151,11 +151,8 @@ def _normalize_doi_string(doi: str) -> str | None:
     """Fix DOI format: unicode hyphens to ASCII, remove internal spaces."""
     if not doi:
         return None
-    # Unicode hyphens → ASCII
-    doi = doi.replace("\u2010", "-")  # HYPHEN
-    doi = doi.replace("\u2012", "-")  # FIGURE DASH
-    doi = doi.replace("\u2013", "-")  # EN DASH
-    doi = doi.replace("\u2014", "-")  # EM DASH
+    from .text import ascii_dashes
+    doi = ascii_dashes(doi)
     # Remove internal spaces
     doi = re.sub(r"\s+", "", doi)
     # Strip trailing punctuation

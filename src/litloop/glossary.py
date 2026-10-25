@@ -51,11 +51,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from . import store
+from . import store, text
 
 MAX_VARIANTS = 3      # extra runs of one keyword query (own value)
 MIN_PAPERS = 2        # a discovered pair is suggested once this many papers write it (own value)
-_STOP = set("a an and as at by for from in into of on or the to with using via under over between".split())
 
 
 def path() -> Path:
@@ -101,23 +100,13 @@ def elements() -> list[dict[str, Any]]:
     expansion in a query nor is added to a search: the agent's "In" or "La" core
     term still gets the name. ``match``: terms that trigger an expansion in a
     query; ``add``: terms that may be searched for (both default to all terms)."""
-    from importlib.resources import files
-    text = (files("litloop") / "data" / "elements.tsv").read_text(encoding="utf-8")
     out = []
-    for line in text.splitlines():
-        if not line or line.startswith("#"):
-            continue
-        symbol, name = line.split("\t")
+    for symbol, name in text.elements():
         loose = len(symbol) == 1 or symbol.lower() in AMBIGUOUS_SYMBOLS
         out.append({"id": f"element:{symbol}", "terms": [symbol, name], "status": "active",
                     "source": "builtin", "builtin": "element",
                     "match": [] if loose else [symbol], "add": [name] if loose else [symbol, name]})
     return out
-
-
-@lru_cache(maxsize=1)
-def _symbols() -> frozenset[str]:
-    return frozenset(e["terms"][0] for e in elements())
 
 
 def disabled() -> set[str]:
@@ -160,21 +149,13 @@ def builtin(query: str = "", limit: int = 50) -> dict[str, Any]:
 
 # --------------------------------------------------------------------------- normalizing
 
-_DASHES = re.compile(r"[‐-―−�-]+")
-
-
 def normalize(term: str) -> str:
     """One spelling for comparing terms: lower case, American spelling, dashes and
     spaces alike, the last word singular ("Metal-matrix composites" ->
     "metal matrix composite")."""
-    from .spelling import to_us
-    words = to_us(_DASHES.sub(" ", term or "")).split()
+    words = text.plain(term).split()
     if words:
-        last = words[-1]
-        if len(last) > 4 and last.endswith("ies"):
-            words[-1] = last[:-3] + "y"
-        elif len(last) > 3 and last.endswith("s") and not last.endswith(("ss", "us", "is")):
-            words[-1] = last[:-1]
+        words[-1] = text.singular(words[-1])
     return " ".join(words)
 
 
@@ -270,30 +251,33 @@ def _find(data: dict[str, Any], entry_id: str) -> dict[str, Any]:
 
 def _abbreviation(term: str) -> bool:
     """"PDC", "SiC", "EMW" and element symbols: matched with case, so "Al" is not "al" in a sentence."""
-    return " " not in term and (sum(ch.isupper() for ch in term) >= 2 or term in _symbols())
+    return " " not in term and (sum(ch.isupper() for ch in term) >= 2 or term in text.element_symbols())
+
+
+_D = re.escape(text.DASHES)  # any dash, for the patterns below
 
 
 @lru_cache(maxsize=2048)
 def _pattern(term: str) -> re.Pattern[str]:
     """``term`` as a whole word or phrase, written any way ``normalize`` treats as the
-    same: a hyphen or a space ("polymer derived"), British spelling, the last word
+    same: a dash or a space ("polymer derived"), British spelling, the last word
     plural ("PDCs", "polymer-derived ceramics")."""
     from .spelling import variants
     if _abbreviation(term):
-        return re.compile(rf"(?<![\w-]){re.escape(term)}s?(?![\w-])")
-    words = [w for w in re.split(r"[-\s]+", term) if w]
+        return re.compile(rf"(?<![\w{_D}]){re.escape(term)}s?(?![\w{_D}])")
+    words = [w for w in re.split(rf"[\s{_D}]+", term) if w]
     alts = [variants(w) for w in words]
     last = words[-1] if words else ""
     if len(last) > 2 and last[-1:].lower() == "y" and last[-2:-1].lower() not in "aeiou":
         alts[-1] += [last[:-1] + "ies"]
-    body = r"[-\s]+".join("(?:" + "|".join(re.escape(a) for a in alt) + ")" for alt in alts)
-    return re.compile(rf"(?<![\w-]){body}(?:s|es)?(?![\w-])", re.I)
+    body = rf"[\s{_D}]+".join("(?:" + "|".join(re.escape(a) for a in alt) + ")" for alt in alts)
+    return re.compile(rf"(?<![\w{_D}]){body}(?:s|es)?(?![\w{_D}])", re.I)
 
 
 def _has_other_concepts(query: str, span: tuple[int, int]) -> bool:
     """Something besides the matched term that keeps an expansion on topic."""
     rest = query[:span[0]] + " " + query[span[1]:]
-    return any(len(w) >= 3 and w.lower() not in _STOP for w in re.findall(r"[A-Za-z0-9]+", rest))
+    return any(len(w) >= 3 and w.lower() not in text.STOPWORDS for w in re.findall(r"[A-Za-z0-9]+", rest))
 
 
 def other_spelling(query: str) -> tuple[str, list[tuple[str, str]]]:
@@ -377,7 +361,7 @@ _COMMON = set("SEM TEM HRTEM STEM XRD XPS FTIR FT-IR IR NMR TGA DTA DSC TG EDS E
 def _usable(short: str, long: str) -> bool:
     words = long.split()
     return (2 <= len(short) <= 12 and any(ch.isalpha() for ch in short) and _short_key(short) not in _COMMON
-            and 1 <= len(words) <= 8 and not re.search(r"[()\[\]]", long) and words[0].lower() not in _STOP)
+            and 1 <= len(words) <= 8 and not re.search(r"[()\[\]]", long) and words[0].lower() not in text.STOPWORDS)
 
 
 def _short_key(short: str) -> str:
@@ -389,7 +373,7 @@ def _short_key(short: str) -> str:
 
 def _meaning_key(norm_long: str) -> str:
     """Wordings of one meaning ("scanning electron microscopy" / "microscope"): word stems."""
-    return " ".join(w[:7] for w in norm_long.split())
+    return " ".join(text.stem(w) for w in norm_long.split())
 
 
 def discover(texts: list[str]) -> dict[str, dict[str, dict[str, Any]]]:
@@ -397,13 +381,13 @@ def discover(texts: list[str]) -> dict[str, dict[str, dict[str, Any]]]:
     {"text": its most common wording, "papers": how many texts write it}."""
     from abbreviations import schwartz_hearst
     seen: dict[str, dict[str, Counter]] = {}
-    for text in texts:
+    for abstract in texts:
         try:
-            pairs = schwartz_hearst.extract_abbreviation_definition_pairs(doc_text=text or "")
+            pairs = schwartz_hearst.extract_abbreviation_definition_pairs(doc_text=abstract or "")
         except Exception:  # an odd abstract must not stop the rest
             continue
         for short, long in pairs.items():
-            long = _DASHES.sub("-", " ".join(long.split()))
+            long = text.ascii_dashes(" ".join(long.split()))
             if _usable(short, long):
                 key = _meaning_key(normalize(long))
                 seen.setdefault(_short_key(short), {}).setdefault(key, Counter())[long.lower()] += 1
