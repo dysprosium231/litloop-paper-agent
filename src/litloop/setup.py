@@ -36,7 +36,7 @@ def check_tor() -> dict[str, Any]:
     # Check embedded Tor binary
     from .config import load_config
     config = load_config()
-    from .embedded_tor import _tor_binary
+    from .tor.embedded import _tor_binary
     embedded = _tor_binary(config)
     if embedded:
         result["installed"] = True

@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 import types
 
-from litloop import zotero_bridge
+from litloop.zotero import bridge as zotero_bridge
 
 
 def test_plain_strips_tags_and_unescapes_entities():

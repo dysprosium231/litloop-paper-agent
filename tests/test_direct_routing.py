@@ -44,7 +44,7 @@ class DirectRoutingTests(unittest.TestCase):
 
     def test_tor_still_wins(self):
         cfg = {"network_proxy": PROXY}
-        with patch("litloop.tor.ensure_tor", return_value="socks5://127.0.0.1:9050"):
+        with patch("litloop.tor.proxy.ensure_tor", return_value="socks5://127.0.0.1:9050"):
             self.assertEqual(
                 select_proxy_for_url("https://sci-hub.ru/x", cfg, use_tor=True),
                 "socks5://127.0.0.1:9050",

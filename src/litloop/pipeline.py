@@ -480,7 +480,7 @@ def load_job(path: str | Path) -> list[QueueEntry]:
     text = _read_text(p)
     apa_like = bool(re.search(r"[A-Z][a-z\u00C0-\u024F]+,\s+[A-Z]\.", text)) and "doi.org" in text.lower()
     if p.suffix.lower() == ".bib" or apa_like:
-        from .paperlist import parse_paper_list
+        from .citations.paper_list import parse_paper_list
         return _from_paper_entries(parse_paper_list(p))
     return parse_queue(text)
 

@@ -113,7 +113,7 @@ def _install_config(monkeypatch, config, config_file):
 
 def _patch_download_network(monkeypatch):
     monkeypatch.setattr("litloop.identifiers.validate_doi", lambda doi: (True, "https://doi.org/" + doi))
-    monkeypatch.setattr("litloop.citation.fetch_metadata", lambda doi, config: None)
+    monkeypatch.setattr("litloop.citations.formats.fetch_metadata", lambda doi, config: None)
     monkeypatch.setattr("litloop.sources._build_free_sources", lambda doi, config: [])
     monkeypatch.setattr("litloop.sources._build_institutional_sources", lambda doi, config, **kw: [])
 

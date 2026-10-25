@@ -69,7 +69,7 @@ def _check_sources(config: dict[str, Any]) -> dict[str, Any]:
 
     # Tor
     try:
-        from .tor import check_tor_circuit
+        from .tor.proxy import check_tor_circuit
         tor_ok = check_tor_circuit(config)
         sources["tor"] = tor_ok
     except Exception:

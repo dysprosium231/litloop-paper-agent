@@ -16,7 +16,7 @@ def _setup(monkeypatch, tmp_path, called):
     monkeypatch.setattr(ids, "validate_doi", lambda doi: (True, ""))  # no network
     import litloop.session_heal as sh
     monkeypatch.setattr(sh, "ensure_institutional_sessions", lambda *a, **k: {})
-    import litloop.citation as cit
+    import litloop.citations.formats as cit
     monkeypatch.setattr(cit, "fetch_metadata", lambda *a, **k: {})  # no network
 
 
@@ -68,7 +68,7 @@ def test_a_download_clears_the_judgment(monkeypatch, tmp_path):
 
     import litloop.identifiers as ids
     monkeypatch.setattr(ids, "validate_doi", lambda doi: (True, ""))
-    import litloop.citation as cit
+    import litloop.citations.formats as cit
     monkeypatch.setattr(cit, "fetch_metadata", lambda *a, **k: {})  # no network
     import litloop.pdf_utils as pu
     monkeypatch.setattr(pu, "is_suspicious_pdf", lambda *a, **k: False)

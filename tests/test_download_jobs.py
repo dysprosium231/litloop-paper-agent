@@ -12,7 +12,8 @@ import pytest
 import requests
 from fastapi.testclient import TestClient
 
-from litloop import app_server, config, download_jobs, progress_reporter, screening, server, store, zotero
+from litloop import app_server, config, download_jobs, progress_reporter, screening, server, store
+from litloop.zotero import client as zotero
 
 TOKEN = "t0ken"
 

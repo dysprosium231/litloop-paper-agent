@@ -14,6 +14,11 @@ MODULES = [
     "litloop.main", "litloop.server", "litloop.app_server", "litloop.fetcher", "litloop.auth",
     "litloop.sources", "litloop.pipeline", "litloop.download_jobs", "litloop.deep_search",
     "litloop.search", "litloop.screening", "litloop.schools", "litloop.browser_engine",
+    "litloop.terms.text", "litloop.terms.spelling", "litloop.terms.glossary",
+    "litloop.citations.formats", "litloop.citations.bibtex_crossref", "litloop.citations.bib_import",
+    "litloop.citations.paper_list", "litloop.citations.session_export",
+    "litloop.tor.proxy", "litloop.tor.embedded",
+    "litloop.zotero.client", "litloop.zotero.bridge",
 ]
 
 failed = []

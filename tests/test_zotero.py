@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from litloop import zotero
+from litloop.zotero import client as zotero
 
 
 def _fake_zotero_mcp(tmp_path, monkeypatch, reply_line):
@@ -55,7 +55,7 @@ def test_zotero_mcp_bridge_garbage_output_is_an_error(tmp_path, monkeypatch):
 
 def test_zotero_bridge_parses_item_and_attachment_keys(monkeypatch):
     import types, sys
-    from litloop import zotero_bridge
+    from litloop.zotero import bridge as zotero_bridge
 
     calls = {}
     write = types.SimpleNamespace(
@@ -83,7 +83,7 @@ def test_zotero_bridge_parses_item_and_attachment_keys(monkeypatch):
 def test_zotero_bridge_flags_attachment_without_file(monkeypatch):
     """zotero-mcp skips upload when the filename exists; an empty record is not a PDF."""
     import types, sys
-    from litloop import zotero_bridge
+    from litloop.zotero import bridge as zotero_bridge
 
     write = types.SimpleNamespace(
         add_item=lambda **kw: "Already in library:\n\nItem key: `QWER5678`\n",
@@ -114,7 +114,7 @@ def test_zotero_bridge_accepts_file_stored_on_webdav(monkeypatch):
     """A WebDAV upload leaves no md5 on the item; the .prop sidecar proves the file."""
     import types, sys
     import requests
-    from litloop import zotero_bridge
+    from litloop.zotero import bridge as zotero_bridge
 
     client = types.ModuleType("zotero_mcp.client")
     client.get_zotero_client = lambda: types.SimpleNamespace(item=lambda key: {"data": {"md5": None}})
@@ -204,7 +204,7 @@ def test_no_zotero_mcp_anywhere_returns_error(tmp_path, monkeypatch):
 
 def test_zotero_bridge_resolves_localhost_to_ipv4(monkeypatch):
     import socket
-    from litloop import zotero_bridge
+    from litloop.zotero import bridge as zotero_bridge
 
     seen = []
     monkeypatch.setattr(socket, "getaddrinfo", lambda host, *a, **kw: seen.append(host) or [])

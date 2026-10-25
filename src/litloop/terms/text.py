@@ -90,5 +90,5 @@ def title_key(title: Any) -> str:
 def paper_key(rec: dict[str, Any]) -> str:
     """The key that says two records are one paper: the DOI, or else the title
     ("title:<letters and digits>"). The app's ``paperKey`` (app/src/lib/api.ts) mirrors it."""
-    from .identifiers import canonical_doi
+    from ..identifiers import canonical_doi
     return canonical_doi(rec.get("doi")) or "title:" + title_key(rec.get("title"))

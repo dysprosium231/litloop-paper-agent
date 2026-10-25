@@ -60,7 +60,7 @@ def _installed(dist: str) -> str | None:
 
 
 def _zotero_mcp_installed(cfg: dict[str, Any]) -> str | None:
-    from .zotero import discover_zotero_mcp
+    from .zotero.client import discover_zotero_mcp
     found = discover_zotero_mcp(cfg)
     if not found:
         return None

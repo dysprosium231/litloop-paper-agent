@@ -215,7 +215,7 @@ def _topic_search(term: str, glossary_alts: dict[str, list[str]] | None = None) 
     terms to a word it knows (``glossary_alts``, from ``_glossary_expansions``),
     a phrase in quotes: "(PDC OR \"polymer-derived ceramic\") AND aerogel".
     """
-    from .spelling import variants
+    from .terms.spelling import variants
     groups = []
     for w in term.replace(",", " ").split():
         alts = [v for a in w.split("|") if a for v in variants(a)]
@@ -426,8 +426,8 @@ _WORD = re.compile(r"[a-z][a-z0-9]+")
 
 
 def _tokens(rec: dict[str, Any]) -> Counter:
-    from .spelling import to_us
-    from .text import STOPWORDS, stem
+    from .terms.spelling import to_us
+    from .terms.text import STOPWORDS, stem
     words = (rec.get("title") or "") + " " + (rec.get("abstract") or "")
     return Counter(stem(w) for w in _WORD.findall(to_us(words)) if w not in STOPWORDS)
 
@@ -586,7 +586,7 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
 
 def _core_term_notes(core_terms: list[str]) -> list[str]:
     """Warnings about core terms that would make the citation route far too broad."""
-    from .glossary import AMBIGUOUS_SYMBOLS
+    from .terms.glossary import AMBIGUOUS_SYMBOLS
     alts = {a.lower() for term in core_terms for w in term.replace(",", " ").split() for a in w.split("|") if a}
     loose = sorted(alts & AMBIGUOUS_SYMBOLS)
     if not loose:
@@ -669,7 +669,7 @@ def _glossary_expansions(queries: list[str], core_terms: list[str],
     the words of the core terms, and a report of both for the user. Core-term
     words are expanded only when there are at least two of them, so another
     concept keeps each expansion on topic."""
-    from . import glossary
+    from .terms import glossary
     try:
         use = glossary.in_use()
     except Exception as exc:  # an unreadable glossary must not stop the search
@@ -696,7 +696,7 @@ def _glossary_expansions(queries: list[str], core_terms: list[str],
 def _glossary_suggestions(state: dict[str, Any], rated: dict[str, str]) -> list[dict[str, Any]]:
     """Abbreviations the papers read so far define ("polymer-derived ceramics
     (PDCs)"), added to the glossary as suggestions for the user to confirm."""
-    from . import glossary
+    from .terms import glossary
     pool = state["pool"]
     keys = set(state["seeds"]) | {k for k, r in rated.items() if r in ("高", "中")}
     texts = [pool[k].get("abstract") or "" for k in keys if k in pool]

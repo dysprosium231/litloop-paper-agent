@@ -214,7 +214,7 @@ def diagnose_network(config: dict[str, Any] | None = None) -> dict[str, Any]:
 
     # Check Tor status
     try:
-        from ..tor import check_tor_circuit
+        from ..tor.proxy import check_tor_circuit
         tor_ok = check_tor_circuit(config)
         report["tests"].append({"target": "Tor SOCKS5", "status": "running" if tor_ok else "not running"})
         if not tor_ok:

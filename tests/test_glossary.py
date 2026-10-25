@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from litloop import deep_search, glossary
+from litloop import deep_search
+from litloop.terms import glossary
 
 
 @pytest.fixture(autouse=True)
@@ -93,7 +94,7 @@ def test_built_in_entries_can_be_switched_off():
     glossary.set_builtin("element:Al", False)
     assert "element:Al" not in {e["id"] for e in glossary.in_use()}
     assert glossary.query_variants("Al SiC composite", glossary.in_use())[0] == []
-    from litloop import spelling
+    from litloop.terms import spelling
     glossary.set_builtin("spelling:aluminum", False)
     assert spelling.variants("aluminum") == ["aluminum"] and spelling.to_us("aluminium") == "aluminium"
     found = glossary.builtin("alumin")

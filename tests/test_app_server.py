@@ -104,7 +104,7 @@ def test_openalex_live_count_is_kept_two_minutes(client, monkeypatch):
 
 
 def test_glossary_add_confirm_edit_delete(client):
-    from litloop import glossary
+    from litloop.terms import glossary
     added = client.post("/api/glossary", json={"terms": ["PDC", "polymer-derived ceramic"]}).json()
     assert added["status"] == "active"
     assert client.post("/api/glossary", json={"terms": ["PDC"]}).status_code == 400

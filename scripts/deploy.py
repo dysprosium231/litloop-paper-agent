@@ -315,7 +315,7 @@ def checks(py: Path, dry: bool) -> None:
              f"{py} -m patchright install chromium")
 
     probe = ("import json;from litloop.config import load_config;"
-             "from litloop.zotero import discover_zotero_mcp as d;"
+             "from litloop.zotero.client import discover_zotero_mcp as d;"
              "f=d(load_config());print(json.dumps(str(f['python']) if f else ''))")
     z = run([str(py), "-c", probe], check=False).stdout.strip().splitlines()
     zpath = json.loads(z[-1]) if z else ""

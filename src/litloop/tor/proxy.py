@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from .log import get_logger
+from ..log import get_logger
 
 log = get_logger()
 
@@ -31,7 +31,7 @@ def get_tor_proxy(config: dict[str, Any] | None = None) -> str | None:
     if config and config.get("tor_proxy"):
         return config["tor_proxy"]
     try:
-        from .embedded_tor import running_embedded_tor
+        from .embedded import running_embedded_tor
         tor = running_embedded_tor()
         if tor:
             return tor.proxy_url
@@ -66,7 +66,7 @@ def ensure_tor(config: dict[str, Any]) -> str | None:
 
     # 2. Try starting embedded Tor (auto-install if needed)
     try:
-        from .embedded_tor import get_embedded_tor
+        from .embedded import get_embedded_tor
         log.info("Tor: starting embedded Tor...")
         tor = get_embedded_tor(config)
         if tor and tor.is_running():
@@ -82,7 +82,7 @@ def ensure_tor(config: dict[str, Any]) -> str | None:
 def start_embedded_tor(config: dict[str, Any]) -> dict[str, Any]:
     """Start embedded Tor proxy. Returns status dict."""
     try:
-        from .embedded_tor import get_embedded_tor
+        from .embedded import get_embedded_tor
         tor = get_embedded_tor(config)
         if tor:
             return {"running": True, "proxy": tor.proxy_url}
@@ -94,7 +94,7 @@ def start_embedded_tor(config: dict[str, Any]) -> dict[str, Any]:
 def stop_embedded_tor() -> dict[str, Any]:
     """Stop embedded Tor proxy."""
     try:
-        from .embedded_tor import stop_embedded_tor as _stop
+        from .embedded import stop_embedded_tor as _stop
         _stop()
         return {"stopped": True}
     except Exception as e:
@@ -104,7 +104,7 @@ def stop_embedded_tor() -> dict[str, Any]:
 def install_tor(config: dict[str, Any]) -> dict[str, Any]:
     """Download and install Tor Expert Bundle."""
     try:
-        from .embedded_tor import install_tor as _install
+        from .embedded import install_tor as _install
         return _install(config)
     except Exception as e:
         return {"installed": False, "error": str(e)}

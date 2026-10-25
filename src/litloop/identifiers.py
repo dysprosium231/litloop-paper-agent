@@ -82,7 +82,7 @@ def extract_identifiers(text: str) -> tuple[list[str], list[str]]:
 
     # Copied from PDFs: Unicode hyphens and dashes inside DOIs, non-breaking and
     # zero-width spaces.
-    from .text import ascii_dashes
+    from .terms.text import ascii_dashes
     text = ascii_dashes(text or "")
     text = re.sub("[ ​‌‍﻿]", " ", text)
     for line in text.splitlines():

@@ -12,7 +12,7 @@ from typing import Any
 
 import requests
 
-from . import text
+from .terms import text
 from .config import load_config
 from .network import user_agent
 
@@ -286,7 +286,7 @@ def search_papers_v2(
 def _glossary_variants(query: str) -> tuple[list[str], list[dict[str, Any]]]:
     """Other wordings of ``query`` from the glossary (``glossary.query_variants``:
     the other spelling, the user's terms, element symbols and names)."""
-    from . import glossary
+    from .terms import glossary
     try:
         return glossary.query_variants(query, glossary.in_use())
     except Exception as exc:  # an unreadable glossary must not stop the search

@@ -890,7 +890,7 @@ def _auto_rename(result: dict[str, Any], identifier: str, config: dict[str, Any]
         log.info(f"   Non-PDF artifact ({file_path.suffix or 'no ext'}) — skipping auto-rename")
         return
     # Use cached metadata or fetch from Crossref
-    from ..citation import fetch_metadata
+    from ..citations.formats import fetch_metadata
     _doi = doi or result.get("doi", identifier)
     metadata = fetch_metadata(_doi, config)
     if metadata:
@@ -1294,7 +1294,7 @@ def _download_impl(
         if cached_file.is_file():
             cached["cached"] = True
             if bibtex:
-                from ..bibtex import fetch_bibtex
+                from ..citations.bibtex_crossref import fetch_bibtex
                 cached["bibtex"] = fetch_bibtex(identifier, config)
             return cached
 
@@ -1344,7 +1344,7 @@ def _download_impl(
         except Exception:
             pass
 
-    from ..citation import fetch_metadata
+    from ..citations.formats import fetch_metadata
     metadata = fetch_metadata(doi, config)
     if metadata:
         from ..rename import rename_format
@@ -1387,7 +1387,7 @@ def _download_impl(
                 _auto_rename(result, identifier, config, doi=identifier, target_dir=target_dir)
             cache_set(identifier, result, config)
             if bibtex:
-                from ..bibtex import fetch_bibtex
+                from ..citations.bibtex_crossref import fetch_bibtex
                 result["bibtex"] = fetch_bibtex(identifier, config)
             return result
         return fail(identifier, "arXiv PDF not available")
@@ -1420,7 +1420,7 @@ def _download_impl(
                 _auto_rename(result, identifier, config, doi=doi, target_dir=target_dir)
             cache_set(identifier, result, config)
             if bibtex:
-                from ..bibtex import fetch_bibtex
+                from ..citations.bibtex_crossref import fetch_bibtex
                 result["bibtex"] = fetch_bibtex(doi, config)
             return result
 
@@ -1475,7 +1475,7 @@ def _download_impl(
                     _auto_rename(result, identifier, config, doi=doi, target_dir=target_dir)
                 cache_set(identifier, result, config)
                 if bibtex:
-                    from ..bibtex import fetch_bibtex
+                    from ..citations.bibtex_crossref import fetch_bibtex
                     result["bibtex"] = fetch_bibtex(doi, config)
                 return result
 
@@ -1493,7 +1493,7 @@ def _download_impl(
             if rename:
                 _auto_rename(result, identifier, config, doi=doi, target_dir=target_dir)
             if bibtex:
-                from ..bibtex import fetch_bibtex
+                from ..citations.bibtex_crossref import fetch_bibtex
                 result["bibtex"] = fetch_bibtex(identifier, config)
             return result
 
@@ -1589,7 +1589,7 @@ def _build_failure_guidance(doi: str, config: dict[str, Any], error_type: str = 
 
     # Check Tor
     try:
-        from ..tor import check_tor_circuit
+        from ..tor.proxy import check_tor_circuit
         if not check_tor_circuit(config):
             tips.append("Tor 未运行 → 运行: litloop tor_start（匿名访问 Sci-Hub/LibGen）")
     except Exception:

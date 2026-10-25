@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 import requests
 
-from litloop.paperlist import PaperEntry
+from litloop.citations.paper_list import PaperEntry
 from litloop.resolver import batch_resolve, resolve_title_to_doi
 
 

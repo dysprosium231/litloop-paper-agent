@@ -514,7 +514,7 @@ def _set_zotero(job: str, **fields: Any) -> None:
 
 def _push(job: str, collection: str, tags: list[str]) -> None:
     from .config import load_config
-    from .zotero import ensure_collection, push_via_zotero_mcp
+    from .zotero.client import ensure_collection, push_via_zotero_mcp
     cfg = load_config()
     try:
         found = ensure_collection(collection, cfg)

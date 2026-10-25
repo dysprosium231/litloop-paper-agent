@@ -1,6 +1,6 @@
-"""Shared text normalisation (litloop.text)."""
+"""Shared text normalisation (litloop.terms.text)."""
 
-from litloop import text
+from litloop.terms import text
 
 
 def test_every_dash_counts_the_same():

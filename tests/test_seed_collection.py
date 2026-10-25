@@ -2,7 +2,8 @@
 
 import json
 
-from litloop import deep_search, server, zotero
+from litloop import deep_search, server
+from litloop.zotero import client as zotero
 
 
 def _capture_start(monkeypatch):

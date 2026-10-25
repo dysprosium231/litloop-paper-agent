@@ -6,7 +6,7 @@ import re
 import urllib.parse
 from typing import Any
 
-from .network import fetch_json
+from ..network import fetch_json
 
 
 def fetch_bibtex(doi: str, config: dict[str, Any]) -> str | None:

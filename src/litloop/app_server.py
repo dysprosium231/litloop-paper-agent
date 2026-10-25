@@ -294,7 +294,7 @@ def create_app(token: str) -> FastAPI:
     @app.post("/api/sessions/{session}/export")
     def export_session(session: str, body: Export) -> dict[str, Any]:
         """Write the session's picks (or its 高 papers) as BibTeX / RIS / a DOI list under <output_dir>/exports."""
-        from . import export
+        from .citations import session_export as export
         _record_path(session)
         if body.which not in ("selected", "high"):
             raise HTTPException(400, "无法导出：只能导出待下载或评为高的文献")
@@ -341,12 +341,12 @@ def create_app(token: str) -> FastAPI:
 
     @app.get("/api/glossary")
     def glossary_list() -> dict[str, Any]:
-        from . import glossary
+        from .terms import glossary
         return {"active": glossary.entries("active"), "suggested": glossary.entries("suggested")}
 
     @app.post("/api/glossary")
     def glossary_add(body: GlossaryEntry) -> dict[str, Any]:
-        from . import glossary
+        from .terms import glossary
         try:
             return glossary.add(body.terms or [], note=body.note or "")
         except ValueError as exc:
@@ -354,12 +354,12 @@ def create_app(token: str) -> FastAPI:
 
     @app.get("/api/glossary/builtin")
     def glossary_builtin(q: str = "") -> dict[str, Any]:
-        from . import glossary
+        from .terms import glossary
         return glossary.builtin(q)
 
     @app.post("/api/glossary/builtin")
     def glossary_builtin_switch(body: BuiltinSwitch) -> dict[str, Any]:
-        from . import glossary
+        from .terms import glossary
         try:
             glossary.set_builtin(body.id, body.enabled)
         except KeyError as exc:
@@ -368,7 +368,7 @@ def create_app(token: str) -> FastAPI:
 
     @app.post("/api/glossary/{entry_id}")
     def glossary_update(entry_id: str, body: GlossaryEntry) -> dict[str, Any]:
-        from . import glossary
+        from .terms import glossary
         try:
             return glossary.update(entry_id, terms=body.terms, note=body.note, confirm=body.confirm)
         except KeyError as exc:
@@ -379,7 +379,7 @@ def create_app(token: str) -> FastAPI:
     @app.post("/api/glossary/{entry_id}/delete")
     def glossary_delete(entry_id: str) -> dict[str, Any]:
         """POST: the app's CORS allows GET and POST only. A deleted suggestion is not suggested again."""
-        from . import glossary
+        from .terms import glossary
         try:
             glossary.delete(entry_id)
         except KeyError as exc:
@@ -533,7 +533,7 @@ def create_app(token: str) -> FastAPI:
 
         from . import download_jobs
         from .config import load_config
-        from .zotero import discover_zotero_mcp
+        from .zotero.client import discover_zotero_mcp
         try:
             running = requests.get("http://127.0.0.1:23119/connector/ping", timeout=2,
                                    proxies={"http": None, "https": None}).status_code == 200
@@ -550,7 +550,7 @@ def create_app(token: str) -> FastAPI:
     @app.get("/api/zotero/write-mode")
     def zotero_write_mode() -> dict[str, Any]:
         from .config import load_config
-        from .zotero import write_mode
+        from .zotero.client import write_mode
         # Asking costs a zotero-mcp start (2-3 s) and the mode only changes when the
         # user authorizes, so the first good answer is kept until then.
         if "mode" not in _WRITE_MODE:
@@ -564,7 +564,7 @@ def create_app(token: str) -> FastAPI:
     def zotero_authorize() -> dict[str, Any]:
         """Zotero asks the user (a dialog in the Zotero app); the answer decides the mode."""
         from .config import load_config
-        from .zotero import authorize_local_writes
+        from .zotero.client import authorize_local_writes
         r = authorize_local_writes(load_config())
         _WRITE_MODE.clear()
         from . import error_text
@@ -577,7 +577,7 @@ def create_app(token: str) -> FastAPI:
         """The PDF state of every item in a collection, and for problem items a local PDF if one exists."""
         from . import download_jobs
         from .config import load_config
-        from .zotero import check_collection
+        from .zotero.client import check_collection
         if not re.fullmatch(r"[A-Z0-9]{8}", body.key):
             raise HTTPException(400, "无法检查附件：分类编号不正确")
         r = check_collection(body.key, load_config())
@@ -593,7 +593,7 @@ def create_app(token: str) -> FastAPI:
         """Repair one item: trash its empty attachments, attach the local PDF found for its DOI."""
         from . import download_jobs
         from .config import load_config
-        from .zotero import repair_attachment
+        from .zotero.client import repair_attachment
         if not re.fullmatch(r"[A-Z0-9]{8}", body.item_key) or any(not re.fullmatch(r"[A-Z0-9]{8}", k) for k in body.trash):
             raise HTTPException(400, "无法重新附加：条目编号不正确")
         pdf = download_jobs.find_local_pdf(body.doi or "") if body.attach else None  # never a path from the client
@@ -608,7 +608,7 @@ def create_app(token: str) -> FastAPI:
     def zotero_collections() -> list[dict[str, Any]]:
         """The library's collections as '/'-paths (read through zotero-mcp)."""
         from .config import load_config
-        from .zotero import zotero_collections as read
+        from .zotero.client import zotero_collections as read
         r = read(load_config())
         if not r.get("success"):
             raise _fail(503, r.get("error"), "读取分类", "Zotero is not reachable")

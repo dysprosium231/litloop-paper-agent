@@ -26,7 +26,7 @@ def parse_paper_list(file_path: str | Path) -> list[PaperEntry]:
 
     suffix = path.suffix.lower()
     if suffix in (".csv", ".xlsx", ".tsv", ".tab"):
-        from .pipeline import entries_from_table, read_table
+        from ..pipeline import entries_from_table, read_table
 
         return _entries_from_queue(entries_from_table(read_table(path)))
 
@@ -151,7 +151,7 @@ def _normalize_doi_string(doi: str) -> str | None:
     """Fix DOI format: unicode hyphens to ASCII, remove internal spaces."""
     if not doi:
         return None
-    from .text import ascii_dashes
+    from ..terms.text import ascii_dashes
     doi = ascii_dashes(doi)
     # Remove internal spaces
     doi = re.sub(r"\s+", "", doi)
@@ -168,7 +168,7 @@ def _normalize_doi_string(doi: str) -> str | None:
 
 def _parse_bib_to_entries(content: str) -> list[PaperEntry]:
     """Parse BibTeX content into PaperEntry list."""
-    from .bibparser import parse_bib_text
+    from .bib_import import parse_bib_text
     raw_entries = parse_bib_text(content, require_doi=False)
     entries = []
     for e in raw_entries:

@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .log import get_logger
+from ..log import get_logger
 
 log = get_logger()
 
@@ -285,7 +285,7 @@ def _run_bridge(found: dict[str, Any], req: dict[str, Any], timeout: int) -> dic
     python = found["python"]
     env_script = found.get("env_script") or ""
     req = {**req, "env_script": str(Path(env_script).expanduser()) if env_script else ""}
-    bridge = Path(__file__).with_name("zotero_bridge.py")
+    bridge = Path(__file__).with_name("bridge.py")
     # The MCP client's env block for the zotero server (API key, WebDAV...).
     env = dict(os.environ, **found.get("env", {}), PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
     try:

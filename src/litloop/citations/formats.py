@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .network import fetch_json
+from ..network import fetch_json
 
 
 def fetch_metadata(doi: str, config: dict[str, Any]) -> dict[str, Any] | None:

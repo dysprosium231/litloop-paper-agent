@@ -36,7 +36,7 @@ def _slug(text: str) -> str:
 
 
 def _key(item: dict[str, Any]) -> str:
-    from .text import paper_key
+    from .terms.text import paper_key
     return paper_key(item)
 
 

@@ -11,8 +11,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import screening
-from .config import load_config
+from .. import screening
+from ..config import load_config
 
 FORMATS = {"bibtex": "bib", "ris": "ris", "doi": "txt"}
 

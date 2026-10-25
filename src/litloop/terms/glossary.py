@@ -51,14 +51,15 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from . import store, text
+from .. import store
+from . import text
 
 MAX_VARIANTS = 3      # extra runs of one keyword query (own value)
 MIN_PAPERS = 2        # a discovered pair is suggested once this many papers write it (own value)
 
 
 def path() -> Path:
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     return Path(DATA_DIR) / "glossary.json"
 
 

@@ -349,7 +349,7 @@ def _taylorfrancis_chapter_book(doi: str, landing_url: str) -> tuple[str, str] |
 def _chapter_note(doi: str, config: dict[str, Any]) -> str:
     """Where the chapter is in the book, for the user: from Crossref's page range."""
     try:
-        from ..citation import fetch_metadata
+        from ..citations.formats import fetch_metadata
         meta = fetch_metadata(doi, config) or {}
         page = str(meta.get("page") or "").strip()
     except Exception:

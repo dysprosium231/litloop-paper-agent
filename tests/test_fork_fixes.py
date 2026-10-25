@@ -102,7 +102,7 @@ def test_late_finisher_drops_its_copy(tmp_path, monkeypatch):
 
 
 def test_rename_removes_duplicate_source_copies(tmp_path, monkeypatch):
-    import litloop.citation as citation
+    import litloop.citations.formats as citation
     doi = "10.1038/s1"
     safe = sources.safe_filename(doi)
     winner = tmp_path / f"{safe}.pdf"

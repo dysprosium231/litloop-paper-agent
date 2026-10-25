@@ -7,7 +7,8 @@ import re
 import threading
 from pathlib import Path
 
-from litloop import config, deep_search, download_jobs, error_text, screening, server, store, zotero
+from litloop import config, deep_search, download_jobs, error_text, screening, server, store
+from litloop.zotero import client as zotero
 
 API_TS = Path(__file__).resolve().parents[1] / "app" / "src" / "lib" / "api.ts"
 

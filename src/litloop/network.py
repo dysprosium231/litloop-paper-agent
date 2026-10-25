@@ -191,7 +191,7 @@ def proxy_dict(proxy: str | None) -> dict[str, str] | None:
 
 def select_proxy_for_url(url: str, config: dict[str, Any], use_tor: bool = False) -> str | None:
     if use_tor:
-        from .tor import ensure_tor
+        from .tor.proxy import ensure_tor
         tor_proxy = ensure_tor(config)
         if tor_proxy:
             return tor_proxy

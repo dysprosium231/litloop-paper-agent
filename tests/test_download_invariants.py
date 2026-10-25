@@ -24,7 +24,7 @@ PDF = b"%PDF-1.4\n" + b"0" * 20000 + b"\n%%EOF"
 @pytest.fixture(autouse=True)
 def _offline(monkeypatch):
     monkeypatch.setattr(ids, "validate_doi", lambda doi: (True, ""))
-    import litloop.citation as cit
+    import litloop.citations.formats as cit
     monkeypatch.setattr(cit, "fetch_metadata", lambda *a, **k: {})  # no network
     import litloop.session_heal as sh
     monkeypatch.setattr(sh, "ensure_institutional_sessions", lambda *a, **k: {})

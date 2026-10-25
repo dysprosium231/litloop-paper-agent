@@ -1,4 +1,4 @@
-from litloop.spelling import to_us, variants
+from litloop.terms.spelling import to_us, variants
 
 
 def test_to_us_british_to_american():

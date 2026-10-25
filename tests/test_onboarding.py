@@ -32,7 +32,8 @@ def test_optional_components_step_says_what_a_missing_piece_costs(monkeypatch):
     """The guide's 可选组件 step: nothing to set, only what is installed."""
     import shutil
 
-    from litloop import app_settings, browser_backend, deps, embedded_tor
+    from litloop import app_settings, browser_backend, deps
+    from litloop.tor import embedded as embedded_tor
     assert "components" in [s["group"] for s in app_settings.STEPS]
     monkeypatch.setattr(browser_backend, "is_available", lambda name=None: True)
     monkeypatch.setattr(browser_backend, "browser_info", lambda cfg=None: {"binary": "channel=chrome", "version": ""})

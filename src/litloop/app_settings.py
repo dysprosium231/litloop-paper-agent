@@ -460,7 +460,8 @@ def test_components() -> list[dict[str, Any]]:
     """What is installed, and what a missing piece costs (deps, embedded_tor)."""
     import shutil
 
-    from . import browser_backend, deps, embedded_tor
+    from . import browser_backend, deps
+    from .tor import embedded as embedded_tor
     cfg = _config.load_config()
     out = []
     if not browser_backend.is_available():

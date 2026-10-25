@@ -15,11 +15,11 @@ except ModuleNotFoundError:  # mcp >= 2.0 renamed FastMCP to MCPServer
 from .cache import cache_clear, cache_get
 from .config import get_config_safe, load_config, mask_config_value, update_config
 from .network import fetch_json
-from .paperlist import parse_paper_list
+from .citations.paper_list import parse_paper_list
 from .resolver import batch_resolve
 from .search import search_papers_v2 as search_papers
 from .sources import batch_download, download
-from .tor import check_tor_circuit, get_tor_proxy
+from .tor.proxy import check_tor_circuit, get_tor_proxy
 
 mcp_app = FastMCP(
     name="litloop",
@@ -453,7 +453,7 @@ def litloop_deep_search(
             from_zotero = None
             if seed_collection:
                 # The papers the user already keeps on the topic: seeds (and positives).
-                from .zotero import collection_dois
+                from .zotero.client import collection_dois
                 got = collection_dois(seed_collection, load_config())
                 if not got.get("success"):
                     return json.dumps({"error": f"seed_collection: {got.get('error')}"}, ensure_ascii=False)
@@ -659,7 +659,7 @@ def litloop_auto_setup() -> str:
 
     # 1. Auto-start Tor
     try:
-        from .tor import ensure_tor, check_tor_circuit
+        from .tor.proxy import ensure_tor, check_tor_circuit
         tor_proxy = ensure_tor(config)
         if tor_proxy:
             report["actions"].append(f"Tor started at {tor_proxy}")
@@ -910,7 +910,7 @@ def litloop_import_bib(
         scihub_enabled: Enable/disable Sci-Hub
         use_tor: Route through Tor
     """
-    from .bibparser import parse_bib_file
+    from .citations.bib_import import parse_bib_file
     from .log import get_logger
     _log = get_logger()
     entries = parse_bib_file(bib_file)
@@ -948,13 +948,13 @@ def _citation_impl(identifier: str, format: str = "bibtex") -> str:
     doi = normalize_doi(identifier)
 
     if format == "bibtex":
-        from .bibtex import fetch_bibtex
+        from .citations.bibtex_crossref import fetch_bibtex
         citation = fetch_bibtex(doi, config)
     elif format == "ris":
-        from .citation import to_ris
+        from .citations.formats import to_ris
         citation = to_ris(doi, config)
     elif format == "endnote":
-        from .citation import to_endnote
+        from .citations.formats import to_endnote
         citation = to_endnote(doi, config)
     else:
         return json.dumps({"success": False, "error": f"Unknown format: {format}. Use bibtex, ris, or endnote"})
@@ -1007,7 +1007,7 @@ def litloop_zotero_push(
         tags: tags
     """
     from .identifiers import normalize_doi
-    from .zotero import push_via_zotero_mcp
+    from .zotero.client import push_via_zotero_mcp
     config = load_config()
 
     # Check if paper is in cache
@@ -1374,7 +1374,7 @@ def litloop_tor_install() -> str:
     entirely within the litloop data directory.
     """
     config = load_config()
-    from .tor import install_tor
+    from .tor.proxy import install_tor
     result = install_tor(config)
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -1393,14 +1393,14 @@ def litloop_tor_start(use_bridges: bool = False) -> str:
         update_config("tor_use_bridges", "true")
     update_config("use_tor_for_scihub", "true")
 
-    from .tor import start_embedded_tor
+    from .tor.proxy import start_embedded_tor
     result = start_embedded_tor(config)
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 def litloop_tor_stop() -> str:
     """Stop the embedded Tor SOCKS5 proxy."""
-    from .tor import stop_embedded_tor
+    from .tor.proxy import stop_embedded_tor
     result = stop_embedded_tor()
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -1659,7 +1659,7 @@ def litloop_config(key: str = "", value: str = "") -> str:
 @mcp_app.tool()
 def litloop_glossary(action: str = "list", terms: list[str] | None = None, entry_id: str = "", note: str = "") -> str:
     """Abbreviation/synonym glossary searches expand: action=list|add (terms; waits for the user)|confirm|edit|delete (entry_id)."""
-    from . import glossary
+    from .terms import glossary
     try:
         if action == "add":
             return json.dumps(glossary.add(terms or [], note=note, source="agent"), ensure_ascii=False)

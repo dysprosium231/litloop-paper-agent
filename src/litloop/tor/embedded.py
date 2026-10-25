@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .log import get_logger
+from ..log import get_logger
 
 log = get_logger()
 
@@ -68,7 +68,7 @@ def _download_url() -> tuple[str, str]:
 
 
 def _tor_dir(config: dict[str, Any]) -> Path:
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     return Path(config.get("cache_dir", str(DATA_DIR / "cache"))).parent / "tor"
 
 

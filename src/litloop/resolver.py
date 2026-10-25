@@ -7,7 +7,7 @@ import time
 from difflib import SequenceMatcher
 from typing import Any
 
-from .paperlist import PaperEntry
+from .citations.paper_list import PaperEntry
 
 log = logging.getLogger(__name__)
 
