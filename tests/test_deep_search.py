@@ -33,7 +33,7 @@ def net(tmp_path, monkeypatch):
             return [by_doi[v] for v in values if v in by_doi]
         return []  # seed references: no metadata needed for these tests
 
-    def cites_refs(refs, terms, years, max_records=1000, credits0=None):
+    def cites_refs(refs, terms, years, max_records=1000, credits0=None, **kw):
         calls["cites_refs"].append(sorted(refs))
         return ([REF_TARGET, NOISE] if "R1" in refs else ([LATE] if "R7" in refs else [])), set(refs)
 
@@ -136,7 +136,7 @@ def test_start_needs_queries_and_seeds(net):
 def test_rated_paper_without_doi_is_not_served_again(net, monkeypatch):
     no_doi = dict(rec("10.1/x", "Infiltration of SiC foams by aluminium", abstract="pressureless infiltration SiC aluminum"),
                   doi=None, openalex="WNODOI")
-    monkeypatch.setattr(deep_search, "_cites_refs_on_topic", lambda refs, terms, years, max_records=1000, credits0=None: ([no_doi], set(refs)))
+    monkeypatch.setattr(deep_search, "_cites_refs_on_topic", lambda refs, terms, years, max_records=1000, credits0=None, **kw: ([no_doi], set(refs)))
     out = deep_search.start("q", ["pressureless infiltration SiC aluminum"], ["10.1/seed"], ["aluminum"], batch_size=10)
     first = [b for b in out["batch"] if b["doi"] is None]
     assert first

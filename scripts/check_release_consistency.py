@@ -55,7 +55,7 @@ RETIRED_TOOLS = (
     "litloop_ezproxy_status",
 )
 
-EXPECTED_TOOL_COUNT = 20
+EXPECTED_TOOL_COUNT = 21
 
 
 def _read_version_sources() -> list[tuple[str, str]]:

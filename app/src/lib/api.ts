@@ -65,6 +65,8 @@ export interface Summary {
   coverage?: { doi: string; status: "screened" | "seed" | "in_pool" | "not_found"; relevance?: string; rank?: number }[]
   core_terms?: string[]
   queries?: string[]
+  /** Glossary expansions used this session (docs/APP_DATA.md). */
+  glossary?: { term: string; with: string[]; id?: string; query?: string; alone?: boolean; core_term?: boolean }[]
 }
 
 export interface SessionRecord {

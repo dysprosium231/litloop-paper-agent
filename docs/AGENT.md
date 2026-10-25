@@ -88,7 +88,7 @@ litloop check                                                     # 检查依赖
 
 <!-- mcp-tools:start -->
 <details>
-<summary><strong>MCP 工具全表</strong>（20 个，按用途分组）</summary>
+<summary><strong>MCP 工具全表</strong>（21 个，按用途分组）</summary>
 
 | 想做什么 | 工具 |
 |---|---|
@@ -96,6 +96,7 @@ litloop check                                                     # 检查依赖
 | 批量下载（列表 / xlsx·csv·bib·APA 文件） | `litloop_batch_download` |
 | 检索、作者检索、深度检索（关键词 + 共同引用扩展，分批筛选） | `litloop_search` · `litloop_find` · `litloop_deep_search` |
 | 筛选记录（相关度 + 理由，记录选择，生成下载队列） | `litloop_screening` |
+| 术语表（缩写、同义词；深度检索自动展开，Agent 添加的要用户确认） | `litloop_glossary` |
 | 准备队列（校验 / OA 定位 / 构建） | `litloop_prepare_queue` |
 | 机构登录与状态（WebVPN / CARSI / EZProxy / 出版商 SSO） | `litloop_login` · `litloop_channel_status` · `litloop_schools` |
 | 引文 / 元数据 / Zotero | `litloop_citation` · `litloop_zotero_push` |

@@ -24,6 +24,7 @@ EXPECTED = {
     "litloop_elsevier_setup",
     "litloop_deep_search",
     "litloop_find",
+    "litloop_glossary",
     "litloop_login",
     "litloop_parse_list",
     "litloop_prepare_queue",
@@ -39,7 +40,7 @@ EXPECTED = {
 def test_tool_surface_matches_expected():
     tools = asyncio.run(mcp_app.list_tools())
     assert {t.name for t in tools} == EXPECTED
-    assert len(tools) == 20
+    assert len(tools) == 21
 
 
 def test_tool_descriptions_are_diet_sized():

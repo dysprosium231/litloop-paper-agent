@@ -89,6 +89,7 @@ with store.update(screening_dir() / f"{session}.json", indent=2) as data:
 | `coverage` | 必找文章：`doi`、`status`（`screened` 已评，带 `relevance`；`seed` 已是种子；`in_pool` 在候选池，带当前排名 `rank`；`not_found` 没找到） |
 | `api_warnings` | 额度、限流提醒（英文短句） |
 | `core_terms`、`queries` | 本次的核心词、检索词 |
+| `glossary` | 本次按术语表做的展开（2026-10-25 起）：每项 `term`（检索式里的写法）、`with`（另搜的写法）；检索词的展开带 `id`（术语编号）和 `query`，只有缩写本身、没有展开的另带 `alone: true`；核心词的展开带 `core_term: true`。没有展开时为空列表 |
 | `current_batch` | 当前这一批，和 Agent 看到的一样：`n`、`doi`、`title`、`year`、`journal`、`journal_rank`、`authors`（前 3 位）、`cited_by_count`、`abstract`（前 1200 字）、`abstract_missing`、`retracted`、`concern`、`why`（`shared_refs_with_seeds`、`queries_matched`、`found_via`） |
 
 ### 进度 `<session>.progress.json`
@@ -175,3 +176,19 @@ app 的「新建检索」把表单拼成一段话（`agent_runner.build_prompt`�
 - `state`：`running` → `done` / `failed` / `cancelled`；文件里是 `running`、但后台没有在跑它（app 中途关闭），读出时当作 `interrupted`。同一时间只运行一个。
 - `session`：Agent 保存的筛选会话（从工具返回里取到的最后一个），app 据此打开结果；`agent_session` 是 Agent 自己的对话编号，可用 `claude --resume` 接着聊。
 - `events` 只保留最近 200 条，`doing` 是当前一步，结束后为 `null`。
+
+### 术语表 `<litloop home>/glossary.json`
+
+app 和 Agent 共用，由 `glossary.py` 经 `store` 读写（2026-10-25 起）。
+
+```json
+{"schema": 1,
+ "entries": [{"id": "3f9a1c2e", "terms": ["PDC", "polymer-derived ceramic"], "status": "active",
+              "source": "user", "note": "", "added": "2026-10-25"}],
+ "dismissed": [["pdc", "polycrystalline diamond compact"]]}
+```
+
+- `terms`：同一个意思的几种写法，至少两种；第一种通常是缩写。
+- `status`：`active` 检索时使用；`suggested` 等用户确认（`source` 为 `agent` 或 `auto` 的条目都从这里开始）。
+- `source`：`user` 用户自己加的；`agent` Agent 建议的；`auto` 从读过的摘要里自动发现的（另有 `papers`：在几篇摘要里这样写）。
+- `dismissed`：用户删掉的自动建议（缩写和全称都已归一化），不再建议。

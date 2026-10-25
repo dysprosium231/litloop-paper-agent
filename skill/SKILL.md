@@ -25,9 +25,9 @@ description: >
 
 ## 概述
 
-litloop 是一个 MCP 服务器，提供 **20 个高层工具**，覆盖学术论文的搜索、下载（开放获取 / 灰色源 / 机构渠道）、发现与队列准备、引文导出和诊断排障。下载引擎支持 13+ 数据源并行竞速、100+ 中国高校 WebVPN。
+litloop 是一个 MCP 服务器，提供 **21 个高层工具**，覆盖学术论文的搜索、下载（开放获取 / 灰色源 / 机构渠道）、发现与队列准备、引文导出和诊断排障。下载引擎支持 13+ 数据源并行竞速、100+ 中国高校 WebVPN。
 
-## MCP 工具参考（20 个）
+## MCP 工具参考（21 个）
 
 ### 下载
 
@@ -71,6 +71,7 @@ litloop 是一个 MCP 服务器，提供 **20 个高层工具**，覆盖学术�
 | 工具 | 功能 | 关键参数 |
 |------|------|----------|
 | `litloop_config` | 读取/设置配置（值会脱敏） | `key`（可选）、`value`（可选） |
+| `litloop_glossary` | 术语表（缩写、同义词）：深度检索自动展开；Agent 添加的条目要用户确认才生效 | `action=list\|add\|confirm\|edit\|delete`、`terms`、`entry_id` |
 | `litloop_channel_status` | 机构渠道状态：`kind=webvpn\|carsi\|ezproxy\|browser\|webvpn_test` | `kind`、`doi`（仅测试） |
 | `litloop_schools` | 搜索/设置 WebVPN 高校 | `action=search\|set`、`query`、`school` |
 | `litloop_diagnostics` | 健康/网络/来源/设置诊断 | `check=health\|network\|sources\|setup` |

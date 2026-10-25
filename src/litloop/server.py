@@ -1655,6 +1655,29 @@ def litloop_config(key: str = "", value: str = "") -> str:
 
 
 @mcp_app.tool()
+def litloop_glossary(action: str = "list", terms: list[str] | None = None, entry_id: str = "", note: str = "") -> str:
+    """Abbreviation/synonym glossary searches expand: action=list|add (terms; waits for the user)|confirm|edit|delete (entry_id)."""
+    from . import glossary
+    try:
+        if action == "add":
+            return json.dumps(glossary.add(terms or [], note=note, source="agent"), ensure_ascii=False)
+        if action == "confirm":
+            return json.dumps(glossary.update(entry_id, confirm=True), ensure_ascii=False)
+        if action == "edit":
+            return json.dumps(glossary.update(entry_id, terms=terms, note=note or None), ensure_ascii=False)
+        if action == "delete":
+            glossary.delete(entry_id)
+            return json.dumps({"deleted": entry_id}, ensure_ascii=False)
+        if action != "list":
+            return json.dumps({"error": f"unknown action: {action}",
+                               "allowed": ["list", "add", "confirm", "edit", "delete"]}, ensure_ascii=False)
+        return json.dumps({"active": glossary.entries("active"), "suggested": glossary.entries("suggested"),
+                           "note": "Suggested entries count only after the user confirms them."}, ensure_ascii=False)
+    except (KeyError, ValueError) as exc:
+        return json.dumps({"error": str(exc).strip("'\"")}, ensure_ascii=False)
+
+
+@mcp_app.tool()
 def litloop_tor(action: str = "start", use_bridges: bool = False) -> str:
     """Embedded Tor SOCKS5 proxy: action=install|start|stop; use_bridges enables obfs4 when Tor itself is blocked."""
     if action == "install":

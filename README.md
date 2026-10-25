@@ -169,7 +169,7 @@
 
 ## 搭配 Agent 使用
 
-LitLoop 同时是一个 MCP 服务器（20 个工具）和命令行工具。装进 Claude Code、Codex、ZCode 后，可以不打开 app，直接用一句话走完流程：
+LitLoop 同时是一个 MCP 服务器（21 个工具）和命令行工具。装进 Claude Code、Codex、ZCode 后，可以不打开 app，直接用一句话走完流程：
 
 ```text
 找一下近五年城市热岛和绿地降温的论文，只要中科院 2 区以上，排除撤稿

@@ -50,7 +50,7 @@
 - [ ] 类别多、彼此引用少的课题建池（评审 5）：稀土测试集漏的 7 篇里 3 篇不在候选池；离线对比“每个子方向单写检索词”和“按类别配额出批”，看读到第 60 篇找到几篇目标。
 - [ ] 用公开数据集离线评测排序和停止规则（SYNERGY，`scripts/eval_synergy.py`；2026-10-24 已跑 10 个综述，结果见 DECISIONS「SYNERGY 离线评测（第二批）」）：停止规则改成“连续 2 批才停”在 10 个综述上都更好，**待用户决定**；排序在“类别多、彼此引用少”的综述上弱（Moran_2021 读 200 篇只找到 8%），并入下一条一起改。它评不了建候选池和材料领域，这两项仍靠 `tests/acceptance/`。
 - [ ] 停止规则校准（评审 8）：每轮已记下规则和估计（`stop_checks`），`scripts/stop_calibration.py` 汇总，评测工具 `--past-stop` 可读过停止点；SYNERGY 上可离线试（`eval_synergy.py run --knee/--patience`），攒够数据再改，现在不改。
-- [ ] 术语表（2026-10-16 用户确定，设计见 CHARTER）：用户在 app 里增删缩写和同义词、设作用范围；Agent 可建议、用户确认；检索时自动展开并写明用到的展开。可先做配置文件 + MCP 动作，再做 app 页面。
+- [ ] 术语表（设计见 CHARTER，2026-10-25 改定）：后台、深度检索的展开和自动建议、MCP 工具 `litloop_glossary` 已做（见 DECISIONS「术语表」）。还差：app 里的术语表页面（确认、删除建议，增改条目）；快速检索也按术语表展开；等真实检索后看建议条目的质量。
 - [ ] 阶段 3：系统综述支持（PRISMA 式统计、纳入排除理由，中断后可续跑）。
 - [ ] 阶段 4：定期追踪（保存检索式，只推送新文章）。
 - [ ] 中文文献（知网、万方）。
@@ -67,6 +67,7 @@
 
 ### 分析归纳
 - [ ] 从全文抽取要点、做对比表、起草综述（现成的 `extractors.extract_figures` 可抽图注）；app 的分析归纳页。
+  - 抽取性质数据考虑用 [ChemDataExtractor2](https://github.com/CambridgeMolecularEngineering/ChemDataExtractor2)（2026-10-25 用户提出；MIT，剑桥维护，能从材料与化学论文的正文和表格里抽化合物、性质数值、光谱）。它要求 Python ≤ 3.12、numpy < 2，依赖 transformers、stanza 等，几个 GB，和 LitLoop 的环境（Python 3.14、numpy 2）冲突：单独建一个环境，LitLoop 用子进程调用它（像 zotero-mcp 那样）。它的缩写识别没有用于术语表：600 篇材料摘要上实测不如 `abbreviations`（见 DECISIONS「术语表」）。
 
 ### 待用户决定
 - [ ] Sci-Hub、LibGen、Tor 和自动化 WebVPN 登录是否拆成单独的插件（2026-10-23 外部审查提出：放在实名公开的仓库里，默认关闭也不改变代码存在这个事实；见 DECISIONS「外部代码审查」第 9 条）。

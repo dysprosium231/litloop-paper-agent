@@ -206,17 +206,22 @@ def _citing(work_ids: list[str], years: list[str], max_records: int = 400) -> li
                      _chunks(work_ids))
 
 
-def _topic_search(term: str) -> str:
+def _topic_search(term: str, glossary_alts: dict[str, list[str]] | None = None) -> str:
     """Core term -> OpenAlex search text. Words must all appear; ``a|b`` means either.
 
     Papers often write only the abbreviation ("Al/SiC"), so the agent writes
     "Al|aluminum SiC"; British spellings are added here, giving
-    "(Al OR aluminum OR aluminium) AND SiC".
+    "(Al OR aluminum OR aluminium) AND SiC". The user's glossary adds its other
+    terms to a word it knows (``glossary_alts``, from ``_glossary_expansions``),
+    a phrase in quotes: "(PDC OR \"polymer-derived ceramic\") AND aerogel".
     """
     from .spelling import variants
     groups = []
     for w in term.replace(",", " ").split():
         alts = [v for a in w.split("|") if a for v in variants(a)]
+        for a in w.split("|"):
+            for g in (glossary_alts or {}).get(a.lower(), []):
+                alts.append(f'"{g}"' if (" " in g or "-" in g) else g)
         if alts:
             groups.append(list(dict.fromkeys(alts)))
     if all(len(g) == 1 for g in groups):
@@ -235,6 +240,7 @@ def _budget_ok(credits0: int) -> bool:
 
 def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[str],
                          max_records: int = 1000, credits0: int | None = None,
+                         glossary_alts: dict[str, list[str]] | None = None,
                          ) -> tuple[list[dict[str, Any]], set[str]]:
     """Works citing any of ``ref_ids`` whose title/abstract mentions every core term.
 
@@ -253,7 +259,7 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
     jobs = [(term, chunk) for chunk in _chunks(ref_ids)]
 
     def flt(term: str, chunk: list[str]) -> str:
-        topic = [f"title_and_abstract.search:{_topic_search(term)}"] if term else []
+        topic = [f"title_and_abstract.search:{_topic_search(term, glossary_alts)}"] if term else []
         return ",".join(["cites:" + "|".join(chunk)] + topic + years)
 
     def one(job: tuple[str, list[str]]) -> list[tuple[bool, list[dict[str, Any]]]]:
@@ -337,15 +343,21 @@ def _score(state: dict[str, Any]) -> None:
     # hits only change with its text or the queries, so only new or changed ones are matched.
     cache = _cache(state)["hits"]
     queries = tuple(state["queries"])
-    stale = {k: r for k, r in pool.items() if cache.get(k, (None,))[0] != (queries, _text_sig(r))}
+    # A query's glossary variants ("PDC aerogel" -> "polymer-derived ceramic aerogel")
+    # count as the query: a paper matching either has matched it once.
+    variants = state.get("query_variants") or {}
+    sig = (queries, tuple(tuple(variants.get(q) or ()) for q in queries))
+    stale = {k: r for k, r in pool.items() if cache.get(k, (None,))[0] != (sig, _text_sig(r))}
     fresh = {k: 0 for k in stale}
     for q in queries:
         rows = [{"title": r["title"], "abstract": r.get("abstract") or "", "_k": k} for k, r in stale.items()]
-        for row in _match_tier(rows, q):
-            if row["_tier"] == 0:
-                fresh[row["_k"]] += 1
+        hit = set()
+        for form in [q, *(variants.get(q) or [])]:
+            hit |= {row["_k"] for row in _match_tier(rows, form) if row["_tier"] == 0}
+        for k in hit:
+            fresh[k] += 1
     for k, n in fresh.items():
-        cache[k] = ((queries, _text_sig(stale[k])), n)
+        cache[k] = ((sig, _text_sig(stale[k])), n)
     hits = {k: cache[k][1] for k in pool}
     for k, r in pool.items():
         shared = [ref for ref in (r.get("refs") or []) if ref in seed_refs]
@@ -551,7 +563,8 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
     if new_refs:
         for rec in _by_filter("openalex", new_refs, years):
             _add(pool, rec, "seed_reference")
-        got, asked = _cites_refs_on_topic(new_refs, state["core_terms"], years, credits0=credits0)
+        got, asked = _cites_refs_on_topic(new_refs, state["core_terms"], years, credits0=credits0,
+                                          glossary_alts=state.get("glossary_alts"))
         for rec in got:
             _add(pool, rec, "cites_seed_references")
     seed_ids = [s["openalex"] for s in seeds if s.get("openalex")]
@@ -614,13 +627,15 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
 def _start(session: str, t0: float, question: str, queries: list[str], seeds: list[str],
            core_terms: list[str], must_find: list[str] | None, year_from: int | None, year_to: int | None,
            batch_size: int, cap: int) -> dict[str, Any]:
-    _phase("keywords", len(queries))
+    query_variants, glossary_alts, glossary_used = _glossary_expansions(queries, core_terms)
+    all_queries = queries + [v for q in queries for v in query_variants.get(q, [])]
+    _phase("keywords", len(all_queries))
     years = _year_filter(year_from, year_to)
     pool: dict[str, dict] = {}
     seed_recs = _by_filter("doi", [canonical_doi(s) for s in seeds])
     for rec in seed_recs:
         _add(pool, rec, "seed")
-    for q, rows in _keyword_candidates(queries, year_from, year_to).items():
+    for q, rows in _keyword_candidates(all_queries, year_from, year_to).items():
         for r in rows:
             _add(pool, {"openalex": None, "doi": canonical_doi(r.get("doi")) or None,
                         "title": r.get("title") or "", "year": r.get("year"), "journal": r.get("journal") or "",
@@ -635,7 +650,8 @@ def _start(session: str, t0: float, question: str, queries: list[str], seeds: li
              "orig_seeds": [_key(r) for r in seed_recs],
              "year_from": year_from, "year_to": year_to, "batch_size": batch_size, "cap": cap,
              "must_find": [canonical_doi(d) for d in (must_find or [])], "seeds": [], "seed_refs": [],
-             "queried_refs": [], "served": [], "rounds": [], "pool": pool}
+             "queried_refs": [], "served": [], "rounds": [], "pool": pool,
+             "query_variants": query_variants, "glossary_alts": glossary_alts, "glossary_used": glossary_used}
     _expand(state, [_key(r) for r in seed_recs])
     _score(state)
     state["rounds"].append({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "event": "start",
@@ -645,8 +661,56 @@ def _start(session: str, t0: float, question: str, queries: list[str], seeds: li
     notes = _core_term_notes(core_terms)
     if notes:
         out["core_term_notes"] = notes
+    if glossary_used:
+        out["glossary"] = glossary_used
     _run.progress.finish()
     return out
+
+
+def _glossary_expansions(queries: list[str], core_terms: list[str],
+                         ) -> tuple[dict[str, list[str]], dict[str, list[str]], list[dict[str, Any]]]:
+    """What the user's glossary (``glossary.py``) adds to this search: other
+    wordings of each query, other terms for the words of the core terms, and a
+    report of both for the user. Core-term words are expanded only when there
+    are at least two of them, so another concept keeps each expansion on topic."""
+    from . import glossary
+    try:
+        use = glossary.entries("active")
+    except Exception as exc:  # an unreadable glossary must not stop the search
+        logger.warning("deep search: glossary not read (%s)", exc)
+        return {}, {}, []
+    if not use:
+        return {}, {}, []
+    variants: dict[str, list[str]] = {}
+    used: list[dict[str, Any]] = []
+    for q in queries:
+        v, u = glossary.query_variants(q, use)
+        if v:
+            variants[q] = v
+        used += u
+    alts: dict[str, list[str]] = {}
+    words = [a for term in core_terms for w in term.replace(",", " ").split() for a in w.split("|") if a]
+    if len(words) >= 2:
+        for a in words:
+            more = glossary.alternatives(a, use)
+            if more and a.lower() not in alts:
+                alts[a.lower()] = more
+                used.append({"term": a, "with": more, "core_term": True})
+    return variants, alts, used
+
+
+def _glossary_suggestions(state: dict[str, Any], rated: dict[str, str]) -> list[dict[str, Any]]:
+    """Abbreviations the papers read so far define ("polymer-derived ceramics
+    (PDCs)"), added to the glossary as suggestions for the user to confirm."""
+    from . import glossary
+    pool = state["pool"]
+    keys = set(state["seeds"]) | {k for k, r in rated.items() if r in ("高", "中")}
+    texts = [pool[k].get("abstract") or "" for k in keys if k in pool]
+    try:
+        return [{k: e.get(k) for k in ("id", "terms", "note")} for e in glossary.suggest_from(texts)]
+    except Exception as exc:  # a suggestion is a convenience; the search goes on without it
+        logger.warning("deep search: no glossary suggestions (%s)", exc)
+        return []
 
 
 def next_batch(session: str, force: bool = False) -> dict[str, Any]:
@@ -700,6 +764,9 @@ def _next_round(session: str, force: bool = False) -> dict[str, Any]:
     state["rounds"].append(rnd)
     _save(state)
     out = _next_batch(state, rated, force, prefilled=True)
+    suggested = _glossary_suggestions(state, rated)
+    if suggested:
+        out["glossary_suggestions"] = suggested
     rnd["rank_seconds"] = round(time.time() - t1, 1)  # abstracts, model, journal ranks
     rnd["openalex_credits"] = quota.spent("openalex") - credits0
     rnd["api_budget"] = {k: {f: v.get(f) for f in ("remaining", "limit", "resets_at")}
@@ -946,6 +1013,7 @@ def _write_summary(state: dict[str, Any], rated: dict[str, str], stop: dict[str,
                "stop_suggested": stop.get("stop_suggested", False), "stop_reason": stop.get("stop_reason", ""),
                "remaining_estimate": stop.get("remaining_estimate"),
                "coverage": coverage, "api_warnings": notes, "core_terms": state.get("core_terms", []),
+               "glossary": state.get("glossary_used", []),
                "queries": state.get("queries", []), "current_batch": batch}
     try:
         store.write_json(store.summary_path(state["session"]), summary)

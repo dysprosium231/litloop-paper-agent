@@ -22,6 +22,9 @@ dependencies = [
     # WebVPN's address encoding; fetcher imports it at the top, so every
     # download needs it (2026-10-23: a base install could not download).
     "pycryptodome>=3.20",
+    # Finds "long form (SF)" pairs in abstracts for the glossary's suggestions
+    # (Schwartz-Hearst; MIT, needs only `regex`).
+    "abbreviations>=0.2.5",
 ]
 
 [project.urls]
