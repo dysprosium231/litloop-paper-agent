@@ -427,9 +427,9 @@ _WORD = re.compile(r"[a-z][a-z0-9]+")
 
 def _tokens(rec: dict[str, Any]) -> Counter:
     from .terms.spelling import to_us
-    from .terms.text import STOPWORDS, stem
+    from .terms.text import RANKING_STOPWORDS, stem
     words = (rec.get("title") or "") + " " + (rec.get("abstract") or "")
-    return Counter(stem(w) for w in _WORD.findall(to_us(words)) if w not in STOPWORDS)
+    return Counter(stem(w) for w in _WORD.findall(to_us(words)) if w not in RANKING_STOPWORDS)
 
 
 def _features(state: dict[str, Any]) -> dict[str, dict[str, float]]:

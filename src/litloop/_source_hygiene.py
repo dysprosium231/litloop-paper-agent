@@ -3,6 +3,8 @@
 Scans source code for:
 - Hard-coded absolute user / development paths (e.g. D:\\Projects, C:\\Users)
 - Hard-coded User-Agent strings drifting away from litloop.network.user_agent()
+- Own copies of the text rules litloop.terms.text holds (stop-word lists, dash
+  sets, title keys, guessed element symbols); 2026-10-25 there were 15 of them
 """
 
 from __future__ import annotations
@@ -18,6 +20,34 @@ USER_PATH_PATTERN = re.compile(r"[A-Za-z]:[\\/]+(?:Projects|Users)[\\/]+", re.I)
 USER_AGENT_PATTERN = re.compile(r"(?:LitLoop|litloop)/\d+")
 
 UA_EXEMPT_FILENAMES = frozenset({"network.py"})
+
+RULE_OWN_TEXT_RULE = "own copy of a text rule (use litloop.terms.text)"
+_DASH_CHAR = r"(?:[‐-―−]|\\u201[0-5]|\\u2212)"
+TITLE_KEY_PATTERN = re.compile(r"""\[\^a-z0-9\]\+["']\s*,\s*["']["']""")  # re.sub(r"[^a-z0-9]+", "", title)
+DASH_SET_PATTERN = re.compile(rf"\[[^\]\n]*{_DASH_CHAR}[^\]\n]*{_DASH_CHAR}")  # [...] with two kinds of dash
+DASH_REPLACE_PATTERN = re.compile(rf"""\.replace\(\s*["']{_DASH_CHAR}""")
+ELEMENT_GUESS_PATTERN = re.compile(r"\^\[A-Z\]\[a-z\]\?\$")  # ^[A-Z][a-z]?$
+_STOPWORD_SAMPLE = frozenset("a an and the of in on for to with by from at as or".split())
+_WORDS_LITERAL = re.compile(r"""["']([a-z]+(?: [a-z]+){5,}) ?["']""")
+
+
+def _is_text_rules_home(path: Path) -> bool:
+    """terms/text.py holds the rules; this file holds the patterns that find copies of them."""
+    return (path.name == "text.py" and path.parent.name == "terms") or path.name == "_source_hygiene.py"
+
+
+def own_text_rule(line: str) -> str:
+    """Which rule of litloop.terms.text the line rebuilds, or ""."""
+    if TITLE_KEY_PATTERN.search(line):
+        return "title key: use text.title_key / text.paper_key"
+    if DASH_SET_PATTERN.search(line) or DASH_REPLACE_PATTERN.search(line):
+        return "dash set: use text.DASHES / text.ascii_dashes / text.plain"
+    if ELEMENT_GUESS_PATTERN.search(line):
+        return "element guess: use text.element_symbols / text.is_chemical_system"
+    for m in _WORDS_LITERAL.finditer(line):
+        if len(set(m.group(1).split()) & _STOPWORD_SAMPLE) >= 5:
+            return "stop-word list: use text.STOPWORDS"
+    return ""
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PACKAGE_DIR.parent.parent
@@ -101,7 +131,11 @@ def check_source_hygiene(
             continue
 
         is_network = py_file.name in UA_EXEMPT_FILENAMES
+        is_text_home = _is_text_rules_home(py_file)
         for idx, line in enumerate(lines, 1):
+            what = "" if is_text_home else own_text_rule(line)
+            if what:
+                problems.append(HygieneProblem(file=rel, line=idx, rule=RULE_OWN_TEXT_RULE, detail=what))
             if USER_PATH_PATTERN.search(line):
                 problems.append(
                     HygieneProblem(

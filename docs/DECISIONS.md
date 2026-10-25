@@ -85,7 +85,25 @@
   - 化学体系只认真正的元素符号。
   - 术语匹配接受各种连字符。
 - **防止再写重复**：AGENTS.md 新增「代码放在哪」；源码规范检查会报出 `text.py` 之外另写的停用词表、连字符集合、标题键和元素猜测（规则在重构前的代码上能找出全部 15 处，重构后为 0）。
-- **评测**：SYNERGY 10 个综述各 3 轮，比较改动前后的召回率和 WSS@95。结果待补。
+- **评测**：SYNERGY 10 个综述各 3 轮。合并后 Leenaars_2019、Appenzeller-Herzog_2019 变差（Leenaars 读到 95% 召回从 181/134/135 篇变成 182/152/184 篇）。评测是确定的（重跑逐位相同）；只把排序特征的停用词表换回旧的，两个综述逐位回到改动前，原因确认；只加 via/under/over/between 也会改变排序。修法：排序特征改用单独的 `RANKING_STOPWORDS`（和改动前相同），加回归测试（换回合并表时会失败）。修后 10 个综述 30 轮和改动前逐位相同。
+
+## 2026-10-25：模块按领域分子包
+
+- **起因**：用户要求把散落的同类代码和模块名字统一整理。`src/litloop/` 顶层平铺了 70 多个模块，其中：
+  - 名字不说明用途：`discovery.py` 其实是 ScanSci Find 的封装；`setup.py` 是环境诊断，和 setuptools 的 `setup.py` 同名；`camofox.py` 是云端 API 客户端，不是本地的 camoufox 浏览器。
+  - 同一个东西有两份：`cloakbrowser_compat.py` 在顶层和 `institutional/` 下各一份。
+  - 只做转发的空壳：`institutional/fetcher.py`、`institutional/profile_health.py`。
+  - 同名不同物：`sources/carsi.py` 是 CARSI 登录，`sources/carsi_source.py` 才是下载来源。
+- **用户的决定**：按领域分子包（在“只清理重复和误导的名字”和“按领域分子包”之间选了后者），对照表经用户确认，见 [LAYOUT.md](LAYOUT.md)。用户还要求以后写新代码也照这个布局放：写进 AGENTS.md「代码放在哪」。
+- **考虑过的其他做法**：
+  - 只改名、不分包：改动小，但 70 多个模块仍然平铺，新代码放哪还是靠猜。没采用。
+  - 旧名字全部留转发模块：外部用户只通过 `litloop` 命令、`python -m litloop` 和 MCP 工具使用 LitLoop，没有人 import 内部模块，留转发只会让同一个东西有两个名字。没采用。
+  - 桌面后台的子包叫 `app/`：和仓库根目录的 `app/`（前端）同名，容易混淆，改叫 `desktop/`。
+- **兼容**：`litloop` 命令、`python -m litloop`、`from litloop import search_papers` 不变。唯一保留的转发是 `litloop.app_server`：已经装好的桌面 app 用这个路径启动后台，留一个版本后删除。
+- **做法**：分 4 批，Antigravity 按对照表 `git mv` 并改 import，Claude 审查改动（只许有 import 行、路径字符串和按文件位置找的路径）、跑 import 冒烟测试、全量测试和一致性检查后单独提交。
+  - 第 1 批 terms、citations、tor、zotero：7249a9a（52 个文件，只有 import、3 个测试里的路径字符串、bridge 脚本的文件名和冒烟测试清单变了；冒烟 25/25，全量 944 通过）。
+  - 其余三批待做，要特别处理的地方记在 LAYOUT.md「还没搬的几批要注意的」：按文件位置找路径的 5 处里，`cloakbrowser_compat.py` 若照搬不改，会让用户已下载的内置浏览器找不到。
+- **防止再写重复**：源码规范检查（`_source_hygiene.py`）报出 `terms/text.py` 之外另写的停用词表、连字符集合、标题键和元素猜测；在重构前的代码上它能找出全部 15 处，现在为 0。“没写进 LAYOUT.md 的模块”这一项等模块搬完再加。
 
 ## 2026-10-24：SYNERGY 离线评测（第二批，共 10 个综述）
 

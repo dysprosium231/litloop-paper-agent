@@ -5,6 +5,13 @@
 
 ## 正在做
 
+**代码整理**（2026-10-25 起，用户要求；布局见 [docs/LAYOUT.md](docs/LAYOUT.md)）：
+- [x] 文本规则合成一份 `text.py`（54a199a，见 DECISIONS「文本归一化合成一份」）。
+- [ ] 修回排序：合并停用词表让排序模型变差（SYNERGY 上 Leenaars、Appenzeller-Herzog，对照实验已确认是这一处，介词也会改变排序）；排序特征改用单独的 `RANKING_STOPWORDS`（和改动前相同），加回归测试，10 个综述的评测要和改动前逐位相同。
+- [ ] 模块按领域分子包，分 4 批（Antigravity 搬、Claude 审查和验证、每批单独提交）：~~terms/citations/tor/zotero~~（7249a9a）→ search/download → browser/institutional/sources/publishers → desktop/cli/入口。后三批要特别处理的地方（按文件位置找的路径、`search` 变成包、唯一保留的 `app_server` 转发）记在 LAYOUT.md「还没搬的几批要注意的」。
+- [ ] 装上防重复的检查：源码规范检查报出 `terms/text.py` 之外另写的文本规则（2026-10-25 已装）；一致性检查报出没写进 LAYOUT.md 的模块（等模块搬完再装）。
+- [ ] 删掉 `litloop.app_server` 转发模块：留一个版本，给已装好的桌面 app 用。
+
 **下载提速与实测**（2026-10-17 起）。2026-10-19 晚收尾时的状态：
 - 第 1 条重测已做完（结果见 DECISIONS「新文献重测（第二轮）」），细查出的三个小问题已修（f768355），都标了“待实测”。
 - 第 2 条「出版商官网只用专用窗口」代码已改（2026-10-20，见 DECISIONS），待实测：重启 app 后用同样 20 篇重测、逐篇对比；重点看最小化的窗口里人机验证能否自己通过、需要操作时窗口有没有弹到前台。
@@ -74,7 +81,7 @@
 
 ### 不做
 - 不重写下载引擎；不把排序换成大模型打分；没有测试集不调排序参数（2026-10-18 评审）。
-- 不拆分 `server.py`、`_publisher_strategies_core.py` 两个大文件（继承自原项目，风险大、收益不直接）。
+- 不拆分 `server.py`、`_publisher_strategies_core.py` 两个大文件（继承自原项目，风险大、收益不直接）。2026-10-25 的模块整理只把后者原样挪到 `publishers/strategies/_core.py`，不拆。
 - 不给 `publisher-batch` 补导入登录状态，整条路去掉（2026-10-19）。
 - 不接回 FlareSolverr（要另跑服务；人机验证交给用户，2026-10-19）。
 

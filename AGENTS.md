@@ -36,6 +36,17 @@
 
 - `skills/litloop/SKILL.md`、`zcode-plugin/skills/litloop/SKILL.md`、`skill/SKILL.md` 由 `skills-src/` 生成：改 `skills-src/` 里的模板或 `shared/` 片段，再运行 `python scripts/build_skills.py`；不要直接改生成的文件（`check_release_consistency.py` 会报出来）。
 
+## 代码放在哪
+
+- 模块按领域分子包，布局和每个子包管什么写在 [docs/LAYOUT.md](docs/LAYOUT.md)。新函数、新模块放进对应的子包；几个子包都要用的才放顶层。新增或挪动模块时同步改 LAYOUT.md。
+- 写之前先找现成的，不要另写一份：
+  - 文本归一化（大小写、各种连字符、英美拼写、单复数、截词、停用词）、元素符号、判断两条记录是不是同一篇文献：用 `terms/text.py`；
+  - 缩写、同义词、拼写的展开：用 `terms/glossary.py`（`in_use`、`query_variants`、`alternatives`）；
+  - DOI 的解析和规范化：用 `identifiers.py`。
+- 现成的不够用，就在原模块里扩展，不在调用处另写一版。
+- `check_release_consistency.py` 会报出在 `terms/text.py` 之外另写的停用词表、连字符集合、标题键和元素猜测（`_source_hygiene.py`）。模块全部搬完后，再加上“没写进 LAYOUT.md 的模块”这一项。
+- 排序模型的词特征用 `RANKING_STOPWORDS`，不用 `STOPWORDS`；改它会改变深度检索的排序，改之前和改之后都跑 `scripts/eval_synergy.py`。
+
 ## 其他
 
 - 与用户交流用简体中文；提交信息可以用英文。

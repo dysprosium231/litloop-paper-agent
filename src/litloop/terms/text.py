@@ -7,7 +7,8 @@ stemming, four sets of dashes and four paper keys):
 * ``plain`` / ``squash`` / ``ascii_dashes``: case, every kind of dash, American spelling;
 * ``singular`` / ``stem``: the plural of a word, and the crude prefix stem used
   for substring tests and word features;
-* ``STOPWORDS``: words that carry no topic;
+* ``STOPWORDS``: words that carry no topic in a query; ``RANKING_STOPWORDS``,
+  the shorter list the ranking model's word features drop;
 * ``element_symbols``: the chemical elements (data/elements.tsv, from PubChem);
 * ``paper_key`` / ``title_key``: when two records are the same paper.
 """
@@ -29,6 +30,17 @@ STOPWORDS = frozenset(
     "a an and the of in on for to with by from at as or via its their into using based under over between "
     "is are was were be this that these which we our than also "
     "study studies effect effects analysis review".split()
+)
+
+# The ranking model's word features (deep_search ``_tokens``) drop only these.
+# Not STOPWORDS: on SYNERGY, dropping review/study/effect/analysis/using/based
+# from the features made Leenaars_2019 and Appenzeller-Herzog_2019 worse, and
+# adding just via/under/over/between changed the ranking too (DECISIONS,
+# 2026-10-25). Changing this list changes the ranking: run
+# scripts/eval_synergy.py before and after.
+RANKING_STOPWORDS = frozenset(
+    "the and of in for with by on to a an is are was were from as at this that these be or its "
+    "their which we our into than also".split()
 )
 
 

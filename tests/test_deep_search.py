@@ -447,3 +447,8 @@ def test_next_round_fetches_abstracts_while_it_expands(net, monkeypatch):
     assert events == ["fetch start", "expand", "fetch end"]
     rnd = deep_search._load(sid)["rounds"][-1]
     assert rnd["abstracts_asked"] >= 1 and "abstracts_wait_seconds" in rnd
+
+
+def test_word_features_keep_words_that_only_queries_ignore():
+    toks = deep_search._tokens({"title": "A review of the effect", "abstract": "via study"})
+    assert {"review", "effect", "via", "study"} <= set(toks) and "the" not in toks

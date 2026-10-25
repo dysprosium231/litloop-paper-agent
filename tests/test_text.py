@@ -24,3 +24,11 @@ def test_elements_and_chemical_systems():
 def test_paper_key():
     assert text.paper_key({"doi": "https://doi.org/10.1/ABC", "title": "x"}) == "10.1/abc"
     assert text.paper_key({"title": "A Title: With, Punctuation"}) == "title:atitlewithpunctuation"
+
+
+def test_ranking_stop_list_is_pinned():
+    # Changing it changes the deep search's ranking: re-run scripts/eval_synergy.py first.
+    assert text.RANKING_STOPWORDS == frozenset(
+        "the and of in for with by on to a an is are was were from as at this that these be or its "
+        "their which we our into than also".split())
+    assert {"review", "study", "effect", "via"}.isdisjoint(text.RANKING_STOPWORDS)
