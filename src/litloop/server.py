@@ -265,6 +265,7 @@ def litloop_search(
 ) -> str:
     """Search papers by English keywords/author; sort=cited|date; journal filters (max_cas_zone / max_cas_sub_zone / max_jcr_quartile) are off unless set. out_file queues."""
     stats: dict = {}
+    expansions: list = []
     results = search_papers(
         query,
         limit=min(limit, 50),
@@ -279,8 +280,10 @@ def litloop_search(
         exclude_warning=exclude_warning,
         exclude_retracted=exclude_retracted,
         stats=stats,
+        expansions=expansions,
     )
     filtered = {k: v for k, v in stats.items() if v}
+    extra = {**({"filtered": filtered} if filtered else {}), **({"glossary": expansions} if expansions else {})}
     if out_file and results:
         from .pipeline import QueueEntry, predict_channel, write_queue
 
@@ -296,11 +299,10 @@ def litloop_search(
         path = write_queue(qe, out_file)
         return _with_update_notice(json.dumps(
             {"results": results, "queue_file": str(path), "queued": len(qe),
-             **({"filtered": filtered} if filtered else {})},
+             **extra},
             ensure_ascii=False,
         ))
-    return _with_update_notice(json.dumps({"results": results, **({"filtered": filtered} if filtered else {})},
-                                          ensure_ascii=False))
+    return _with_update_notice(json.dumps({"results": results, **extra}, ensure_ascii=False))
 
 
 def _with_update_notice(out: str) -> str:
@@ -1672,7 +1674,10 @@ def litloop_glossary(action: str = "list", terms: list[str] | None = None, entry
             return json.dumps({"error": f"unknown action: {action}",
                                "allowed": ["list", "add", "confirm", "edit", "delete"]}, ensure_ascii=False)
         return json.dumps({"active": glossary.entries("active"), "suggested": glossary.entries("suggested"),
-                           "note": "Suggested entries count only after the user confirms them."}, ensure_ascii=False)
+                           "builtin_disabled": sorted(glossary.disabled()),
+                           "note": "Suggested entries count only after the user confirms them. Element "
+                                   "symbols/names (Al = aluminum) and British/American spellings are built in; "
+                                   "builtin_disabled lists those the user switched off."}, ensure_ascii=False)
     except (KeyError, ValueError) as exc:
         return json.dumps({"error": str(exc).strip("'\"")}, ensure_ascii=False)
 

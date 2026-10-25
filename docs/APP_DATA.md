@@ -185,10 +185,13 @@ app 和 Agent 共用，由 `glossary.py` 经 `store` 读写（2026-10-25 起）�
 {"schema": 1,
  "entries": [{"id": "3f9a1c2e", "terms": ["PDC", "polymer-derived ceramic"], "status": "active",
               "source": "user", "note": "", "added": "2026-10-25"}],
- "dismissed": [["pdc", "polycrystalline diamond compact"]]}
+ "dismissed": [["pdc", "polycrystalline diamond compact"]],
+ "disabled": ["element:La", "spelling:aluminum"]}
 ```
 
 - `terms`：同一个意思的几种写法，至少两种；第一种通常是缩写。
 - `status`：`active` 检索时使用；`suggested` 等用户确认（`source` 为 `agent` 或 `auto` 的条目都从这里开始）。
 - `source`：`user` 用户自己加的；`agent` Agent 建议的；`auto` 从读过的摘要里自动发现的（另有 `papers`：在几篇摘要里这样写）。
 - `dismissed`：用户删掉的自动建议（缩写和全称都已归一化），不再建议。
+- `disabled`：用户停用的内置条目（2026-10-25 起）：`element:<元素符号>`，或 `spelling:<美式拼写>`（这个词不再按英美拼写展开、统一）。
+- 概况文件 `glossary` 里来自内置元素表的展开带 `builtin: "element"`。

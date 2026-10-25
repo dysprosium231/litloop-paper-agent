@@ -221,7 +221,7 @@ def _topic_search(term: str, glossary_alts: dict[str, list[str]] | None = None) 
         alts = [v for a in w.split("|") if a for v in variants(a)]
         for a in w.split("|"):
             for g in (glossary_alts or {}).get(a.lower(), []):
-                alts.append(f'"{g}"' if (" " in g or "-" in g) else g)
+                alts += [f'"{g}"'] if (" " in g or "-" in g) else variants(g)
         if alts:
             groups.append(list(dict.fromkeys(alts)))
     if all(len(g) == 1 for g in groups):
@@ -585,13 +585,9 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
 
 # --------------------------------------------------------------------------- public
 
-# Element symbols that are also everyday words (OpenAlex search ignores case): "La", "Ce"
-# match French, "Er" German, "Eu" the EU, "In"/"As"/"Be"/"He"/"No" English.
-AMBIGUOUS_SYMBOLS = {"as", "at", "be", "ce", "er", "es", "eu", "he", "in", "la", "no"}
-
-
 def _core_term_notes(core_terms: list[str]) -> list[str]:
     """Warnings about core terms that would make the citation route far too broad."""
+    from .glossary import AMBIGUOUS_SYMBOLS
     alts = {a.lower() for term in core_terms for w in term.replace(",", " ").split() for a in w.split("|") if a}
     loose = sorted(alts & AMBIGUOUS_SYMBOLS)
     if not loose:
@@ -669,17 +665,16 @@ def _start(session: str, t0: float, question: str, queries: list[str], seeds: li
 
 def _glossary_expansions(queries: list[str], core_terms: list[str],
                          ) -> tuple[dict[str, list[str]], dict[str, list[str]], list[dict[str, Any]]]:
-    """What the user's glossary (``glossary.py``) adds to this search: other
-    wordings of each query, other terms for the words of the core terms, and a
-    report of both for the user. Core-term words are expanded only when there
-    are at least two of them, so another concept keeps each expansion on topic."""
+    """What the glossary (``glossary.py``: the user's entries and the built-in
+    elements) adds to this search: other wordings of each query, other terms for
+    the words of the core terms, and a report of both for the user. Core-term
+    words are expanded only when there are at least two of them, so another
+    concept keeps each expansion on topic."""
     from . import glossary
     try:
-        use = glossary.entries("active")
+        use = glossary.in_use()
     except Exception as exc:  # an unreadable glossary must not stop the search
         logger.warning("deep search: glossary not read (%s)", exc)
-        return {}, {}, []
-    if not use:
         return {}, {}, []
     variants: dict[str, list[str]] = {}
     used: list[dict[str, Any]] = []
@@ -692,10 +687,10 @@ def _glossary_expansions(queries: list[str], core_terms: list[str],
     words = [a for term in core_terms for w in term.replace(",", " ").split() for a in w.split("|") if a]
     if len(words) >= 2:
         for a in words:
-            more = glossary.alternatives(a, use)
+            more, kinds = glossary.alternatives(a, use)
             if more and a.lower() not in alts:
                 alts[a.lower()] = more
-                used.append({"term": a, "with": more, "core_term": True})
+                used.append({"term": a, "with": more, "core_term": True, **({"builtin": kinds[0]} if kinds else {})})
     return variants, alts, used
 
 

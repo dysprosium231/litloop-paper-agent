@@ -29,7 +29,7 @@
     - 用户删掉的建议记下来，不再建议。
   - **MCP 工具** `litloop_glossary`：列出、添加、确认、修改、删除；Agent 添加的条目要等用户确认才生效。工具总数变为 21。
 - **实测**：从 PDC 气凝胶检索候选池里随机取 300 篇摘要，得到 37 条建议，比如 SiOC = silicon oxycarbide（13 篇）、PDC = polymer-derived ceramics（9 篇）、PCS = polycarbosilane、PIP = precursor infiltration and pyrolysis、CVI = chemical vapor infiltration。
-- **还没做**：快速检索按术语表展开。
+- **还没做**：快速检索按术语表展开（已做，见「快速检索按术语表展开」）。
 
 ## 2026-10-25：术语表页面
 
@@ -40,6 +40,31 @@
 - 后台接口：`GET /api/glossary`、`POST /api/glossary`（添加）、`POST /api/glossary/{id}`（修改、确认）、`POST /api/glossary/{id}/delete`。删除用 POST，因为 app 后台只放行 GET 和 POST。
 - 试用时发现：同一条里加 `chemical vapour infiltration` 会被当成 `vapor` 的重复去掉，可检索时又按字面匹配，查询里写英式拼写或复数（`PDCs`、`polymer-derived ceramics`）就认不出。改为匹配时也认英美拼写、末词复数，和去重用同一个标准。
 - 界面用词写进 UI_COPY 的术语表：术语表、术语、写法、待确认、使用中。
+
+## 2026-10-25：术语表集成内置的英美拼写和元素表
+
+- **用户的要求**：把术语表和英美拼写、化学元素集成到一处。原来没有单独的化学术语表：元素符号和名称靠 Agent 每次在核心词里手写 `Al|aluminum`，撞普通单词的符号只有一条提醒。
+- **用户的选择**：新建内置元素表；页面里内置部分只读、可搜索、可单条停用。用户还指出英美拼写是比元素更广的一张通用表，两者都放进「内置」。
+- **做法**：
+  - 元素表：118 个元素的符号和美式名称，取自 PubChem 的元素周期表（`scripts/build_element_table.py` 生成 `data/elements.tsv`，NOTICE 注明来源）。英式名称（aluminium、caesium、sulphur）由拼写表负责，不重复存。
+  - 检索时用的是用户在用的术语加上没停用的元素（`glossary.in_use`），走同一套展开和报告；元素的展开在报告里带 `builtin: "element"`。
+  - 元素符号按大小写匹配。单字母符号（C、I、W）和与常用词同形的符号（In、La、As 等 11 个）在检索词里不触发展开，也不会被加进检索；核心词写了 La 仍会补上 lanthanum。元素名在检索词里也不触发（lead 是常用动词），只在核心词里补符号。
+  - 核心词里补上的单词也按英美拼写展开：`SiC aluminum` → `SiC AND (aluminum OR aluminium OR Al)`。
+  - 停用记在 `glossary.json` 的 `disabled`：`element:Al`，或 `spelling:aluminum`（这个词不再按英美拼写展开和统一，`spelling.py` 在文件改动后重读）。
+  - 自动建议跳过元素表已有的“名称 (符号)”。
+  - app：术语表页面分「我的术语」「内置」两栏；「内置」可搜元素和单词（搜 aluminium 也能找到 Al），每条可停用、启用。接口 `GET/POST /api/glossary/builtin`。
+  - 技能文档：元素符号和名称不用 Agent 再写；MCP 工具 `list` 返回 `builtin_disabled`。
+
+## 2026-10-25：快速检索按术语表展开
+
+- **用户的要求**：快速检索也接上术语表。
+- **做法**：
+  - 快速检索（MCP `litloop_search`、命令行、app 新建检索经 Agent）都经过 `search._collect`，在这里接入：用 `glossary.query_variants` 得到最多 3 种其他写法，和原检索词并行各搜一次（每次照常走发现引擎或内置三源检索），结果轮流取（原词第 1 条、写法一第 1 条……），按 DOI 或标题去重。这样只写全称的文献也能进第一页。
+  - 按匹配程度分档时，命中任何一种写法都算命中，用全称的文献不会因为没写缩写排到后面。
+  - 返回里新增 `glossary`，格式和深度检索一样。
+  - 只有缩写、没有别的概念词时照旧不展开。
+- **检索词也按英美拼写另搜一次**（深度检索和快速检索都是）：之前只有深度检索的核心词会展开拼写，检索词按原样搜，可 OpenAlex 不会合并两种拼写。现在整条检索词换成另一种拼写（英式换美式，美式换成第一个英式写法）作为第一种写法，报告里带 `builtin: "spelling"`。拼写是同一个词，所以检索词只有这个词时也展开。缩写（PDC、SiC）不动；用户停用的拼写不换。
+- **代价**：有展开时快速检索多搜 1–3 次，并行进行；深度检索的关键词阶段同样多几次 OpenAlex 请求。
 
 ## 2026-10-24：SYNERGY 离线评测（第二批，共 10 个综述）
 

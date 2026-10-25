@@ -254,8 +254,12 @@ def search_papers_v2(
     exclude_warning: bool = False,
     exclude_retracted: bool = False,
     stats: dict[str, Any] | None = None,
+    expansions: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Keyword search via ScanSci Find's discovery engine when available.
+
+    Other wordings of the query from the glossary (spelling, the user's terms,
+    element symbols) are searched too; ``expansions`` receives what was expanded.
 
     Falls back transparently to the built-in three-source ``search_papers``
     when the scansci-find CLI is missing or the discovery call fails. Author
@@ -272,13 +276,25 @@ def search_papers_v2(
     filtering = bool(max_cas_zone or max_cas_sub_zone or max_jcr_quartile
                      or exclude_warning or exclude_retracted)
     pool = limit * 3 if filtering else limit
-    results = _collect(query, pool, limit, year_from, year_to, sort, author, author_id)
+    results = _collect(query, pool, limit, year_from, year_to, sort, author, author_id, expansions)
     return _finalize(results, limit, max_cas_zone=max_cas_zone, max_cas_sub_zone=max_cas_sub_zone,
                      max_jcr_quartile=max_jcr_quartile,
                      exclude_warning=exclude_warning, exclude_retracted=exclude_retracted, stats=stats)
 
 
-def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) -> list[dict[str, Any]]:
+def _glossary_variants(query: str) -> tuple[list[str], list[dict[str, Any]]]:
+    """Other wordings of ``query`` from the glossary (``glossary.query_variants``:
+    the other spelling, the user's terms, element symbols and names)."""
+    from . import glossary
+    try:
+        return glossary.query_variants(query, glossary.in_use())
+    except Exception as exc:  # an unreadable glossary must not stop the search
+        logger.warning("search: glossary not read (%s)", exc)
+        return [], []
+
+
+def _collect(query, pool, limit, year_from, year_to, sort, author, author_id,
+             expansions: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     if author_id or author:
         return search_papers(
             query, limit=pool, year_from=year_from, year_to=year_to, sort=sort,
@@ -286,10 +302,40 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
         )
     if not query:
         return []
+    variants, used = _glossary_variants(query)
+    if expansions is not None:
+        expansions += used
+    if not variants:
+        return _tidy(_collect_one(query, pool, year_from, year_to, sort), query, sort)
+    # Each wording is searched on its own; results are taken from each in turn,
+    # so papers that only write the other wording also reach the first page.
+    with ThreadPoolExecutor(max_workers=len(variants) + 1) as ex:
+        runs = list(ex.map(lambda q: _collect_one(q, pool, year_from, year_to, sort), [query, *variants]))
+    logger.info("search: glossary wordings %s returned %s results", variants, [len(r) for r in runs])
+    return _tidy(_take_in_turns(runs), query, sort, variants)
+
+
+def _take_in_turns(runs: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """The first result of each run, then the second of each, ...; one record per DOI or title."""
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for i in range(max(map(len, runs), default=0)):
+        for run in runs:
+            if i < len(run):
+                r = run[i]
+                key = str(r.get("doi") or "").lower() or "title:" + re.sub(r"[^a-z0-9]+", "", str(r.get("title") or "").lower())
+                if key not in seen:
+                    seen.add(key)
+                    out.append(r)
+    return out
+
+
+def _collect_one(query, pool, year_from, year_to, sort) -> list[dict[str, Any]]:
+    """One wording of a keyword search, not yet tidied: the discovery engine, or the built-in search."""
     try:
         from .discovery import find_cli_available, search as discovery_search, to_legacy_results
         if not find_cli_available():
-            return _tidy(search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort), query, sort)
+            return search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort)
         with tempfile.TemporaryDirectory(prefix="scansci_find_") as tmp:
             payload = discovery_search(
                 query, tmp, depth="quick", limit=max(pool * 2, 30),
@@ -299,7 +345,7 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
         logger.info("search: discovery engine returned %d results", len(results))
     except Exception as exc:  # noqa: BLE001 - degrade gracefully to 3-source search
         logger.warning("search: discovery engine failed (%s), falling back to the built-in search", exc)
-        return _tidy(search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort), query, sort)
+        return search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort)
 
     if sort == "cited_by_count":
         # The relevance pool holds only the top ~30 matches; the field's most
@@ -310,15 +356,17 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id) ->
                 seen.add(extra["doi"].lower())
                 extra["_matched"] = True  # OpenAlex matched it in title/abstract
                 results.append(extra)
-    return _tidy(results, query, sort)
+    return results
 
 
-def _tidy(results: list[dict[str, Any]], query: str, sort: str | None) -> list[dict[str, Any]]:
-    """Drop junk titles, rank by how well each matches the query, merge duplicate
-    titles. Both the discovery engine and the built-in fallback go through it:
-    the fallback used to skip it (code review, 2026-10-18), so users without the
-    engine got unranked, undeduplicated results."""
-    results = _dedupe_titles(_match_tier(_drop_junk_titles(results), query))
+def _tidy(results: list[dict[str, Any]], query: str, sort: str | None,
+          variants: list[str] | None = None) -> list[dict[str, Any]]:
+    """Drop junk titles, rank by how well each matches the query (or one of its
+    glossary ``variants``), merge duplicate titles. Both the discovery engine and
+    the built-in fallback go through it: the fallback used to skip it (code
+    review, 2026-10-18), so users without the engine got unranked,
+    undeduplicated results."""
+    results = _dedupe_titles(_match_tier(_drop_junk_titles(results), query, variants))
     # Sorting by citations or date happens within a match tier, so a famous
     # but weakly matching paper does not jump ahead of the on-topic ones.
     if sort == "cited_by_count":
@@ -619,7 +667,8 @@ def _plain(text: str) -> str:
     return re.sub(r"[\-‐-―]", " ", to_us(text))
 
 
-def _match_tier(results: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+def _match_tier(results: list[dict[str, Any]], query: str,
+                variants: list[str] | None = None) -> list[dict[str, Any]]:
     """Order records by how well they match the query, without dropping any.
 
     Tier 0: the record names every hyphenated concept of the query and at
@@ -634,30 +683,40 @@ def _match_tier(results: list[dict[str, Any]], query: str) -> list[dict[str, Any
     abstract, while the index matched the full record, and a deep search
     loses more from a dropped target than from a few extra records to screen.
     Queries in CJK scripts and records OpenAlex matched on title/abstract
-    (``_matched``) count as tier 0.
+    (``_matched``) count as tier 0. With glossary ``variants`` (other wordings
+    of the query), a record gets the best tier any wording gives it.
     """
     cjk = re.search(r"[぀-ヿ㐀-鿿가-힯]", query or "")
-    terms = [] if cjk else _query_terms(query or "")
-    need = max(1, math.ceil(0.6 * len(terms))) if len(terms) >= 2 else 0
-    compounds = set() if cjk else _query_compounds(query or "")
+    specs = []
+    for q in [query or "", *(variants or [])]:
+        terms = [] if cjk else _query_terms(q)
+        need = max(1, math.ceil(0.6 * len(terms))) if len(terms) >= 2 else 0
+        specs.append((terms, need, set() if cjk else _query_compounds(q)))
     tiered = []
     for pos, r in enumerate(results):
         tier = 0
         if not r.pop("_matched", False):
             text = _plain(f"{r.get('title') or ''} {r.get('abstract') or ''}")
+            squashed = _squash(f"{r.get('title') or ''} {r.get('abstract') or ''}")
             judged_on_title = len(r.get("abstract") or "") < 300
-            if need and sum(1 for t in terms if t in text) < need:
-                # A title alone rarely carries every term: too little to call it off-topic.
-                tier = 1 if judged_on_title else 2
-            elif compounds and r.get("abstract"):
-                squashed = _squash(f"{r.get('title') or ''} {r.get('abstract') or ''}")
-                if not all(c in squashed for c in compounds):
-                    tier = 1
+            tier = min(_tier(terms, need, compounds, text, squashed, judged_on_title, bool(r.get("abstract")))
+                       for terms, need, compounds in specs)
         tiered.append((tier, pos, r))
     tiered.sort(key=lambda x: (x[0], x[1]))
     for tier, _, r in tiered:
         r["_tier"] = tier
     return [r for _, _, r in tiered]
+
+
+def _tier(terms: list[str], need: int, compounds: set[str], text: str, squashed: str,
+          judged_on_title: bool, has_abstract: bool) -> int:
+    """One record's tier against one wording of the query (see ``_match_tier``)."""
+    if need and sum(1 for t in terms if t in text) < need:
+        # A title alone rarely carries every term: too little to call it off-topic.
+        return 1 if judged_on_title else 2
+    if compounds and has_abstract and not all(c in squashed for c in compounds):
+        return 1
+    return 0
 
 
 def _squash(text: str) -> str:

@@ -53,16 +53,57 @@ def test_a_term_is_found_however_normalize_would_write_it():
            {"id": "c", "terms": ["EIS", "impedance spectroscopy"]}]
     assert glossary.query_variants("PDCs aerogel", use)[0] == ["polymer-derived ceramic aerogel"]
     assert glossary.query_variants("polymer derived ceramics aerogel", use)[0] == ["PDC aerogel"]
-    assert glossary.query_variants("chemical vapour infiltration SiC", use)[0] == ["CVI SiC"]
+    # the other spelling comes first, then the glossary's terms
+    assert glossary.query_variants("chemical vapour infiltration SiC", use)[0] == ["chemical vapor infiltration SiC", "CVI SiC"]
     assert glossary.query_variants("impedance spectroscopies of LLZO", use)[0] == ["EIS of LLZO"]
     assert glossary.query_variants("PDCX aerogel", use)[0] == []
 
 
+def test_a_query_is_also_searched_in_its_other_spelling():
+    assert glossary.other_spelling("Fibre reinforced aluminium foams") == (
+        "Fiber reinforced aluminum foams", [("Fibre", "fiber"), ("aluminium", "aluminum")])
+    assert glossary.other_spelling("aluminum foam")[0] == "aluminium foam"
+    assert glossary.other_spelling("PDC SiC aerogel") == ("", [])  # abbreviations stay; aerogel has no other
+    variants, used = glossary.query_variants("aluminium", [])
+    assert variants == ["aluminum"] and used[0]["builtin"] == "spelling"  # safe even alone: same word
+
+
 def test_core_term_words_get_the_other_terms_in_quotes():
     use = [{"id": "a", "terms": ["PDC", "polymer-derived ceramic"]}]
-    assert glossary.alternatives("PDC", use) == ["polymer-derived ceramic"]
+    assert glossary.alternatives("PDC", use) == (["polymer-derived ceramic"], [])
     q = deep_search._topic_search("PDC aerogel", {"pdc": ["polymer-derived ceramic"]})
     assert q == '(PDC OR "polymer-derived ceramic") AND aerogel'
+
+
+def test_elements_are_built_in_and_their_symbols_matched_with_care():
+    use = glossary.in_use()
+    variants, used = glossary.query_variants("Al SiC composite", use)
+    assert variants == ["aluminum SiC composite"] and used[0]["builtin"] == "element"
+    assert glossary.query_variants("al alloy foam", use)[0] == []  # a symbol is matched with its case
+    # everyday words and single letters never trigger: "In situ", "lead to", "type I"
+    assert glossary.query_variants("In situ TEM of lead halide perovskite type I", use)[0] == []
+    assert glossary.alternatives("La", use) == (["lanthanum"], ["element"])  # the name is still added
+    assert glossary.alternatives("indium", use) == ([], [])  # but never the loose symbol
+    assert glossary.alternatives("aluminum", use) == (["Al"], ["element"])
+    _, alts, _ = deep_search._glossary_expansions(["x"], ["SiC aluminum"])
+    assert deep_search._topic_search("SiC aluminum", alts) == "SiC AND (aluminum OR aluminium OR Al)"
+
+
+def test_built_in_entries_can_be_switched_off():
+    glossary.set_builtin("element:Al", False)
+    assert "element:Al" not in {e["id"] for e in glossary.in_use()}
+    assert glossary.query_variants("Al SiC composite", glossary.in_use())[0] == []
+    from litloop import spelling
+    glossary.set_builtin("spelling:aluminum", False)
+    assert spelling.variants("aluminum") == ["aluminum"] and spelling.to_us("aluminium") == "aluminium"
+    found = glossary.builtin("alumin")
+    assert [e["id"] for e in found["elements"]] == ["element:Al"] and found["elements"][0]["disabled"]
+    assert found["spelling"][0]["id"] == "spelling:aluminum" and found["spelling"][0]["disabled"]
+    glossary.set_builtin("spelling:aluminum", True)
+    assert "aluminium" in spelling.variants("aluminum")
+    for bad in ("element:Xx", "spelling:ceramic", "other:x"):
+        with pytest.raises(KeyError):
+            glossary.set_builtin(bad, False)
 
 
 def test_expansions_need_another_concept_and_report_what_they_did():

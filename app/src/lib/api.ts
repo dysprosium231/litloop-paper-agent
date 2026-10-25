@@ -199,6 +199,22 @@ export const glossaryApi = {
   update: (id: string, change: { terms?: string[]; note?: string; confirm?: boolean }) =>
     call<GlossaryEntry>(`/api/glossary/${encodeURIComponent(id)}`, change),
   remove: (id: string) => call<{ deleted: string }>(`/api/glossary/${encodeURIComponent(id)}/delete`, {}),
+  builtin: (q: string) => call<BuiltinTerms>(`/api/glossary/builtin?q=${encodeURIComponent(q)}`),
+  switchBuiltin: (id: string, enabled: boolean) => call<{ id: string; disabled: boolean }>("/api/glossary/builtin", { id, enabled }),
+}
+
+/** Built-in wordings: element symbol and name ("element:Al"), British and American spellings ("spelling:aluminum"). */
+export interface BuiltinTerm {
+  id: string
+  terms: string[]
+  disabled: boolean
+}
+
+export interface BuiltinTerms {
+  elements: BuiltinTerm[]
+  /** Only for a search: the spellings of words starting with it. */
+  spelling: BuiltinTerm[]
+  spelling_disabled: BuiltinTerm[]
 }
 
 // ------------------------------------------------------------------ settings

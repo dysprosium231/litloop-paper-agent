@@ -36,3 +36,7 @@ Third-party data
 src/litloop/data/spelling_*.tsv.gz are derived from VarCon (Variant Conversion
 Info), Copyright 2000-2020 Kevin Atkinson and Benjamin Titze, part of SCOWL
 (http://wordlist.aspell.net/). See src/litloop/data/VARCON-LICENSE.txt.
+
+src/litloop/data/elements.tsv lists element symbols and names taken from
+PubChem's periodic table (National Center for Biotechnology Information,
+https://pubchem.ncbi.nlm.nih.gov/periodic-table/), retrieved 2026-10-25.

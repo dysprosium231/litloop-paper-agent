@@ -119,3 +119,13 @@ def test_glossary_add_confirm_edit_delete(client):
     assert client.post(f"/api/glossary/{added['id']}/delete").json() == {"deleted": added["id"]}
     assert client.post(f"/api/glossary/{added['id']}/delete").status_code == 404
     assert client.post("/api/glossary/nope", json={"confirm": True}).status_code == 404
+
+
+def test_glossary_builtin_lookup_and_switch(client):
+    got = client.get("/api/glossary/builtin", params={"q": "alumin"}).json()
+    assert [e["id"] for e in got["elements"]] == ["element:Al"] and got["spelling"][0]["id"] == "spelling:aluminum"
+    assert len(client.get("/api/glossary/builtin").json()["elements"]) == 118
+    r = client.post("/api/glossary/builtin", json={"id": "element:Al", "enabled": False}).json()
+    assert r == {"id": "element:Al", "disabled": True}
+    assert client.get("/api/glossary/builtin", params={"q": "Al"}).json()["elements"][0]["disabled"]
+    assert client.post("/api/glossary/builtin", json={"id": "element:Xx", "enabled": False}).status_code == 404

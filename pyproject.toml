@@ -59,7 +59,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-litloop = ["data/*.json", "data/*.dat", "data/*.gz", "data/*.txt", "_core/*.pyd", "_core/*.so", "templates/*.html"]
+litloop = ["data/*.json", "data/*.dat", "data/*.gz", "data/*.txt", "data/*.tsv", "_core/*.pyd", "_core/*.so", "templates/*.html"]
 
 [tool.pytest.ini_options]
 # Manual network/browser scripts in the repo root (e.g. test_download_pnas.py)

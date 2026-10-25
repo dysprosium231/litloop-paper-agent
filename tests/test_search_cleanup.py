@@ -70,3 +70,23 @@ def test_venue_without_doi_is_flagged():
             {"doi": "10.1/x", "journal": "J. Eur. Ceram. Soc."}]
     search._note_unverified_venues(rows)
     assert rows[0]["venue_unverified"] is True and "venue_unverified" not in rows[1]
+
+
+def test_a_record_matching_another_wording_is_not_ranked_down():
+    full = {"title": "Polymer-derived ceramic aerogels", "abstract": "Polymer-derived ceramic aerogels " * 20}
+    assert search._match_tier([full], "PDC aerogel thermal")[0]["_tier"] == 2
+    full.pop("_tier")
+    assert search._match_tier([full], "PDC aerogel thermal", ["polymer-derived ceramic aerogel thermal"])[0]["_tier"] == 0
+
+
+def test_quick_search_runs_each_wording_and_takes_results_in_turns(monkeypatch):
+    runs = {"PDC aerogel": [_rec("10.1/a", "A"), _rec("10.1/b", "B")],
+            "polymer-derived ceramic aerogel": [_rec("10.1/c", "C"), _rec("10.1/a", "A again")]}
+    used = [{"id": "x", "term": "PDC", "with": ["polymer-derived ceramic"], "query": "PDC aerogel"}]
+    monkeypatch.setattr(search, "_glossary_variants", lambda q: (["polymer-derived ceramic aerogel"], used))
+    monkeypatch.setattr(search, "_collect_one", lambda q, *a: [dict(r) for r in runs[q]])
+    expansions: list = []
+    got = search._collect("PDC aerogel", 10, 10, None, None, None, None, None, expansions)
+    assert [r["doi"] for r in got] == ["10.1/a", "10.1/c", "10.1/b"] and expansions == used
+    monkeypatch.setattr(search, "_glossary_variants", lambda q: ([], []))
+    assert [r["doi"] for r in search._collect("PDC aerogel", 10, 10, None, None, None, None, None)] == ["10.1/a", "10.1/b"]

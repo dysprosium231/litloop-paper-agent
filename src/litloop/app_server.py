@@ -124,6 +124,11 @@ class GlossaryEntry(BaseModel):
     confirm: bool = False  # a suggestion becomes an entry in use
 
 
+class BuiltinSwitch(BaseModel):
+    id: str  # "element:<symbol>" or "spelling:<American word>"
+    enabled: bool
+
+
 class Translate(BaseModel):
     doi: str | None = None
     title: str | None = None
@@ -346,6 +351,20 @@ def create_app(token: str) -> FastAPI:
             return glossary.add(body.terms or [], note=body.note or "")
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.get("/api/glossary/builtin")
+    def glossary_builtin(q: str = "") -> dict[str, Any]:
+        from . import glossary
+        return glossary.builtin(q)
+
+    @app.post("/api/glossary/builtin")
+    def glossary_builtin_switch(body: BuiltinSwitch) -> dict[str, Any]:
+        from . import glossary
+        try:
+            glossary.set_builtin(body.id, body.enabled)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc).strip("'\"")) from exc
+        return {"id": body.id, "disabled": not body.enabled}
 
     @app.post("/api/glossary/{entry_id}")
     def glossary_update(entry_id: str, body: GlossaryEntry) -> dict[str, Any]:

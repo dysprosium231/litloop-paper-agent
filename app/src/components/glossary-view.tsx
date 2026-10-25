@@ -4,7 +4,7 @@ import { PlusIcon, XIcon } from "lucide-react"
 import { Card, Empty, PageBody, PageHeader, SectionTitle } from "@/components/page"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { errorMessage, glossaryApi, type GlossaryEntry } from "@/lib/api"
+import { errorMessage, glossaryApi, type BuiltinTerm, type BuiltinTerms, type GlossaryEntry } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const SOURCE = { auto: "自动发现", agent: "Agent 建议", user: "" } as Record<string, string>
@@ -17,15 +17,18 @@ const SOURCE = { auto: "自动发现", agent: "Agent 建议", user: "" } as Reco
 export function GlossaryPage({ onBack }: { onBack: () => void }) {
   const [data, setData] = React.useState<{ active: GlossaryEntry[]; suggested: GlossaryEntry[] } | null>(null)
   const [error, setError] = React.useState<string | null>(null)
+  const [tab, setTab] = React.useState("mine")
   const load = React.useCallback(() => {
     glossaryApi.list().then((d) => { setData(d); setError(null) }).catch((e) => setError(errorMessage(e)))
   }, [])
   React.useEffect(load, [load])
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader title="术语表">
+      <PageHeader title="术语表" active={tab} onTab={setTab}
+        tabs={[{ id: "mine", label: "我的术语", count: data?.suggested.length }, { id: "builtin", label: "内置" }]}>
         <Button size="sm" variant="outline" onClick={onBack}>返回筛选</Button>
       </PageHeader>
+      {tab === "builtin" ? <BuiltinTab /> : (
       <PageBody>
         {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
         {!data && !error && <p className="text-sm text-muted-foreground">正在读取术语表…</p>}
@@ -59,7 +62,66 @@ export function GlossaryPage({ onBack }: { onBack: () => void }) {
           </section>
         )}
       </PageBody>
+      )}
     </div>
+  )
+}
+
+/**
+ * The built-in wordings: chemical elements (symbol and name) and British and
+ * American spellings. Read only, but each can be switched off when its
+ * expansion goes wrong for the user's field.
+ */
+function BuiltinTab() {
+  const [q, setQ] = React.useState("")
+  const [data, setData] = React.useState<BuiltinTerms | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+  const load = React.useCallback((query: string) => {
+    glossaryApi.builtin(query).then((d) => { setData(d); setError(null) }).catch((e) => setError(errorMessage(e)))
+  }, [])
+  React.useEffect(() => {
+    const t = setTimeout(() => load(q), 200)
+    return () => clearTimeout(t)
+  }, [q, load])
+  const toggle = (t: BuiltinTerm) =>
+    glossaryApi.switchBuiltin(t.id, t.disabled).then(() => load(q)).catch((e) => setError(errorMessage(e)))
+  const spelling = q.trim() ? data?.spelling ?? [] : data?.spelling_disabled ?? []
+  return (
+    <PageBody>
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索元素或单词，例如 Al、aluminium"
+        aria-label="搜索内置术语" className="bg-background" />
+      {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+      <section>
+        <SectionTitle title="英美拼写" note="检索时同时搜索英式和美式拼写（VarCon）" />
+        <Card>
+          {spelling.length
+            ? <ul className="divide-y">{spelling.map((t) => <BuiltinRow key={t.id} term={t} onToggle={toggle} />)}</ul>
+            : <Empty title={q.trim() ? "没有匹配的单词" : "未停用任何拼写"} note={q.trim() ? undefined : "输入单词以查看它的英美拼写"} />}
+        </Card>
+      </section>
+      <section>
+        <SectionTitle title="元素" note="符号和名称互相展开；La、In 等与常用词同形的符号只换成名称" />
+        <Card>
+          {data?.elements.length
+            ? <ul className="divide-y">{data.elements.map((t) => <BuiltinRow key={t.id} term={t} onToggle={toggle} />)}</ul>
+            : <Empty title={data ? "没有匹配的元素" : "正在读取…"} />}
+        </Card>
+      </section>
+    </PageBody>
+  )
+}
+
+function BuiltinRow({ term: t, onToggle }: { term: BuiltinTerm; onToggle: (t: BuiltinTerm) => void }) {
+  return (
+    <li className="flex items-center gap-4 px-5 py-2">
+      <div className={cn("flex min-w-0 flex-1 flex-wrap items-center gap-1.5", t.disabled && "text-muted-foreground")}>
+        {t.terms.map((w, i) => (
+          <span key={w} className={cn("rounded border px-1.5 py-px text-sm", i === 0 && "font-medium", t.disabled && "line-through")}>{w}</span>
+        ))}
+        {t.disabled && <span className="text-xs">已停用</span>}
+      </div>
+      <Button size="sm" variant="ghost" onClick={() => onToggle(t)}>{t.disabled ? "启用" : "停用"}</Button>
+    </li>
   )
 }
 
