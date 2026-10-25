@@ -179,6 +179,28 @@ export const rating = (it: Item) => it.user_relevance ?? it.relevance
 export const paperKey = (p: { doi?: string; title?: string }) =>
   p.doi ? p.doi.toLowerCase() : "title:" + (p.title ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "")
 
+// ------------------------------------------------------------------ glossary
+
+/** One entry of the glossary (docs/APP_DATA.md): several wordings of one meaning. */
+export interface GlossaryEntry {
+  id: string
+  terms: string[]
+  status: "active" | "suggested"
+  source: "user" | "agent" | "auto"
+  note: string
+  added: string
+  /** Auto suggestions: in how many abstracts it was written this way. */
+  papers?: number
+}
+
+export const glossaryApi = {
+  list: () => call<{ active: GlossaryEntry[]; suggested: GlossaryEntry[] }>("/api/glossary"),
+  add: (terms: string[], note: string) => call<GlossaryEntry>("/api/glossary", { terms, note }),
+  update: (id: string, change: { terms?: string[]; note?: string; confirm?: boolean }) =>
+    call<GlossaryEntry>(`/api/glossary/${encodeURIComponent(id)}`, change),
+  remove: (id: string) => call<{ deleted: string }>(`/api/glossary/${encodeURIComponent(id)}/delete`, {}),
+}
+
 // ------------------------------------------------------------------ settings
 
 export interface SettingField {

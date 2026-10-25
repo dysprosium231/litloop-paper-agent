@@ -29,7 +29,17 @@
     - 用户删掉的建议记下来，不再建议。
   - **MCP 工具** `litloop_glossary`：列出、添加、确认、修改、删除；Agent 添加的条目要等用户确认才生效。工具总数变为 21。
 - **实测**：从 PDC 气凝胶检索候选池里随机取 300 篇摘要，得到 37 条建议，比如 SiOC = silicon oxycarbide（13 篇）、PDC = polymer-derived ceramics（9 篇）、PCS = polycarbosilane、PIP = precursor infiltration and pyrolysis、CVI = chemical vapor infiltration。
-- **还没做**：app 里的术语表页面；快速检索按术语表展开。
+- **还没做**：快速检索按术语表展开。
+
+## 2026-10-25：术语表页面
+
+- 入口在筛选页顶栏，挨着「筛选历史」；页面分「待确认」「使用中」「添加术语」三块。
+  - 待确认的术语可以确认、修改、忽略；忽略的不再建议，所以不再弹确认。
+  - 使用中的术语可以修改、删除；删除前在行内问一次。
+  - 每种写法一个输入框，至少两种，可以加写法和备注。
+- 后台接口：`GET /api/glossary`、`POST /api/glossary`（添加）、`POST /api/glossary/{id}`（修改、确认）、`POST /api/glossary/{id}/delete`。删除用 POST，因为 app 后台只放行 GET 和 POST。
+- 试用时发现：同一条里加 `chemical vapour infiltration` 会被当成 `vapor` 的重复去掉，可检索时又按字面匹配，查询里写英式拼写或复数（`PDCs`、`polymer-derived ceramics`）就认不出。改为匹配时也认英美拼写、末词复数，和去重用同一个标准。
+- 界面用词写进 UI_COPY 的术语表：术语表、术语、写法、待确认、使用中。
 
 ## 2026-10-24：SYNERGY 离线评测（第二批，共 10 个综述）
 

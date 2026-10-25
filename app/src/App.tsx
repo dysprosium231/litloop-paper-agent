@@ -1,5 +1,5 @@
 import * as React from "react"
-import { ChevronDownIcon, HistoryIcon, PlusIcon } from "lucide-react"
+import { BookAIcon, ChevronDownIcon, HistoryIcon, PlusIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
@@ -10,6 +10,7 @@ import { DownloadsOverview, JobPane, OVERVIEW, useDownloads } from "@/components
 import { useZotero, ZoteroPage, type ZoteroView } from "@/components/zotero-view"
 import { DetailPane, type Paper } from "@/components/detail-pane"
 import { Onboarding } from "@/components/onboarding"
+import { GlossaryPage } from "@/components/glossary-view"
 import { HistoryPage } from "@/components/history-view"
 import { SearchPage } from "@/components/search-view"
 import { ProgressStrip } from "@/components/progress-strip"
@@ -165,7 +166,8 @@ export default function App() {
   const [section, setSection] = React.useState<Section>("screen")
   const [history, setHistory] = React.useState(false)  // the screening section's history page
   const [newSearch, setNewSearch] = React.useState(false)  // ... and its new-search page
-  const fullPage = history || newSearch  // screening without its paper list
+  const [glossary, setGlossary] = React.useState(false)  // ... and its glossary page
+  const fullPage = history || newSearch || glossary  // screening without its paper list
   // First run: the guide covers the window until it is finished or skipped.
   const [guide, setGuide] = React.useState<{ group: string; intro: string }[] | null>(null)
   React.useEffect(() => {
@@ -356,6 +358,8 @@ export default function App() {
                 setSid(s)
                 setNewSearch(false)
               }} />
+          ) : glossary ? (
+            <GlossaryPage onBack={() => setGlossary(false)} />
           ) : history ? (
             <HistoryPage onBack={() => setHistory(false)}
               onOpen={(s) => { setSid(s); setHistory(false) }}
@@ -395,6 +399,9 @@ export default function App() {
             </Button>
             <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setHistory(true)}>
               <HistoryIcon />筛选历史
+            </Button>
+            <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setGlossary(true)}>
+              <BookAIcon />术语表
             </Button>
           </header>
           <ProgressStrip progress={progress} summary={summary} onContinue={continueSearch} />

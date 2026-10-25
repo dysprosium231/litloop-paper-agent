@@ -101,3 +101,21 @@ def test_openalex_live_count_is_kept_two_minutes(client, monkeypatch):
     assert client.get("/api/quota/openalex").json() == {"credits_remaining": 1}
     assert client.get("/api/quota/openalex").json() == {"credits_remaining": 1}  # from the cache
     assert client.get("/api/quota/openalex?fresh=true").json() == {"credits_remaining": 2}
+
+
+def test_glossary_add_confirm_edit_delete(client):
+    from litloop import glossary
+    added = client.post("/api/glossary", json={"terms": ["PDC", "polymer-derived ceramic"]}).json()
+    assert added["status"] == "active"
+    assert client.post("/api/glossary", json={"terms": ["PDC"]}).status_code == 400
+    assert client.post("/api/glossary", json={"terms": ["pdc", "Polymer derived ceramics"]}).status_code == 400
+    s = glossary.suggest_from(["silicon oxycarbide (SiOC) foam", "dense silicon oxycarbide (SiOC)"])[0]
+    got = client.get("/api/glossary").json()
+    assert [e["id"] for e in got["active"]] == [added["id"]] and [e["id"] for e in got["suggested"]] == [s["id"]]
+    assert client.post(f"/api/glossary/{s['id']}", json={"confirm": True}).json()["status"] == "active"
+    edited = client.post(f"/api/glossary/{added['id']}", json={"terms": ["PDC", "PDCs", "polymer-derived ceramic"], "note": "n"}).json()
+    assert edited["note"] == "n"
+    assert client.post(f"/api/glossary/{added['id']}", json={"terms": ["PDC"]}).status_code == 400
+    assert client.post(f"/api/glossary/{added['id']}/delete").json() == {"deleted": added["id"]}
+    assert client.post(f"/api/glossary/{added['id']}/delete").status_code == 404
+    assert client.post("/api/glossary/nope", json={"confirm": True}).status_code == 404

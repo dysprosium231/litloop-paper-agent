@@ -39,6 +39,7 @@ import re
 import time
 import uuid
 from collections import Counter
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -184,11 +185,21 @@ def _abbreviation(term: str) -> bool:
     return " " not in term and sum(ch.isupper() for ch in term) >= 2
 
 
+@lru_cache(maxsize=2048)
 def _pattern(term: str) -> re.Pattern[str]:
-    """``term`` as a whole word or phrase; a hyphen and a space are the same ("polymer derived")."""
-    words = [re.escape(w) for w in re.split(r"[-\s]+", term) if w]
-    body = r"[-\s]+".join(words)
-    return re.compile(rf"(?<![\w-]){body}(?![\w-])", 0 if _abbreviation(term) else re.I)
+    """``term`` as a whole word or phrase, written any way ``normalize`` treats as the
+    same: a hyphen or a space ("polymer derived"), British spelling, the last word
+    plural ("PDCs", "polymer-derived ceramics")."""
+    from .spelling import variants
+    if _abbreviation(term):
+        return re.compile(rf"(?<![\w-]){re.escape(term)}s?(?![\w-])")
+    words = [w for w in re.split(r"[-\s]+", term) if w]
+    alts = [variants(w) for w in words]
+    last = words[-1] if words else ""
+    if len(last) > 2 and last[-1:].lower() == "y" and last[-2:-1].lower() not in "aeiou":
+        alts[-1] += [last[:-1] + "ies"]
+    body = r"[-\s]+".join("(?:" + "|".join(re.escape(a) for a in alt) + ")" for alt in alts)
+    return re.compile(rf"(?<![\w-]){body}(?:s|es)?(?![\w-])", re.I)
 
 
 def _has_other_concepts(query: str, span: tuple[int, int]) -> bool:

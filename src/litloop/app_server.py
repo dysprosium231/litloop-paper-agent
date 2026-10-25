@@ -118,6 +118,12 @@ class Onboarding(BaseModel):
     done: bool = True
 
 
+class GlossaryEntry(BaseModel):
+    terms: list[str] | None = None
+    note: str | None = None
+    confirm: bool = False  # a suggestion becomes an entry in use
+
+
 class Translate(BaseModel):
     doi: str | None = None
     title: str | None = None
@@ -327,6 +333,39 @@ def create_app(token: str) -> FastAPI:
             item = _find(data["items"], body.doi, body.title)
             item["decision"] = body.decision
         return {"item": item}
+
+    @app.get("/api/glossary")
+    def glossary_list() -> dict[str, Any]:
+        from . import glossary
+        return {"active": glossary.entries("active"), "suggested": glossary.entries("suggested")}
+
+    @app.post("/api/glossary")
+    def glossary_add(body: GlossaryEntry) -> dict[str, Any]:
+        from . import glossary
+        try:
+            return glossary.add(body.terms or [], note=body.note or "")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/glossary/{entry_id}")
+    def glossary_update(entry_id: str, body: GlossaryEntry) -> dict[str, Any]:
+        from . import glossary
+        try:
+            return glossary.update(entry_id, terms=body.terms, note=body.note, confirm=body.confirm)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc).strip("'\"")) from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/glossary/{entry_id}/delete")
+    def glossary_delete(entry_id: str) -> dict[str, Any]:
+        """POST: the app's CORS allows GET and POST only. A deleted suggestion is not suggested again."""
+        from . import glossary
+        try:
+            glossary.delete(entry_id)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc).strip("'\"")) from exc
+        return {"deleted": entry_id}
 
     @app.get("/api/quota")
     def quota_summary() -> dict[str, Any]:

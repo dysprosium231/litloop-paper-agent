@@ -47,6 +47,17 @@ def test_a_query_gets_a_variant_per_other_term_unless_it_is_the_term_alone():
     assert variants == []  # an abbreviation is matched with its case
 
 
+def test_a_term_is_found_however_normalize_would_write_it():
+    use = [{"id": "a", "terms": ["PDC", "polymer-derived ceramic"]},
+           {"id": "b", "terms": ["CVI", "chemical vapor infiltration"]},
+           {"id": "c", "terms": ["EIS", "impedance spectroscopy"]}]
+    assert glossary.query_variants("PDCs aerogel", use)[0] == ["polymer-derived ceramic aerogel"]
+    assert glossary.query_variants("polymer derived ceramics aerogel", use)[0] == ["PDC aerogel"]
+    assert glossary.query_variants("chemical vapour infiltration SiC", use)[0] == ["CVI SiC"]
+    assert glossary.query_variants("impedance spectroscopies of LLZO", use)[0] == ["EIS of LLZO"]
+    assert glossary.query_variants("PDCX aerogel", use)[0] == []
+
+
 def test_core_term_words_get_the_other_terms_in_quotes():
     use = [{"id": "a", "terms": ["PDC", "polymer-derived ceramic"]}]
     assert glossary.alternatives("PDC", use) == ["polymer-derived ceramic"]
