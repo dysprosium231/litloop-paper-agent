@@ -7,7 +7,7 @@ import subprocess
 
 import pytest
 
-from litloop.discovery import build_preprint_fallbacks
+from litloop.search.scansci_find import build_preprint_fallbacks
 from litloop.sources import _apply_preprint_fallbacks, _write_download_results
 
 
@@ -103,7 +103,7 @@ class TestDiscoveryGate:
     """DISCOVERY-01: light budgets, Unpaywall email precheck, structured errors."""
 
     def test_resolve_oa_blocked_without_email(self, monkeypatch):
-        from litloop import discovery
+        from litloop.search import scansci_find as discovery
 
         monkeypatch.setattr(discovery, "_build_env", lambda: {"OPENALEX_API_KEY": "x"})
         payload = discovery.resolve_oa([{"doi": "10.1000/x"}])
@@ -113,7 +113,7 @@ class TestDiscoveryGate:
         assert "hint" in payload
 
     def test_resolve_oa_proceeds_with_email(self, monkeypatch):
-        from litloop import discovery
+        from litloop.search import scansci_find as discovery
 
         monkeypatch.setattr(discovery, "_build_env", lambda: {"UNPAYWALL_EMAIL": "a@b.com"})
         monkeypatch.setattr(
@@ -124,14 +124,14 @@ class TestDiscoveryGate:
         assert payload["status"] == "ok"  # did not short-circuit at the email gate
 
     def test_light_timeout_is_shorter_than_systematic_budget(self):
-        from litloop import discovery
+        from litloop.search import scansci_find as discovery
 
         assert discovery.LIGHT_TIMEOUT < discovery.DEFAULT_TIMEOUT
         assert discovery.LIGHT_TIMEOUT == 45
 
     def test_timeout_raises_structured_discovery_timeout_error(self, monkeypatch):
-        from litloop import discovery
-        from litloop.discovery import DiscoveryTimeoutError
+        from litloop.search import scansci_find as discovery
+        from litloop.search.scansci_find import DiscoveryTimeoutError
 
         def slow_run(cmd, *a, **kw):
             raise subprocess.TimeoutExpired(cmd, timeout=kw.get("timeout", 45))
@@ -147,7 +147,8 @@ class TestDiscoveryGate:
 
     def test_timeout_error_fields_survive_server_wrapper(self, monkeypatch):
         """server.py maps DiscoveryTimeoutError to a structured payload."""
-        from litloop import discovery, server
+        from litloop import server
+        from litloop.search import scansci_find as discovery
 
         def slow_run(cmd, *a, **kw):
             raise subprocess.TimeoutExpired(cmd, timeout=kw.get("timeout", 45))

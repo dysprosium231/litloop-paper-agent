@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 
 import litloop.browser_backend as bb
-from litloop.pipeline import QueueEntry, run_scihub_then_single
-import litloop.pipeline as pipeline
+from litloop.download.pipeline import QueueEntry, run_scihub_then_single
+from litloop.download import pipeline
 import litloop.sources as sources
 from litloop.sources import _try_source, instsci
 

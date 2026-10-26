@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from litloop import search
+from litloop.search import quick as search
 
 _ABSTRACT = (
     "Aerogels with low thermal conductivity, high porosity and large specific surface area were widely used "

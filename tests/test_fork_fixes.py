@@ -304,7 +304,7 @@ def test_wait_any_returns_early_once_cancelled(no_browser_kill):
 
 def test_openalex_key_only_sent_to_openalex(monkeypatch):
     import requests
-    import litloop.search as search_mod
+    import litloop.search.quick as search_mod
     monkeypatch.setattr(search_mod, "load_config", lambda: {"openalex_api_key": "K123"})
     sent = {}
     monkeypatch.setattr(requests.Session, "request",
@@ -328,7 +328,7 @@ def test_openalex_source_sends_key_as_api_key(monkeypatch, tmp_path):
 
 def test_race_keeps_waiting_while_user_logs_in(tmp_path, monkeypatch, no_browser_kill):
     """The race must not give up (and open the next phase's window) mid-login."""
-    from litloop import pdf_utils
+    from litloop.download import pdf as pdf_utils
     real_wait = sources._wait_any
     monkeypatch.setattr(sources, "_wait_any", lambda ev, t: real_wait(ev, min(t, 0.2)))
     monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda *a: False)
@@ -380,7 +380,7 @@ def test_science_check_access_is_a_paywall():
 
 def test_race_waits_for_download_after_login(tmp_path, monkeypatch, no_browser_kill):
     """Login done (heartbeats stop), PDF capture still running: keep waiting."""
-    from litloop import pdf_utils
+    from litloop.download import pdf as pdf_utils
     real_wait = sources._wait_any
     monkeypatch.setattr(sources, "_wait_any", lambda ev, t: real_wait(ev, min(t, 0.2)))
     monkeypatch.setattr(pdf_utils, "is_suspicious_pdf", lambda *a: False)
@@ -436,7 +436,7 @@ def test_navigate_retries_transient_network_error(monkeypatch):
 
 def test_one_page_article_pdf_is_not_a_preview(tmp_path, monkeypatch):
     fitz = pytest.importorskip("fitz")
-    from litloop import pdf_utils
+    from litloop.download import pdf as pdf_utils
     pdf = tmp_path / "a.pdf"
     doc = fitz.open(); doc.new_page(); doc.save(pdf); doc.close()
     pdf.write_bytes(pdf.read_bytes() + b"%" + b"0" * 60_000)  # past the size floor
@@ -514,7 +514,7 @@ def test_scihub_use_browser_false_disables_grey_browsers():
 # --- search polish (2026-10-11) -------------------------------------------
 
 def test_search_sort_aliases():
-    from litloop.search import _normalize_sort
+    from litloop.search.quick import _normalize_sort
     assert _normalize_sort("cited") == "cited_by_count"
     assert _normalize_sort("Citations") == "cited_by_count"
     assert _normalize_sort("newest") == "publication_date"
@@ -523,7 +523,7 @@ def test_search_sort_aliases():
 
 
 def test_search_ranks_off_topic_records_last_instead_of_dropping():
-    from litloop.search import _match_tier
+    from litloop.search.quick import _match_tier
     rows = [
         {"title": "Endoscopic mucosal resection for lesions", "abstract": ""},
         {"title": "High-entropy ceramics with low thermal conductivity", "abstract": ""},
@@ -540,7 +540,7 @@ def test_search_ranks_off_topic_records_last_instead_of_dropping():
 
 
 def test_discovery_results_report_real_citation_counts():
-    from litloop.discovery import to_legacy_results
+    from litloop.search.scansci_find import to_legacy_results
     out = to_legacy_results([{"doi": "10.1/x", "title": "t", "citation_count": 619,
                               "source_hits": ["OpenAlex", "Crossref"]}])
     assert out[0]["cited_by_count"] == 619
@@ -548,7 +548,7 @@ def test_discovery_results_report_real_citation_counts():
 
 
 def test_openalex_cited_sort_matches_title_and_abstract(monkeypatch):
-    from litloop import search as s
+    from litloop.search import quick as s
     seen = {}
 
     class Resp:
@@ -571,7 +571,7 @@ def test_openalex_cited_sort_matches_title_and_abstract(monkeypatch):
 
 def test_search_results_get_journal_rank_when_tool_installed(monkeypatch):
     import sys, types
-    from litloop import search as s
+    from litloop.search import quick as s
     fake = types.ModuleType("litloop_journal_rank")
     fake.lookup = lambda journal="", issn=None: (
         {"found": True, "label": "中科院2区", "warnings": [{"year": 2025}]} if issn == ["0272-8842"]
@@ -585,14 +585,14 @@ def test_search_results_get_journal_rank_when_tool_installed(monkeypatch):
 
 def test_search_works_without_journal_rank_tool(monkeypatch):
     import sys
-    from litloop import search as s
+    from litloop.search import quick as s
     monkeypatch.setitem(sys.modules, "litloop_journal_rank", None)  # import fails
     rows = [{"journal": "X"}]
     assert s._add_journal_rank(rows) == [{"journal": "X"}]
 
 
 def test_journal_filters_and_drop_counts():
-    from litloop.search import _filter_by_journal
+    from litloop.search.quick import _filter_by_journal
     rows = [
         {"title": "a", "cas_zone": 1, "jcr_quartile": 1},
         {"title": "b", "cas_zone": 3, "jcr_quartile": 1},
@@ -608,7 +608,7 @@ def test_journal_filters_and_drop_counts():
 
 
 def test_finalize_flags_and_optionally_drops_retracted(monkeypatch):
-    from litloop import abstracts, search as s
+    from litloop.search import abstracts, quick as s
     monkeypatch.setattr(s, "_add_journal_rank", lambda rows: rows)
     monkeypatch.setattr(abstracts, "fill_abstracts", lambda rows, config=None: None)
 
@@ -626,7 +626,7 @@ def test_finalize_flags_and_optionally_drops_retracted(monkeypatch):
 
 
 def test_retraction_check_is_one_batched_openalex_request(monkeypatch):
-    from litloop import search as s
+    from litloop.search import quick as s
     calls = []
 
     class Resp:
@@ -651,7 +651,7 @@ def test_retraction_check_is_one_batched_openalex_request(monkeypatch):
 
 
 def test_subcategory_zone_filter_keeps_niche_top_journals():
-    from litloop.search import _filter_by_journal
+    from litloop.search.quick import _filter_by_journal
     rows = [
         {"title": "jecs", "cas_zone": 2, "cas_sub_zone": 1},   # 大类2区, 小类1区
         {"title": "ci", "cas_zone": 2, "cas_sub_zone": 2},
@@ -666,7 +666,7 @@ def test_subcategory_zone_filter_keeps_niche_top_journals():
 
 def test_retraction_flags_prefer_local_retraction_watch(monkeypatch):
     import sys, types
-    from litloop import search as s
+    from litloop.search import quick as s
     fake = types.ModuleType("litloop_journal_rank.retractions")
     fake.ensure_fresh = lambda proxy=None: "fresh"
     fake.lookup_papers = lambda dois: {

@@ -290,7 +290,7 @@ def _fill_meta(path: Path, wait_s: float = 10.0, publishers: bool = False) -> No
         return
 
     def run() -> None:
-        from .deep_search import _get
+        from .search.deep import _get
         from .sources.scihub import note_years
         for k in range(0, len(missing), 50):
             chunk = missing[k:k + 50]
@@ -354,7 +354,7 @@ def _run(job: str, only: list[str] | None = None, rounds: str = "all") -> None:
                   source=r.get("source"), file=r.get("file") or None, error=error_text.pick_failure(r),
                   note=r.get("note"), attempts=error_text.steps_for_app(r.get("attempts")))
 
-    from . import progress_reporter
+    from .download import progress as progress_reporter
     from .sources import _SKIPPED
     from .sources.scihub import note_years
     _SKIPPED.clear()  # skips asked for in an earlier job do not carry over

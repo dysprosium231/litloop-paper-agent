@@ -11,8 +11,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from litloop import pipeline
-from litloop.pipeline import QueueEntry
+from litloop.download import pipeline
+from litloop.download.pipeline import QueueEntry
 from litloop.supplementary import extract_supplementary_links, fetch_supplementary
 
 HTML = """

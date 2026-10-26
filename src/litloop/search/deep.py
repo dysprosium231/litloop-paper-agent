@@ -36,10 +36,11 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from . import screening, store, translate
-from .config import load_config
-from .identifiers import canonical_doi
-from .log import get_logger
+from . import screening
+from .. import store, translate
+from ..config import load_config
+from ..identifiers import canonical_doi
+from ..log import get_logger
 
 logger = get_logger()
 _run = threading.local()  # the round being worked on in this thread, for progress reports
@@ -91,8 +92,8 @@ def _boolean_heavy(params: dict[str, Any]) -> bool:
 def _get(params: dict[str, Any], *, tries: int = 6) -> dict[str, Any]:
     """One OpenAlex request, paced and counted by ``quota``. A 429 is retried with
     growing waits; a spent daily budget (remaining 0) is reported plainly."""
-    from . import quota
-    from .search import _plain_session
+    from .. import quota
+    from .quick import _plain_session
     key = str(load_config().get("openalex_api_key") or "").strip()
     if key:
         params = {**params, "api_key": key}
@@ -127,7 +128,7 @@ def _short(wid: str) -> str:
 
 
 def _record(w: dict[str, Any]) -> dict[str, Any]:
-    from .search import _reconstruct_abstract
+    from .quick import _reconstruct_abstract
     src = ((w.get("primary_location") or {}).get("source") or {})
     return {
         "openalex": _short(w.get("id")),
@@ -215,7 +216,7 @@ def _topic_search(term: str, glossary_alts: dict[str, list[str]] | None = None) 
     terms to a word it knows (``glossary_alts``, from ``_glossary_expansions``),
     a phrase in quotes: "(PDC OR \"polymer-derived ceramic\") AND aerogel".
     """
-    from .terms.spelling import variants
+    from ..terms.spelling import variants
     groups = []
     for w in term.replace(",", " ").split():
         alts = [v for a in w.split("|") if a for v in variants(a)]
@@ -231,7 +232,7 @@ def _topic_search(term: str, glossary_alts: dict[str, list[str]] | None = None) 
 
 def _budget_ok(credits0: int) -> bool:
     """True while this round may still spend OpenAlex credits (see ROUND_CREDITS, RESERVE_CREDITS)."""
-    from . import quota
+    from .. import quota
     if quota.spent("openalex") - credits0 >= ROUND_CREDITS:
         return False
     remaining = (quota.summary().get("openalex") or {}).get("remaining")
@@ -253,7 +254,7 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
     actually asked about: once the round's credit budget is spent, the rest
     are left for a later round.
     """
-    from . import quota
+    from .. import quota
     credits0 = quota.spent("openalex") if credits0 is None else credits0
     term = " ".join(t.strip() for t in core_terms or [] if t.strip())
     jobs = [(term, chunk) for chunk in _chunks(ref_ids)]
@@ -291,7 +292,7 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
 # --------------------------------------------------------------------------- pool
 
 def _keyword_candidates(queries: list[str], year_from: int | None, year_to: int | None) -> dict[str, list[dict]]:
-    from .search import _collect
+    from .quick import _collect
 
     def one(q: str) -> list[dict[str, Any]]:
         try:
@@ -334,7 +335,7 @@ def _score(state: dict[str, Any]) -> None:
     1), so a seed set drifting toward a neighbouring topic cannot outvote the
     original intent.
     """
-    from .search import _match_tier
+    from .quick import _match_tier
     pool = state["pool"]
     seed_refs = set(state["seed_refs"])
     orig_refs = {r for s in _orig_seeds(state) for r in (pool.get(s, {}).get("refs") or [])}
@@ -426,8 +427,8 @@ _WORD = re.compile(r"[a-z][a-z0-9]+")
 
 
 def _tokens(rec: dict[str, Any]) -> Counter:
-    from .terms.spelling import to_us
-    from .terms.text import RANKING_STOPWORDS, stem
+    from ..terms.spelling import to_us
+    from ..terms.text import RANKING_STOPWORDS, stem
     words = (rec.get("title") or "") + " " + (rec.get("abstract") or "")
     return Counter(stem(w) for w in _WORD.findall(to_us(words)) if w not in RANKING_STOPWORDS)
 
@@ -545,7 +546,7 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
     """Add citation-route candidates for new seeds; returns how many records were added."""
     pool = state["pool"]
     years = _year_filter(state.get("year_from"), state.get("year_to"))
-    from . import quota
+    from .. import quota
     credits0 = quota.spent("openalex")
     seeds = [pool[k] for k in new_seed_keys if k in pool]
     # References shared by more seeds (the user's own seeds count double) are asked first,
@@ -586,7 +587,7 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
 
 def _core_term_notes(core_terms: list[str]) -> list[str]:
     """Warnings about core terms that would make the citation route far too broad."""
-    from .terms.glossary import AMBIGUOUS_SYMBOLS
+    from ..terms.glossary import AMBIGUOUS_SYMBOLS
     alts = {a.lower() for term in core_terms for w in term.replace(",", " ").split() for a in w.split("|") if a}
     loose = sorted(alts & AMBIGUOUS_SYMBOLS)
     if not loose:
@@ -669,7 +670,7 @@ def _glossary_expansions(queries: list[str], core_terms: list[str],
     the words of the core terms, and a report of both for the user. Core-term
     words are expanded only when there are at least two of them, so another
     concept keeps each expansion on topic."""
-    from .terms import glossary
+    from ..terms import glossary
     try:
         use = glossary.in_use()
     except Exception as exc:  # an unreadable glossary must not stop the search
@@ -696,7 +697,7 @@ def _glossary_expansions(queries: list[str], core_terms: list[str],
 def _glossary_suggestions(state: dict[str, Any], rated: dict[str, str]) -> list[dict[str, Any]]:
     """Abbreviations the papers read so far define ("polymer-derived ceramics
     (PDCs)"), added to the glossary as suggestions for the user to confirm."""
-    from .terms import glossary
+    from ..terms import glossary
     pool = state["pool"]
     keys = set(state["seeds"]) | {k for k, r in rated.items() if r in ("高", "中")}
     texts = [pool[k].get("abstract") or "" for k in keys if k in pool]
@@ -727,7 +728,7 @@ def next_batch(session: str, force: bool = False) -> dict[str, Any]:
 
 
 def _next_round(session: str, force: bool = False) -> dict[str, Any]:
-    from . import quota
+    from .. import quota
     t0 = time.time()
     credits0 = quota.spent("openalex")
     state = _load(session)
@@ -1018,7 +1019,7 @@ def _write_summary(state: dict[str, Any], rated: dict[str, str], stop: dict[str,
 def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None, force: bool = False,
                 prefilled: bool = False) -> dict[str, Any]:
     from .abstracts import clean_abstract, fill_abstracts
-    from .search import _add_journal_rank, _flag_retractions
+    from .quick import _add_journal_rank, _flag_retractions
     rated = rated if rated is not None else _ratings(state)
     stop = _stop(state, rated)
     _log_stop(state, rated, stop)
@@ -1061,7 +1062,7 @@ def _next_batch(state: dict[str, Any], rated: dict[str, str] | None = None, forc
         # What action="rate" needs to turn "n=3 高" back into a screening item.
         state["last_batch"] = [{"key": k, **{f: b.get(f) for f in _BATCH_FIELDS}} for k, b in zip(picked, batch)]
         _save(state)
-    from . import quota
+    from .. import quota
     notes = quota.warnings()
     if not str(load_config().get("openalex_api_key") or "").strip():
         notes.insert(0, "no OpenAlex API key: the free daily budget without one is about 1,000 credits, "

@@ -16,8 +16,8 @@ from .cache import cache_clear, cache_get
 from .config import get_config_safe, load_config, mask_config_value, update_config
 from .network import fetch_json
 from .citations.paper_list import parse_paper_list
-from .resolver import batch_resolve
-from .search import search_papers_v2 as search_papers
+from .search.title_to_doi import batch_resolve
+from .search.quick import search_papers_v2 as search_papers
 from .sources import batch_download, download
 from .tor.proxy import check_tor_circuit, get_tor_proxy
 
@@ -110,7 +110,7 @@ def litloop_download(
 
     if result.get("success") and markdown:
         try:
-            from .md_export import pdf_to_markdown_detailed
+            from .download.markdown import pdf_to_markdown_detailed
 
             md_out, md_warnings = pdf_to_markdown_detailed(result["file"])
             result["markdown"] = str(md_out)
@@ -181,7 +181,7 @@ def _batch_download_impl(
         and cfg.get("download_strategy", "fastest") not in ("scihub_only", "grey_only", "scihub_first")
     )
     if use_lanes:
-        from .pipeline import grey_allowed, parse_queue, run_lanes
+        from .download.pipeline import grey_allowed, parse_queue, run_lanes
         from .sources import _write_download_results
 
         all_entries = parse_queue("\n".join(identifiers))
@@ -190,7 +190,7 @@ def _batch_download_impl(
         allow_grey = (scihub_enabled is not False) and grey_allowed(cfg)
         out_dir = output_dir or cfg.get("output_dir") or str(Path.cwd())
         if rounds != "all" or len(entries) <= int(cfg.get("batch_small_max", 30) or 0):
-            from .pipeline import run_scihub_then_single
+            from .download.pipeline import run_scihub_then_single
             _log.info(f"Short list ({len(entries)} items, rounds {rounds}): Sci-Hub for all, then a full single download for each miss")
             raw = run_scihub_then_single(entries, out_dir, config=cfg, allow_grey=allow_grey,
                                          workers=int(cfg.get("batch_small_workers", 1) or 1), rounds=rounds)
@@ -285,7 +285,7 @@ def litloop_search(
     filtered = {k: v for k, v in stats.items() if v}
     extra = {**({"filtered": filtered} if filtered else {}), **({"glossary": expansions} if expansions else {})}
     if out_file and results:
-        from .pipeline import QueueEntry, predict_channel, write_queue
+        from .download.pipeline import QueueEntry, predict_channel, write_queue
 
         qe = [
             QueueEntry(
@@ -333,7 +333,7 @@ def litloop_screening(
     out_file: str | None = None,
 ) -> str:
     """Screening record: save (items: doi,title,relevance 高/中/低/不相关,reason), decide (selected nos/DOIs), translate (items: doi,abstract_zh), list, show."""
-    from . import screening
+    from .search import screening
     try:
         if action == "save":
             return json.dumps(screening.save(question, items or [], criteria=criteria, query=query,
@@ -370,7 +370,7 @@ def litloop_plan_search(
         domain: Domain profile: general/medicine/computer_science/chinese_general/...
         depth: quick/standard/systematic.
     """
-    from .discovery import plan
+    from .search.scansci_find import plan
     try:
         return json.dumps(plan(query, domain=domain, depth=depth), ensure_ascii=False)
     except Exception as exc:
@@ -389,7 +389,7 @@ def litloop_estimate_search(
         domain: Domain profile.
         depth: quick/standard/systematic.
     """
-    from .discovery import estimate
+    from .search.scansci_find import estimate
     try:
         return json.dumps(estimate(query, domain=domain, depth=depth), ensure_ascii=False)
     except Exception as exc:
@@ -401,7 +401,7 @@ def litloop_smoke_search(
     domain: str = "general",
 ) -> str:
     """Fetch 4 records per source and validate the candidate contract before the real search."""
-    from .discovery import smoke
+    from .search.scansci_find import smoke
     try:
         return json.dumps(smoke(query, domain=domain), ensure_ascii=False)
     except Exception as exc:
@@ -422,7 +422,7 @@ def litloop_calibrate_search(
         depth: quick/standard/systematic.
         sample_size: Records to sample (default 100).
     """
-    from .discovery import calibrate
+    from .search.scansci_find import calibrate
     try:
         return json.dumps(calibrate(query, domain=domain, depth=depth, sample_size=sample_size),
                           ensure_ascii=False)
@@ -447,7 +447,7 @@ def litloop_deep_search(
     ratings: list[dict] | None = None,
 ) -> str:
     """Deep search: start (question, 4-8 queries, seed DOIs and/or a Zotero seed_collection, core_terms), rate (ratings=[{n, relevance, reason}]), next, status."""
-    from . import deep_search
+    from .search import deep as deep_search
     try:
         if action == "start":
             from_zotero = None
@@ -484,7 +484,7 @@ def litloop_verify_identifiers(candidates_json: str) -> str:
     Args:
         candidates_json: JSON array of candidates (as produced by ScanSci Find), or a path to one.
     """
-    from .discovery import DiscoveryTimeoutError, verify
+    from .search.scansci_find import DiscoveryTimeoutError, verify
     try:
         return json.dumps(verify(candidates_json), ensure_ascii=False)
     except DiscoveryTimeoutError as exc:
@@ -499,7 +499,7 @@ def litloop_resolve_oa(candidates_json: str) -> str:
     Args:
         candidates_json: JSON array of candidates (as produced by ScanSci Find), or a path to one.
     """
-    from .discovery import DiscoveryTimeoutError, resolve_oa
+    from .search.scansci_find import DiscoveryTimeoutError, resolve_oa
     try:
         return json.dumps(resolve_oa(candidates_json), ensure_ascii=False)
     except DiscoveryTimeoutError as exc:
@@ -534,7 +534,7 @@ def litloop_build_download_queue(
         depth: quick/standard (default quick).
     """
     import tempfile as _tempfile
-    from .discovery import build_download_queue, search
+    from .search.scansci_find import build_download_queue, search
     try:
         with _tempfile.TemporaryDirectory(prefix="scansci_find_") as tmp:
             payload = search(query, tmp, depth=depth, limit=min(limit * 2, 60))
@@ -1555,7 +1555,7 @@ def litloop_prepare_queue(
     if action == "build":
         return litloop_build_download_queue(query=query, limit=limit, depth=depth)
     if action == "full":
-        from .discovery import DiscoveryTimeoutError, resolve_oa, verify
+        from .search.scansci_find import DiscoveryTimeoutError, resolve_oa, verify
         # Shared budget: verify + resolve-oa together must not take the sum of
         # two light budgets (45s each). Each subprocess gets the remaining time.
         budget_seconds = 75

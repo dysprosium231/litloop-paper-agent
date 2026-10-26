@@ -26,7 +26,7 @@ def parse_paper_list(file_path: str | Path) -> list[PaperEntry]:
 
     suffix = path.suffix.lower()
     if suffix in (".csv", ".xlsx", ".tsv", ".tab"):
-        from ..pipeline import entries_from_table, read_table
+        from ..download.pipeline import entries_from_table, read_table
 
         return _entries_from_queue(entries_from_table(read_table(path)))
 

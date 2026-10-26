@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from litloop import screening
+from litloop.search import screening
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +51,7 @@ def test_merge_keeps_decisions_and_appends_search():
 def test_decide_by_number_or_doi_and_queue(monkeypatch, tmp_path):
     sid = screening.save("q", ITEMS)["session"]
     written = {}
-    import litloop.pipeline as pl
+    import litloop.download.pipeline as pl
     monkeypatch.setattr(pl, "write_queue", lambda qe, path: written.setdefault("ids", [q.identifier for q in qe]) and path)
     r = screening.decide(sid, selected=["1", "10.1/MID"], rejected=["3"], out_file=str(tmp_path / "q.json"))
     assert r["selected"] == 2 and set(r["identifiers"]) == {"10.1/HIGH", "10.1/mid"}

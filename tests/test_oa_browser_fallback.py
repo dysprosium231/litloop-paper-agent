@@ -6,8 +6,8 @@ from __future__ import annotations
 import threading
 import time
 
-from litloop import pipeline
-from litloop.pipeline import QueueEntry
+from litloop.download import pipeline
+from litloop.download.pipeline import QueueEntry
 
 
 def test_browser_fallback_is_short_and_one_at_a_time(tmp_path, monkeypatch):

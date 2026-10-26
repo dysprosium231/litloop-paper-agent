@@ -100,7 +100,7 @@ def _build_env() -> dict[str, str]:
     """
     env = dict(os.environ)
     try:
-        from .config import load_config
+        from ..config import load_config
         cfg = load_config()
         openalex_key = str(cfg.get("openalex_api_key") or "").strip()
         if openalex_key and not env.get("OPENALEX_API_KEY"):

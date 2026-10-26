@@ -7,7 +7,7 @@ from typing import Any
 
 from ..identifiers import normalize_arxiv_id
 from ..network import fetch
-from ..pdf_utils import _response_looks_pdf, is_pdf_file, success
+from ..download.pdf import _response_looks_pdf, is_pdf_file, success
 
 
 def try_arxiv(identifier: str, output_path: Path, config: dict[str, Any]) -> dict[str, Any] | None:

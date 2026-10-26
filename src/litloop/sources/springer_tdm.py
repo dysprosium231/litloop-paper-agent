@@ -112,7 +112,7 @@ def try_springer_tdm(doi: str, output_path: Path,
 
     xml, status = fetch_fulltext_xml(doi, api_key, config)
     if status == "invalid_key":
-        from ..pdf_utils import fail
+        from ..download.pdf import fail
 
         return fail(
             doi,
@@ -130,7 +130,7 @@ def try_springer_tdm(doi: str, output_path: Path,
     except OSError:
         return None
 
-    from ..pdf_utils import success
+    from ..download.pdf import success
 
     return success(doi, xml_path, "SpringerTDM")
 

@@ -3,7 +3,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from litloop import app_server, screening, store
+from litloop import app_server, store
+from litloop.search import screening
 
 TOKEN = "t0ken"
 

@@ -40,7 +40,7 @@ def test_sciopen_pdf_button(page):
 
 
 def test_sciopen_url_from_doi():
-    from litloop.pipeline import sciopen_pdf_url
+    from litloop.download.pipeline import sciopen_pdf_url
     assert sciopen_pdf_url("10.26599/jac.2025.9221068") == \
         "https://www.sciopen.com/local/article_pdf/10.26599/JAC.2025.9221068.pdf"
     assert sciopen_pdf_url("10.1016/j.x.2025.1") == ""

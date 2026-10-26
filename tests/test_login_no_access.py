@@ -70,7 +70,7 @@ def test_a_download_clears_the_judgment(monkeypatch, tmp_path):
     monkeypatch.setattr(ids, "validate_doi", lambda doi: (True, ""))
     import litloop.citations.formats as cit
     monkeypatch.setattr(cit, "fetch_metadata", lambda *a, **k: {})  # no network
-    import litloop.pdf_utils as pu
+    import litloop.download.pdf as pu
     monkeypatch.setattr(pu, "is_suspicious_pdf", lambda *a, **k: False)
     monkeypatch.setattr(src, "_build_free_sources", lambda doi, config: [(writer, "Crossref")])
     core.note_no_access("10.9999/later-ok")

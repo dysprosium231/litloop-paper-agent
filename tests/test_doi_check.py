@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 import requests
 
-from litloop import doi_check, error_text, sources
+from litloop import error_text, sources
+from litloop.download import doi_check
 
 
 class _Resp:

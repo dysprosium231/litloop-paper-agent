@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from litloop import pipeline
-from litloop.pipeline import QueueEntry, _mdpi_variants, _PDF_URL_HINT
+from litloop.download import pipeline
+from litloop.download.pipeline import QueueEntry, _mdpi_variants, _PDF_URL_HINT
 
 
 class TestMdpiSlugExtensions:

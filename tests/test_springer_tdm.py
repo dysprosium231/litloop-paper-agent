@@ -116,8 +116,8 @@ class TestWiring:
         assert PUBLISHER_TOOL_MAP["Springer"][0] == "SpringerTDM"
 
     def test_fast_lane_hits_springer(self, tmp_path: Path, monkeypatch):
-        from litloop import pipeline
-        from litloop.pipeline import QueueEntry
+        from litloop.download import pipeline
+        from litloop.download.pipeline import QueueEntry
 
         called = []
         monkeypatch.setattr(
@@ -133,8 +133,8 @@ class TestWiring:
         assert results[0]["success"] and results[0]["source"] == "springer_tdm"
 
     def test_fast_lane_skips_springer_without_key(self, tmp_path: Path, monkeypatch):
-        from litloop import pipeline
-        from litloop.pipeline import QueueEntry
+        from litloop.download import pipeline
+        from litloop.download.pipeline import QueueEntry
 
         called = []
         monkeypatch.setattr(

@@ -157,7 +157,7 @@ class CARSIClient:
 
         idp_en = _IDP_MAP.get(idp_name, idp_name)
 
-        from ..pdf_utils import is_pdf_file, success as _success
+        from ..download.pdf import is_pdf_file, success as _success
 
         # Serialize browser opens across threads — only one browser at a time
         with self._login_lock:
@@ -445,7 +445,7 @@ class CARSIClient:
                             return saved
 
                     # Step 7: Find PDF link in HTML
-                    from ..pdf_utils import extract_pdf_url_from_html
+                    from ..download.pdf import extract_pdf_url_from_html
                     html = page.content()
                     found_pdf = extract_pdf_url_from_html(html, page.url)
                     if found_pdf:

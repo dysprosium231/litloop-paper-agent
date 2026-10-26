@@ -30,7 +30,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from litloop import deep_search, quota  # noqa: E402
+from litloop import quota  # noqa: E402
+from litloop.search import deep as deep_search  # noqa: E402
 from litloop.identifiers import canonical_doi  # noqa: E402
 
 

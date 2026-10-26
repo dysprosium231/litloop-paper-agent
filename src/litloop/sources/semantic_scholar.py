@@ -12,7 +12,7 @@ from typing import Any
 import requests
 
 from ..network import fetch_json, polite_delay
-from ..pdf_utils import download_pdf, is_plausible_pdf_url
+from ..download.pdf import download_pdf, is_plausible_pdf_url
 
 logger = logging.getLogger(__name__)
 

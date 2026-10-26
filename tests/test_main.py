@@ -4,7 +4,8 @@ from contextlib import redirect_stdout
 import io
 import json
 
-from litloop import main, search
+from litloop import main
+from litloop.search import quick as search
 
 
 def test_search_json_is_ascii_safe_and_contains_author_match(monkeypatch):

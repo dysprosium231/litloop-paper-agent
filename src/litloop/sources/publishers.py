@@ -218,7 +218,7 @@ def resolve_doi(doi: str, config: dict[str, Any]) -> str | None:
 def try_publisher_direct(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str, Any] | None:
     """Try publisher direct download with HTTP first, then browser fallback."""
     from ..network import USER_AGENT, polite_delay
-    from ..pdf_utils import is_pdf_file, success, _response_looks_pdf
+    from ..download.pdf import is_pdf_file, success, _response_looks_pdf
 
     log.info(f"   [PublisherDirect] Starting for {doi}")
     resolved_url = resolve_doi(doi, config)
@@ -291,7 +291,7 @@ def try_mdpi_direct(doi: str, output_path: Path, config: dict[str, Any]) -> dict
     if not doi.startswith("10.3390/"):
         return None
 
-    from ..pdf_utils import is_pdf_file, success, _response_looks_pdf
+    from ..download.pdf import is_pdf_file, success, _response_looks_pdf
     from ..network import USER_AGENT, polite_delay
 
     article_id = doi.split("10.3390/")[-1]
@@ -354,7 +354,7 @@ def try_science_direct(doi: str, output_path: Path, config: dict[str, Any]) -> d
         return None
 
     from ..network import polite_delay
-    from ..pdf_utils import is_pdf_file, success, _response_looks_pdf
+    from ..download.pdf import is_pdf_file, success, _response_looks_pdf
 
     def _fetch_pdf_camofox(pdf_url: str) -> "requests.Response | None":  # type: ignore[name-defined]
         from ..camofox import is_available as _camofox_avail, solve_url as _camofox_solve
@@ -418,7 +418,7 @@ def try_pnas_direct(doi: str, output_path: Path, config: dict[str, Any]) -> dict
         return None
 
     from ..network import USER_AGENT, polite_delay
-    from ..pdf_utils import is_pdf_file, success, _response_looks_pdf
+    from ..download.pdf import is_pdf_file, success, _response_looks_pdf
 
     doi_suffix = doi.split("10.1073/")[-1]
     pdf_url = f"https://www.pnas.org/doi/epdf/{doi}"
@@ -459,7 +459,7 @@ def try_plos_direct(doi: str, output_path: Path, config: dict[str, Any]) -> dict
         return None
 
     from ..network import USER_AGENT, polite_delay
-    from ..pdf_utils import is_pdf_file, success, _response_looks_pdf
+    from ..download.pdf import is_pdf_file, success, _response_looks_pdf
 
     # PLOS PDF URL: https://journals.plos.org/{journal}/article/file?id={doi}&type=printable
     # Determine journal from DOI: 10.1371/journal.pone.0123456 -> plosone
@@ -519,7 +519,7 @@ def try_frontiers_direct(doi: str, output_path: Path, config: dict[str, Any]) ->
         return None
 
     from ..network import USER_AGENT, polite_delay
-    from ..pdf_utils import is_pdf_file, success, _response_looks_pdf
+    from ..download.pdf import is_pdf_file, success, _response_looks_pdf
 
     # Frontiers PDF URL: https://www.frontiersin.org/articles/{doi}/pdf
     pdf_url = f"https://www.frontiersin.org/articles/{doi}/pdf"
@@ -560,7 +560,7 @@ def try_bmc_direct(doi: str, output_path: Path, config: dict[str, Any]) -> dict[
         return None
 
     from ..network import USER_AGENT, polite_delay
-    from ..pdf_utils import is_pdf_file, success, _response_looks_pdf
+    from ..download.pdf import is_pdf_file, success, _response_looks_pdf
 
     # BMC/SpringerOpen PDF: try Springer link first, then direct biomedcentral
     pdf_urls = [

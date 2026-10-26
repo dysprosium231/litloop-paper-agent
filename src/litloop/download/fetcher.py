@@ -12,15 +12,15 @@ from urllib.parse import urlparse
 
 import requests
 
-from .auth import EZProxyAuth, WebVPNAuth
-from .http_utils import request_with_retry
-from .extractors import html_extractor, pdf_extractor
-from .models import FetchResult, NextAction, Paper
-from .publisher_pdf_router import build_pdf_candidates, discover_pdf_candidates_from_html
-from .publisher_profiles import infer_publisher_profile, infer_publisher_profile_from_url
+from ..auth import EZProxyAuth, WebVPNAuth
+from ..http_utils import request_with_retry
+from ..extractors import html_extractor, pdf_extractor
+from ..models import FetchResult, NextAction, Paper
+from ..publisher_pdf_router import build_pdf_candidates, discover_pdf_candidates_from_html
+from ..publisher_profiles import infer_publisher_profile, infer_publisher_profile_from_url
 
 try:
-    from .browser_backend import is_available as _browser_backend_available
+    from ..browser_backend import is_available as _browser_backend_available
     _HAS_CLOAKBROWSER = _browser_backend_available()
 except ImportError:
     _HAS_CLOAKBROWSER = False
@@ -139,7 +139,7 @@ def _wait_for_challenge(page, max_tries: int = 6, *, current: str = "") -> None:
     attention_key = f"browser-challenge:{id(page)}:{current}"
     attention_open = False
     try:
-        from . import progress_reporter as reporter
+        from . import progress as reporter
     except Exception:
         reporter = None
     try:
@@ -167,7 +167,7 @@ class PaperFetcher:
     """Main class for fetching academic papers via multi-stage pipeline."""
 
     def __init__(self, config: dict | None = None):
-        from .config import load_config
+        from ..config import load_config
         self.config = config or load_config()
         self._auth: WebVPNAuth | EZProxyAuth | None = None
         self._last_request_time = 0.0
@@ -183,7 +183,7 @@ class PaperFetcher:
     @property
     def auth(self) -> WebVPNAuth | EZProxyAuth:
         if self._auth is None:
-            from .schools import get_school
+            from ..schools import get_school
             school_name = (self.config.get("instsci_school", "")
                            or self.config.get("vpnsci_school", "")).strip()
             if not school_name:
@@ -370,8 +370,8 @@ class PaperFetcher:
 
     def _try_open_access(self, doi: str, identifier: str = "") -> Paper | None:
         """Try to fetch paper from Open Access sources."""
-        from .sources import unpaywall, arxiv
-        from .identifiers import normalize_arxiv_id
+        from ..sources import unpaywall, arxiv
+        from ..identifiers import normalize_arxiv_id
 
         output_dir = Path(self.config.get("output_dir", "."))
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -654,7 +654,7 @@ class PaperFetcher:
         return paths
 
     def _try_carsi_pdf(self, doi: str, resolved_url: str, paper: Paper) -> Paper | None:
-        from .sources.carsi import CARSIClient
+        from ..sources.carsi import CARSIClient
 
         pdf_url = self._build_publisher_pdf_url(doi, resolved_url)
         if not pdf_url:
@@ -677,7 +677,7 @@ class PaperFetcher:
         return None
 
     def _try_carsi_html(self, url: str, paper: Paper) -> Paper | None:
-        from .sources.carsi import CARSIClient
+        from ..sources.carsi import CARSIClient
 
         logger.info("Trying CARSI HTML: %s", url)
         self._rate_limit()
@@ -741,7 +741,7 @@ class PaperFetcher:
         return paper
 
     def _try_elsevier_api(self, doi: str, paper: Paper) -> Paper | None:
-        from .sources import elsevier_api
+        from ..sources import elsevier_api
 
         api_key = elsevier_api.get_api_key(self.config.get("elsevier_api_key", ""))
         if not api_key:
@@ -891,7 +891,7 @@ class PaperFetcher:
         return identifier if identifier.startswith("http") else None
 
     def _resolve_doi(self, doi: str) -> str | None:
-        from .network import user_agent
+        from ..network import user_agent
 
         try:
             resp = request_with_retry(

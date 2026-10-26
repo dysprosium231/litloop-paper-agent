@@ -36,19 +36,19 @@ class TestIsSuspiciousPdf:
         p = tmp_path / "preview.pdf"
         p.write_bytes(_make_pdf(1, min_size=150_000))
         assert p.stat().st_size > 100_000
-        from litloop.pdf_utils import is_suspicious_pdf
+        from litloop.download.pdf import is_suspicious_pdf
         assert is_suspicious_pdf(p) is True
 
     def test_large_multi_page_is_not_suspicious(self, tmp_path: Path):
         p = tmp_path / "full.pdf"
         p.write_bytes(_make_pdf(3, min_size=150_000))
-        from litloop.pdf_utils import is_suspicious_pdf
+        from litloop.download.pdf import is_suspicious_pdf
         assert is_suspicious_pdf(p) is False
 
     def test_small_file_is_suspicious(self, tmp_path: Path):
         p = tmp_path / "cover.pdf"
         p.write_bytes(_make_pdf(1))
-        from litloop.pdf_utils import is_suspicious_pdf
+        from litloop.download.pdf import is_suspicious_pdf
         assert is_suspicious_pdf(p) is True
 
 

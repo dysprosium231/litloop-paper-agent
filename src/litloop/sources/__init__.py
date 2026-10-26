@@ -15,8 +15,8 @@ from ..cache import cache_get, cache_set
 from ..config import load_config, DATA_DIR
 from ..identifiers import is_arxiv_identifier, normalize_doi, safe_filename
 from ..log import get_logger
-from ..pdf_utils import fail
-from ..rename import rename_pdf, generate_filename as rename_pdf_generate_filename
+from ..download.pdf import fail
+from ..download.rename import rename_pdf, generate_filename as rename_pdf_generate_filename
 
 log = get_logger()
 
@@ -223,7 +223,7 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
                 # Check for suspicious PDF (1-page or very small — likely not full text)
                 file_path = result.get("file", "")
                 if file_path:
-                    from ..pdf_utils import is_suspicious_pdf, suspicious_pdf
+                    from ..download.pdf import is_suspicious_pdf, suspicious_pdf
                     fp = Path(file_path)
                     if fp.exists() and is_suspicious_pdf(fp, doi):
                         log.info(f"   SUSPICIOUS {label}: PDF appears to be a preview/cover page, not full text")
@@ -242,7 +242,7 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
         error_type = classify_error(exception=e)
         # Check if a valid PDF was actually written to disk despite the exception
         # (common with Sci-Hub: browser download succeeds but post-download logic raises)
-        from ..pdf_utils import is_pdf_file as _is_pdf
+        from ..download.pdf import is_pdf_file as _is_pdf
         if output_path.exists() and _is_pdf(output_path):
             log.info(f"   OK {label} (recovered after {error_type})")
             record_result(label, True, latency_ms)
@@ -400,7 +400,7 @@ def _run_institutional_sequence(steps: list[tuple[Any, str]], doi: str, target_d
                                 config: dict[str, Any], failures: list[dict[str, str]] | None = None,
                                 ) -> dict[str, Any] | None:
     """Try the school's routes one at a time; the first PDF wins."""
-    from .. import progress_reporter
+    from ..download import progress as progress_reporter
     log.info(f"   School routes in turn: {', '.join(label for _, label in steps)}")
     t_seq = time.time()
     for fn, label in steps:
@@ -717,7 +717,7 @@ def _run_tiers_parallel(
             return None
 
         # Final scan: check if any source wrote a valid PDF file despite timeout
-        from ..pdf_utils import is_pdf_file, is_suspicious_pdf, suspicious_pdf
+        from ..download.pdf import is_pdf_file, is_suspicious_pdf, suspicious_pdf
         for label, src_output in futures.values():
             if src_output.exists() and is_pdf_file(src_output):
                 if is_suspicious_pdf(src_output, doi):
@@ -878,7 +878,7 @@ def _update_doi_index(
 
 def _auto_rename(result: dict[str, Any], identifier: str, config: dict[str, Any], doi: str = "", target_dir: Path | None = None) -> None:
     """Auto-rename downloaded PDF based on metadata."""
-    from ..rename import rename_format
+    from ..download.rename import rename_format
     if rename_format(config) == "off":
         return
     file_path = Path(result.get("file", ""))
@@ -1022,7 +1022,7 @@ def note_user_waiting(what: str = "") -> None:
         if att is not None:
             att.user_wait_at = time.time()
         try:
-            from .. import progress_reporter as pr
+            from ..download import progress as pr
             text = _WAIT_TEXT.get(what, "请在弹出的浏览器窗口中完成登录或人机验证")
             pr.set_attention(f"wait:{doi}", f"{text}（{doi}）", current=doi, phase="等待你的操作")
             pr.item_stage(doi, "等待你在浏览器中操作")
@@ -1071,7 +1071,7 @@ def skip_download(identifier: str) -> bool:
             return True
         _SETTLED.add(key)  # its sources stop waiting, launch nothing, drop late results
     try:
-        from .. import progress_reporter as _pr
+        from ..download import progress as _pr
         _pr.clear_attention(f"wait:{key}")
         from ..browser_backend import close_browsers_since
         close_browsers_since(0.0, owner=key)  # its own windows only
@@ -1149,7 +1149,7 @@ def download(
     key = identifier.strip()
     if not is_arxiv_identifier(key):
         key = normalize_doi(key)
-        from ..doi_check import registered
+        from ..download.doi_check import registered
         if registered(key) is False:  # a typo: no source can have it
             return fail(key, "DOI is not registered at doi.org", error_type="doi_not_found",
                         action="check the DOI for typos")
@@ -1207,7 +1207,7 @@ def download(
     finally:
         _DL_TLS.key = prev_key
         try:  # whatever this paper waited on the user for is over now
-            from .. import progress_reporter as _pr
+            from ..download import progress as _pr
             _pr.clear_attention(f"wait:{normalize_doi(key) if not is_arxiv_identifier(key) else key}")
         except Exception:
             pass
@@ -1347,7 +1347,7 @@ def _download_impl(
     from ..citations.formats import fetch_metadata
     metadata = fetch_metadata(doi, config)
     if metadata:
-        from ..rename import rename_format
+        from ..download.rename import rename_format
         expected_name = rename_pdf_generate_filename(metadata, doi=doi, fmt=rename_format(config))
         if expected_name:
             # Generated names can collide across papers, so a name match

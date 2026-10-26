@@ -29,7 +29,7 @@ def _offline(monkeypatch):
     import litloop.session_heal as sh
     monkeypatch.setattr(sh, "ensure_institutional_sessions", lambda *a, **k: {})
     monkeypatch.setattr(src, "_build_institutional_sources", lambda *a, **k: [])
-    import litloop.pdf_utils as pu
+    import litloop.download.pdf as pu
     monkeypatch.setattr(pu, "is_suspicious_pdf", lambda *a, **k: False)  # the fake PDF has one page
     yield
     src._SKIPPED.clear()

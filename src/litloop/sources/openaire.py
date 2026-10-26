@@ -12,7 +12,7 @@ from typing import Any
 from urllib.parse import quote
 
 from ..network import fetch_json, polite_delay
-from ..pdf_utils import download_pdf
+from ..download.pdf import download_pdf
 
 _WEBRESOURCE_RE = re.compile(r"<webresource>\s*<url>([^<]+)</url>", re.I)
 

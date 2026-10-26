@@ -2,7 +2,8 @@
 
 import json
 
-from litloop import deep_search, server
+from litloop import server
+from litloop.search import deep as deep_search
 from litloop.zotero import client as zotero
 
 

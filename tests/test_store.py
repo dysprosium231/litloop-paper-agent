@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from litloop import screening, store
+from litloop import store
+from litloop.search import screening
 
 SRC = str(Path(__file__).resolve().parents[1] / "src")
 

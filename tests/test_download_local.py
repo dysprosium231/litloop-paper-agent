@@ -5,7 +5,8 @@ import time
 
 import pytest
 
-from litloop import config, download_jobs, progress_reporter, server
+from litloop import config, download_jobs, server
+from litloop.download import progress as progress_reporter
 
 
 @pytest.fixture

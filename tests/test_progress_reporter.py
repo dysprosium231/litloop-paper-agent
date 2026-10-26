@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from litloop import progress_reporter
+from litloop.download import progress as progress_reporter
 
 
 def test_manual_attention_lifecycle(tmp_path, monkeypatch):
@@ -40,7 +40,7 @@ def test_challenge_wait_publishes_and_clears_attention(tmp_path, monkeypatch):
     monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
     progress_reporter.start_task("文献下载", total=1)
 
-    from litloop import fetcher
+    from litloop.download import fetcher
 
     class FakePage:
         def __init__(self):

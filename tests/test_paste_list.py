@@ -64,7 +64,7 @@ class _Resp:
 
 def test_a_reference_line_finds_its_paper_and_a_near_miss_does_not(monkeypatch):
     import requests
-    from litloop import resolver
+    from litloop.search import title_to_doi as resolver
     ref = ("Wu, C., Lv, G. (2025). Preparation and Performance Analysis of SiCp/Al Composite Materials "
            "by Non pressure Infiltration Method. In Proceedings of MMTME 2024, pp. 338-344. Springer.")
     good = {"DOI": "10.1007/978-981-96-2944-2_32", "issued": {"date-parts": [[2025]]},
@@ -77,7 +77,8 @@ def test_a_reference_line_finds_its_paper_and_a_near_miss_does_not(monkeypatch):
 
 
 def test_resolve_endpoint_marks_what_was_downloaded(monkeypatch):
-    from litloop import download_jobs, resolver
+    from litloop import download_jobs
+    from litloop.search import title_to_doi as resolver
     monkeypatch.setattr(resolver, "resolve_reference",
                         lambda line, config, timeout=15.0: {"doi": "10.1/a", "title": "A paper", "year": 2020} if "A paper" in line else None)
     monkeypatch.setattr(download_jobs, "local_files", lambda: {"10.1/a": "a.pdf"})

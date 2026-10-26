@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from litloop.rename import generate_filename, rename_pdf
+from litloop.download.rename import generate_filename, rename_pdf
 
 
 def _meta(title, family="Jiang", year=2024, doi=None):

@@ -49,7 +49,6 @@ __version__ = "1.18.0"
 
 __all__ = [
     "__version__",
-    "download",
     "batch_download",
     "search_papers",
     "load_config",
@@ -57,6 +56,6 @@ __all__ = [
     "get_config_safe",
 ]
 
-from .sources import download, batch_download
-from .search import search_papers
+from .sources import batch_download
+from .search.quick import search_papers
 from .config import load_config, update_config, get_config_safe

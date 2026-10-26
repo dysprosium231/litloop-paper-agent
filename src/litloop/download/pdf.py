@@ -10,7 +10,7 @@ from typing import Any
 
 import requests
 
-from .network import fetch
+from ..network import fetch
 
 try:
     from bs4 import BeautifulSoup
@@ -235,7 +235,7 @@ def download_pdf(
 
     try:
         if cookies is not None:
-            from .network import (
+            from ..network import (
                 CHROME_UA,
                 request_timeout,
                 proxy_dict,

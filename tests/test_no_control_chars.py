@@ -22,6 +22,6 @@ def test_no_control_characters_in_source():
 
 
 def test_boolean_heavy_counts_whole_operators():
-    from litloop.deep_search import _boolean_heavy
+    from litloop.search.deep import _boolean_heavy
     assert _boolean_heavy({"search": "a OR b OR c AND d OR e NOT f OR g"})
     assert not _boolean_heavy({"search": "ORANGE ANDROID NOTE a OR b"})

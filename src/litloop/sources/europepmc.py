@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..network import fetch_json, polite_delay
-from ..pdf_utils import download_pdf, is_plausible_pdf_url, dedupe
+from ..download.pdf import download_pdf, is_plausible_pdf_url, dedupe
 
 
 def extract_europepmc_pdf_candidates(payload: dict[str, Any]) -> list[str]:

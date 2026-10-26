@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from litloop import pipeline, server
-from litloop.pipeline import QueueEntry
+from litloop import server
+from litloop.download import pipeline
+from litloop.download.pipeline import QueueEntry
 
 
 @pytest.fixture
@@ -94,7 +95,7 @@ def test_cancel_stops_the_papers_not_yet_started(calls, monkeypatch, tmp_path: P
 def test_queued_papers_say_why_they_wait(calls, monkeypatch, tmp_path: Path):
     """Only papers the Sci-Hub round asked are "not found" there; new ones were never asked."""
     stages = {}
-    import litloop.progress_reporter as pr
+    import litloop.download.progress as pr
     monkeypatch.setattr(pr, "item_stage", lambda i, s: s.startswith("等待中") and stages.setdefault(i, s))
     entries = [QueueEntry(identifier=d) for d in ("10.1/subscription", "10.1016/j.jallcom.2025.179147")]
     pipeline.run_scihub_then_single(entries, tmp_path, config={"scihub_skip_from_year": 2024})

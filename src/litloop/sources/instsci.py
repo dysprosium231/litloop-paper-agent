@@ -23,7 +23,7 @@ from bs4 import BeautifulSoup
 
 from ..browser_pdf import capture_pdf_via_cdp, find_page_pdf_link, wait_page_settled
 from ..log import get_logger
-from ..pdf_utils import (
+from ..download.pdf import (
     _response_looks_pdf,
     extract_pdf_url_from_html,
     is_pdf_file,
@@ -966,7 +966,7 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
         # this lane for the publisher's next papers instead of opening another
         # doomed window each time.
         from ..network import is_cloudflare_challenge
-        from ..pdf_utils import fail
+        from ..download.pdf import fail
         if is_cloudflare_challenge(page_title) and urllib.parse.urlparse(page_url).netloc == base_host:
             log.info("   [WebVPN-Browser] Cloudflare challenge inside the WebVPN — publisher unusable via VPN")
             return fail(doi, "Cloudflare challenge inside WebVPN",

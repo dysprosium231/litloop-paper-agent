@@ -7,7 +7,7 @@ import time
 from difflib import SequenceMatcher
 from typing import Any
 
-from .citations.paper_list import PaperEntry
+from ..citations.paper_list import PaperEntry
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def resolve_reference(line: str, config: dict[str, Any], timeout: float = 15.0) 
     download. Returns {"doi", "title", "year"} or None."""
     import requests
 
-    from . import quota
+    from .. import quota
     line = " ".join((line or "").split())
     if len(line) < 15:
         return None
@@ -74,8 +74,8 @@ def resolve_references(lines: list[str], config: dict[str, Any], budget_s: float
 
 def resolve_title_to_doi(title: str, config: dict[str, Any]) -> str | None:
     """Search OpenAlex by title and return best-matching DOI."""
-    from .network import _get_session, request_timeout
-    from .search import _reconstruct_abstract
+    from ..network import _get_session, request_timeout
+    from .quick import _reconstruct_abstract
 
     if not title or len(title) < 10:
         return None

@@ -13,7 +13,7 @@ import requests
 from ..config import DATA_DIR
 from ..log import get_logger
 from ..network import USER_AGENT
-from ..pdf_utils import _response_looks_pdf, is_pdf_file
+from ..download.pdf import _response_looks_pdf, is_pdf_file
 from .publishers import _load_publisher_cookies, _write_pdf_atomic
 
 log = get_logger()

@@ -2,7 +2,7 @@
 
 import unittest
 
-from litloop.pipeline import QueueEntry, extract_identifier, parse_queue
+from litloop.download.pipeline import QueueEntry, extract_identifier, parse_queue
 
 
 class ExtractIdentifierArxivTests(unittest.TestCase):

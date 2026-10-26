@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from .config import load_config
 from .identifiers import is_arxiv_identifier, normalize_doi
 from .log import get_logger
-from .search import search_papers
+from .search.quick import search_papers
 from .sources import download
 
 log = get_logger()
@@ -109,7 +109,7 @@ async def api_download(req: DownloadRequest):
 
     # If input looks like a title (not DOI/arXiv), try to resolve first
     if not _is_doi_or_arxiv(identifier):
-        from .resolver import resolve_title_to_doi
+        from .search.title_to_doi import resolve_title_to_doi
         config = load_config()
         doi = resolve_title_to_doi(identifier, config)
         if doi:

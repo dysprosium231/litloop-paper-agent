@@ -39,7 +39,7 @@ def ensure_webvpn_session(config: dict[str, Any]) -> dict[str, Any]:
     if status in ("valid", "none", "unreachable"):
         return {"status": status, "auto_relogin": True}
     log.info("   [session-heal] WebVPN session expired, opening login browser...")
-    from . import progress_reporter as _pr
+    from .download import progress as _pr
     school = str(config.get("vpnsci_school") or "学校").strip()
     _pr.set_attention("webvpn-login", f"WebVPN 登录已过期，请在弹出的浏览器窗口中重新登录{school} WebVPN",
                       phase="等待你的操作")

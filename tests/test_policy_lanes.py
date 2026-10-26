@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import pytest
 
-from litloop.pipeline import grey_allowed, run_lanes
+from litloop.download.pipeline import grey_allowed, run_lanes
 from litloop.publisher_strategies.registry import StrategyRegistry
-from litloop.pipeline import QueueEntry
+from litloop.download.pipeline import QueueEntry
 
 
 class TestGreyAllowed:

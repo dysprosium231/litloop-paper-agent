@@ -30,8 +30,8 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 from typing import Any
 
-from .identifiers import normalize_doi, normalize_arxiv_id
-from .identifiers import OLD_ARXIV_RE
+from ..identifiers import normalize_doi, normalize_arxiv_id
+from ..identifiers import OLD_ARXIV_RE
 
 CHANNELS = ("oa", "elsevier", "grey", "institution", "auto")
 
@@ -81,7 +81,7 @@ def predict_channel(identifier: str) -> str:
     return "auto"
 
 
-from .supplementary import fetch_supplementary
+from ..supplementary import fetch_supplementary
 
 _PDF_URL_HINT = re.compile(
     r"\.pdf($|[?#])|/pdf(/|\?|$)|article-pdf|/epdf/|/pdfdirect", re.IGNORECASE)
@@ -100,7 +100,7 @@ def _fetch_oa_pdf(doi: str, config: dict[str, Any]) -> str:
     optimization, never a hard dependency.
     """
     try:
-        from .cache import cache_get, cache_set
+        from ..cache import cache_get, cache_set
         cached = cache_get(f"oa:{doi}", config) if config.get("cache_dir") else None
         if cached is not None:
             return str(cached.get("pdf_url") or "")
@@ -165,7 +165,7 @@ def _fetch_oa_pdf(doi: str, config: dict[str, Any]) -> str:
     if lookup_ok:
         try:
             if config.get("cache_dir"):
-                from .cache import cache_set
+                from ..cache import cache_set
                 cache_set(f"oa:{doi}", {"pdf_url": pdf}, config)
         except Exception:
             pass
@@ -480,7 +480,7 @@ def load_job(path: str | Path) -> list[QueueEntry]:
     text = _read_text(p)
     apa_like = bool(re.search(r"[A-Z][a-z\u00C0-\u024F]+,\s+[A-Z]\.", text)) and "doi.org" in text.lower()
     if p.suffix.lower() == ".bib" or apa_like:
-        from .citations.paper_list import parse_paper_list
+        from ..citations.paper_list import parse_paper_list
         return _from_paper_entries(parse_paper_list(p))
     return parse_queue(text)
 
@@ -564,9 +564,9 @@ def run_scihub_then_single(
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    from . import progress_reporter as _progress
-    from . import sources as _sources
-    from .sources import download
+    from . import progress as _progress
+    from .. import sources as _sources
+    from ..sources import download
 
     config = config or {}
     gen0 = _sources._CANCEL_GEN[0]  # cancel_downloads() bumps it: papers not yet started stop too
@@ -588,7 +588,7 @@ def run_scihub_then_single(
     _enrich_oa_urls(entries, config)
     _lap("open-access links looked up")
     springer_key = str(config.get("springer_api_key", "") or "")
-    from .sources.elsevier_api import fulltext_enabled
+    from ..sources.elsevier_api import fulltext_enabled
     fast_channels = ("oa", "elsevier") if fulltext_enabled(config) else ("oa",)
     fast = [e for e in entries if e.identifier in ids and (
         e.oa_url or (e.channel if e.channel not in ("", "auto") else predict_channel(e.identifier)) in fast_channels
@@ -597,7 +597,7 @@ def run_scihub_then_single(
         _progress.update(phase="开放获取")
         for e in fast:
             _progress.item_stage(e.identifier, "正在下载开放获取全文")
-        from .sources import _auto_rename, _update_doi_index
+        from ..sources import _auto_rename, _update_doi_index
         for r in _run_fast_lane(fast, out, config, workers=min(8, len(fast)), progress=None):
             if r.get("success"):
                 # as a single download leaves it: indexed (the app sees it) and renamed
@@ -624,7 +624,7 @@ def run_scihub_then_single(
         r.setdefault("identifier", ident)
         return r
 
-    from .sources.scihub import too_new
+    from ..sources.scihub import too_new
     grey_ids = [] if rounds == "single" else [i for i in ids if i not in results and not too_new(i, config)]
     if grey_ids and allow_grey and grey_allowed(config):
         # Which mirror and route (proxy or direct) is fastest right now: the
@@ -633,7 +633,7 @@ def run_scihub_then_single(
         for i in grey_ids:
             _progress.item_stage(i, "正在测试 Sci-Hub 镜像速度")
         try:
-            from .sources.scihub_speed import measure
+            from ..sources.scihub_speed import measure
             measure(config)
         except Exception as exc:
             logger.info(f"Sci-Hub speed test skipped: {exc}")
@@ -711,7 +711,7 @@ def run_lanes(
 
     _enrich_oa_urls(entries, config)
 
-    from . import progress_reporter as _progress
+    from . import progress as _progress
     _progress.start_task("文献下载", total=len(entries))
     _progress.set_output_dir(str(out))
 
@@ -744,7 +744,7 @@ def run_lanes(
     # Lane scheduling must not widen source authorization: if the user has
     # disabled grey sources, overflow simply does not get a grey retry.
     if grey_ids and allow_grey and grey_allowed(config):
-        from .sources import batch_download
+        from ..sources import batch_download
         _progress.update(phase="灰色源竞速")
         raw = batch_download(
             grey_ids, str(out), scihub_enabled=True,
@@ -762,7 +762,7 @@ def run_lanes(
     # WebVPN / CARSI / EZProxy), one paper at a time so a login opens once.
     # Without this a batch never reached the school at all.
     if allow_institution:
-        from .sources import institutional_download
+        from ..sources import institutional_download
         got = {str(r.get("doi") or "").strip().lower() for r in results if r.get("success")}
         left = [e.identifier for e in entries
                 if e.identifier and not e.unresolved and e.identifier.lower() not in got
@@ -781,13 +781,13 @@ def run_lanes(
             results.append(r)
 
     if inst and allow_institution:
-        from .institutional.config_adapter import ConfigAdapter
-        from .institutional.fetcher import PaperFetcher
+        from ..institutional.config_adapter import ConfigAdapter
+        from ..institutional.fetcher import PaperFetcher
 
         _progress.update(phase="机构级联")
 
         def _inst_fetch_chunk(chunk: list[str]) -> list[dict[str, Any]]:
-            from .browser_backend import shared
+            from ..browser_backend import shared
             with shared():  # the fetcher's browser serves every paper of the chunk
                 return _inst_fetch_chunk_inner(chunk)
 
@@ -869,7 +869,7 @@ def _transient_retry(results: list[dict[str, Any]], entries: list[QueueEntry],
         return
     logger.info(f"  瞬时失败冷却重试: {len(retry_entries)} 篇，等待 {wait_sec}s 后原车道重试")
     try:
-        from . import progress_reporter as _progress
+        from . import progress as _progress
         _progress.update(phase="冷却重试")
     except Exception:
         pass
@@ -898,7 +898,7 @@ def _fetch_si_for_results(results: list[dict[str, Any]], out: Path, config: dict
     if not ok:
         return
     try:
-        from . import progress_reporter as _progress
+        from . import progress as _progress
         _progress.update(phase="抓取附件")
     except Exception:
         pass
@@ -906,7 +906,7 @@ def _fetch_si_for_results(results: list[dict[str, Any]], out: Path, config: dict
     manifest_lock = threading.Lock()
 
     def _si_one(row: dict[str, Any]) -> None:
-        from .browser_backend import shared
+        from ..browser_backend import shared
         with shared():  # the pool thread's browser serves the next papers too
             _si_one_inner(row)
 
@@ -952,8 +952,8 @@ def _run_fast_lane(
     import requests
 
     from concurrent.futures import as_completed
-    from .network import configured_proxy
-    from .sources.elsevier_api import fetch_pdf
+    from ..network import configured_proxy
+    from ..sources.elsevier_api import fetch_pdf
 
     api_key = config.get("elsevier_api_key", "")
     inst_token = config.get("elsevier_insttoken", "")
@@ -972,7 +972,7 @@ def _run_fast_lane(
         # Springer: entitled full text via the TDM API (JATS XML artifact)
         if (str(config.get("springer_api_key", "") or "")
                 and e.identifier.lower().startswith("10.1007/")):
-            from .sources.springer_tdm import try_springer_tdm
+            from ..sources.springer_tdm import try_springer_tdm
 
             r = try_springer_tdm(e.identifier, out / _safe_name(e.identifier), config)
             if r and r.get("success"):
@@ -984,7 +984,7 @@ def _run_fast_lane(
                 # OA 直链被出版商反爬 403（如 Wiley pdfdirect 挡无指纹请求），
                 # 内容公开可得——浏览器指纹可过，回退常驻池浏览器捕获。
                 try:
-                    from .browser_engine import download_pdf_via_browser
+                    from ..browser_engine import download_pdf_via_browser
 
                     bpath = out / _safe_name(e.identifier)
                     # One at a time (each worker thread would start its own visible
@@ -1079,7 +1079,7 @@ def _safe_name(identifier: str) -> str:
 
 def _user_agent() -> str:
     try:
-        from .network import USER_AGENT
+        from ..network import USER_AGENT
         return USER_AGENT
     except Exception:  # pragma: no cover
         return "Mozilla/5.0 (compatible; litloop)"

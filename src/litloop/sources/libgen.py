@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..network import fetch, polite_delay
-from ..pdf_utils import download_pdf
+from ..download.pdf import download_pdf
 
 LIBGEN_MIRRORS = [
     "https://libgen.li",

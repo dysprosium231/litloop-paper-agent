@@ -23,7 +23,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .config import load_config, save_config
-from .fetcher import PaperFetcher
+from .download.fetcher import PaperFetcher
 from .schools import get_school, list_schools, search_schools
 from .sources import semantic_scholar
 

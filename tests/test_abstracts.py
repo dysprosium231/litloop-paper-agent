@@ -1,4 +1,4 @@
-from litloop import abstracts as a
+from litloop.search import abstracts as a
 
 
 def test_clean_jats_formula_entities_and_boilerplate():
@@ -77,7 +77,7 @@ def test_trim_authors():
 
 
 def test_dedupe_titles_merges_preprint_and_published():
-    from litloop.search import _dedupe_titles
+    from litloop.search.quick import _dedupe_titles
     rows = [{"title": "High-Entropy Fluorite Oxides for barrier coatings", "doi": "", "cited_by_count": 3},
             {"title": "High-entropy fluorite oxides for barrier coatings.", "doi": "10.1/x",
              "journal": "J", "cited_by_count": 650},
@@ -86,7 +86,7 @@ def test_dedupe_titles_merges_preprint_and_published():
     assert len(out) == 3 and out[0]["doi"] == "10.1/x" and out[0]["cited_by_count"] == 650
 
 def test_semantic_scholar_batches_are_chunked_and_odd_replies_ignored(monkeypatch):
-    import litloop.abstracts as a
+    import litloop.search.abstracts as a
     sizes = []
 
     class R:
@@ -171,7 +171,7 @@ def test_springer_stops_at_the_daily_limit(monkeypatch):
 
 
 def test_fill_reports_progress_as_papers_are_settled(monkeypatch):
-    from litloop import abstracts
+    from litloop.search import abstracts
     monkeypatch.setattr(abstracts, "_semantic_scholar", lambda dois, timeout: {"10.1/a": "Found by S2."})
     monkeypatch.setattr(abstracts, "_crossref", lambda doi, timeout, email="": "")
     seen = []

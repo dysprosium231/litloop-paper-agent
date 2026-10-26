@@ -1,4 +1,4 @@
-"""Tests for title-to-DOI resolver in litloop.resolver."""
+"""Tests for title-to-DOI resolver in litloop.search.title_to_doi."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any
 import requests
 
 from litloop.citations.paper_list import PaperEntry
-from litloop.resolver import batch_resolve, resolve_title_to_doi
+from litloop.search.title_to_doi import batch_resolve, resolve_title_to_doi
 
 
 class DummyResponse:
@@ -156,7 +156,7 @@ def test_batch_resolve(monkeypatch):
             return "10.1109/CVPR.2016.90"
         return None
 
-    monkeypatch.setattr("litloop.resolver.resolve_title_to_doi", fake_resolve)
+    monkeypatch.setattr("litloop.search.title_to_doi.resolve_title_to_doi", fake_resolve)
 
     entries = [
         PaperEntry(title="Transformer paper", doi="10.48550/arXiv.1706.03762"),

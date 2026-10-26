@@ -16,7 +16,7 @@ def test_the_apps_batch_jobs_keep_attempts(monkeypatch, tmp_path):
     """DeepSeek review 2026-10-19: lists over batch_small_max go through the lanes,
     which report only at the end; stripping attempts there left app jobs without reasons."""
     import json
-    from litloop import pipeline
+    from litloop.download import pipeline
     failed = {"doi": "10.1016/j.test.2024.000001", "success": False, "reason": "no PDF found",
               "attempts": [{"source": "ElsevierBrowser", "route": "free", "seconds": 30, "ok": False,
                             "error_type": "paywall", "reason": "paywall — requires institutional access"}]}

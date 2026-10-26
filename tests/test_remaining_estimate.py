@@ -1,6 +1,6 @@
 """Deep search: rough estimate of the 高 papers still unread, from the yield curve."""
 
-from litloop import deep_search
+from litloop.search import deep as deep_search
 
 
 def _state(highs, size=30, unread=600):

@@ -2,7 +2,8 @@
 
 import pytest
 
-from litloop import progress_reporter, sources
+from litloop import sources
+from litloop.download import progress as progress_reporter
 
 
 def test_waiting_for_the_user_raises_a_notice_and_a_stage(monkeypatch):

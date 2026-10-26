@@ -12,7 +12,7 @@ LitLoop 桌面 app 里给用户看的文字都按这份写。
   - `src/litloop/proxy_check.py`：代理软件名、引导里出现的程序名；
   - `src/litloop/app_server.py`：返回给 app 的错误；
   - `src/litloop/download_jobs.py`：任务标题、条目的 `error`；
-  - `src/litloop/rename.py` 的 `FORMATS`：文件名格式的名称。
+  - `src/litloop/download/rename.py` 的 `FORMATS`：文件名格式的名称。
 - 不管：代码注释、日志、CLI 和 MCP 工具的输出（它们给 Agent 和开发者看）。
 
 **写一条新文案的步骤**

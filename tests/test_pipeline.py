@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from litloop.pipeline import (
+from litloop.download.pipeline import (
     QueueEntry,
     collect_failures,
     entries_from_table,

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from litloop import pipeline
-from litloop.pipeline import QueueEntry
+from litloop.download import pipeline
+from litloop.download.pipeline import QueueEntry
 
 
 @pytest.fixture

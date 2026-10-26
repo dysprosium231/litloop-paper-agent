@@ -12,9 +12,9 @@ from typing import Any
 
 import requests
 
-from .terms import text
-from .config import load_config
-from .network import user_agent
+from ..terms import text
+from ..config import load_config
+from ..network import user_agent
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class _AcademicSession(requests.Session):
                 params.setdefault("api_key", key)
                 kwargs["params"] = params
             resp = super().request(method, url, *args, **kwargs)
-            from . import quota  # count keyword searches too (10 credits each), not only deep search
+            from .. import quota  # count keyword searches too (10 credits each), not only deep search
             quota.record("openalex", resp)
             return resp
         return super().request(method, url, *args, **kwargs)
@@ -286,7 +286,7 @@ def search_papers_v2(
 def _glossary_variants(query: str) -> tuple[list[str], list[dict[str, Any]]]:
     """Other wordings of ``query`` from the glossary (``glossary.query_variants``:
     the other spelling, the user's terms, element symbols and names)."""
-    from .terms import glossary
+    from ..terms import glossary
     try:
         return glossary.query_variants(query, glossary.in_use())
     except Exception as exc:  # an unreadable glossary must not stop the search
@@ -334,7 +334,7 @@ def _take_in_turns(runs: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
 def _collect_one(query, pool, year_from, year_to, sort) -> list[dict[str, Any]]:
     """One wording of a keyword search, not yet tidied: the discovery engine, or the built-in search."""
     try:
-        from .discovery import find_cli_available, search as discovery_search, to_legacy_results
+        from .scansci_find import find_cli_available, search as discovery_search, to_legacy_results
         if not find_cli_available():
             return search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort)
         with tempfile.TemporaryDirectory(prefix="scansci_find_") as tmp:

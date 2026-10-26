@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from litloop import progress_reporter as pr
+from litloop.download import progress as pr
 
 
 class PidAliveTests(unittest.TestCase):

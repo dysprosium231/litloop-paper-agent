@@ -8,7 +8,7 @@ from typing import Any
 
 from ..config import DEFAULT_CONFIG
 from ..network import fetch, polite_delay
-from ..pdf_utils import download_pdf, is_plausible_pdf_url, dedupe, fail
+from ..download.pdf import download_pdf, is_plausible_pdf_url, dedupe, fail
 
 
 def _is_placeholder_email(email: str) -> bool:

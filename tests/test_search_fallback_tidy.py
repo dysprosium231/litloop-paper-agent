@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import litloop.search as s
+import litloop.search.quick as s
 
 RAW = [
     {"title": "Unrelated work on bird migration", "abstract": "Birds fly south. " * 30, "doi": "10.1/a"},
@@ -13,7 +13,7 @@ RAW = [
 
 
 def _run(monkeypatch, *, engine_raises: bool):
-    import litloop.discovery as d
+    import litloop.search.scansci_find as d
     if engine_raises:
         monkeypatch.setattr(d, "find_cli_available", lambda: True)
         monkeypatch.setattr(d, "search", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("engine down")))

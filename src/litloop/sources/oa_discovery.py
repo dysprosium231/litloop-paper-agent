@@ -12,7 +12,7 @@ from typing import Any
 import requests
 
 from ..network import polite_delay, USER_AGENT, request_timeout, proxy_dict, select_proxy_for_url
-from ..pdf_utils import download_pdf, is_plausible_pdf_url
+from ..download.pdf import download_pdf, is_plausible_pdf_url
 
 
 def try_openaire(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str, Any] | None:

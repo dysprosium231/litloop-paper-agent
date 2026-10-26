@@ -29,7 +29,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from . import __version__, screening, store
+from . import __version__, store
+from .search import screening
 
 # Where the app's pages are served from: the Vite dev server, and Tauri's
 # own origins (Windows uses http://tauri.localhost, macOS/Linux tauri://localhost).
@@ -181,7 +182,7 @@ def _ensure_item(session: str, doi: str | None, title: str | None, relevance: st
         return
     except HTTPException:
         pass
-    from . import deep_search
+    from .search import deep as deep_search
     try:
         paper = deep_search.batch_paper(session, doi, title)
     except FileNotFoundError:
@@ -264,7 +265,7 @@ def create_app(token: str) -> FastAPI:
         import threading
         import time
 
-        from . import deep_search
+        from .search import deep as deep_search
         _record_path(session)
         if not deep_search._pool_path(session).exists():
             raise HTTPException(400, "无法继续检索：这不是深度检索会话。")
@@ -438,7 +439,8 @@ def create_app(token: str) -> FastAPI:
     # Downloads: jobs started from the app (download_jobs), one at a time.
     @app.get("/api/downloads")
     def downloads() -> dict[str, Any]:
-        from . import download_jobs, progress_reporter
+        from . import download_jobs
+        from .download import progress as progress_reporter
         from .config import load_config
         live = progress_reporter.read_state() if download_jobs.running() else None
         # A download the agent or the command line runs: shown on the page too.
@@ -450,7 +452,7 @@ def create_app(token: str) -> FastAPI:
     @app.get("/api/downloads/notice")
     def downloads_notice() -> dict[str, Any] | None:
         """Polled on every page for the system notifications (the app's own jobs and the agent's)."""
-        from . import progress_reporter
+        from .download import progress as progress_reporter
         return progress_reporter.latest_notice()
 
     @app.get("/api/downloads/pending")
@@ -677,7 +679,7 @@ def create_app(token: str) -> FastAPI:
         on Crossref. Only when the user asks (a button), at most 100 lines."""
         from . import download_jobs
         from .config import load_config
-        from .resolver import resolve_references
+        from .search.title_to_doi import resolve_references
         lines = [ln.strip() for ln in body.lines if ln.strip()][:100]
         rows = resolve_references(lines, load_config())
         got = set(download_jobs.local_files())

@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 import requests
 
 from ..log import get_logger
-from ..pdf_utils import (
+from ..download.pdf import (
     _response_looks_pdf,
     extract_pdf_url_from_html,
     is_pdf_file,

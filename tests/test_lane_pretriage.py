@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from litloop import pipeline
-from litloop.pipeline import (
+from litloop.download import pipeline
+from litloop.download.pipeline import (
     QueueEntry,
     _mdpi_variants,
     predict_channel,

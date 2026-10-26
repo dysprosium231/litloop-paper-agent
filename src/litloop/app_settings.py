@@ -19,8 +19,8 @@ from pathlib import Path
 from typing import Any
 
 from . import config as _config
-from .rename import FORMATS as _RENAME_FORMATS
-from .rename import rename_format as _rename_format
+from .download.rename import FORMATS as _RENAME_FORMATS
+from .download.rename import rename_format as _rename_format
 
 # type: secret | text | email | path | bool | select; a path may say pick: dir | file (the app offers a chooser)
 GROUPS: list[dict[str, Any]] = [

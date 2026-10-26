@@ -5,7 +5,8 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from litloop import app_server, deep_search, screening, store
+from litloop import app_server, store
+from litloop.search import deep as deep_search, screening
 
 TOKEN = "t0ken"
 PAPER = {"doi": "10.1/new", "title": "New", "year": 2024, "journal": "J", "abstract": "A."}

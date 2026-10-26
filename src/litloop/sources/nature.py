@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..network import fetch
-from ..pdf_utils import download_pdf
+from ..download.pdf import download_pdf
 
 
 def try_nature_direct(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str, Any] | None:

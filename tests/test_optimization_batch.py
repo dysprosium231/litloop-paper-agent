@@ -8,8 +8,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from litloop import domain_db, pipeline
-from litloop.pipeline import QueueEntry
+from litloop import domain_db
+from litloop.download import pipeline
+from litloop.download.pipeline import QueueEntry
 from litloop.sources import scihub
 
 VG_VERIFICATION = ('<html><head><title>Verification - Sci-Hub</title></head>'

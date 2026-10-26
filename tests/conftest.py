@@ -50,7 +50,7 @@ def _no_doi_check(monkeypatch):
     """Every download first asks doi.org whether the DOI exists (doi_check);
     tests' made-up DOIs must not reach the network, nor fail as unregistered.
     A test of the check itself uses doi_check._real_registered."""
-    from litloop import doi_check
+    from litloop.download import doi_check
     real = doi_check.registered
     monkeypatch.setattr(doi_check, "registered", lambda doi, timeout=6.0: None)
     doi_check._real_registered = real

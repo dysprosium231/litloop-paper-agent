@@ -15,8 +15,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import config as _config
-from . import store
+from .. import config as _config
+from .. import store
 
 RELEVANCE = ("高", "中", "低", "不相关")
 ABSTRACT_CHARS = 1200  # as much as a deep-search batch shows
@@ -36,7 +36,7 @@ def _slug(text: str) -> str:
 
 
 def _key(item: dict[str, Any]) -> str:
-    from .terms.text import paper_key
+    from ..terms.text import paper_key
     return paper_key(item)
 
 
@@ -129,7 +129,7 @@ def _save(sid: str, existing: bool, question: str, items: list[dict[str, Any]], 
 
 def translate_wanted(config: dict[str, Any] | None = None) -> list[str]:
     """The ratings whose abstract is translated without asking (config abstract_translation)."""
-    from .config import load_config
+    from ..config import load_config
     value = str((config or load_config()).get("abstract_translation", "高") or "off")
     if value == "all":
         return list(RELEVANCE)
@@ -139,7 +139,7 @@ def translate_wanted(config: dict[str, Any] | None = None) -> list[str]:
 def untranslated(session: str, config: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Items the agent should still translate: only when the agent is the translator
     (translation_provider "agent"), rated in translate_wanted, with an abstract."""
-    from . import translate as _translate
+    from .. import translate as _translate
     if _translate.by_api(config):
         return []
     wanted = translate_wanted(config)
@@ -205,7 +205,7 @@ def _decide(session: str, selected: list[int | str], rejected: list[int | str] |
                               "rejected": [_brief(it) for it in data["items"] if it.get("decision") == "rejected"],
                               "unknown": unknown, **paths}
     if out_file and chosen:
-        from .pipeline import QueueEntry, predict_channel, write_queue
+        from ..download.pipeline import QueueEntry, predict_channel, write_queue
         qe = [QueueEntry(identifier=it["doi"], channel=predict_channel(it["doi"]), title=it.get("title", ""))
               for it in chosen if it.get("doi")]
         result["queue_file"] = str(write_queue(qe, out_file))

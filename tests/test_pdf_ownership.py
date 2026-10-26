@@ -7,7 +7,7 @@ from pathlib import Path
 import fitz
 import pytest
 
-from litloop.pdf_utils import (
+from litloop.download.pdf import (
     is_pdf_file,
     is_suspicious_pdf,
     success,
@@ -96,7 +96,7 @@ def test_is_suspicious_pdf_single_page_exempted_for_1page_article(tmp_path: Path
     pdf_path = _build_pdf(tmp_path, "single_page_article.pdf", pages=1, pad_size=60_000)
     doi = "10.1038/s41586-026-0001-1"
 
-    monkeypatch.setattr("litloop.pdf_utils._article_is_single_page", lambda d: d == doi)
+    monkeypatch.setattr("litloop.download.pdf._article_is_single_page", lambda d: d == doi)
 
     # For matching single-page DOI, not suspicious
     assert is_suspicious_pdf(pdf_path, doi=doi) is False
@@ -127,7 +127,7 @@ def test_is_suspicious_pdf_regex_fallback(tmp_path: Path, monkeypatch):
     multi = _build_pdf(tmp_path, "regex_multi.pdf", pages=2, pad_size=60_000)
     single = _build_pdf(tmp_path, "regex_single.pdf", pages=1, pad_size=60_000)
 
-    monkeypatch.setattr("litloop.pdf_utils._article_is_single_page", lambda d: False)
+    monkeypatch.setattr("litloop.download.pdf._article_is_single_page", lambda d: False)
     assert is_suspicious_pdf(multi) is False
     assert is_suspicious_pdf(single) is True
 

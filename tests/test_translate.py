@@ -4,7 +4,8 @@ import pytest
 import requests
 from fastapi.testclient import TestClient
 
-from litloop import app_server, config, screening, server, translate
+from litloop import app_server, config, server, translate
+from litloop.search import screening
 
 TOKEN = "t0ken"
 

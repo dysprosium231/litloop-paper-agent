@@ -11,9 +11,13 @@ import importlib
 import sys
 
 MODULES = [
-    "litloop.main", "litloop.server", "litloop.app_server", "litloop.fetcher", "litloop.auth",
-    "litloop.sources", "litloop.pipeline", "litloop.download_jobs", "litloop.deep_search",
-    "litloop.search", "litloop.screening", "litloop.schools", "litloop.browser_engine",
+    "litloop.main", "litloop.server", "litloop.app_server", "litloop.auth",
+    "litloop.sources", "litloop.download_jobs", "litloop.schools", "litloop.browser_engine",
+    "litloop.search.quick", "litloop.search.deep", "litloop.search.scansci_find",
+    "litloop.search.abstracts", "litloop.search.title_to_doi", "litloop.search.screening",
+    "litloop.download.fetcher", "litloop.download.pipeline", "litloop.download.pdf",
+    "litloop.download.rename", "litloop.download.doi_check", "litloop.download.progress",
+    "litloop.download.markdown",
     "litloop.terms.text", "litloop.terms.spelling", "litloop.terms.glossary",
     "litloop.citations.formats", "litloop.citations.bibtex_crossref", "litloop.citations.bib_import",
     "litloop.citations.paper_list", "litloop.citations.session_export",

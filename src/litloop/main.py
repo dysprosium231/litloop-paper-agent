@@ -151,7 +151,7 @@ def get_paper(
         print(f"  OK: {result.get('file', '')}")
         print(f"  Source: {result.get('source', '?')}")
         if md:
-            from .md_export import pdf_to_markdown
+            from .download.markdown import pdf_to_markdown
 
             md_path = pdf_to_markdown(result["file"])
             print(f"  Markdown: {md_path}")
@@ -433,7 +433,7 @@ def _atomic_write_json(path: Path, data: Any) -> None:
 def _write_retry_file(output: str, results: list) -> None:
     """Persist failed identifiers as retry.txt so 'batch --retry' can pick them up."""
     try:
-        from .pipeline import collect_failures
+        from .download.pipeline import collect_failures
 
         failed = collect_failures(results)
         if failed:
@@ -462,13 +462,13 @@ def batch_fetch_cmd(
     fallbacks: dict[str, list[str]] | None = None
     entries = None
     if retry:
-        from .pipeline import collect_failures
+        from .download.pipeline import collect_failures
 
         prev = _json.loads(Path(retry).read_text(encoding="utf-8"))
         dois = collect_failures(prev)
         print(f"  Retrying {len(dois)} failed identifiers from {retry}")
     elif runs_dir:
-        from .discovery import build_download_queue, build_preprint_fallbacks
+        from .search.scansci_find import build_download_queue, build_preprint_fallbacks
         run_identifiers = build_download_queue(runs_dir)
         fallbacks = build_preprint_fallbacks(runs_dir) or None
         if not run_identifiers:
@@ -477,7 +477,7 @@ def batch_fetch_cmd(
         dois = run_identifiers
         print(f"  Using ScanSci Find queue from {runs_dir}: {len(dois)} identifiers")
     else:
-        from .pipeline import load_job
+        from .download.pipeline import load_job
 
         entries = load_job(input_file)
         dois = [e.identifier for e in entries if e.identifier and not e.unresolved]
@@ -493,7 +493,7 @@ def batch_fetch_cmd(
     # express a lane-ORDER preference the fast->grey->institutional schedule
     # would invert, and an explicit --scihub asks for the racing engine —
     # both stay on racing.
-    from .pipeline import collect_failures, grey_allowed, run_lanes
+    from .download.pipeline import collect_failures, grey_allowed, run_lanes
 
     _cfg = _load_config()
     _grey_oriented = (
@@ -661,7 +661,7 @@ def elsevier_check_cmd(
 
     console = Console()
 
-    from . import progress_reporter as _pr
+    from .download import progress as _pr
     from .config import load_config
     from .elsevier_check import check_dois, check_key_profile
 
@@ -782,7 +782,7 @@ def search_cmd(
       litloop search --author-id A5102961214 --limit 10 --sort cited_by_count
     """
     import json as _json
-    from .search import search_papers_v2 as search_papers
+    from .search.quick import search_papers_v2 as search_papers
 
     if author or author_id:
         # Author-based search
@@ -802,7 +802,7 @@ def search_cmd(
         author_match = None
 
     if out:
-        from .pipeline import QueueEntry, predict_channel, write_queue
+        from .download.pipeline import QueueEntry, predict_channel, write_queue
 
         qe = [
             QueueEntry(
@@ -843,7 +843,7 @@ def plan_cmd(
     year_to: int = typer.Option(None, "--year-to"),
 ) -> None:
     """Build an auditable search protocol without running a search (ScanSci Find)."""
-    from .discovery import find_cli_available, plan
+    from .search.scansci_find import find_cli_available, plan
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -861,7 +861,7 @@ def estimate_cmd(
     year_to: int = typer.Option(None, "--year-to"),
 ) -> None:
     """Estimate result volume before spending a full search budget (ScanSci Find)."""
-    from .discovery import find_cli_available, estimate
+    from .search.scansci_find import find_cli_available, estimate
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -876,7 +876,7 @@ def smoke_cmd(
     records: int = typer.Option(4, "--records", help="Records per source (default 4)"),
 ) -> None:
     """Fetch a few records per source and validate the candidate contract (ScanSci Find)."""
-    from .discovery import find_cli_available, smoke
+    from .search.scansci_find import find_cli_available, smoke
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -891,7 +891,7 @@ def calibrate_cmd(
     sample_size: int = typer.Option(100, "--sample-size"),
 ) -> None:
     """Run a bounded calibration sample before a high-recall search (ScanSci Find)."""
-    from .discovery import find_cli_available, calibrate
+    from .search.scansci_find import find_cli_available, calibrate
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -904,7 +904,7 @@ def verify_cmd(
     limit: int = typer.Option(None, "--limit"),
 ) -> None:
     """Verify DOI/PMID/arXiv identifiers against authoritative APIs (ScanSci Find)."""
-    from .discovery import find_cli_available, verify
+    from .search.scansci_find import find_cli_available, verify
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -917,7 +917,7 @@ def resolve_oa_cmd(
     limit: int = typer.Option(None, "--limit"),
 ) -> None:
     """Resolve DOI open-access locations through Unpaywall (ScanSci Find)."""
-    from .discovery import find_cli_available, resolve_oa
+    from .search.scansci_find import find_cli_available, resolve_oa
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -931,7 +931,7 @@ def build_queue_cmd(
 ) -> None:
     """Build a download identifier queue from ScanSci Find output — feed to 'litloop batch'."""
     from pathlib import Path as _Path
-    from .discovery import build_download_queue
+    from .search.scansci_find import build_download_queue
     import json as _json
 
     p = _Path(input_path)
@@ -986,7 +986,7 @@ def find_cmd(
     into --out. Follow up with 'litloop build-queue <dir>' then
     'litloop batch <queue file>' to download.
     """
-    from .discovery import build_download_queue, find_cli_available, search
+    from .search.scansci_find import build_download_queue, find_cli_available, search
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -1026,7 +1026,7 @@ def manifest_cmd(
     from pathlib import Path as _Path
 
     from .identifiers import safe_filename
-    from .pdf_utils import download_pdf, is_pdf_file
+    from .download.pdf import download_pdf, is_pdf_file
     from .sources import _update_doi_index, download
 
     payload = _json.loads(_Path(input_file).read_text(encoding="utf-8"))

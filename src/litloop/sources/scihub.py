@@ -27,7 +27,7 @@ from ..domain_db import (
 from ..log import get_logger
 from . import scihub_speed
 from ..network import fetch, proxy_dict, select_proxy_for_url, _is_cloudflare_block, USER_AGENT
-from ..pdf_utils import extract_pdf_url_from_html, is_pdf_file, success, _response_looks_pdf
+from ..download.pdf import extract_pdf_url_from_html, is_pdf_file, success, _response_looks_pdf
 
 log = get_logger()
 
@@ -429,7 +429,7 @@ def _solve_altcha_and_reload(
         # Check for a PERSISTENT wall: if the reloaded page is still the
         # "你是机器人吗" verification, solving again would only deepen the
         # rate limit — record it and let the cooldown skip this domain.
-        from ..pdf_utils import is_pdf_file, success, extract_pdf_url_from_html
+        from ..download.pdf import is_pdf_file, success, extract_pdf_url_from_html
         from ..browser_engine import download_pdf_via_browser
 
         lower = html.lower()
@@ -480,7 +480,7 @@ def _browser_first_download(
     """
     try:
         from ..browser_engine import solve_url, download_pdf_via_browser
-        from ..pdf_utils import is_pdf_file, success, extract_pdf_url_from_html
+        from ..download.pdf import is_pdf_file, success, extract_pdf_url_from_html
         from urllib.parse import urlparse
         domain = urlparse(landing_url).netloc or landing_url[:40]
 
@@ -533,7 +533,7 @@ def _browser_first_download(
                     return None
                 attention_key = f"turnstile:{domain}"
                 try:
-                    from .. import progress_reporter as _pr
+                    from ..download import progress as _pr
                     _pr.set_attention(attention_key, "请在浏览器窗口完成 Turnstile 人机验证",
                                       current=doi, phase="人工验证")
                 except Exception:
@@ -721,7 +721,7 @@ def _http_altcha_download(landing_url: str, domain: str, doi: str, output_path: 
     if not pdf_url:
         return ABSENT if gated else None
     log.info(f"   [altcha-http] {domain}: PDF {pdf_url[:80]}")
-    from .. import progress_reporter
+    from ..download import progress as progress_reporter
     progress_reporter.item_stage(doi, "Sci-Hub 有下载链接，正在核对")
     result = download_pdf_from_scihub(pdf_url, output_path, config, f"Sci-Hub({domain})",
                                       cookies=session.cookies, referer=landing_url)
@@ -910,7 +910,7 @@ def download_pdf_from_scihub(
     cookies: Any = None,
     referer: str = "",
 ) -> dict[str, Any] | None:
-    from ..pdf_utils import download_pdf
+    from ..download.pdf import download_pdf
     return download_pdf(url, output_path, config, source, require_pdf_like_url=False,
                         use_tor=use_tor, cookies=cookies, referer=referer, browser_ua=True)
 
@@ -1061,7 +1061,7 @@ def try_scihub(doi: str, output_path: Path, config: dict[str, Any], use_tor: boo
         log.info(f"   Sci-Hub: unexpected error: {type(e).__name__}: {e}")
         # Check if a PDF was written to disk despite the exception
         if output_path.exists():
-            from ..pdf_utils import is_pdf_file as _is_pdf
+            from ..download.pdf import is_pdf_file as _is_pdf
             if _is_pdf(output_path):
                 log.info(f"   Sci-Hub: recovered PDF after {type(e).__name__}")
                 return {"success": True, "identifier": doi, "doi": doi,

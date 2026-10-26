@@ -13,8 +13,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from litloop import pipeline
-from litloop.pipeline import QueueEntry, _enrich_oa_urls, _looks_like_pdf_url
+from litloop.download import pipeline
+from litloop.download.pipeline import QueueEntry, _enrich_oa_urls, _looks_like_pdf_url
 
 
 def _cfg(tmp: Path) -> dict:

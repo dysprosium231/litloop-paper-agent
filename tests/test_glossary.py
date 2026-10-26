@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from litloop import deep_search
+from litloop.search import deep as deep_search
 from litloop.terms import glossary
 
 

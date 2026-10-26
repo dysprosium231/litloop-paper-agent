@@ -1,6 +1,6 @@
 """Which links are worth fetching as a PDF."""
 
-from litloop.pdf_utils import is_plausible_pdf_url
+from litloop.download.pdf import is_plausible_pdf_url
 
 
 def test_taylor_francis_book_download_is_a_pdf_link():

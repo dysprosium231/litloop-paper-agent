@@ -85,7 +85,7 @@ def update(path: Path, *, indent: int | None = None) -> Iterator[Any]:
 # --------------------------------------------------------------------------- deep-search progress
 
 def _screening_dir() -> Path:
-    from .screening import screening_dir
+    from .search.screening import screening_dir
     return screening_dir()
 
 

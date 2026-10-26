@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from litloop import deep_search, screening
+from litloop.search import deep as deep_search, screening
 
 
 def rec(doi, title, refs=(), abstract="", year=2020):
@@ -49,8 +49,8 @@ def net(tmp_path, monkeypatch):
     monkeypatch.setattr(deep_search, "_cites_refs_on_topic", cites_refs)
     monkeypatch.setattr(deep_search, "_citing", citing)
     monkeypatch.setattr(deep_search, "_keyword_candidates", keyword)
-    import litloop.abstracts as ab
-    import litloop.search as s
+    import litloop.search.abstracts as ab
+    import litloop.search.quick as s
     monkeypatch.setattr(ab, "fill_abstracts", lambda items, cfg=None, **kw: None)
     monkeypatch.setattr(s, "_add_journal_rank", lambda items: None)
     monkeypatch.setattr(s, "_flag_retractions", lambda items: None)
@@ -181,7 +181,7 @@ def test_model_learns_from_negative_ratings():
 
 
 def test_missing_abstracts_of_top_candidates_are_fetched_once(monkeypatch):
-    import litloop.abstracts as ab
+    import litloop.search.abstracts as ab
     calls = []
 
     def fill(items, cfg=None, **kw):
@@ -201,7 +201,7 @@ def test_missing_abstracts_of_top_candidates_are_fetched_once(monkeypatch):
 
 
 def test_prefill_abstracts_picks_among_records_lacking_abstract(monkeypatch):
-    import litloop.abstracts as ab
+    import litloop.search.abstracts as ab
     monkeypatch.setattr(deep_search, "PREFILL", 2)
     calls = []
 
@@ -296,7 +296,7 @@ def test_angewandte_german_edition_is_the_same_paper():
 
 
 def test_openalex_retries_when_throttled_and_explains_a_spent_budget(monkeypatch):
-    import litloop.search as s
+    import litloop.search.quick as s
     replies = []
 
     class R:
@@ -322,7 +322,8 @@ def test_openalex_retries_when_throttled_and_explains_a_spent_budget(monkeypatch
 
 def test_keyword_searches_are_counted_against_the_openalex_budget(monkeypatch):
     import requests
-    from litloop import quota, search
+    from litloop import quota
+    from litloop.search import quick as search
 
     class R:
         status_code = 200
@@ -367,7 +368,7 @@ def test_a_round_leaves_a_summary_and_progress_for_the_app(net):
 
 
 def test_cached_ranking_matches_a_fresh_one_and_rematches_only_changed_papers(monkeypatch):
-    import litloop.search as search
+    import litloop.search.quick as search
     pool = {f"10.1/p{i}": rec(f"10.1/p{i}", f"Pressureless infiltration of SiC by aluminum {i}",
                               abstract="" if i % 2 else "pressureless infiltration SiC aluminum") for i in range(6)}
     st = _state(pool, ["10.1/p0"], ["10.1/p0"]) | {"session": "cache-test"}

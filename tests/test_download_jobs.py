@@ -12,7 +12,9 @@ import pytest
 import requests
 from fastapi.testclient import TestClient
 
-from litloop import app_server, config, download_jobs, progress_reporter, screening, server, store
+from litloop import app_server, config, download_jobs, server, store
+from litloop.download import progress as progress_reporter
+from litloop.search import screening
 from litloop.zotero import client as zotero
 
 TOKEN = "t0ken"
@@ -1368,7 +1370,8 @@ def test_a_pasted_list_gets_its_years_for_the_scihub_rule(tmp_path, monkeypatch)
     """Pasted DOIs come without a year; the job looks them up (one OpenAlex
     request per 50) so "newer papers skip Sci-Hub" applies to them too."""
     import json as _json
-    from litloop import deep_search, download_jobs, store
+    from litloop import download_jobs, store
+    from litloop.search import deep as deep_search
     from litloop.sources import scihub
     path = tmp_path / "job.json"
     store.write_json(path, {"items": [{"doi": "10.1016/j.jallcom.2025.179147", "year": None},
@@ -1390,7 +1393,8 @@ def test_a_pasted_list_gets_its_years_for_the_scihub_rule(tmp_path, monkeypatch)
 
 
 def test_a_failed_year_lookup_does_not_hold_the_job(tmp_path, monkeypatch):
-    from litloop import deep_search, download_jobs, store
+    from litloop import download_jobs, store
+    from litloop.search import deep as deep_search
     path = tmp_path / "job.json"
     store.write_json(path, {"items": [{"doi": "10.1/x", "year": None}]})
 
@@ -1457,7 +1461,7 @@ def test_publisher_names_lose_their_company_form():
 
 
 def test_the_job_lookup_also_names_each_papers_publisher(tmp_path, monkeypatch):
-    from litloop import deep_search
+    from litloop.search import deep as deep_search
     path = tmp_path / "job.json"
     store.write_json(path, {"items": [{"doi": "10.1016/j.a.2020.1", "year": 2020},
                                       {"doi": "10.1/unknown", "year": 2020}]})

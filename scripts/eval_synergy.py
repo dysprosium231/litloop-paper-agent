@@ -136,7 +136,7 @@ def simulate(name: str, recs: list[dict], n_seeds: int, batch: int, rng: random.
     """One simulated deep search of at most ``max_read`` papers; returns the reading
     order and the first stop. (A real one reads about 200: reading on retrains the
     model on every rating each batch, which takes long in pure Python.)"""
-    from litloop import deep_search as ds
+    from litloop.search import deep as ds
 
     pool = {r["id"]: {"title": r["title"], "abstract": r["abstract"], "refs": r["refs"],
                       "cited_by_count": r["cited_by"], "doi": r["doi"]} for r in recs if r.get("title")}
@@ -262,7 +262,7 @@ def main() -> int:
         export(a.names, _data_dir(a.out))
     else:
         if a.knee:
-            from litloop import deep_search
+            from litloop.search import deep as deep_search
             deep_search.KNEE_RATIO = a.knee
             print(f"stop rule knee ratio set to 1/{a.knee:g} for this run")
         run(a.names, _data_dir(a.data), a.seeds, a.repeats, a.batch, a.max, tuple(a.patience))

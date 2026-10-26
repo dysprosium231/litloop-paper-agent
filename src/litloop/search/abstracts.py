@@ -28,8 +28,8 @@ from typing import Any
 
 import requests
 
-from . import quota
-from .log import get_logger
+from .. import quota
+from ..log import get_logger
 
 log = get_logger()
 
@@ -70,7 +70,7 @@ def clean_abstract(text: str) -> str:
 
 
 def _session() -> requests.Session:
-    from .network import user_agent
+    from ..network import user_agent
 
     s = requests.Session()
     s.headers["User-Agent"] = user_agent("(https://github.com/dysprosium231/litloop-paper-agent)")

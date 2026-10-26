@@ -6,7 +6,7 @@ import pytest
 from pathlib import Path
 
 from litloop import app_settings, config
-from litloop.rename import (
+from litloop.download.rename import (
     DEFAULT_FORMAT,
     FORMATS,
     _full_title,
