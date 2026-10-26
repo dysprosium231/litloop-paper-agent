@@ -39,5 +39,6 @@
   | `schools.py`（`institutional/`） | `parent / "data"` | `parent.parent / "data"` |
   | `web.py`（`cli/web.py`） | `parent / "templates"` | `parent.parent / "templates"` |
 
+- **写死文件路径的工具和文档**：`app/package.json` 的 `lint:copy` 列着 `app_settings.py`、`proxy_check.py`、`download_jobs.py`、`app_server.py`，搬了不改，文案检查会悄悄漏掉它们（搬后在 `app/` 里跑一次 `npm run -s lint:copy` 确认）；`docs/UI_COPY.md`、`docs/API_LIMITS.md` 里提到的文件名一并改。
 - **合并、删除**：`institutional/cloakbrowser_compat.py` 的函数和顶层那份函数体相同，保留顶层的（换上较长的文档字符串）；`institutional/fetcher.py`、`institutional/profile_health.py` 只做转发，删掉，调用处直接指向真正的模块。
 - **唯一保留的转发**：`litloop/app_server.py`，只转发到 `desktop/server.py`，给已经装好的桌面 app 用（它们启动 `python -m litloop.app_server`），留一个版本后删。`lib.rs`、`.claude/launch.json`、`app/README.md` 改用新路径；`tests/test_mcp_lifecycle.py` 的 `-m litloop.main` 改成 `-m litloop.cli.main`。验收时实际运行 `python -m litloop --help`、`-m litloop.app_server --help`、`-m litloop.desktop.server --help`。
