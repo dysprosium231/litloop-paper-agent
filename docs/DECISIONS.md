@@ -142,6 +142,7 @@
   - 第 1 批 terms、citations、tor、zotero：7249a9a（52 个文件，只有 import、3 个测试里的路径字符串、bridge 脚本的文件名和冒烟测试清单变了；冒烟 25/25，全量 944 通过）。
   - 第 2 批 search、download：a35f89b（104 个文件；冒烟 33/33，全量 948 通过；从干净副本打的 wheel 里子包齐全、没有旧模块）。用时 54 分钟，接近第 1 批的两倍。
     - 子包 `download/` 占了 `litloop.download` 这个名字，和原来的快捷写法 `from litloop import download` 冲突（导入子包后这个名字会变成子包）。这个快捷写法是原作者 v1.4.0（fb41a38，2026-05-14）加的，仓库和历来的文档里都没人用；`download` 函数本身最早也是原作者写的，现在 97 行里 56 行出自我们这边的提交。用户同意去掉快捷写法，函数不变，用 `from litloop.sources import download`。下次发版说明里写一句。
+  - 第 3 批 browser、institutional、sources、publishers：afc3849（115 个文件，用时 22 分钟）。除搬动外：两份 `cloakbrowser_compat` 合并，两个只做转发的空壳删掉；5 处按文件位置找的路径改为指回原处，验收时实际解析过（内置浏览器缓存仍在 `src/litloop/_browsers`）；CARSI 两个模块互换名字后，每处导入的名字都在对应模块里（登录：`CARSIClient`、`detect_publisher` 等；下载来源：`try_carsi`）。冒烟 33/33，全量 948 通过，文案检查覆盖到搬走的 `proxy_check.py`。
   - 其余三批待做，要特别处理的地方记在 LAYOUT.md「还没搬的几批要注意的」：按文件位置找路径的 5 处里，`cloakbrowser_compat.py` 若照搬不改，会让用户已下载的内置浏览器找不到。
 - **防止再写重复**：源码规范检查（`_source_hygiene.py`）报出 `terms/text.py` 之外另写的停用词表、连字符集合、标题键和元素猜测；在重构前的代码上它能找出全部 15 处，现在为 0。“没写进 LAYOUT.md 的模块”这一项等模块搬完再加。
 
@@ -653,6 +654,26 @@ DeepSeek Harness 复核评审修改时指出、已复现：
 - CI 在 3 个系统 × 3 个 Python 版本上全部通过（c4b4349、6819595）。
 - README 重写并加上项目状态（a32796c、6c1c3b7）；新图标（04b1fb1）。
 - 本机：虚拟环境改为 `~/.mcp-envs/litloop`，清理 scansci 残留。
+
+## 2026-10-11：下载耗时对比（2026-10-26 从本地 perf-logs/ 补记）
+
+原来只放在本地没进仓库的 `perf-logs/README.md`，2026-10-26 整理工作目录时原样移到这里；文中的 `timed.py`、`bench.py`、`before/`、`after/` 日志随那个文件夹删除（已移进回收站）。
+
+计时方式：`timed.py` 记录插件日志的时间戳；表中“用时”= 从开始比对来源（Racing）到下载完成，不含 Python 启动。
+`before/` 是优化前的日志（只有 AIP、Springer、Science 带时间戳），`after/` 是优化后的日志。
+`bench.py after name=DOI ...` 可重跑：会先把已下载的 PDF 临时挪开，测完放回。
+
+| 出版商 | 优化前 | 优化后 | 说明 |
+|---|---|---|---|
+| Springer | 23 s | 9 s | doi.org 走代理、Springer 走代理例外 |
+| Nature | 26 s | 15 s | 同上 |
+| Wiley | 143 s（两个窗口） | 71 s | 网络重试，不再换窗口 |
+| ACS | 122 s | 97 s | 浏览器立即启动，不再白等 25 s 的直连 403 |
+| AIP | 104 s | 107 s | 省下 18 s，但 AIP 页面本身更慢（波动） |
+| Elsevier | 24 s | 34 s | 网络波动 |
+
+before 中没有时间戳的几家（Elsevier、ACS、Wiley、Nature），“优化前”取自当时 `one.py` 的总计时，口径相同。
+`after/aip_run1_with_bug.txt` 是第 2 项优化初版（25 s 找链接上限）导致失败的那次，已修正。
 
 ## 2026-10-11
 - 改名 LitLoop（0c680d7）。

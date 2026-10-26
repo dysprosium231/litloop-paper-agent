@@ -32,8 +32,9 @@
 ## 正在做
 
 **代码整理**（2026-10-25 起，用户要求）：
-- [ ] 模块按领域分子包，分 4 批（Antigravity 搬、Claude 审查和验证、每批单独提交）：~~terms/citations/tor/zotero~~（7249a9a）→ ~~search/download~~（a35f89b）→ browser/institutional/sources/publishers → desktop/cli/入口。各批要特别处理的地方见 LAYOUT.md「还没搬的几批要注意的」。
+- [ ] 模块按领域分子包，分 4 批（Antigravity 搬、Claude 审查和验证、每批单独提交）：~~terms/citations/tor/zotero~~（7249a9a）→ ~~search/download~~（a35f89b）→ ~~browser/institutional/sources/publishers~~（afc3849）→ desktop/cli/入口。第 4 批要特别处理的地方见 LAYOUT.md「还没搬的一批（第 4 批：desktop、cli、入口）要注意的」。
 - [ ] 模块搬完后，一致性检查再加一项：没写进 LAYOUT.md 的模块报错。（`terms/text.py` 之外另写文本规则的检查、`lint:copy` 路径存在的检查已装：5d59535、0364f7c。）
+- [ ] 技能文件（第 3 批提交后做，用户 2026-10-26 同意）：`.claude/skills/litloop.md` 是 Claude Code 用的（docs/AGENT.md 这样写），但不是由 `skills-src/` 生成的，10-11 之后没更新，里面的工具名大多已在工具精简里删掉；改为由 `build_skills.py` 生成并纳入一致性检查。完整参考 `skill/SKILL.md` 挪到 `skills/litloop/reference.md`，和简版放一起，根目录少一个和 `skills/` 只差一个字母的目录；改链接时连 ZCode 那份一起改。
 - [ ] 删掉 `litloop.app_server` 转发模块：第 4 批留下，给已装好的桌面 app 用，过一个版本再删。
 
 ## 待用户决定
@@ -64,6 +65,7 @@
 ## 待办池
 
 ### 下载
+- [ ] 预印本被存成正式版：2026-10-26 整理工作目录时发现，`Lin2024_…_10.1038_s41598-024-67653-y.pdf`（10-18 下载，来源 `OpenAlexContent`）是 Research Square 的 21 页预印本（每页页眉 “Page 1/21”、首页没有 DOI），正式版是 Scientific Reports 的 12 页。文件和论文的对应校验看标题，同一篇的两个版本都能通过。要做：认出预印本（首页没有 DOI、预印本平台的页眉），优先下正式版；只能拿到预印本时在文件名或下载记录里标明。当时那份已改名为 `…_preprint.pdf`，正式版放回原名。
 - [ ] 批量引擎（车道）：浏览器下载超过竞速时限后“迟到的成功”没算进车道结果，冷却重试又下了一遍（ceramint.2024.08.002）。
 - [ ] 下载慢的几处：车道不必等整批走完；Sci-Hub 镜像找到 PDF 但传输慢时被 45 秒窗口判失败；arXiv 进度用编号汇报、下载任务对不上 DOI。
 
