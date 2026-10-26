@@ -116,7 +116,7 @@ def _check_skill_docs() -> list[str]:
                        capture_output=True, text=True, encoding="utf-8")
     if r.returncode != 0:
         problems.append(r.stdout.strip() or r.stderr.strip())
-    for rel in ("skill/SKILL.md", "skills/litloop/SKILL.md", "zcode-plugin/skills/litloop/SKILL.md"):
+    for rel in ("skills/litloop/reference.md", "skills/litloop/SKILL.md", "zcode-plugin/skills/litloop/SKILL.md"):
         text = (ROOT / rel).read_text(encoding="utf-8")
         for retired in RETIRED_TOOLS:
             if retired in text:

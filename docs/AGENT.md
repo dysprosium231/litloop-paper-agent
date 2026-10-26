@@ -47,7 +47,7 @@ LitLoop 是一个面向 Claude Code、Codex、ZCode 等 Agent 的 MCP 服务器�
 各客户端的插件入口：
 - **Codex**：`.codex-plugin/plugin.json`、`.mcp.json` 和 `skills/`；
 - **ZCode**：[`zcode-plugin/`](../zcode-plugin/)，包含技能和 `/litloop` 快捷命令；
-- **Claude Code**：`.claude/skills/` 加上面的 MCP 配置。
+- **Claude Code**：`scripts/deploy.py` 把 `skills/` 下的技能目录装进 `~/.claude/skills/`，加上面的 MCP 配置。
 
 ### 其他运行方式（HTTP 远程 / Web UI）
 

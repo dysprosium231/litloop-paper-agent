@@ -3,6 +3,15 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-26：技能文件整理
+
+- **起因**：用户觉得工作目录杂乱。根目录有 `skill/`、`skills/`、`skills-src/`、`zcode-plugin/` 四个和技能有关的目录；`.claude/skills/litloop.md` 提交在仓库里，但不是由 `skills-src/` 生成的，10-11 之后没更新，里面的 37 个工具名大多已在工具精简里删掉，描述还写着“机构登录绕过付费墙”。
+- **查到的事实**（Claude Code 文档，github.com/anthropics/claude-code 的 plugin-structure 和 skill-development，2026-10-26 核对）：Claude Code 只把“目录下的 `SKILL.md`”当技能，`.claude/skills/litloop.md` 这样单放的文件不会被加载，是死文件。Claude Code 和 Codex 用户实际拿到的是 `scripts/deploy.py` 整个复制到 `~/.claude/skills/`、`~/.codex/skills/` 的 `skills/litloop/`，那份是生成的、最新的。`docs/AGENT.md` 和 `zcode-plugin/README.md` 写的“Claude Code 用 `.claude/skills/`”不对。
+- **做法**（用户同意整理；原打算把死文件也改成生成的，查清后改为删掉，少维护一份）：
+  - 删掉 `.claude/skills/litloop.md`；两处文档改为写 `deploy.py` 装到 `~/.claude/skills/`。
+  - 完整参考 `skill/SKILL.md` 挪到 `skills/litloop/reference.md`，和简版放在同一个技能目录（技能的通行写法：一份 SKILL.md 加参考文件）；简版里的链接从 `../../skill/SKILL.md` 改成同目录的 `reference.md`，`deploy.py` 装出去的技能不再依赖仓库路径。根目录少了和 `skills/` 只差一个字母的 `skill/`。
+  - `build_skills.py`、一致性检查、AGENTS.md 跟着改路径。
+
 ## 2026-10-26：作为标准 Windows 程序分发
 
 - **用户的要求**：安装包要分发给其他用户，做成标准的 Windows 程序。

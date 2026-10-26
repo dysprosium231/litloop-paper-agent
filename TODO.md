@@ -34,7 +34,6 @@
 **代码整理**（2026-10-25 起，用户要求）：
 - [ ] 模块按领域分子包，分 4 批（Antigravity 搬、Claude 审查和验证、每批单独提交）：~~terms/citations/tor/zotero~~（7249a9a）→ ~~search/download~~（a35f89b）→ ~~browser/institutional/sources/publishers~~（afc3849）→ desktop/cli/入口。第 4 批要特别处理的地方见 LAYOUT.md「还没搬的一批（第 4 批：desktop、cli、入口）要注意的」。
 - [ ] 模块搬完后，一致性检查再加一项：没写进 LAYOUT.md 的模块报错。（`terms/text.py` 之外另写文本规则的检查、`lint:copy` 路径存在的检查已装：5d59535、0364f7c。）
-- [ ] 技能文件（第 3 批提交后做，用户 2026-10-26 同意）：`.claude/skills/litloop.md` 是 Claude Code 用的（docs/AGENT.md 这样写），但不是由 `skills-src/` 生成的，10-11 之后没更新，里面的工具名大多已在工具精简里删掉；改为由 `build_skills.py` 生成并纳入一致性检查。完整参考 `skill/SKILL.md` 挪到 `skills/litloop/reference.md`，和简版放一起，根目录少一个和 `skills/` 只差一个字母的目录；改链接时连 ZCode 那份一起改。
 - [ ] 删掉 `litloop.app_server` 转发模块：第 4 批留下，给已装好的桌面 app 用，过一个版本再删。
 
 ## 待用户决定

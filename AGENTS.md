@@ -42,7 +42,7 @@
 
 ## 技能文档
 
-- `skills/litloop/SKILL.md`、`zcode-plugin/skills/litloop/SKILL.md`、`skill/SKILL.md` 由 `skills-src/` 生成：改 `skills-src/` 里的模板或 `shared/` 片段，再运行 `python scripts/build_skills.py`；不要直接改生成的文件（`check_release_consistency.py` 会报出来）。
+- `skills/litloop/SKILL.md`、`skills/litloop/reference.md`（完整参考）、`zcode-plugin/skills/litloop/SKILL.md` 由 `skills-src/` 生成：改 `skills-src/` 里的模板或 `shared/` 片段，再运行 `python scripts/build_skills.py`；不要直接改生成的文件（`check_release_consistency.py` 会报出来）。
 
 ## 代码放在哪
 

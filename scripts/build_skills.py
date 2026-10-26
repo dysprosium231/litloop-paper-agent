@@ -20,7 +20,7 @@ SRC = ROOT / "skills-src"
 TARGETS = {
     "litloop.md": "skills/litloop/SKILL.md",           # the skill deploy.py installs into AI clients
     "zcode-litloop.md": "zcode-plugin/skills/litloop/SKILL.md",  # the ZCode plugin's
-    "reference.md": "skill/SKILL.md",                   # the full reference
+    "reference.md": "skills/litloop/reference.md",      # the full reference, next to the skill that links it
 }
 INCLUDE = re.compile(r"(?m)^<!-- include: (shared/[\w.-]+\.md) -->\n\n?")
 NOTE = "<!-- 由 skills-src/ 生成：改那里的文件，再运行 python scripts/build_skills.py -->\n"

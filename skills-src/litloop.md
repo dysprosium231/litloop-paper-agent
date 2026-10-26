@@ -9,9 +9,9 @@ description: >
 # LitLoop
 
 Use the bundled `litloop` MCP server for paper discovery, metadata, citations,
-download queues, access diagnostics, and result reporting. The repository's full
-workflow reference is `../../skill/SKILL.md`; read it when the task needs detailed
-tool routing or configuration guidance.
+download queues, access diagnostics, and result reporting. The full workflow
+reference is `reference.md` in this skill's folder; read it when the task needs
+detailed tool routing or configuration guidance.
 
 
 <!-- include: shared/anti-scraping.md -->
