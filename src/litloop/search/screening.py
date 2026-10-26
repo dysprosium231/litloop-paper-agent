@@ -139,7 +139,7 @@ def translate_wanted(config: dict[str, Any] | None = None) -> list[str]:
 def untranslated(session: str, config: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Items the agent should still translate: only when the agent is the translator
     (translation_provider "agent"), rated in translate_wanted, with an abstract."""
-    from .. import translate as _translate
+    from ..desktop import translate as _translate
     if _translate.by_api(config):
         return []
     wanted = translate_wanted(config)

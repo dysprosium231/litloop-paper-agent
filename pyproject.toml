@@ -49,7 +49,7 @@ zotero = ["zotero-mcp-server>=0.14.1"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-litloop = "litloop.main:main"
+litloop = "litloop.cli.main:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

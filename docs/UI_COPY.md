@@ -8,10 +8,10 @@ LitLoop 桌面 app 里给用户看的文字都按这份写。
 
 - 前端：`app/src/**/*.tsx` 里的页面、按钮、提示、`aria-label`、`title`、`placeholder`。
 - 后台返回给 app 显示的文字：
-  - `src/litloop/app_settings.py`：设置项的 `title` / `label` / `help` / `placeholder` / 选项名，检测结果，代理设置引导；
+  - `src/litloop/desktop/settings.py`：设置项的 `title` / `label` / `help` / `placeholder` / 选项名，检测结果，代理设置引导；
   - `src/litloop/institutional/proxy_check.py`：代理软件名、引导里出现的程序名；
-  - `src/litloop/app_server.py`：返回给 app 的错误；
-  - `src/litloop/download_jobs.py`：任务标题、条目的 `error`；
+  - `src/litloop/desktop/server.py`：返回给 app 的错误；
+  - `src/litloop/desktop/download_jobs.py`：任务标题、条目的 `error`；
   - `src/litloop/download/rename.py` 的 `FORMATS`：文件名格式的名称。
 - 不管：代码注释、日志、CLI 和 MCP 工具的输出（它们给 Agent 和开发者看）。
 
@@ -433,7 +433,7 @@ Ant《文案》的标点部分以 1995 年版《标点符号用法》为参考�
 
 ### 6.9 分步引导
 
-用于代理软件设置这类要用户去别的程序里操作的场景（`app_settings.py` 的 `guides`）。
+用于代理软件设置这类要用户去别的程序里操作的场景（`desktop/settings.py` 的 `guides`）。
 
 - 标题：`在 <程序> 中 <做什么>`：`在 v2rayN 中设置直连`、`在 Clash Verge 中设置直连`。
 - 每步一个动作，动词开头，界面元素名放「」，句末加句号。
@@ -627,7 +627,7 @@ cd app
 npm run lint:copy
 ```
 
-- 用 [AutoCorrect](https://github.com/huacnlee/autocorrect)（`autocorrect-node` 2.14.0，开发依赖）检查 `app/src` 以及 `app_settings.py`、`proxy_check.py`、`download_jobs.py`、`app_server.py`。它只看字符串和注释。
+- 用 [AutoCorrect](https://github.com/huacnlee/autocorrect)（`autocorrect-node` 2.14.0，开发依赖）检查 `app/src` 以及 `desktop/settings.py`、`proxy_check.py`、`desktop/download_jobs.py`、`desktop/server.py`。它只看字符串和注释。
 - 后台新增了会显示在 app 里的文字的文件，把它加进 `app/package.json` 的 `lint:copy`。
 - 自动改正：`npx autocorrect --fix <文件>`，改完看 `git diff` 再提交。
 - 现在不带 `--strict`，有问题也不会让命令失败；提交前看输出里有没有问题。

@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "lint:copy": "autocorrect --lint src ../src/litloop/app_settings.py ../src/litloop/institutional/proxy_check.py ../src/litloop/download_jobs.py ../src/litloop/app_server.py"
+    "lint:copy": "autocorrect --lint src ../src/litloop/desktop/settings.py ../src/litloop/institutional/proxy_check.py ../src/litloop/desktop/download_jobs.py ../src/litloop/desktop/server.py"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

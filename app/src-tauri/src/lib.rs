@@ -1,4 +1,4 @@
-//! LitLoop desktop shell: starts the Python backend (litloop.app_server) and
+//! LitLoop desktop shell: starts the Python backend (litloop.desktop.server) and
 //! hands its address and token to the web front end.
 
 use std::io::{BufRead, BufReader};
@@ -24,7 +24,7 @@ fn backend(state: tauri::State<Backend>) -> Result<BackendInfo, String> {
     state.info.clone()
 }
 
-/// Start `python -m litloop.app_server` and wait for the line that names its port.
+/// Start `python -m litloop.desktop.server` and wait for the line that names its port.
 ///
 /// The interpreter is `LITLOOP_PYTHON` when set (the Python environment
 /// LitLoop is installed in), otherwise `python` on PATH. The installed app
@@ -33,7 +33,7 @@ fn start_backend() -> (Result<BackendInfo, String>, Option<Child>) {
     let python = std::env::var("LITLOOP_PYTHON").unwrap_or_else(|_| "python".into());
     let token = uuid::Uuid::new_v4().simple().to_string();
     let mut cmd = Command::new(&python);
-    cmd.args(["-m", "litloop.app_server", "--token", &token])
+    cmd.args(["-m", "litloop.desktop.server", "--token", &token])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());

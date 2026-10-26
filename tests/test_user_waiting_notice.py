@@ -75,5 +75,5 @@ def test_skipping_a_paper_stops_its_download_and_only_that_one(tmp_path, monkeyp
 
 
 def test_a_skipped_paper_reads_as_skipped():
-    from litloop import error_text
+    from litloop.desktop import error_text
     assert error_text.reason("skipped by user") == "已跳过"

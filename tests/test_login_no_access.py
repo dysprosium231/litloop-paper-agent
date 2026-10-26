@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import litloop.sources as src
 from litloop.publishers.strategies import _core as core
-from litloop.error_text import reason
+from litloop.desktop.error_text import reason
 
 
 def _setup(monkeypatch, tmp_path, called):

@@ -2,7 +2,7 @@
 
 import pytest
 
-from litloop import error_text
+from litloop.desktop import error_text
 
 
 @pytest.mark.parametrize("raw, want", [
@@ -45,7 +45,7 @@ def test_cancelled_is_plain():
 
 
 def test_app_server_adds_error_text_and_keeps_raw():
-    from litloop import app_server
+    from litloop.desktop import server as app_server
     item = {"error": "NOT_ENTITLED"}
     app_server._explain(item)
     assert item == {"error": "NOT_ENTITLED", "error_text": "学校未订阅此期刊，或当前不在校园网"}

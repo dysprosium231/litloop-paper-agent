@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 import requests
 
-from litloop import error_text, sources
+from litloop import sources
+from litloop.desktop import error_text
 from litloop.download import doi_check
 
 

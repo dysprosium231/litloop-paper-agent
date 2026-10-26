@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 from pathlib import Path
 
-from litloop import app_settings, config
+from litloop import config
+from litloop.desktop import settings as app_settings
 from litloop.download.rename import (
     DEFAULT_FORMAT,
     FORMATS,

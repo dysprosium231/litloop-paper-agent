@@ -7,7 +7,8 @@ import re
 import threading
 from pathlib import Path
 
-from litloop import config, download_jobs, error_text, server, store
+from litloop import config, server, store
+from litloop.desktop import download_jobs, error_text
 from litloop.search import deep as deep_search, screening
 from litloop.zotero import client as zotero
 

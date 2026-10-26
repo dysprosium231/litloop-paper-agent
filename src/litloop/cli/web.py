@@ -11,15 +11,15 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from .config import load_config
-from .identifiers import is_arxiv_identifier, normalize_doi
-from .log import get_logger
-from .search.quick import search_papers
-from .sources import download
+from ..config import load_config
+from ..identifiers import is_arxiv_identifier, normalize_doi
+from ..log import get_logger
+from ..search.quick import search_papers
+from ..sources import download
 
 log = get_logger()
 
-_TEMPLATE_DIR = Path(__file__).parent / "templates"
+_TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
 templates.env.cache_size = 0
 
@@ -61,7 +61,7 @@ def _check_sources(config: dict[str, Any]) -> dict[str, Any]:
 
     # CloakBrowser
     try:
-        from .browser.engine import is_available
+        from ..browser.engine import is_available
         cb_available = is_available(config)
         sources["cloakbrowser"] = cb_available
     except Exception:
@@ -69,7 +69,7 @@ def _check_sources(config: dict[str, Any]) -> dict[str, Any]:
 
     # Tor
     try:
-        from .tor.proxy import check_tor_circuit
+        from ..tor.proxy import check_tor_circuit
         tor_ok = check_tor_circuit(config)
         sources["tor"] = tor_ok
     except Exception:
@@ -109,7 +109,7 @@ async def api_download(req: DownloadRequest):
 
     # If input looks like a title (not DOI/arXiv), try to resolve first
     if not _is_doi_or_arxiv(identifier):
-        from .search.title_to_doi import resolve_title_to_doi
+        from ..search.title_to_doi import resolve_title_to_doi
         config = load_config()
         doi = resolve_title_to_doi(identifier, config)
         if doi:

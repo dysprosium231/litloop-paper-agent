@@ -715,7 +715,7 @@ def test_index_claims_block_other_dois(tmp_path):
 
 
 def test_cli_downloads_default_to_the_configured_papers_dir(monkeypatch, tmp_path):
-    from litloop import main as cli
+    from litloop.cli import main as cli
     import litloop.config as cfg
     monkeypatch.setattr(cfg, "load_config", lambda: {"output_dir": str(tmp_path / "papers")})
     assert cli._default_output_dir("") == str(tmp_path / "papers")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from litloop import app_settings
+from litloop.desktop import settings as app_settings
 
 
 @pytest.mark.parametrize("bad", [r":\Users\Echo\.litloop\papers", r"Users\Echo\papers", "papers", r"Q:\no-such-drive\papers"])

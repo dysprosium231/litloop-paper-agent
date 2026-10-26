@@ -4,7 +4,7 @@ from contextlib import redirect_stdout
 import io
 import json
 
-from litloop import main
+from litloop.cli import main
 from litloop.search import quick as search
 
 

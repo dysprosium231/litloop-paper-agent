@@ -5,7 +5,8 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from litloop import app_server, store
+from litloop import store
+from litloop.desktop import server as app_server
 from litloop.search import deep as deep_search, screening
 
 TOKEN = "t0ken"

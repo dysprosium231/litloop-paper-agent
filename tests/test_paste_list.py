@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from litloop import app_server
+from litloop.desktop import server as app_server
 from litloop.identifiers import extract_identifiers
 
 PASTED = """\
@@ -38,7 +38,7 @@ def test_every_kind_of_identifier_is_found_once():
 
 
 def test_endpoint_reports_what_it_found_and_what_was_downloaded(monkeypatch):
-    from litloop import download_jobs
+    from litloop.desktop import download_jobs
     monkeypatch.setattr(download_jobs, "local_files", lambda: {"10.1016/j.jallcom.2025.179147": "a.pdf"})
     c = TestClient(app_server.create_app("t"))
     r = c.post("/api/downloads/parse", json={"text": PASTED}, headers={"X-LitLoop-Token": "t"})
@@ -77,7 +77,7 @@ def test_a_reference_line_finds_its_paper_and_a_near_miss_does_not(monkeypatch):
 
 
 def test_resolve_endpoint_marks_what_was_downloaded(monkeypatch):
-    from litloop import download_jobs
+    from litloop.desktop import download_jobs
     from litloop.search import title_to_doi as resolver
     monkeypatch.setattr(resolver, "resolve_reference",
                         lambda line, config, timeout=15.0: {"doi": "10.1/a", "title": "A paper", "year": 2020} if "A paper" in line else None)

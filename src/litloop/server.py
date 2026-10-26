@@ -1362,7 +1362,7 @@ def litloop_setup_check() -> str:
     Returns OS info, component status, and installation suggestions
     for missing dependencies. Use this to guide users through setup.
     """
-    from .setup import setup_check
+    from .cli.doctor import setup_check
     result = setup_check()
     return json.dumps(result, ensure_ascii=False, indent=2)
 

@@ -45,8 +45,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import store
-from .identifiers import canonical_doi
+from .. import store
+from ..identifiers import canonical_doi
 
 _RUN_LOCK = threading.Lock()
 _CURRENT: dict[str, Any] = {"job": None, "cancelled": False}
@@ -59,7 +59,7 @@ class Busy(RuntimeError):
 
 
 def jobs_dir() -> Path:
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     d = Path(DATA_DIR) / "downloads"
     d.mkdir(parents=True, exist_ok=True)
     return d
@@ -151,7 +151,7 @@ def local_files(dois: list[str] | set[str] | None = None) -> dict[str, str]:
     Only files that are still there count; age does not matter (a PDF on disk
     does not expire, whatever cache_ttl_hours says about re-checking sources).
     """
-    from .config import load_config
+    from ..config import load_config
     folder = Path(str(load_config().get("output_dir") or "")).expanduser()
     try:
         idx = json.loads((folder / ".doi_index.json").read_text(encoding="utf-8"))
@@ -215,7 +215,7 @@ def start(papers: list[dict[str, Any]], title: str, session: str | None = None,
     if not _RUN_LOCK.acquire(blocking=False):
         raise Busy("another download is still running")
     try:
-        from .config import load_config
+        from ..config import load_config
         job = time.strftime("%Y%m%d-%H%M%S")
         while job_path(job).exists():
             time.sleep(1)
@@ -265,7 +265,7 @@ def cancel() -> bool:
     """Ask the running job to stop: pending papers are skipped, browser windows closed."""
     if not _CURRENT["job"]:
         return False
-    from .sources import cancel_downloads
+    from ..sources import cancel_downloads
     _CURRENT["cancelled"] = True
     cancel_downloads()
     return True
@@ -290,8 +290,8 @@ def _fill_meta(path: Path, wait_s: float = 10.0, publishers: bool = False) -> No
         return
 
     def run() -> None:
-        from .search.deep import _get
-        from .sources.scihub import note_years
+        from ..search.deep import _get
+        from ..sources.scihub import note_years
         for k in range(0, len(missing), 50):
             chunk = missing[k:k + 50]
             try:
@@ -354,9 +354,9 @@ def _run(job: str, only: list[str] | None = None, rounds: str = "all") -> None:
                   source=r.get("source"), file=r.get("file") or None, error=error_text.pick_failure(r),
                   note=r.get("note"), attempts=error_text.steps_for_app(r.get("attempts")))
 
-    from .download import progress as progress_reporter
-    from .sources import _SKIPPED
-    from .sources.scihub import note_years
+    from ..download import progress as progress_reporter
+    from ..sources import _SKIPPED
+    from ..sources.scihub import note_years
     _SKIPPED.clear()  # skips asked for in an earlier job do not carry over
     # The publication year decides whether Sci-Hub is asked (scihub_skip_from_year).
     note_years({i["doi"]: i.get("year") for i in store.read_json(path)["items"] if i.get("year")})
@@ -367,7 +367,7 @@ def _run(job: str, only: list[str] | None = None, rounds: str = "all") -> None:
     state, error, results = "done", None, []
     try:
         if dois:
-            from .server import _batch_download_impl
+            from ..server import _batch_download_impl
             out = json.loads(_batch_download_impl(dois, batch_id=f"app-{job}", keep_attempts=True,  # the app shows them
                                                   rounds=rounds))
             results = out.get("results", [])
@@ -404,7 +404,7 @@ def _run(job: str, only: list[str] | None = None, rounds: str = "all") -> None:
         finally:
             _CURRENT.update(job=None, cancelled=False)
             _RUN_LOCK.release()
-    from .config import load_config
+    from ..config import load_config
     if load_config().get("zotero_auto_push"):
         try:
             push_zotero(job)
@@ -414,7 +414,7 @@ def _run(job: str, only: list[str] | None = None, rounds: str = "all") -> None:
 
 def default_collection(title: str) -> str:
     """<zotero_collection_root>/<title>, shortened; '/' would start a sub-collection."""
-    from .config import load_config
+    from ..config import load_config
     root = str(load_config().get("zotero_collection_root") or "LitLoop").strip().strip("/")
     name = " ".join(title.replace("/", "-").split())
     name = name if len(name) <= 40 else name[:39] + "…"
@@ -428,8 +428,8 @@ def pushing() -> str | None:
 def find_local_pdf(doi: str) -> Path | None:
     """A PDF of this DOI on this computer: one a job downloaded, else a file in the
     download folder whose name carries the DOI (the default file-name format)."""
-    from .config import load_config
-    from .identifiers import safe_filename
+    from ..config import load_config
+    from ..identifiers import safe_filename
     doi = canonical_doi(doi or "")
     if not doi:
         return None
@@ -513,8 +513,8 @@ def _set_zotero(job: str, **fields: Any) -> None:
 
 
 def _push(job: str, collection: str, tags: list[str]) -> None:
-    from .config import load_config
-    from .zotero.client import ensure_collection, push_via_zotero_mcp
+    from ..config import load_config
+    from ..zotero.client import ensure_collection, push_via_zotero_mcp
     cfg = load_config()
     try:
         found = ensure_collection(collection, cfg)

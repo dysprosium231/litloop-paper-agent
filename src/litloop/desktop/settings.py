@@ -18,9 +18,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import config as _config
-from .download.rename import FORMATS as _RENAME_FORMATS
-from .download.rename import rename_format as _rename_format
+from .. import config as _config
+from ..download.rename import FORMATS as _RENAME_FORMATS
+from ..download.rename import rename_format as _rename_format
 
 # type: secret | text | email | path | bool | select; a path may say pick: dir | file (the app offers a chooser)
 GROUPS: list[dict[str, Any]] = [
@@ -254,7 +254,7 @@ def _cannot_reach(name: str, raw: Any) -> str:
 
 
 def test_sources() -> list[dict[str, Any]]:
-    from . import quota
+    from .. import quota
     cfg = _config.load_config()
     out = []
 
@@ -353,7 +353,7 @@ def test_network() -> list[dict[str, Any]]:
     Clash Verge Rev https://www.clashverge.dev/guide/rules.html ,
     mihomo find-process-mode https://wiki.metacubex.one/config/general/ .
     """
-    from .institutional import proxy_check
+    from ..institutional import proxy_check
     out = []
     cfg = _config.load_config()
     if str(cfg.get("network_proxy") or "").strip():
@@ -424,7 +424,7 @@ def _egress_checks(cfg: dict[str, Any]) -> list[dict[str, Any]]:
     if not key:
         out.append(_result("Elsevier 全文接口", None, "未填写 Elsevier Key"))
         return out
-    from .sources.elsevier_check import ENTITLED, NOT_ENTITLED, _head_probe
+    from ..sources.elsevier_check import ENTITLED, NOT_ENTITLED, _head_probe
     proxy = str(cfg.get("network_proxy") or "").strip()
     code, verdict = _head_probe(EGRESS_SAMPLE_DOI, key, {"http": proxy, "https": proxy} if proxy else None)
     if verdict.startswith(ENTITLED):
@@ -460,8 +460,8 @@ def test_components() -> list[dict[str, Any]]:
     """What is installed, and what a missing piece costs (deps, embedded_tor)."""
     import shutil
 
-    from .browser import backend as browser_backend; from . import deps
-    from .tor import embedded as embedded_tor
+    from ..browser import backend as browser_backend; from .. import deps
+    from ..tor import embedded as embedded_tor
     cfg = _config.load_config()
     out = []
     if not browser_backend.is_available():

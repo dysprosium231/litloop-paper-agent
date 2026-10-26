@@ -12,7 +12,8 @@ import pytest
 import requests
 from fastapi.testclient import TestClient
 
-from litloop import app_server, config, download_jobs, server, store
+from litloop import config, server, store
+from litloop.desktop import download_jobs, server as app_server
 from litloop.download import progress as progress_reporter
 from litloop.search import screening
 from litloop.zotero import client as zotero
@@ -1329,7 +1330,7 @@ def test_api_zotero_repair(client, monkeypatch, tmp_path):
 
 def test_api_zotero_write_mode_and_authorize(client, monkeypatch):
     """GET /api/zotero/write-mode and POST /api/zotero/authorize reflect zotero responses."""
-    from litloop import app_server
+    from litloop.desktop import server as app_server
     app_server._WRITE_MODE.clear()
     # write-mode success
     monkeypatch.setattr(zotero, "write_mode",
@@ -1370,7 +1371,8 @@ def test_a_pasted_list_gets_its_years_for_the_scihub_rule(tmp_path, monkeypatch)
     """Pasted DOIs come without a year; the job looks them up (one OpenAlex
     request per 50) so "newer papers skip Sci-Hub" applies to them too."""
     import json as _json
-    from litloop import download_jobs, store
+    from litloop import store
+    from litloop.desktop import download_jobs
     from litloop.search import deep as deep_search
     from litloop.sources import scihub
     path = tmp_path / "job.json"
@@ -1393,7 +1395,8 @@ def test_a_pasted_list_gets_its_years_for_the_scihub_rule(tmp_path, monkeypatch)
 
 
 def test_a_failed_year_lookup_does_not_hold_the_job(tmp_path, monkeypatch):
-    from litloop import download_jobs, store
+    from litloop import store
+    from litloop.desktop import download_jobs
     from litloop.search import deep as deep_search
     path = tmp_path / "job.json"
     store.write_json(path, {"items": [{"doi": "10.1/x", "year": None}]})

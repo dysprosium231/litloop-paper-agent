@@ -5,7 +5,8 @@ import time
 
 import pytest
 
-from litloop import config, download_jobs, server
+from litloop import config, server
+from litloop.desktop import download_jobs
 from litloop.download import progress as progress_reporter
 
 

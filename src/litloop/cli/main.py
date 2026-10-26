@@ -23,7 +23,7 @@ def _default_output_dir(output: str) -> str:
     """CLI downloads land where MCP downloads do (config output_dir), not in the cwd."""
     if output:
         return output
-    from .config import load_config
+    from ..config import load_config
     return str(Path(load_config().get("output_dir") or ".").expanduser())
 
 @app.command("run")
@@ -33,14 +33,14 @@ def run_server(
     port: int = typer.Option(8000, help="HTTP port"),
 ) -> None:
     """Start the LitLoop server."""
-    from .deps import print_status
-    from .log import get_logger
+    from ..deps import print_status
+    from ..log import get_logger
     log = get_logger()
 
     # Check dependencies before starting
     print_status()
 
-    from .server import mcp_app
+    from ..server import mcp_app
 
     if mode == ServerMode.STDIO:
         log.info("Starting in stdio mode")
@@ -64,7 +64,7 @@ def run_server(
 @app.command("check")
 def check_deps() -> None:
     """Check dependency status."""
-    from .deps import print_status
+    from ..deps import print_status
     print_status()
 
 
@@ -93,11 +93,11 @@ def login(
     url: str = typer.Option("", help="URL to open (for cookies/custom type)"),
 ) -> None:
     """Log in to your institution via stealth browser. Cookies are saved for all future downloads."""
-    from .config import load_config
+    from ..config import load_config
     config = load_config()
 
     if login_type == "cookies":
-        from .browser.cookies import extract_via_browser
+        from ..browser.cookies import extract_via_browser
         target_url = url or "https://www.sciencedirect.com/"
         result = extract_via_browser(config, url=target_url)
         if result["success"]:
@@ -106,19 +106,19 @@ def login(
             print(f"  {result.get('message') or result.get('error', 'Failed')}")
             raise typer.Exit(1)
     elif login_type == "webvpn":
-        from .browser.login import webvpn_login
+        from ..browser.login import webvpn_login
         success = webvpn_login(config)
         raise typer.Exit(0 if success else 1)
     elif login_type == "ezproxy":
-        from .browser.login import ezproxy_login
+        from ..browser.login import ezproxy_login
         success = ezproxy_login(config)
         raise typer.Exit(0 if success else 1)
     elif login_type == "custom":
         if not url:
             print("  Error: --url is required for login_type=custom")
             raise typer.Exit(1)
-        from .browser.login import open_login_browser
-        from .config import DATA_DIR
+        from ..browser.login import open_login_browser
+        from ..config import DATA_DIR
         cookie_file = Path(config.get("cache_dir", str(DATA_DIR / "cache"))) / "custom_cookies.json"
         success = open_login_browser(url, config, cookie_file=cookie_file)
         raise typer.Exit(0 if success else 1)
@@ -138,8 +138,8 @@ def get_paper(
 ) -> None:
     """Download a paper with zero configuration. Just give a DOI."""
     output = _default_output_dir(output)
-    from .sources import download
-    from .config import load_config, update_config
+    from ..sources import download
+    from ..config import load_config, update_config
 
     result = download(
         identifier, output,
@@ -151,12 +151,12 @@ def get_paper(
         print(f"  OK: {result.get('file', '')}")
         print(f"  Source: {result.get('source', '?')}")
         if md:
-            from .download.markdown import pdf_to_markdown
+            from ..download.markdown import pdf_to_markdown
 
             md_path = pdf_to_markdown(result["file"])
             print(f"  Markdown: {md_path}")
         if si:
-            from .publishers.supplementary import fetch_supplementary
+            from ..publishers.supplementary import fetch_supplementary
 
             out_dir = str(Path(result.get("file", output)).parent) if result.get("file") else output
             si_files = fetch_supplementary(identifier, out_dir, load_config())
@@ -183,9 +183,9 @@ def get_paper(
 @app.command("browser-status")
 def browser_status() -> None:
     """Check browser backend availability and which browser kernel is in effect."""
-    from .config import load_config
-    from .browser.engine import is_available
-    from .browser.backend import browser_info
+    from ..config import load_config
+    from ..browser.engine import is_available
+    from ..browser.backend import browser_info
     import importlib.metadata as _md
 
     config = load_config()
@@ -211,7 +211,7 @@ def browser_doctor_cmd() -> None:
     """Report reusable shared browser runtime options without installing anything."""
     import json as _json
 
-    from .browser.runtime import doctor
+    from ..browser.runtime import doctor
 
     print(_json.dumps(doctor(), ensure_ascii=False))
 
@@ -219,8 +219,8 @@ def browser_doctor_cmd() -> None:
 @app.command("import-cookies")
 def import_cookies_cmd(cookie_file: str = typer.Argument(help="Netscape-format cookie file path")) -> None:
     """Import Netscape cookies into browser context."""
-    from .config import load_config
-    from .browser.engine import import_cookies, is_available
+    from ..config import load_config
+    from ..browser.engine import import_cookies, is_available
 
     config = load_config()
     if not is_available(config):
@@ -246,8 +246,8 @@ def coverage_report(
     publishers map to source tiers.
     """
     from pathlib import Path
-    from .config import load_config
-    from .sources.publishers import get_publisher, get_publisher_fast_sources, DOI_PREFIX_TO_PUBLISHER
+    from ..config import load_config
+    from ..sources.publishers import get_publisher, get_publisher_fast_sources, DOI_PREFIX_TO_PUBLISHER
 
     config = load_config()
     if no_browser:
@@ -325,7 +325,7 @@ def setup_school(
     show: bool = typer.Option(False, "--show", help="Show current configuration"),
 ) -> None:
     """Configure institutional access (WebVPN/EZproxy/CARSI)."""
-    from .config import load_config, save_config
+    from ..config import load_config, save_config
 
     config = load_config()
 
@@ -341,7 +341,7 @@ def setup_school(
         return
 
     if not school:
-        from .institutional.schools import list_schools
+        from ..institutional.schools import list_schools
         schools = list_schools()
         print(f"  Available schools ({len(schools)} total):\n")
         for s in schools[:30]:
@@ -350,7 +350,7 @@ def setup_school(
             print(f"\n  ... and {len(schools) - 30} more. Use: litloop schools <query>")
         return
 
-    from .institutional.schools import search_schools
+    from ..institutional.schools import search_schools
     matches = search_schools(school)
     if not matches:
         print(f"  No school matching '{school}' found.")
@@ -374,7 +374,7 @@ def list_schools_cmd(
     query: str = typer.Argument("", help="Search query (name, province, or host)"),
 ) -> None:
     """List or search available schools/institutions."""
-    from .institutional.schools import list_schools, search_schools
+    from ..institutional.schools import list_schools, search_schools
 
     if query:
         results = search_schools(query)
@@ -403,8 +403,8 @@ def fetch_paper_cmd(
     Cascade: cache → OA → Elsevier API → DOI resolve → CARSI → publisher → browser → gateway.
     """
     output = _default_output_dir(output)
-    from .institutional.config_adapter import ConfigAdapter
-    from .download.fetcher import PaperFetcher
+    from ..institutional.config_adapter import ConfigAdapter
+    from ..download.fetcher import PaperFetcher
 
     config = ConfigAdapter.load()
     config._config["output_dir"] = output
@@ -433,7 +433,7 @@ def _atomic_write_json(path: Path, data: Any) -> None:
 def _write_retry_file(output: str, results: list) -> None:
     """Persist failed identifiers as retry.txt so 'batch --retry' can pick them up."""
     try:
-        from .download.pipeline import collect_failures
+        from ..download.pipeline import collect_failures
 
         failed = collect_failures(results)
         if failed:
@@ -457,18 +457,18 @@ def batch_fetch_cmd(
     """Batch fetch papers. Default: institutional cascade. Use --scihub for grey-source racing."""
     output = _default_output_dir(output)
     import json as _json
-    from .config import load_config as _load_config
+    from ..config import load_config as _load_config
 
     fallbacks: dict[str, list[str]] | None = None
     entries = None
     if retry:
-        from .download.pipeline import collect_failures
+        from ..download.pipeline import collect_failures
 
         prev = _json.loads(Path(retry).read_text(encoding="utf-8"))
         dois = collect_failures(prev)
         print(f"  Retrying {len(dois)} failed identifiers from {retry}")
     elif runs_dir:
-        from .search.scansci_find import build_download_queue, build_preprint_fallbacks
+        from ..search.scansci_find import build_download_queue, build_preprint_fallbacks
         run_identifiers = build_download_queue(runs_dir)
         fallbacks = build_preprint_fallbacks(runs_dir) or None
         if not run_identifiers:
@@ -477,7 +477,7 @@ def batch_fetch_cmd(
         dois = run_identifiers
         print(f"  Using ScanSci Find queue from {runs_dir}: {len(dois)} identifiers")
     else:
-        from .download.pipeline import load_job
+        from ..download.pipeline import load_job
 
         entries = load_job(input_file)
         dois = [e.identifier for e in entries if e.identifier and not e.unresolved]
@@ -493,7 +493,7 @@ def batch_fetch_cmd(
     # express a lane-ORDER preference the fast->grey->institutional schedule
     # would invert, and an explicit --scihub asks for the racing engine —
     # both stay on racing.
-    from .download.pipeline import collect_failures, grey_allowed, run_lanes
+    from ..download.pipeline import collect_failures, grey_allowed, run_lanes
 
     _cfg = _load_config()
     _grey_oriented = (
@@ -535,7 +535,7 @@ def batch_fetch_cmd(
 
     if _auto_scihub:
         # Use the source-racing engine (includes Sci-Hub/SciBban/LibGen)
-        from .sources import batch_download
+        from ..sources import batch_download
         results = batch_download(dois, output_dir=output, scihub_enabled=True, fallbacks=fallbacks)
         # Verify file existence for each "success" result before writing report
         _verify_batch_results(results, output)
@@ -547,8 +547,8 @@ def batch_fetch_cmd(
         return
 
     # Default: institutional cascade (PaperFetcher)
-    from .institutional.config_adapter import ConfigAdapter
-    from .download.fetcher import PaperFetcher
+    from ..institutional.config_adapter import ConfigAdapter
+    from ..download.fetcher import PaperFetcher
 
     config = ConfigAdapter.load()
     config._config["output_dir"] = output
@@ -593,7 +593,7 @@ def _verify_batch_results(results: dict, output_dir: str) -> None:
                 # Check if file exists under a different name in the output dir
                 doi = r.get("doi", "")
                 if doi:
-                    from .identifiers import safe_filename
+                    from ..identifiers import safe_filename
                     safe = safe_filename(doi)
                     found = list(output_path.glob(f"{safe}*.pdf"))
                     if found:
@@ -611,7 +611,7 @@ def elsevier_setup(
     inst_token: str = typer.Option("", help="Elsevier institutional token（可选，通常无需配置：校园网 + API key 即可）"),
 ) -> None:
     """Configure Elsevier API access for direct full-text retrieval."""
-    from .config import load_config, save_config
+    from ..config import load_config, save_config
 
     config = load_config()
     changed = False
@@ -622,7 +622,7 @@ def elsevier_setup(
         print(f"  Elsevier API key: saved")
         # 配置即验证：自检样本自动跑一遍，当场给出 key 画像
         try:
-            from .sources.elsevier_check import check_key_profile
+            from ..sources.elsevier_check import check_key_profile
 
             _rows, profile, advice = check_key_profile(config)
             print(f"  key 画像: {profile}")
@@ -661,9 +661,9 @@ def elsevier_check_cmd(
 
     console = Console()
 
-    from .download import progress as _pr
-    from .config import load_config
-    from .sources.elsevier_check import check_dois, check_key_profile
+    from ..download import progress as _pr
+    from ..config import load_config
+    from ..sources.elsevier_check import check_dois, check_key_profile
 
     config = load_config()
     console.print("[bold]Elsevier key 权限自检[/bold]")
@@ -708,8 +708,8 @@ def elsevier_check_cmd(
 @app.command("session-doctor")
 def session_doctor() -> None:
     """Diagnose browser profile sessions and cookie health."""
-    from .institutional.config_adapter import ConfigAdapter
-    from .browser.profile_health import candidate_profile_dirs, inspect_browser_profile
+    from ..institutional.config_adapter import ConfigAdapter
+    from ..browser.profile_health import candidate_profile_dirs, inspect_browser_profile
 
     config = ConfigAdapter.load()
     profiles = candidate_profile_dirs(config.chrome_profile_dir)
@@ -744,8 +744,8 @@ def federated_login(
     force: bool = typer.Option(False, "--force", help="Force re-login"),
 ) -> None:
     """Log in to a publisher via CARSI/Shibboleth federation."""
-    from .institutional.carsi_login import CARSIClient
-    from .config import load_config
+    from ..institutional.carsi_login import CARSIClient
+    from ..config import load_config
 
     config = load_config()
     client = CARSIClient(config)
@@ -782,7 +782,7 @@ def search_cmd(
       litloop search --author-id A5102961214 --limit 10 --sort cited_by_count
     """
     import json as _json
-    from .search.quick import search_papers_v2 as search_papers
+    from ..search.quick import search_papers_v2 as search_papers
 
     if author or author_id:
         # Author-based search
@@ -802,7 +802,7 @@ def search_cmd(
         author_match = None
 
     if out:
-        from .download.pipeline import QueueEntry, predict_channel, write_queue
+        from ..download.pipeline import QueueEntry, predict_channel, write_queue
 
         qe = [
             QueueEntry(
@@ -843,7 +843,7 @@ def plan_cmd(
     year_to: int = typer.Option(None, "--year-to"),
 ) -> None:
     """Build an auditable search protocol without running a search (ScanSci Find)."""
-    from .search.scansci_find import find_cli_available, plan
+    from ..search.scansci_find import find_cli_available, plan
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -861,7 +861,7 @@ def estimate_cmd(
     year_to: int = typer.Option(None, "--year-to"),
 ) -> None:
     """Estimate result volume before spending a full search budget (ScanSci Find)."""
-    from .search.scansci_find import find_cli_available, estimate
+    from ..search.scansci_find import find_cli_available, estimate
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -876,7 +876,7 @@ def smoke_cmd(
     records: int = typer.Option(4, "--records", help="Records per source (default 4)"),
 ) -> None:
     """Fetch a few records per source and validate the candidate contract (ScanSci Find)."""
-    from .search.scansci_find import find_cli_available, smoke
+    from ..search.scansci_find import find_cli_available, smoke
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -891,7 +891,7 @@ def calibrate_cmd(
     sample_size: int = typer.Option(100, "--sample-size"),
 ) -> None:
     """Run a bounded calibration sample before a high-recall search (ScanSci Find)."""
-    from .search.scansci_find import find_cli_available, calibrate
+    from ..search.scansci_find import find_cli_available, calibrate
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -904,7 +904,7 @@ def verify_cmd(
     limit: int = typer.Option(None, "--limit"),
 ) -> None:
     """Verify DOI/PMID/arXiv identifiers against authoritative APIs (ScanSci Find)."""
-    from .search.scansci_find import find_cli_available, verify
+    from ..search.scansci_find import find_cli_available, verify
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -917,7 +917,7 @@ def resolve_oa_cmd(
     limit: int = typer.Option(None, "--limit"),
 ) -> None:
     """Resolve DOI open-access locations through Unpaywall (ScanSci Find)."""
-    from .search.scansci_find import find_cli_available, resolve_oa
+    from ..search.scansci_find import find_cli_available, resolve_oa
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -931,7 +931,7 @@ def build_queue_cmd(
 ) -> None:
     """Build a download identifier queue from ScanSci Find output — feed to 'litloop batch'."""
     from pathlib import Path as _Path
-    from .search.scansci_find import build_download_queue
+    from ..search.scansci_find import build_download_queue
     import json as _json
 
     p = _Path(input_path)
@@ -986,7 +986,7 @@ def find_cmd(
     into --out. Follow up with 'litloop build-queue <dir>' then
     'litloop batch <queue file>' to download.
     """
-    from .search.scansci_find import build_download_queue, find_cli_available, search
+    from ..search.scansci_find import build_download_queue, find_cli_available, search
     if not find_cli_available():
         print("Error: scansci-find CLI not available. Install the scansci-find discovery engine (see README, 依赖与 Key)")
         raise typer.Exit(1)
@@ -1025,9 +1025,9 @@ def manifest_cmd(
     import json as _json
     from pathlib import Path as _Path
 
-    from .identifiers import safe_filename
-    from .download.pdf import download_pdf, is_pdf_file
-    from .sources import _update_doi_index, download
+    from ..identifiers import safe_filename
+    from ..download.pdf import download_pdf, is_pdf_file
+    from ..sources import _update_doi_index, download
 
     payload = _json.loads(_Path(input_file).read_text(encoding="utf-8"))
     entries = payload.get("entries") if isinstance(payload, dict) else payload
@@ -1079,7 +1079,7 @@ def config_show(
     value: str = typer.Argument("", help="Value to set"),
 ) -> None:
     """Show or set configuration values."""
-    from .config import load_config, save_config, update_config
+    from ..config import load_config, save_config, update_config
 
     config = load_config()
 

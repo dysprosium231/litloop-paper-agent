@@ -19,7 +19,7 @@ from typing import Any
 
 import requests
 
-from .config import load_config
+from ..config import load_config
 
 PROVIDERS = ("deepseek", "deepl", "agent")
 

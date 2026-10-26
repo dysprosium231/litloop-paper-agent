@@ -1,4 +1,4 @@
-// Talks to the Python backend (litloop.app_server). Field meanings: docs/APP_DATA.md.
+// Talks to the Python backend (litloop.desktop.server). Field meanings: docs/APP_DATA.md.
 import { invoke } from "@tauri-apps/api/core"
 
 export const RELEVANCE = ["高", "中", "低", "不相关"] as const

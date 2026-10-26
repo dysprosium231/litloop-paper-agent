@@ -23,8 +23,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from . import config as _config
-from . import store
+from .. import config as _config
+from .. import store
 
 # What the agent tells the app, by tool: shown under the run as it works.
 _TOOL_TEXT = {

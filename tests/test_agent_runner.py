@@ -6,7 +6,8 @@ import time
 
 import pytest
 
-from litloop import agent_runner, config
+from litloop import config
+from litloop.desktop import agent_runner
 
 
 def test_the_form_becomes_the_message():

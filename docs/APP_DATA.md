@@ -56,7 +56,7 @@
 ```
 
 - `relevance`、`reason`：Agent 的评分和理由，取值 `高`、`中`、`低`、`不相关`。
-- `abstract_zh`：中文摘要（可选）。翻译服务为 DeepSeek / DeepL 时由 **app 写**（用户打开文献时翻译一次，见 `translate.py`）；为 Agent 时由 Agent 在评分时写，或用 `litloop_screening(action="translate")` 补。重新评分不会抹掉它。
+- `abstract_zh`：中文摘要（可选）。翻译服务为 DeepSeek / DeepL 时由 **app 写**（用户打开文献时翻译一次，见 `desktop/translate.py`）；为 Agent 时由 Agent 在评分时写，或用 `litloop_screening(action="translate")` 补。重新评分不会抹掉它。
 - 只有用户评过、Agent 还没评的文献（app 里「继续检索」出的批次）：**app 写**，`reason` 为空，`relevance` 和 `user_relevance` 都是用户的评分；Agent 之后评分时填上自己的 `relevance` 和 `reason`，`user_relevance` 保留。`litloop_deep_search(action="status")` 的 `unrated` 列出最近一批里 Agent 还没评的。
 - `user_relevance`：**app 写**。用户改过的评分，覆盖 Agent 的（排序、停止判断都用它）；Agent 再评同一篇时不会抹掉它。没改过就没有这个字段。
 - `decision`：**app 写**（或 Agent 按用户的话写）。`selected`（选中下载）、`rejected`（排除）或 `null`。
@@ -117,7 +117,7 @@ with store.update(screening_dir() / f"{session}.json", indent=2) as data:
 
 ### 下载任务 `<litloop home>/downloads/<job>.json`
 
-app 发起的下载，每次一个文件，由 app 后台的 `download_jobs.py` 写（同样经 `store` 加锁、整份替换）；Agent 走 MCP 的批量下载不写这里。
+app 发起的下载，每次一个文件，由 app 后台的 `desktop/download_jobs.py` 写（同样经 `store` 加锁、整份替换）；Agent 走 MCP 的批量下载不写这里。
 
 ```json
 {
@@ -152,7 +152,7 @@ app 发起的下载，每次一个文件，由 app 后台的 `download_jobs.py` 
 
 ### app 发起的检索 `<litloop home>/agent_runs/<run>.json`
 
-app 的「新建检索」把表单拼成一段话（`agent_runner.build_prompt`），从标准输入发给设置里的 Agent 命令（默认 `claude -p`，只允许调用 LitLoop 的工具和技能）。Agent 照常检索、评分，并用 `litloop_screening` / `litloop_deep_search` 保存筛选会话。每次一个文件，由 app 后台的 `agent_runner.py` 写（经 `store` 整份替换）；Agent 的原始输出另存为同名 `.log`。
+app 的「新建检索」把表单拼成一段话（`agent_runner.build_prompt`），从标准输入发给设置里的 Agent 命令（默认 `claude -p`，只允许调用 LitLoop 的工具和技能）。Agent 照常检索、评分，并用 `litloop_screening` / `litloop_deep_search` 保存筛选会话。每次一个文件，由 app 后台的 `desktop/agent_runner.py` 写（经 `store` 整份替换）；Agent 的原始输出另存为同名 `.log`。
 
 ```json
 {

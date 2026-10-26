@@ -34,9 +34,9 @@ def check_tor() -> dict[str, Any]:
     result: dict[str, Any] = {"installed": False, "running": False, "port": 1080, "embedded": False}
 
     # Check embedded Tor binary
-    from .config import load_config
+    from ..config import load_config
     config = load_config()
-    from .tor.embedded import _tor_binary
+    from ..tor.embedded import _tor_binary
     embedded = _tor_binary(config)
     if embedded:
         result["installed"] = True
@@ -66,8 +66,8 @@ def check_browser() -> dict[str, Any]:
     """Check CloakBrowser connectivity."""
     result: dict[str, Any] = {"running": False}
     try:
-        from .browser.engine import is_available
-        from .config import load_config
+        from ..browser.engine import is_available
+        from ..config import load_config
         result["running"] = is_available(load_config())
     except Exception:
         pass

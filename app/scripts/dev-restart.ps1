@@ -16,7 +16,7 @@ $Log = Join-Path $App ".dev.log"
 
 Get-Process litloop-app -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
-    Where-Object { $_.CommandLine -match "litloop\.app_server" } |
+    Where-Object { $_.CommandLine -match "litloop\.(desktop\.server|app_server)" } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 # This app's Vite, found by command line: netstat's
 # state names are localized, so they are not matched.

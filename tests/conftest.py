@@ -39,7 +39,7 @@ def _no_job_year_lookup(monkeypatch):
     """A download job looks up the missing publication years on OpenAlex
     (download_jobs._fill_meta); tests' made-up DOIs must not reach the network.
     A test of the lookup itself patches deep_search._get."""
-    from litloop import download_jobs
+    from litloop.desktop import download_jobs
     real = download_jobs._fill_meta
     monkeypatch.setattr(download_jobs, "_fill_meta", lambda path, **kw: None)
     download_jobs._real_fill_meta = real

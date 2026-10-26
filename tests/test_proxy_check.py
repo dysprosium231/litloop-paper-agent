@@ -34,7 +34,8 @@ def test_nothing_running():
 
 
 def test_network_check_gives_direct_rules_for_tun_mode(monkeypatch, tmp_path):
-    from litloop import app_settings, config
+    from litloop import config
+    from litloop.desktop import settings as app_settings
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.json")
     monkeypatch.setattr(app_settings, "_egress_checks", lambda cfg: [])  # no network in tests
     monkeypatch.setattr(proxy_check, "detect", lambda: {
@@ -49,7 +50,8 @@ def test_network_check_gives_direct_rules_for_tun_mode(monkeypatch, tmp_path):
 
 
 def test_network_check_system_proxy_is_fine(monkeypatch, tmp_path):
-    from litloop import app_settings, config
+    from litloop import config
+    from litloop.desktop import settings as app_settings
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.json")
     monkeypatch.setattr(app_settings, "_egress_checks", lambda cfg: [])  # no network in tests
     monkeypatch.setattr(proxy_check, "detect", lambda: {
@@ -62,7 +64,7 @@ def test_network_check_system_proxy_is_fine(monkeypatch, tmp_path):
 def test_egress_checks_report_the_exit_and_the_publishers_answer(monkeypatch):
     import requests
 
-    from litloop import app_settings
+    from litloop.desktop import settings as app_settings
     from litloop.sources import elsevier_check
 
     class Resp:

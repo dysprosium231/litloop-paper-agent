@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from litloop import error_text
+from litloop.desktop import error_text
 
 
 def _r(**kw):

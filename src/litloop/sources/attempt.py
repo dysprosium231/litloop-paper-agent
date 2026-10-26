@@ -38,7 +38,7 @@ class DownloadAttempt:
                  error: tuple[str, str] = ("", "")) -> None:
         """``error``: the (error_type, action) the source's browser strategy reported,
         for sources that fail by returning None."""
-        from ..error_text import raw_for
+        from ..desktop.error_text import raw_for
         ok = bool(result and result.get("success"))
         step = {"route": route, "source": label, "seconds": round(seconds, 1), "ok": ok}
         if not ok:
@@ -57,7 +57,7 @@ class DownloadAttempt:
     def worst_error(self) -> tuple[str, str]:
         """The browser error that explains this paper best (error_text._FAILURE_ORDER),
         not merely the last lane to fail (DeepSeek review 2026-10-19)."""
-        from ..error_text import _FAILURE_ORDER
+        from ..desktop.error_text import _FAILURE_ORDER
         rank = {t: i for i, t in enumerate(_FAILURE_ORDER)}
         best = min(self.errors, key=lambda e: rank.get(e[0], len(rank)), default=("", ""))
         return best

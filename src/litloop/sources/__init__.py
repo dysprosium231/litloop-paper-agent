@@ -1506,7 +1506,7 @@ def _download_impl(
 
     reason = "no PDF found"
     if error_type in ("paywall", "cloudflare_blocked"):
-        from ..error_text import raw_for
+        from ..desktop.error_text import raw_for
         reason = raw_for(error_type)
 
     # Add agent hint for paywall - clear instruction on what to do next

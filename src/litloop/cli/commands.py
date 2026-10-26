@@ -22,10 +22,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from .config import load_config, save_config
-from .download.fetcher import PaperFetcher
-from .institutional.schools import get_school, list_schools, search_schools
-from .sources import semantic_scholar
+from ..config import load_config, save_config
+from ..download.fetcher import PaperFetcher
+from ..institutional.schools import get_school, list_schools, search_schools
+from ..sources import semantic_scholar
 
 app = typer.Typer(
     name="litloop",
@@ -152,7 +152,7 @@ def _doctor_checks() -> list[tuple[str, str, str]]:
     cb_status, cb_detail = _cloakbrowser_version_status()
     checks.append(("package: cloakbrowser", cb_status if cb_status != "not_installed" else "warning", cb_detail))
     try:
-        from .browser.cloakbrowser_compat import configure_builtin_cloakbrowser
+        from ..browser.cloakbrowser_compat import configure_builtin_cloakbrowser
         cache_dir = configure_builtin_cloakbrowser(create_dir=False)
         status = "ok" if cache_dir.exists() else "warning"
         detail = str(cache_dir) if cache_dir.exists() else f"not downloaded yet: {cache_dir}"
@@ -494,8 +494,8 @@ def session_doctor(
     output: str = typer.Option("", "--output", "-o", help="Optional JSON report path."),
 ):
     """Inspect local browser profiles for institution/publisher session presence."""
-    from .browser.profile_health import DEFAULT_SESSION_DOMAINS, candidate_profile_dirs, inspect_browser_profile
-    from .publishers.profiles import get_publisher_profile
+    from ..browser.profile_health import DEFAULT_SESSION_DOMAINS, candidate_profile_dirs, inspect_browser_profile
+    from ..publishers.profiles import get_publisher_profile
 
     cfg = load_config()
     profile = None
@@ -571,8 +571,8 @@ def publisher_doctor(
     Browser-backed InstSci workflows are authoritative for publisher PDF
     capability verdicts; this command only checks route templates and blockers.
     """
-    from .publishers.access import verify_publishers
-    from .publishers.profiles import list_publisher_profiles
+    from ..publishers.access import verify_publishers
+    from ..publishers.profiles import list_publisher_profiles
 
     keys = list_publisher_profiles() if publisher.strip().lower() == "all" else [publisher.strip()]
     console.print(f"[bold]Verifying publisher access assets:[/bold] {', '.join(keys)}")
@@ -621,7 +621,7 @@ def identity_policy(
     output: str = typer.Option("", "--output", "-o", help="Optional JSON report path."),
 ):
     """Show the institutional identity routing policy for publisher PDFs."""
-    from .publishers.access import load_institutional_identity_policy
+    from ..publishers.access import load_institutional_identity_policy
 
     policy = load_institutional_identity_policy()
     console.print("[bold]InstSci Institutional Identity Policy[/bold]")
@@ -765,7 +765,7 @@ def schools(
     table.add_column("Host", max_width=40)
     table.add_column("Custom Key", width=5, justify="center")
 
-    from .institutional.schools import WEBVPN_DEFAULT_KEY
+    from ..institutional.schools import WEBVPN_DEFAULT_KEY
     for i, s in enumerate(results, 1):
         has_custom = "Y" if s.key != WEBVPN_DEFAULT_KEY else ""
         table.add_row(str(i), s.province, s.name, _school_type_label(s.school_type), s.host, has_custom)
@@ -901,7 +901,7 @@ def config_cmd(
     if show and not has_setter:
         # Determine school type
         try:
-            from .institutional.schools import get_school as _get_school
+            from ..institutional.schools import get_school as _get_school
             school_entry = _get_school(cfg.get("instsci_school", ""))
             school_type = school_entry.school_type
         except ValueError:
@@ -956,7 +956,7 @@ def _run_federated_login(
         raise typer.Exit(1)
 
     if not publisher and url:
-        from .institutional.carsi_login import detect_publisher
+        from ..institutional.carsi_login import detect_publisher
         publisher = detect_publisher(url) or ""
 
     if not publisher:
@@ -964,7 +964,7 @@ def _run_federated_login(
         console.print("  sciencedirect, springer, wiley, ieee, tandfonline, nature")
         publisher = typer.prompt("Enter publisher name")
 
-    from .institutional.carsi_login import CARSIClient
+    from ..institutional.carsi_login import CARSIClient
     carsi = CARSIClient(config)
     try:
         console.print(f"[bold]Federated login for: {publisher}[/bold]")

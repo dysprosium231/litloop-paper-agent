@@ -37,7 +37,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from . import screening
-from .. import store, translate
+from .. import store
+from ..desktop import translate
 from ..config import load_config
 from ..identifiers import canonical_doi
 from ..log import get_logger
