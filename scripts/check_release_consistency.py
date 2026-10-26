@@ -149,6 +149,18 @@ def _check_swallowed_exceptions() -> list[str]:
     return []
 
 
+def _check_copy_lint_paths() -> list[str]:
+    """Every file app/package.json's lint:copy names exists: AutoCorrect reports
+    "No issues found" for a missing path, so a moved file would drop out silently."""
+    package = ROOT / "app" / "package.json"
+    if not package.exists():
+        return []
+    script = json.loads(package.read_text(encoding="utf-8")).get("scripts", {}).get("lint:copy", "")
+    return [f"app/package.json lint:copy names a missing file: {arg} (moved? update the path)"
+            for arg in script.split()
+            if arg.endswith(".py") and not (package.parent / arg).exists()]
+
+
 def _check_source_hygiene() -> list[str]:
     sys.path.insert(0, str(ROOT / "src"))
     from litloop._source_hygiene import check_source_hygiene
@@ -174,6 +186,7 @@ def main() -> int:
     problems += _check_mcp_tool_count()
     problems += _check_skill_docs()
     problems += _check_source_hygiene()
+    problems += _check_copy_lint_paths()
     problems += _check_swallowed_exceptions()
 
     if problems:
