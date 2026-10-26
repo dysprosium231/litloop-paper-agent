@@ -3,6 +3,12 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-26：Windows 上读共享文件偶尔失败
+
+- **发现**：07fa70a 的 CI 在 10 个任务里只挂了 Windows + Python 3.11 一个：`test_agent_runner.py::test_a_run_reports_the_session_it_saved` 读运行状态文件时 `PermissionError`。同一份源码在上一次 CI（15c08b2）里是过的，那次提交也没改源码，所以不是模块整理弄坏的。
+- **原因**：`store` 写文件是先写临时文件再整份替换；写的一方遇到“读者正开着文件”会重试（`_replace`），读的一方没有。Windows 上读者恰好在替换那一瞬间打开文件会被拒。本机复现：一个线程循环重写、一个线程连读 20000 次，23 次 `PermissionError`。app 轮询进度文件、Agent 同时写，正是这个情形，不只是测试的问题。
+- **修复**：`read_json` 遇到 `PermissionError` 隔 0.02 秒重试，最多 100 次（约 2 秒），和写的一方对称；一直打不开仍报错。改后同样的复现脚本 40000 次读 0 失败。回归测试 `test_store.py::test_a_read_during_a_replace_tries_again` 模拟两次被拒后读到，以及一直被拒时报错；换回旧写法时它失败。
+
 ## 2026-10-26：技能文件整理
 
 - **起因**：用户觉得工作目录杂乱。根目录有 `skill/`、`skills/`、`skills-src/`、`zcode-plugin/` 四个和技能有关的目录；`.claude/skills/litloop.md` 提交在仓库里，但不是由 `skills-src/` 生成的，10-11 之后没更新，里面的 37 个工具名大多已在工具精简里删掉，描述还写着“机构登录绕过付费墙”。

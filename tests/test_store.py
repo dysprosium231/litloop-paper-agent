@@ -26,6 +26,26 @@ def test_write_is_whole_and_carries_the_schema(tmp_path):
     assert [p.name for p in tmp_path.iterdir()] == ["x.json"]  # no temporary file left behind
 
 
+def test_a_read_during_a_replace_tries_again(tmp_path, monkeypatch):
+    # Windows refuses to open a file while another thread replaces it (failed CI, 2026-10-26).
+    p = tmp_path / "run.json"
+    store.write_json(p, {"n": 1})
+    real, refused = Path.read_text, []
+
+    def flaky(self, *a, **k):
+        if len(refused) < 2:
+            refused.append(1)
+            raise PermissionError(13, "Permission denied")
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(Path, "read_text", flaky)
+    monkeypatch.setattr(store.time, "sleep", lambda s: None)
+    assert store.read_json(p)["n"] == 1 and len(refused) == 2
+    monkeypatch.setattr(Path, "read_text", lambda self, *a, **k: (_ for _ in ()).throw(PermissionError(13, "x")))
+    with pytest.raises(PermissionError):  # a file that stays locked is reported, not waited on forever
+        store.read_json(p)
+
+
 def test_a_newer_schema_asks_for_an_update(tmp_path):
     f = tmp_path / "x.json"
     f.write_text(json.dumps({"schema": store.SCHEMA + 1}), encoding="utf-8")

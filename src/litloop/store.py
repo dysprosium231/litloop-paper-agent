@@ -65,8 +65,22 @@ def write_json(path: Path, data: Any, *, indent: int | None = None) -> None:
     write_text(path, json.dumps(data, ensure_ascii=False, indent=indent))
 
 
+def _read_text(path: Path) -> str:
+    # On Windows, opening a file at the moment a writer replaces it fails with
+    # PermissionError (about 1 read in 1000 while a file is rewritten in a loop,
+    # 2026-10-26; it failed a CI run). The replace takes a moment: try again.
+    for attempt in range(100):
+        try:
+            return Path(path).read_text(encoding="utf-8")
+        except PermissionError:
+            if attempt == 99:
+                raise
+            time.sleep(0.02)
+    raise AssertionError("unreachable")
+
+
 def read_json(path: Path) -> Any:
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    data = json.loads(_read_text(path))
     if isinstance(data, dict) and (data.get("schema") or 0) > SCHEMA:
         raise SchemaTooNew(f"{Path(path).name} was written by a newer LitLoop (schema {data['schema']}, "
                            f"this copy knows {SCHEMA}); update LitLoop")
