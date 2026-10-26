@@ -179,7 +179,7 @@ app 的「新建检索」把表单拼成一段话（`agent_runner.build_prompt`�
 
 ### 术语表 `<litloop home>/glossary.json`
 
-app 和 Agent 共用，由 `glossary.py` 经 `store` 读写（2026-10-25 起）。
+app 和 Agent 共用，由 `terms/glossary.py` 经 `store` 读写（2026-10-25 起）。
 
 ```json
 {"schema": 1,

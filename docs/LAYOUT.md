@@ -2,7 +2,7 @@
 
 `src/litloop/` 按领域分子包（2026-10-25 整理，见 DECISIONS「模块按领域分子包」）。新模块放进对应的子包；几个子包都要用的基础模块留在顶层。
 
-> **整理进行中**：下表是用户确认的目标布局。已搬完的是 `terms/`、`citations/`、`tor/`、`zotero/`（7249a9a）；其余子包按 TODO「代码整理」分批搬，搬之前模块还在顶层的原名下（括号里的名字）。新代码：子包已建好的，放进子包；还没搬的，先写进原模块，随它一起搬。
+> **整理进行中**：下表是用户确认的目标布局。已搬完的是 `terms/`、`citations/`、`tor/`、`zotero/`（7249a9a）和 `search/`、`download/`（a35f89b）；其余子包按 TODO「代码整理」分批搬，搬之前模块还在顶层的原名下（括号里的名字）。新代码：子包已建好的，放进子包；还没搬的，先写进原模块，随它一起搬。
 
 | 子包 | 管什么 | 模块（括号里是 2026-10-25 之前的名字） |
 |---|---|---|
@@ -22,13 +22,11 @@
 
 顶层：`server.py`（MCP 服务）、`config.py`、`store.py`、`network.py`、`http_utils.py`、`identifiers.py`、`models.py`、`quota.py`、`updates.py`、`cache.py`、`deps.py`、`log.py`、`_source_hygiene.py`、`__init__.py`、`__main__.py`。
 
-固定的入口：命令 `litloop`（`litloop.cli.main:main`）、`python -m litloop`、桌面壳启动的 `python -m litloop.desktop.server`（`app/src-tauri/src/lib.rs`）、`from litloop import search_papers`。
+固定的入口：命令 `litloop`（`litloop.cli.main:main`）、`python -m litloop`、桌面壳启动的 `python -m litloop.desktop.server`（`app/src-tauri/src/lib.rs`）、`from litloop import search_papers`、`from litloop import batch_download`。`from litloop import download` 已去掉（2026-10-26，和子包 `download/` 重名），用 `from litloop.sources import download`。
 
 ## 还没搬的几批要注意的
 
-每批只搬文件、改 import 和测试里写死的路径字符串（`patch("litloop.xxx")`），不改逻辑；搬完跑 `scripts/import_smoke.py`、全量测试和一致性检查，单独提交。
-
-- **`search` 从模块变成包**：`__init__.py` 的 `from .search import search_papers` 改指 `search.quick`；测试里 `from litloop import search` 再用 `search._match_tier` 的，改成 `from litloop.search import quick as search`。
+每批只搬文件、改 import 和测试里写死的路径字符串（`patch("litloop.xxx")`），不改逻辑；搬完跑 `scripts/import_smoke.py`、全量测试、一致性检查，并从干净副本打一次 wheel 检查子包齐全，单独提交。新子包不要和 `litloop/__init__.py` 导出的名字重名（`download/` 撞上过）。
 - **按文件位置找路径的**，搬后要指回原处：
 
   | 模块（搬到） | 现在 | 改成 |

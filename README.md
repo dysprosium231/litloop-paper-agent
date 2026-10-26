@@ -62,6 +62,7 @@
 - **继续检索**：Agent 停下后，按目前全部评分生成下一批；这一批你先评，回到对话后 Agent 会补上它的评分。
 - **深度检索进度**：顶部显示已评篇数 / 候选池大小、每批高相关比例的小柱图、各阶段进度和预计剩余时间；到了建议停止的时候会提示。
 - **历史**：按课题分组，每次检索读了多少、选了哪些；可导出或一键加入下载。
+- **术语表**：同一个意思的几种写法（如 `PDC = polymer-derived ceramic`），检索时一起搜，每次检索写明展开了什么。深度检索会从读过的摘要里找出常见缩写作为建议，你确认后才生效；英美拼写（aluminium / aluminum）和元素符号与名称（Al / aluminum）内置，可以搜索，展开不对时可单条停用。
 
 ### 下载
 
@@ -204,6 +205,7 @@ MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、�
 | [docs/API_LIMITS.md](docs/API_LIMITS.md) | 各外部接口的官方限额（附来源和核对日期）和 LitLoop 的节奏控制 |
 | [docs/APP_DATA.md](docs/APP_DATA.md) | app 与 Agent 共用的筛选、下载、进度文件格式 |
 | [app/README.md](app/README.md) | 桌面 app 的开发方式 |
+| [AGENTS.md](AGENTS.md) · [docs/LAYOUT.md](docs/LAYOUT.md) | 参与开发的约定 · 代码布局（各子包管什么） |
 | [CHARTER.md](CHARTER.md) · [TODO.md](TODO.md) · [docs/DECISIONS.md](docs/DECISIONS.md) | 设计与验收标准 · 进度与待办 · 决定与实验记录 |
 
 ## 项目状态
@@ -216,7 +218,7 @@ MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、�
 
 | 环节 | 状态 |
 |---|---|
-| 检索 | 查 OpenAlex（没有 Key 时用 Crossref，设了 Key 可加 Semantic Scholar）；过滤离题结果和垃圾记录；预印本并入正式版；补全并清洗摘要；标出撤稿和关注声明；可按被引数或年份排序 |
+| 检索 | 查 OpenAlex（没有 Key 时用 Crossref，设了 Key 可加 Semantic Scholar）；按术语表同时搜缩写、全称、英美拼写和元素符号；过滤离题结果和垃圾记录；预印本并入正式版；补全并清洗摘要；标出撤稿和关注声明；可按被引数或年份排序 |
 | 筛选 | AI 逐篇给相关度和理由，你挑选，记录存在本地，可直接生成下载队列 |
 | 深度检索 | 多组检索词 + 共同引用建池，分批筛选，按评分持续重新排序，高相关文章自动滚雪球 |
 | 下载 | 开放获取、出版商官网、学校通道依次尝试；WebVPN、CARSI、EZProxy；文件名带 DOI，不会把一篇论文的 PDF 当成另一篇 |
