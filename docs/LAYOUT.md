@@ -2,7 +2,7 @@
 
 `src/litloop/` 按领域分子包（2026-10-25 整理，见 DECISIONS「模块按领域分子包」）。新模块放进对应的子包；几个子包都要用的基础模块留在顶层。
 
-> **整理进行中**：下表是用户确认的目标布局。已搬完的是 `terms/`、`citations/`、`tor/`、`zotero/`（7249a9a）、`search/`、`download/`（a35f89b）和 `browser/`、`institutional/`、`sources/`、`publishers/`（afc3849）；其余子包按 TODO「代码整理」分批搬，搬之前模块还在顶层的原名下（括号里的名字）。新代码：子包已建好的，放进子包；还没搬的，先写进原模块，随它一起搬。
+2026-10-25～26 分 4 批搬完（7249a9a、a35f89b、afc3849、15c08b2）。表里括号中是搬之前的名字，查旧提交、旧文档时对照用。`scripts/check_release_consistency.py` 会报出没写进这份文件的模块：新增模块时在对应子包那一行写上它。
 
 | 子包 | 管什么 | 模块（括号里是 2026-10-25 之前的名字） |
 |---|---|---|
@@ -20,14 +20,13 @@
 | `zotero/` | Zotero | `client.py`（zotero.py）、`bridge.py`（zotero_bridge.py，在 zotero-mcp 的 Python 里按文件路径运行，不能 import litloop） |
 | `extractors/` | 从 HTML、PDF 抽内容 | 未变 |
 
-顶层：`server.py`（MCP 服务）、`config.py`、`store.py`、`network.py`、`http_utils.py`、`identifiers.py`、`models.py`、`quota.py`、`updates.py`、`cache.py`、`deps.py`、`log.py`、`_source_hygiene.py`、`__init__.py`、`__main__.py`。
+顶层：`server.py`（MCP 服务）、`config.py`、`store.py`、`network.py`、`http_utils.py`、`identifiers.py`、`models.py`、`quota.py`、`updates.py`、`cache.py`、`deps.py`、`log.py`、`_source_hygiene.py`、`__init__.py`、`__main__.py`；`app_server.py` 只转发到 `desktop/server.py`，给已装好、还在启动 `python -m litloop.app_server` 的桌面 app 用，过一个版本后删（见 TODO）。
 
 固定的入口：命令 `litloop`（`litloop.cli.main:main`）、`python -m litloop`、桌面壳启动的 `python -m litloop.desktop.server`（`app/src-tauri/src/lib.rs`）、`from litloop import search_papers`、`from litloop import batch_download`。`from litloop import download` 已去掉（2026-10-26，和子包 `download/` 重名），用 `from litloop.sources import download`。
 
-## 还没搬的一批（第 4 批：desktop、cli、入口）要注意的
+## 新增或挪动模块时
 
-每批只搬文件、改 import 和测试里写死的路径字符串（`patch("litloop.xxx")`），不改逻辑；搬完跑 `scripts/import_smoke.py`、全量测试、一致性检查，并从干净副本打一次 wheel 检查子包齐全，单独提交。新子包不要和 `litloop/__init__.py` 导出的名字重名（`download/` 撞上过）。
-
-- **按文件位置找路径的**：`web.py` 搬到 `cli/web.py` 后，`parent / "templates"` 改成 `parent.parent / "templates"`。
-- **写死文件路径的工具和文档**：`app/package.json` 的 `lint:copy` 列着 `app_settings.py`、`download_jobs.py`、`app_server.py`（一致性检查会报出不存在的路径）；`docs/UI_COPY.md` 里提到的文件名一并改。
-- **唯一保留的转发**：`litloop/app_server.py`，只转发到 `desktop/server.py`，给已经装好的桌面 app 用（它们启动 `python -m litloop.app_server`），留一个版本后删。`lib.rs`、`.claude/launch.json`、`app/README.md` 改用新路径；`tests/test_mcp_lifecycle.py` 的 `-m litloop.main` 改成 `-m litloop.cli.main`。验收时实际运行 `python -m litloop --help`、`-m litloop.app_server --help`、`-m litloop.desktop.server --help`。
+- 放进管它的子包，在上表那一行写上；几个子包都要用的才放顶层，写进“顶层”那一行。
+- 新子包不要和 `litloop/__init__.py` 导出的名字重名（`download/` 撞上过，见 DECISIONS「模块按领域分子包」）。
+- 按文件位置找数据、模板的写法（`Path(__file__).parent / "data"`）挪了层级要跟着改；改完从干净副本打一次 wheel 看子包和数据都在。
+- `app/package.json` 的 `lint:copy`、`app/src-tauri/src/lib.rs`、`.claude/launch.json` 里写着文件或模块路径，挪了要跟着改（`lint:copy` 的路径不存在时一致性检查会报出来）。

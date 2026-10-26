@@ -152,6 +152,8 @@
   - 第 2 批 search、download：a35f89b（104 个文件；冒烟 33/33，全量 948 通过；从干净副本打的 wheel 里子包齐全、没有旧模块）。用时 54 分钟，接近第 1 批的两倍。
     - 子包 `download/` 占了 `litloop.download` 这个名字，和原来的快捷写法 `from litloop import download` 冲突（导入子包后这个名字会变成子包）。这个快捷写法是原作者 v1.4.0（fb41a38，2026-05-14）加的，仓库和历来的文档里都没人用；`download` 函数本身最早也是原作者写的，现在 97 行里 56 行出自我们这边的提交。用户同意去掉快捷写法，函数不变，用 `from litloop.sources import download`。下次发版说明里写一句。
   - 第 3 批 browser、institutional、sources、publishers：afc3849（115 个文件，用时 22 分钟）。除搬动外：两份 `cloakbrowser_compat` 合并，两个只做转发的空壳删掉；5 处按文件位置找的路径改为指回原处，验收时实际解析过（内置浏览器缓存仍在 `src/litloop/_browsers`）；CARSI 两个模块互换名字后，每处导入的名字都在对应模块里（登录：`CARSIClient`、`detect_publisher` 等；下载来源：`try_carsi`）。冒烟 33/33，全量 948 通过，文案检查覆盖到搬走的 `proxy_check.py`。
+  - 第 4 批 desktop、cli、入口：15c08b2（49 个文件，用时 30 分钟）。`litloop` 命令改指 `litloop.cli.main`，桌面壳和 `launch.json` 改为启动 `litloop.desktop.server`；全程唯一的转发 `app_server.py` 留给已装好的桌面 app，下次发版后删（TODO）。审查时发现 Antigravity 改 `dev-restart.ps1` 时丢了 UTF-8 BOM（文件现在全是 ASCII，暂不影响），按“只搬不改”恢复。验收：三条启动命令都打出用法；`pip install -e .` 重装前 `litloop` 命令报找不到 `litloop.main`，重装后正常；从 `launch.json` 启动的后台回应 `/api/health`，不带令牌仍是 401。
+  - 搬完后一致性检查加上“模块写进 LAYOUT.md”：子包里的模块要出现在那个子包那一行（`browser/` 和 `download/` 都有 `pdf.py`，只看文件名不够），顶层模块在“顶层”那一行；`sources/`、`extractors/`、`publishers/strategies/` 只要写出目录。第一次运行就报出转发 `app_server.py` 没写进去；往 `browser/` 和顶层各放一个临时文件，都报出来了。LAYOUT.md 改为定稿，末尾留“新增或挪动模块时”的注意事项。
   - 其余三批待做，要特别处理的地方记在 LAYOUT.md「还没搬的几批要注意的」：按文件位置找路径的 5 处里，`cloakbrowser_compat.py` 若照搬不改，会让用户已下载的内置浏览器找不到。
 - **防止再写重复**：源码规范检查（`_source_hygiene.py`）报出 `terms/text.py` 之外另写的停用词表、连字符集合、标题键和元素猜测；在重构前的代码上它能找出全部 15 处，现在为 0。“没写进 LAYOUT.md 的模块”这一项等模块搬完再加。
 

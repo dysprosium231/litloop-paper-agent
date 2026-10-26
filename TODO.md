@@ -31,10 +31,7 @@
 
 ## 正在做
 
-**代码整理**（2026-10-25 起，用户要求）：
-- [ ] 模块按领域分子包，分 4 批（Antigravity 搬、Claude 审查和验证、每批单独提交）：~~terms/citations/tor/zotero~~（7249a9a）→ ~~search/download~~（a35f89b）→ ~~browser/institutional/sources/publishers~~（afc3849）→ desktop/cli/入口。第 4 批要特别处理的地方见 LAYOUT.md「还没搬的一批（第 4 批：desktop、cli、入口）要注意的」。
-- [ ] 模块搬完后，一致性检查再加一项：没写进 LAYOUT.md 的模块报错。（`terms/text.py` 之外另写文本规则的检查、`lint:copy` 路径存在的检查已装：5d59535、0364f7c。）
-- [ ] 删掉 `litloop.app_server` 转发模块：第 4 批留下，给已装好的桌面 app 用，过一个版本再删。
+（无。代码整理 2026-10-26 做完，见 DECISIONS「模块按领域分子包」；下一步按路线图选，建议先和用户做一轮实测。）
 
 ## 待用户决定
 
@@ -78,6 +75,7 @@
 - [ ] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。
 
 ### app
+- [ ] 下次发版后删掉 `src/litloop/app_server.py`：模块整理时留下的唯一转发，给已装好、还在启动 `python -m litloop.app_server` 的桌面 app 用（15c08b2）；删时把 `scripts/import_smoke.py` 里的 `litloop.app_server` 和 LAYOUT.md 顶层那句一起去掉。
 - [ ] 后端 B：内置 Agent（设计见 CHARTER「可视化 app → 任务与后端」）：app 直接调模型 API，Anthropic 原生接口和 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、本地 Ollama / vLLM）；设置里按服务商、地址、Key、模型名配置，可按任务分模型，测试按钮检查工具调用；用测试集存档比较各模型的评分质量。2026-10-26 补记：原来只写在 CHARTER 的「顺序」里，TODO 漏了这一项。
 - [ ] 安装包与自动更新（评审 12；设计和验收见 CHARTER「可视化 app → 发布」，2026-10-26 用户定了安装范围、签名、分发和浏览器的做法，见 DECISIONS「作为标准 Windows 程序分发」）。模块整理做完后开始，大致步骤：
   - 先摸底：嵌入式 Python + 核心依赖在本机脱离开发环境跑起来，量安装包多大，Defender 扫一遍，确认去掉 `pymupdf-layout` 后 PDF 转 Markdown 差多少；

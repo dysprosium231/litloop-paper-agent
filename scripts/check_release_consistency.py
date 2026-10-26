@@ -149,6 +149,42 @@ def _check_swallowed_exceptions() -> list[str]:
     return []
 
 
+def _check_layout() -> list[str]:
+    """Every module of src/litloop is named in docs/LAYOUT.md (AGENTS.md "where code goes"):
+    a subpackage's module in that subpackage's table row, a top-level one in the 顶层 line.
+    Subpackages LAYOUT describes as a group (many sources, publisher strategies,
+    extractors) only need their folder named."""
+    layout_path = ROOT / "docs" / "LAYOUT.md"
+    if not layout_path.exists():
+        return ["docs/LAYOUT.md is missing"]
+    layout = layout_path.read_text(encoding="utf-8")
+    rows = {m.group(1): m.group(0) for m in re.finditer(r"(?m)^\| `([\w/]+)/` \|.*$", layout)}
+    top = next((line for line in layout.splitlines() if line.startswith("顶层：")), "")
+    grouped = ("sources", "extractors", "publishers/strategies")
+    pkg = ROOT / "src" / "litloop"
+    problems = []
+    for path in sorted(pkg.rglob("*.py")):
+        rel = path.relative_to(pkg)
+        if "__pycache__" in rel.parts or rel.parts[0] in ("_browsers", "data", "templates"):
+            continue
+        folder = rel.parent.as_posix()
+        if folder == ".":
+            if path.name in ("__init__.py", "__main__.py") or f"`{path.name}`" in top:
+                continue
+            problems.append(f"module not in docs/LAYOUT.md: {rel.as_posix()} (top level: add it to the top-level line, or move it into a subpackage)")
+            continue
+        if path.name == "__init__.py":
+            continue
+        group = next((g for g in grouped if folder == g or folder.startswith(g + "/")), None)
+        if group:
+            if f"`{group.split('/')[0]}/`" not in layout:
+                problems.append(f"subpackage not in docs/LAYOUT.md: {group}/")
+            continue
+        if f"`{path.name}`" not in rows.get(folder, ""):
+            problems.append(f"module not in docs/LAYOUT.md: {rel.as_posix()} (add it to the `{folder}/` row)")
+    return sorted(set(problems))
+
+
 def _check_copy_lint_paths() -> list[str]:
     """Every file app/package.json's lint:copy names exists: AutoCorrect reports
     "No issues found" for a missing path, so a moved file would drop out silently."""
@@ -187,6 +223,7 @@ def main() -> int:
     problems += _check_skill_docs()
     problems += _check_source_hygiene()
     problems += _check_copy_lint_paths()
+    problems += _check_layout()
     problems += _check_swallowed_exceptions()
 
     if problems:

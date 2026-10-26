@@ -52,7 +52,7 @@
   - 缩写、同义词、拼写的展开：用 `terms/glossary.py`（`in_use`、`query_variants`、`alternatives`）；
   - DOI 的解析和规范化：用 `identifiers.py`。
 - 现成的不够用，就在原模块里扩展，不在调用处另写一版。
-- `check_release_consistency.py` 会报出在 `terms/text.py` 之外另写的停用词表、连字符集合、标题键和元素猜测（`_source_hygiene.py`）。模块全部搬完后，再加上“没写进 LAYOUT.md 的模块”这一项。
+- `check_release_consistency.py` 会报出在 `terms/text.py` 之外另写的停用词表、连字符集合、标题键和元素猜测（`_source_hygiene.py`），以及没写进 LAYOUT.md 的模块（子包里的写在那个子包那一行，顶层的写在“顶层”那一行）。
 - 排序模型的词特征用 `RANKING_STOPWORDS`，不用 `STOPWORDS`；改它会改变深度检索的排序，改之前和改之后都跑 `scripts/eval_synergy.py`。
 
 ## 其他
