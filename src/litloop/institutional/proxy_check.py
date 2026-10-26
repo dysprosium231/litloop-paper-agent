@@ -50,7 +50,7 @@ def litloop_paths() -> list[str]:
     is the process that talks to the network, so that is the one listed.
     """
     paths = [getattr(sys, "_base_executable", "") or sys.executable]
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     try:
         paths += [str(p) for p in Path(DATA_DIR).glob(f"*/{BROWSER_PROCESS}")]
     except OSError:

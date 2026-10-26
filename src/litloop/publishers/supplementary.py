@@ -150,7 +150,7 @@ def _browser_page(article_url: str, config: dict, timeout: int):
     the PAGE is closed - the pooled browser stays alive for the next paper.
     """
     try:
-        from .browser_engine import get_browser_page
+        from ..browser.engine import get_browser_page
 
         page = get_browser_page(config)
     except Exception:
@@ -190,7 +190,7 @@ def _ext_from_content_type(ctype: str) -> str | None:
 
 def _article_url(doi: str) -> str | None:
     try:
-        from .publisher_strategies import StrategyRegistry
+        from .strategies import StrategyRegistry
         strategy = StrategyRegistry.get_for_doi(doi)
     except Exception:
         return None
@@ -213,7 +213,7 @@ def _safe_stem(identifier: str) -> str:
 
 def _user_agent() -> str:
     try:
-        from .network import USER_AGENT
+        from ..network import USER_AGENT
         return USER_AGENT
     except Exception:  # pragma: no cover
         return "Mozilla/5.0 (compatible; litloop)"

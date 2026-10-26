@@ -15,8 +15,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from litloop import browser_backend as bb
-from litloop import browser_pdf
+from litloop.browser import backend as bb
+from litloop.browser import pdf as browser_pdf
 from litloop import sources
 
 
@@ -54,7 +54,7 @@ def test_stable_browser_alias_created_and_refreshed(tmp_path):
 
 
 def test_close_browsers_since_kills_only_newer(monkeypatch):
-    import litloop.browser_engine as be
+    import litloop.browser.engine as be
     killed = []
     monkeypatch.setattr(be, "_tree_kill", lambda proc: killed.append(proc))
 
@@ -122,7 +122,7 @@ def test_rename_removes_duplicate_source_copies(tmp_path, monkeypatch):
 
 def test_elsevier_pii_keeps_check_char(monkeypatch):
     import requests
-    from litloop import _publisher_strategies_core as core
+    from litloop.publishers.strategies import _core as core
 
     class _Sess:
         trust_env = True
@@ -158,7 +158,7 @@ def test_webvpn_session_probe_hits_gateway_root(monkeypatch):
 
 
 def test_carsi_cloudflare_probe_trusts_fresh_cookies(tmp_path, monkeypatch):
-    from litloop.sources import carsi
+    from litloop.institutional import carsi_login as carsi
     client = carsi.CARSIClient.__new__(carsi.CARSIClient)
     client._publisher_configs = {"sd": SimpleNamespace(domains=["www.sciencedirect.com"])}
     cookie = tmp_path / "sd.json"
@@ -363,7 +363,7 @@ def test_waived_lane_cannot_launch_a_browser(monkeypatch):
 
 def test_browser_errors_are_per_thread():
     import threading
-    from litloop import _publisher_strategies_core as core
+    from litloop.publishers.strategies import _core as core
     core._set_error("login_abandoned", "retry_login")
     other = {}
     t = threading.Thread(target=lambda: (core._clear_error(), other.update(e=core.get_last_error())))
@@ -374,7 +374,7 @@ def test_browser_errors_are_per_thread():
 
 
 def test_science_check_access_is_a_paywall():
-    from litloop._publisher_strategies_core import _detect_paywall
+    from litloop.publishers.strategies._core import _detect_paywall
     assert _detect_paywall('<button>CHECK ACCESS</button>')
 
 
@@ -400,7 +400,7 @@ def test_race_waits_for_download_after_login(tmp_path, monkeypatch, no_browser_k
 def test_http_pdf_download_has_wall_clock_deadline(tmp_path, monkeypatch):
     """A trickling server must not hold a racing lane for minutes."""
     import requests
-    from litloop import _publisher_strategies_core as core
+    from litloop.publishers.strategies import _core as core
 
     class Resp:
         status_code = 200
@@ -420,7 +420,7 @@ def test_http_pdf_download_has_wall_clock_deadline(tmp_path, monkeypatch):
 
 
 def test_navigate_retries_transient_network_error(monkeypatch):
-    from litloop import browser_engine as be
+    from litloop.browser import engine as be
     calls = []
 
     class Page:
@@ -446,7 +446,7 @@ def test_one_page_article_pdf_is_not_a_preview(tmp_path, monkeypatch):
 
 
 def test_pdf_capture_recognises_bounce_to_article():
-    from litloop.browser_pdf import _is_bounce_to_html
+    from litloop.browser.pdf import _is_bounce_to_html
     html = [{"name": "Content-Type", "value": "text/html; charset=utf-8"}]
     pdf = "https://www.nature.com/articles/x.pdf"
     bounce = {"responseStatusCode": 200, "responseHeaders": html,
@@ -480,7 +480,7 @@ def test_publisher_browser_lane_is_launched_second():
 
 
 def test_known_landing_urls_skip_doi_org():
-    from litloop._publisher_strategies_core import _known_landing_url as f
+    from litloop.publishers.strategies._core import _known_landing_url as f
     assert f("10.1126/science.aeg4972") == "https://www.science.org/doi/10.1126/science.aeg4972"
     assert f("10.1038/s41563-025-02281-z") == "https://www.nature.com/articles/s41563-025-02281-z"
     assert f("10.1007/978-3-030-1") == "https://link.springer.com/chapter/10.1007/978-3-030-1"
@@ -488,7 +488,7 @@ def test_known_landing_urls_skip_doi_org():
 
 
 def test_direct_http_skipped_behind_bot_walls():
-    from litloop._publisher_strategies_core import _direct_pdf_urls
+    from litloop.publishers.strategies._core import _direct_pdf_urls
     assert _direct_pdf_urls("10.1021/acsami.5c16640", "ACS") == []
     springer = _direct_pdf_urls("10.1007/s10853-026-13435-y", "Springer")
     assert springer and len(springer) == len(set(springer))

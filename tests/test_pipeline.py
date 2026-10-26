@@ -15,7 +15,7 @@ from litloop.download.pipeline import (
     read_table,
     write_queue,
 )
-from litloop.supplementary import extract_supplementary_links
+from litloop.publishers.supplementary import extract_supplementary_links
 
 
 # --- channel prediction -------------------------------------------------------

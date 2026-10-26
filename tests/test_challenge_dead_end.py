@@ -1,6 +1,6 @@
 """A check page that cannot run is not waited on."""
 
-from litloop import _publisher_strategies_core as core
+from litloop.publishers.strategies import _core as core
 
 
 def test_dead_end_check_pages():

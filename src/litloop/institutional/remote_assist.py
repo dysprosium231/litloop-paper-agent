@@ -21,7 +21,7 @@ import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any
 
-from .log import get_logger
+from ..log import get_logger
 
 log = get_logger()
 

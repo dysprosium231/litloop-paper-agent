@@ -8,7 +8,7 @@ from pathlib import Path
 
 _DEFAULT_KEY = b"wrdvpnisthebest!"
 
-_DATA_DIR = Path(__file__).parent / "data"
+_DATA_DIR = Path(__file__).parent.parent / "data"
 _DATA_FILE = _DATA_DIR / "webvpn.json"
 
 

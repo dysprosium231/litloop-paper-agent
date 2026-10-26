@@ -19,7 +19,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from .log import get_logger
+from ..log import get_logger
 
 logger = get_logger()
 

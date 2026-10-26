@@ -88,7 +88,7 @@ def __getattr__(name: str):
         "_extract_elsevier_pdf_attachment_eids",
     }
     if name in _legacy_exports:
-        from .. import _publisher_strategies_core as _core
+        from . import _core
         obj = getattr(_core, name, None)
         if obj is not None:
             return obj

@@ -66,7 +66,7 @@ def check_browser() -> dict[str, Any]:
     """Check CloakBrowser connectivity."""
     result: dict[str, Any] = {"running": False}
     try:
-        from .browser_engine import is_available
+        from .browser.engine import is_available
         from .config import load_config
         result["running"] = is_available(load_config())
     except Exception:

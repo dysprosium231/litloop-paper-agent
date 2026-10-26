@@ -98,7 +98,7 @@ def litloop_download(
         try:
             from pathlib import Path as _P
 
-            from .supplementary import fetch_supplementary
+            from .publishers.supplementary import fetch_supplementary
 
             out_dir = str(_P(result["file"]).parent) if result.get("file") else (output_dir or "")
             if out_dir:
@@ -584,7 +584,7 @@ def litloop_health_check(detailed: bool = False) -> str:
     tor_ok = check_tor_circuit(config)
     checks["tor"] = {"status": "ok" if tor_ok else "unavailable", "proxy": get_tor_proxy(config)}
 
-    from .browser_engine import is_available as browser_ok
+    from .browser.engine import is_available as browser_ok
     checks["browser"] = {"status": "ok" if browser_ok(config) else "unavailable"}
 
     overall = "ok" if all(c.get("status") == "ok" for c in checks.values()) else "degraded"
@@ -596,7 +596,7 @@ def litloop_health_check(detailed: bool = False) -> str:
     }
 
     if detailed:
-        from .domain_db import load_stats
+        from .sources.scihub_domains import load_stats
         stats = load_stats(config)
         scihub_domains = []
         for domain, s in stats.items():
@@ -619,7 +619,7 @@ def litloop_health_check(detailed: bool = False) -> str:
 
 def litloop_browser_doctor() -> str:
     """Report reusable shared browser runtime options before suggesting installs."""
-    from .browser_discovery import doctor
+    from .browser.runtime import doctor
 
     return json.dumps(doctor(), ensure_ascii=False, indent=2)
 
@@ -673,7 +673,7 @@ def litloop_auto_setup() -> str:
 
     # 2. Check browser
     try:
-        from .browser_engine import is_available
+        from .browser.engine import is_available
         if is_available(config):
             report["actions"].append("CloakBrowser is running")
             report["status"]["browser"] = "running"
@@ -686,11 +686,11 @@ def litloop_auto_setup() -> str:
     # 3. Probe Sci-Hub domains
     try:
         from .sources.scihub import _probe_scihub_domains
-        from .domain_db import load_stats
+        from .sources.scihub_domains import load_stats
         config_copy = config.copy()
         config_copy["_force_probe"] = True
         # Reset probe timestamp to force re-probe
-        from .domain_db import set_probe_timestamp
+        from .sources.scihub_domains import set_probe_timestamp
         set_probe_timestamp(config_copy, timestamp=0)
         _probe_scihub_domains(config_copy)
         stats = load_stats(config_copy)
@@ -1100,7 +1100,7 @@ def litloop_vpnsci_schools(query: str | None = None) -> str:
     Args:
         query: Search by name, province, or host. Omit to list all schools.
     """
-    from .schools import list_schools, search_schools
+    from .institutional.schools import list_schools, search_schools
     if query:
         results = search_schools(query)
     else:
@@ -1120,7 +1120,7 @@ def litloop_carsi_login(publisher: str | None = None) -> str:
         publisher: Publisher key (sciencedirect, springer, wiley, ieee, tandfonline, nature).
                    Auto-detected from DOI if omitted.
     """
-    from .sources.carsi import CARSIClient
+    from .institutional.carsi_login import CARSIClient
 
     config = load_config()
     if not config.get("carsi_enabled"):
@@ -1144,7 +1144,7 @@ def litloop_carsi_login(publisher: str | None = None) -> str:
 
 def litloop_carsi_status() -> str:
     """Check CARSI configuration and login status."""
-    from .sources.carsi import CARSIClient
+    from .institutional.carsi_login import CARSIClient
 
     config = load_config()
     enabled = config.get("carsi_enabled", False)
@@ -1218,7 +1218,7 @@ def litloop_vpnsci_set_school(school: str) -> str:
     Args:
         school: University name (e.g. "北京大学", "浙江大学", "复旦大学")
     """
-    from .schools import get_school
+    from .institutional.schools import get_school
     try:
         entry = get_school(school)
     except ValueError as e:
@@ -1421,7 +1421,7 @@ def litloop_import_browser_cookies(
         max_wait: Max seconds to wait for login (default 300).
     """
     config = load_config()
-    from .browser_cookies import extract_via_browser
+    from .browser.cookies import extract_via_browser
     result = extract_via_browser(config, url=url, max_wait=max_wait)
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -1447,7 +1447,7 @@ def _publisher_login_impl(
         max_wait: Max seconds to wait for login (default 300)
     """
     config = load_config()
-    from .browser_cookies import publisher_login
+    from .browser.cookies import publisher_login
     result = publisher_login(identifier, config, max_wait=max_wait)
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -1455,7 +1455,7 @@ def _publisher_login_impl(
 def litloop_browser_status() -> str:
     """Check CloakBrowser availability and configuration."""
     config = load_config()
-    from .browser_engine import is_available
+    from .browser.engine import is_available
     available = is_available(config)
     return json.dumps({
         "available": available,
@@ -1476,7 +1476,7 @@ def litloop_browser_login(
         custom_url: URL to open (required when login_type is "custom")
     """
     config = load_config()
-    from .browser_login import open_login_browser, webvpn_login, ezproxy_login
+    from .browser.login import open_login_browser, webvpn_login, ezproxy_login
     from .config import DATA_DIR
     from pathlib import Path
 
@@ -1505,7 +1505,7 @@ def litloop_browser_import_cookies(cookie_file: str) -> str:
         cookie_file: Path to Netscape-format cookie file
     """
     config = load_config()
-    from .browser_engine import import_cookies, is_available
+    from .browser.engine import import_cookies, is_available
     if not is_available(config):
         return json.dumps({"error": "CloakBrowser is not running"})
     try:

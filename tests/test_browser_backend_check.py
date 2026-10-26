@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-import litloop.browser_backend as bb
-from litloop import browser_engine
+import litloop.browser.backend as bb
+from litloop.browser import engine as browser_engine
 
 
 @pytest.fixture(autouse=True)

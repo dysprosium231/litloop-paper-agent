@@ -12,15 +12,15 @@ from urllib.parse import urlparse
 
 import requests
 
-from ..auth import EZProxyAuth, WebVPNAuth
+from ..institutional.auth import EZProxyAuth, WebVPNAuth
 from ..http_utils import request_with_retry
 from ..extractors import html_extractor, pdf_extractor
 from ..models import FetchResult, NextAction, Paper
-from ..publisher_pdf_router import build_pdf_candidates, discover_pdf_candidates_from_html
-from ..publisher_profiles import infer_publisher_profile, infer_publisher_profile_from_url
+from ..publishers.pdf_router import build_pdf_candidates, discover_pdf_candidates_from_html
+from ..publishers.profiles import infer_publisher_profile, infer_publisher_profile_from_url
 
 try:
-    from ..browser_backend import is_available as _browser_backend_available
+    from ..browser.backend import is_available as _browser_backend_available
     _HAS_CLOAKBROWSER = _browser_backend_available()
 except ImportError:
     _HAS_CLOAKBROWSER = False
@@ -183,7 +183,7 @@ class PaperFetcher:
     @property
     def auth(self) -> WebVPNAuth | EZProxyAuth:
         if self._auth is None:
-            from ..schools import get_school
+            from ..institutional.schools import get_school
             school_name = (self.config.get("instsci_school", "")
                            or self.config.get("vpnsci_school", "")).strip()
             if not school_name:
@@ -654,7 +654,7 @@ class PaperFetcher:
         return paths
 
     def _try_carsi_pdf(self, doi: str, resolved_url: str, paper: Paper) -> Paper | None:
-        from ..sources.carsi import CARSIClient
+        from ..institutional.carsi_login import CARSIClient
 
         pdf_url = self._build_publisher_pdf_url(doi, resolved_url)
         if not pdf_url:
@@ -677,7 +677,7 @@ class PaperFetcher:
         return None
 
     def _try_carsi_html(self, url: str, paper: Paper) -> Paper | None:
-        from ..sources.carsi import CARSIClient
+        from ..institutional.carsi_login import CARSIClient
 
         logger.info("Trying CARSI HTML: %s", url)
         self._rate_limit()

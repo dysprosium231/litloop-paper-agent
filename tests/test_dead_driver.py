@@ -10,7 +10,7 @@ import pytest
 
 SCRIPT = textwrap.dedent("""
     import time
-    from litloop import browser_backend as bb
+    from litloop.browser import backend as bb
     try:
         b = bb.launch(headless=True)
     except Exception as e:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from litloop import browser_backend as bb
+from litloop.browser import backend as bb
 
 
 def test_gate_passes_on_current(monkeypatch):

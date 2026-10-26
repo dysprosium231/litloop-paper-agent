@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from ..log import get_logger
+from ...log import get_logger
 
 log = get_logger()
 

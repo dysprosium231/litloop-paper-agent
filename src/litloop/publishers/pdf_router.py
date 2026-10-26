@@ -14,7 +14,7 @@ from urllib.parse import parse_qs, quote, urljoin, urlparse, urlunparse
 
 from bs4 import BeautifulSoup
 
-from .publisher_profiles import PublisherProfile
+from .profiles import PublisherProfile
 
 PDF_LINK_TEXT_MARKERS = ("pdf", "download pdf", "full text pdf", "view pdf")
 PDF_URL_MARKERS = (".pdf", "/pdf", "/epdf", "/pdfdirect", "/pdfft", "download=true")

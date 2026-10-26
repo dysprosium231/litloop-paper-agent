@@ -20,12 +20,12 @@ def _default_profile_dir() -> str:
     explicit = os.environ.get("LITLOOP_CHROME_PROFILE_DIR", "").strip()
     if explicit:
         return explicit
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     return str(Path(DATA_DIR) / "browser_profiles")
 
 
 def _default_cache_dir() -> str:
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     return str(Path(DATA_DIR) / "cache" / "browser")
 
 
@@ -41,9 +41,9 @@ def _default_system_browser_paths() -> List[str]:
 def _default_current_module_paths() -> List[str]:
     base = Path(__file__).resolve().parent
     return [
-        str(base / "browser_cookies.py"),
-        str(base / "browser_engine.py"),
-        str(base / "browser_login.py"),
+        str(base / "cookies.py"),
+        str(base / "engine.py"),
+        str(base / "login.py"),
     ]
 
 
@@ -189,7 +189,7 @@ def doctor() -> Dict[str, Any]:
     # anti-detection patches fast; surfacing staleness here lets users
     # diagnose silent bot-detection failures via litloop browser-doctor.
     try:
-        from .cli import _cloakbrowser_version_status, CLOAKBROWSER_RECOMMENDED_MIN
+        from ..cli import _cloakbrowser_version_status, CLOAKBROWSER_RECOMMENDED_MIN
         cb_status, cb_detail = _cloakbrowser_version_status()
         result["cloakbrowser_version"] = {
             "status": cb_status,

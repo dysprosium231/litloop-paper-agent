@@ -18,7 +18,7 @@ END = "<!-- publisher-table:end -->"
 
 
 def build_table() -> str:
-    from litloop.publisher_strategies import StrategyRegistry
+    from litloop.publishers.strategies import StrategyRegistry
 
     lines = [
         "| 策略 | DOI 前缀 | 域名 |",

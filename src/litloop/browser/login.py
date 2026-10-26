@@ -10,9 +10,9 @@ from typing import Any
 from urllib.parse import urlparse
 
 try:
-    from .browser_backend import launch
-    from .browser_backend import BACKEND_CAMOUFOX, BACKEND_CLOAKBROWSER, BACKEND_PATCHRIGHT
-    from .browser_backend import is_available as _browser_backend_available
+    from .backend import launch
+    from .backend import BACKEND_CAMOUFOX, BACKEND_CLOAKBROWSER, BACKEND_PATCHRIGHT
+    from .backend import is_available as _browser_backend_available
     _HAS_CLOAKBROWSER = any(
         _browser_backend_available(b)
         for b in (BACKEND_PATCHRIGHT, BACKEND_CLOAKBROWSER, BACKEND_CAMOUFOX)
@@ -20,7 +20,7 @@ try:
 except ImportError:
     launch = None  # type: ignore[assignment]
     _HAS_CLOAKBROWSER = False
-from .log import get_logger
+from ..log import get_logger
 
 log = get_logger()
 
@@ -75,7 +75,7 @@ class PersistentBrowser:
 
     def _restore_state(self, config: dict[str, Any]):
         """Restore saved cookies and localStorage into the browser."""
-        from .config import DATA_DIR
+        from ..config import DATA_DIR
         cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache")))
         state_file = cache_dir / "browser_state.json"
         if not state_file.exists():
@@ -110,7 +110,7 @@ class PersistentBrowser:
         if not self._context:
             return
         try:
-            from .config import DATA_DIR
+            from ..config import DATA_DIR
             cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache")))
             cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -140,7 +140,7 @@ class PersistentBrowser:
 
             state = {"cookies": cookies, "localStorage": localStorage}
             state_file = cache_dir / "browser_state.json"
-            from .session_store import keep_private
+            from ..institutional.session_store import keep_private
             state_file.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
             keep_private(state_file)
 
@@ -153,7 +153,7 @@ class PersistentBrowser:
             keep_private(cookie_file)
 
             netscape_file = cache_dir / "instsci-cookies.txt"
-            from .browser_cookies import cookies_to_netscape
+            from .cookies import cookies_to_netscape
             netscape_file.write_text(cookies_to_netscape(cookies), encoding="utf-8")
             keep_private(netscape_file)
 
@@ -190,7 +190,7 @@ def _save_cookies_json(cookies: list[dict[str, Any]], cookie_file: Path) -> None
         {"name": c["name"], "value": c["value"], "domain": c.get("domain", ""), "path": c.get("path", "/")}
         for c in cookies
     ]
-    from .session_store import keep_private
+    from ..institutional.session_store import keep_private
     cookie_file.parent.mkdir(parents=True, exist_ok=True)
     cookie_file.write_text(
         json.dumps(cookie_data, indent=2, ensure_ascii=False),
@@ -203,7 +203,7 @@ def _save_cookies_json(cookies: list[dict[str, Any]], cookie_file: Path) -> None
     if cookie_file.name != "instsci-cookies.json":
         return
     try:
-        from .auth import _get_cookie_path
+        from ..institutional.auth import _get_cookie_path
         auth_cookie_path = _get_cookie_path({})
         auth_cookie_path.parent.mkdir(parents=True, exist_ok=True)
         auth_cookie_path.write_text(
@@ -218,8 +218,8 @@ def _save_cookies_json(cookies: list[dict[str, Any]], cookie_file: Path) -> None
 
 def _save_cookies_netscape(cookies: list[dict[str, Any]], cookie_file: Path) -> None:
     """Save cookies in Netscape format (CloakBrowser import compatible)."""
-    from .browser_cookies import cookies_to_netscape
-    from .session_store import keep_private
+    from .cookies import cookies_to_netscape
+    from ..institutional.session_store import keep_private
     cookie_file.write_text(cookies_to_netscape(cookies), encoding="utf-8")
     keep_private(cookie_file)
 
@@ -238,7 +238,7 @@ def _import_to_browser(cookie_file: Path, config: dict[str, Any]) -> int:
     except RuntimeError:
         pass
     try:
-        from .browser_engine import import_cookies, is_available
+        from .engine import import_cookies, is_available
         if not is_available(config):
             log.info("   [browser] CloakBrowser not running, skipping auto-import")
             return 0
@@ -283,7 +283,7 @@ def open_login_browser(
     # Start remote assist if port is configured
     remote = None
     if int(config.get("remote_assist_port", 0)) > 0:
-        from .remote_assist import RemoteAssist
+        from ..institutional.remote_assist import RemoteAssist
         remote = RemoteAssist(config, publisher=publisher)
         remote.start()
         remote.update_url(url)
@@ -294,7 +294,7 @@ def open_login_browser(
 
     # Close any lingering background shared browser on this thread
     try:
-        from .browser_engine import close_shared_browser
+        from .engine import close_shared_browser
         close_shared_browser(config)
     except Exception:
         pass
@@ -375,7 +375,7 @@ def open_login_browser(
             elapsed += 2
             # Tell the download this window waits for the user (the race keeps
             # waiting, the app shows a notice); raises once the paper is settled.
-            from .sources import note_user_waiting
+            from ..sources import note_user_waiting
             note_user_waiting("login")
 
             if elapsed % 10 == 0:
@@ -484,13 +484,13 @@ def open_login_browser(
 
 def webvpn_login(config: dict[str, Any]) -> bool:
     """Login to WebVPN via stealth browser."""
-    from .sources.instsci import _get_webvpn_base
+    from ..sources.instsci import _get_webvpn_base
     base = _get_webvpn_base(config)
     if not base:
         log.info("   [WebVPN] No base URL configured")
         return False
 
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache")))
     cookie_file = cache_dir / "instsci-cookies.json"
 
@@ -507,7 +507,7 @@ def webvpn_login(config: dict[str, Any]) -> bool:
         for any WebVPN gateway and needs no cookie-name or page-text guesses.
         """
         import requests
-        from .network import USER_AGENT
+        from ..network import USER_AGENT
         s = requests.Session()
         s.trust_env = False
         for c in cookies:
@@ -554,7 +554,7 @@ def webvpn_login(config: dict[str, Any]) -> bool:
 
 def carsi_login(publisher: str, config: dict[str, Any], *, login_url: str, domains: list[str]) -> bool:
     """Login to CARSI federated authentication via stealth browser."""
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache"))) / "carsi_cookies"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cookie_file = cache_dir / f"{publisher}.json"
@@ -592,14 +592,14 @@ def carsi_login(publisher: str, config: dict[str, Any], *, login_url: str, domai
 
 def ezproxy_login(config: dict[str, Any]) -> bool:
     """Login to EZProxy via stealth browser."""
-    from .sources.ezproxy import _ezproxy_origin, _is_proxy_domain
+    from ..sources.ezproxy import _ezproxy_origin, _is_proxy_domain
 
     origin = _ezproxy_origin(config)
     if not origin:
         log.info("   [EZProxy] No ezproxy_login_url configured")
         return False
 
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache")))
     cookie_file = cache_dir / "ezproxy_cookies.json"
 

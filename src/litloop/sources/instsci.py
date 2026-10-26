@@ -21,7 +21,7 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup
 
-from ..browser_pdf import capture_pdf_via_cdp, find_page_pdf_link, wait_page_settled
+from ..browser.pdf import capture_pdf_via_cdp, find_page_pdf_link, wait_page_settled
 from ..log import get_logger
 from ..download.pdf import (
     _response_looks_pdf,
@@ -79,7 +79,7 @@ def _get_webvpn_base(config: dict[str, Any]) -> str:
     school = _cfg(config, "school", "")
     if school:
         try:
-            from ..schools import get_school
+            from ..institutional.schools import get_school
             entry = get_school(school)
             return entry.host.rstrip("/")
         except ValueError:
@@ -108,7 +108,7 @@ def _get_school_keys(config: dict[str, Any]) -> tuple[bytes, bytes]:
     school = _cfg(config, "school", "")
     if school:
         try:
-            from ..schools import get_school
+            from ..institutional.schools import get_school
             entry = get_school(school)
             return entry.key, entry.iv
         except ValueError:
@@ -223,7 +223,7 @@ def instsci_login(config: dict[str, Any]) -> bool:
 def _browser_login(config: dict[str, Any]) -> bool:
     """Open browser for CAS login via CloakBrowser."""
     try:
-        from ..browser_login import webvpn_login
+        from ..browser.login import webvpn_login
         if webvpn_login(config):
             return True
     except Exception as exc:
@@ -248,7 +248,7 @@ def _is_campus_connector_mode(config: dict[str, Any]) -> bool:
     school = _cfg(config, "school", "")
     if school:
         try:
-            from ..schools import get_school
+            from ..institutional.schools import get_school
             entry = get_school(school)
             if entry.school_type in ("easyconnect", "atrust"):
                 return True
@@ -730,8 +730,8 @@ def _download_pdf_socks5(
 def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str, Any] | None:
     """Download via visible stealth browser browser. Login + download in same session."""
     try:
-        from ..browser_backend import launch
-        from ..browser_backend import is_available as _browser_backend_available
+        from ..browser.backend import launch
+        from ..browser.backend import is_available as _browser_backend_available
         if not _browser_backend_available():
             log.info("   [WebVPN-Browser] no browser backend available")
             return None
@@ -819,7 +819,7 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
         title, url_now = wait_page_settled(page)
 
         # If on login page, wait for user to login then retry
-        from ..publisher_strategies import _school_auth_patterns
+        from ..publishers.strategies import _school_auth_patterns
         _stoks = _school_auth_patterns(config)
         _auth_url_signals = list(_stoks) + ["/do/off/ui/auth"]
 
@@ -865,7 +865,7 @@ def _try_instsci_browser(doi: str, output_path: Path, config: dict[str, Any]) ->
                             {"name": c["name"], "value": c["value"], "domain": c.get("domain", ""), "path": c.get("path", "/")}
                             for c in cookies
                         ]
-                        from ..session_store import keep_private
+                        from ..institutional.session_store import keep_private
                         (cache_dir / "instsci-cookies.json").write_text(
                             json.dumps(cookie_data, indent=2, ensure_ascii=False), encoding="utf-8")
                         keep_private(cache_dir / "instsci-cookies.json")
@@ -1105,7 +1105,7 @@ def try_instsci(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str
     2. Try CloakBrowser download (handles CAS auth + Cloudflare)
     3. Try WebVPN HTTP approach (if session cookies valid)
 
-    Note: CARSI is now a standalone source tier (carsi_source.try_carsi),
+    Note: CARSI is now a standalone source tier (sources.carsi.try_carsi),
     called independently from the download orchestrator.
     """
     if not _cfg(config, "enabled", False):
@@ -1240,7 +1240,7 @@ def _try_browser_via_webvpn(url: str, config: dict[str, Any]) -> str | None:
     base = _get_webvpn_base(config)
     proxied_url = convert_url(url, base, config)
     try:
-        from ..browser_engine import is_available as browser_avail, get_html as browser_html
+        from ..browser.engine import is_available as browser_avail, get_html as browser_html
         if browser_avail(config):
             result = browser_html(proxied_url, config)
             if result:

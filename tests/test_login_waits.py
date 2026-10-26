@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 import litloop.sources as sources
-from litloop._publisher_strategies_core import _on_login_page, _user_waiting
+from litloop.publishers.strategies._core import _on_login_page, _user_waiting
 
 
 class FakePage:

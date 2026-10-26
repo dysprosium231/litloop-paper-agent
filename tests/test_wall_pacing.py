@@ -13,7 +13,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from litloop import domain_db
+from litloop.sources import scihub_domains as domain_db
 from litloop.sources import scihub
 
 

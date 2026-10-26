@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from litloop.publisher_strategies import StrategyRegistry
+from litloop.publishers.strategies import StrategyRegistry
 
 STRATEGIES = StrategyRegistry.list_all()
 

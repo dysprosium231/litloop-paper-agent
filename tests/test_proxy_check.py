@@ -1,6 +1,6 @@
 """Telling apart proxy programs in TUN mode (needs direct rules) from system-proxy mode (bypassed)."""
 
-from litloop import proxy_check
+from litloop.institutional import proxy_check
 
 
 def facts(adapters=(), processes=(), enable=0, server=None):
@@ -62,7 +62,8 @@ def test_network_check_system_proxy_is_fine(monkeypatch, tmp_path):
 def test_egress_checks_report_the_exit_and_the_publishers_answer(monkeypatch):
     import requests
 
-    from litloop import app_settings, elsevier_check
+    from litloop import app_settings
+    from litloop.sources import elsevier_check
 
     class Resp:
         def json(self):

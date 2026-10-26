@@ -14,8 +14,8 @@ from typing import Any
 import requests
 
 from ..config import DEFAULT_SCIHUB_DOMAINS
-from .. import domain_db
-from ..domain_db import (
+from . import scihub_domains as domain_db
+from .scihub_domains import (
     load_stats,
     record_result,
     update_probe,
@@ -70,7 +70,7 @@ def _submit(pool: ThreadPoolExecutor, fn: Any, *args: Any, **kwargs: Any) -> Any
     own and serves later papers too, so it is registered as SHARED: skipping or
     finishing one paper does not kill it under the next (DeepSeek review
     2026-10-19); cancelling the job does."""
-    from ..browser_backend import carry_owner, shared
+    from ..browser.backend import carry_owner, shared
 
     owned = carry_owner(fn)
 
@@ -104,7 +104,7 @@ def _race_pool(config: dict[str, Any]) -> ThreadPoolExecutor:
 def _close_my_browser() -> None:
     """Runs INSIDE a pool worker: closes that worker's own thread-local browser."""
     try:
-        from ..browser_engine import shutdown_shared_browser
+        from ..browser.engine import shutdown_shared_browser
         shutdown_shared_browser()
     except Exception:
         pass
@@ -319,11 +319,11 @@ def _is_browser_available(config: dict[str, Any]) -> bool:
     except RuntimeError:
         loop = None
     if loop is not None:
-        from ..browser_engine import is_playwright_owned_loop
+        from ..browser.engine import is_playwright_owned_loop
         if not is_playwright_owned_loop(loop):
             return False
     try:
-        from ..browser_engine import is_available
+        from ..browser.engine import is_available
         return is_available(config)
     except Exception:
         return False
@@ -346,7 +346,7 @@ def _solve_altcha_and_reload(
     import time as _time
 
     try:
-        from ..browser_engine import get_browser_page
+        from ..browser.engine import get_browser_page
     except ImportError:
         log.info("   [altcha] browser engine not available for ALTCHA bypass")
         return None
@@ -430,7 +430,7 @@ def _solve_altcha_and_reload(
         # "你是机器人吗" verification, solving again would only deepen the
         # rate limit — record it and let the cooldown skip this domain.
         from ..download.pdf import is_pdf_file, success, extract_pdf_url_from_html
-        from ..browser_engine import download_pdf_via_browser
+        from ..browser.engine import download_pdf_via_browser
 
         lower = html.lower()
         if "你是机器人吗" in html or "altcha" in lower and "iframe" not in lower:
@@ -479,7 +479,7 @@ def _browser_first_download(
     (not_in_library / challenge_* / network / http_*).
     """
     try:
-        from ..browser_engine import solve_url, download_pdf_via_browser
+        from ..browser.engine import solve_url, download_pdf_via_browser
         from ..download.pdf import is_pdf_file, success, extract_pdf_url_from_html
         from urllib.parse import urlparse
         domain = urlparse(landing_url).netloc or landing_url[:40]
@@ -526,7 +526,7 @@ def _browser_first_download(
             # human click. The clearance cookie then lasts the whole batch.
             # Serialized across pool workers — see _TURNSTILE_INTERACTIVE_LOCK.
             with _TURNSTILE_INTERACTIVE_LOCK:
-                from ..browser_engine import get_browser_page
+                from ..browser.engine import get_browser_page
                 page = get_browser_page(config)
                 if page is None:
                     _note_structural(domain, config)
@@ -856,7 +856,7 @@ def try_scihub_domain(
             # redirects to a host that times out) costs every paper 15-30 s:
             # mark it unreachable, so the next 10 minutes skip it.
             try:
-                from ..domain_db import record_result as _db_result, update_probe
+                from .scihub_domains import record_result as _db_result, update_probe
                 _db_result(domain, False, config)
                 update_probe(domain, False, 0.0, config)
             except Exception:
@@ -874,7 +874,7 @@ def _try_browser(
         return None
     # solve_url lives in browser_engine; the old import path (the FlareSolverr
     # client module, removed 2026-10-19) broke the challenge bypass with ImportError.
-    from ..browser_engine import solve_url
+    from ..browser.engine import solve_url
     result = solve_url(url, config)
     if not result:
         return None
@@ -933,7 +933,7 @@ def _race_browser_domains(
     The winning file is renamed to output_path; loser tabs and temp
     files are cleaned up.
     """
-    from ..browser_engine import _get_shared_browser, is_available as _browser_available
+    from ..browser.engine import _get_shared_browser, is_available as _browser_available
 
     if not _browser_available(config):
         return None
@@ -1000,7 +1000,7 @@ def _race_browser_domains(
                 pdf_url = extract_pdf_url_from_html(html, page.url)
                 if pdf_url:
                     log.info(f"   Sci-Hub: {domain} found PDF, downloading...")
-                    from ..browser_engine import download_pdf_via_browser
+                    from ..browser.engine import download_pdf_via_browser
                     if download_pdf_via_browser(pdf_url, temp_output, config):
                         # Verify PDF file — retry with backoff (browser may still flush)
                         for _retry in range(10):

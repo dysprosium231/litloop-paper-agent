@@ -13,7 +13,7 @@ import threading
 
 from typing import Any
 
-from .log import get_logger
+from ..log import get_logger
 
 log = get_logger()
 
@@ -33,13 +33,13 @@ def ensure_webvpn_session(config: dict[str, Any]) -> dict[str, Any]:
     """
     if not config.get("auto_relogin", True):
         return {"status": "disabled", "auto_relogin": False}
-    from .sources.instsci import instsci_login, session_status
+    from ..sources.instsci import instsci_login, session_status
 
     status = session_status(config)
     if status in ("valid", "none", "unreachable"):
         return {"status": status, "auto_relogin": True}
     log.info("   [session-heal] WebVPN session expired, opening login browser...")
-    from .download import progress as _pr
+    from ..download import progress as _pr
     school = str(config.get("vpnsci_school") or "学校").strip()
     _pr.set_attention("webvpn-login", f"WebVPN 登录已过期，请在弹出的浏览器窗口中重新登录{school} WebVPN",
                       phase="等待你的操作")

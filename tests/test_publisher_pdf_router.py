@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from litloop import publisher_pdf_router as r
-from litloop.publisher_profiles import PUBLISHER_PROFILES as P
+from litloop.publishers import pdf_router as r
+from litloop.publishers.profiles import PUBLISHER_PROFILES as P
 
 
 @pytest.mark.parametrize("url, pii", [
@@ -92,5 +92,5 @@ def test_supplements_and_non_pdf_links_are_not_candidates():
 
 
 def test_optica_profile_is_in_the_one_registry():
-    from litloop.publisher_profiles import infer_publisher_profile
+    from litloop.publishers.profiles import infer_publisher_profile
     assert infer_publisher_profile("10.1364/ol.47.013297").name == "Optica"

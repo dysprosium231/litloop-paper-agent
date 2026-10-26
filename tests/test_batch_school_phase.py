@@ -44,6 +44,6 @@ def test_school_only_skips_the_free_sources(tmp_path, monkeypatch):
     monkeypatch.setattr("litloop.identifiers.validate_doi", lambda d: (True, ""))
     monkeypatch.setattr("litloop.citations.formats.fetch_metadata", lambda *a, **k: {})
     monkeypatch.setattr(sources, "_build_institutional_sources", lambda *a, **k: [])
-    monkeypatch.setattr("litloop.session_heal.ensure_institutional_sessions", lambda *a, **k: {})
+    monkeypatch.setattr("litloop.institutional.session_heal.ensure_institutional_sessions", lambda *a, **k: {})
     sources._download_impl("10.1/x", tmp_path, _school_only=True)
     assert built == []

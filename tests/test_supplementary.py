@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 
 from litloop.download import pipeline
 from litloop.download.pipeline import QueueEntry
-from litloop.supplementary import extract_supplementary_links, fetch_supplementary
+from litloop.publishers.supplementary import extract_supplementary_links, fetch_supplementary
 
 HTML = """
 <html><body>
@@ -63,8 +63,8 @@ class FetchSupplementaryTests(unittest.TestCase):
                 return b"PK\x03\x04", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             return b"%PDF-1.4 fake", "application/pdf"
 
-        with patch("litloop.supplementary._fetch_page", return_value=(HTML, fake_fetch)), \
-             patch("litloop.supplementary._article_url", return_value=BASE):
+        with patch("litloop.publishers.supplementary._fetch_page", return_value=(HTML, fake_fetch)), \
+             patch("litloop.publishers.supplementary._article_url", return_value=BASE):
             saved = fetch_supplementary("10.1038/nature12345", self.out, {}, max_files=10)
         self.assertEqual(len(saved), 2)  # gate page dropped, 3 candidates -> 2 files
         self.assertTrue(any(f.endswith(".xlsx") for f in saved))
@@ -73,7 +73,7 @@ class FetchSupplementaryTests(unittest.TestCase):
         self.assertFalse(any("MOESM1" in f for f in saved))
 
     def test_no_article_url_returns_empty(self):
-        with patch("litloop.supplementary._article_url", return_value=None):
+        with patch("litloop.publishers.supplementary._article_url", return_value=None):
             self.assertEqual(fetch_supplementary("10.1/none", self.out, {}), [])
 
 

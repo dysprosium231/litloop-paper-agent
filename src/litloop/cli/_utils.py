@@ -128,7 +128,7 @@ def _doctor_checks() -> list[tuple[str, str, str]]:
     cb_status, cb_detail = _cloakbrowser_version_status()
     checks.append(("package: cloakbrowser", cb_status if cb_status != "not_installed" else "warning", cb_detail))
     try:
-        from ..cloakbrowser_compat import configure_builtin_cloakbrowser
+        from ..browser.cloakbrowser_compat import configure_builtin_cloakbrowser
         cache_dir = configure_builtin_cloakbrowser(create_dir=False)
         status = "ok" if cache_dir.exists() else "warning"
         detail = str(cache_dir) if cache_dir.exists() else f"not downloaded yet: {cache_dir}"
@@ -140,7 +140,7 @@ def _doctor_checks() -> list[tuple[str, str, str]]:
 
 
 def _apply_school_config(cfg: dict, school: str):
-    from ..schools import get_school
+    from ..institutional.schools import get_school
     entry = get_school(school)
     cfg["instsci_school"] = entry.name
     if entry.school_type == "ezproxy":
@@ -246,14 +246,14 @@ def _run_federated_login(publisher: str, url: str, force: bool, verbose: bool) -
         console.print("[red]Federated login school not set. Run: instsci config-cmd --federated-school \"你的学校名\"[/red]")
         raise typer.Exit(1)
     if not publisher and url:
-        from ..sources.carsi import detect_publisher
+        from ..institutional.carsi_login import detect_publisher
         publisher = detect_publisher(url) or ""
     if not publisher:
         console.print("[yellow]Available publishers:[/yellow]")
         console.print("  sciencedirect, springer, wiley, ieee, tandfonline, nature")
         publisher = typer.prompt("Enter publisher name")
 
-    from ..sources.carsi import CARSIClient
+    from ..institutional.carsi_login import CARSIClient
     carsi = CARSIClient(config)
     try:
         console.print(f"[bold]Federated login for: {publisher}[/bold]")

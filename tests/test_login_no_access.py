@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import litloop.sources as src
-from litloop import _publisher_strategies_core as core
+from litloop.publishers.strategies import _core as core
 from litloop.error_text import reason
 
 
@@ -14,7 +14,7 @@ def _setup(monkeypatch, tmp_path, called):
     monkeypatch.setattr(src, "_build_institutional_sources", lambda *a, **k: [(None, "WebVPN")])
     import litloop.identifiers as ids
     monkeypatch.setattr(ids, "validate_doi", lambda doi: (True, ""))  # no network
-    import litloop.session_heal as sh
+    import litloop.institutional.session_heal as sh
     monkeypatch.setattr(sh, "ensure_institutional_sessions", lambda *a, **k: {})
     import litloop.citations.formats as cit
     monkeypatch.setattr(cit, "fetch_metadata", lambda *a, **k: {})  # no network
@@ -126,7 +126,7 @@ class _QuietPage:
 
 
 def test_a_page_asking_to_log_in_is_not_waited_on(monkeypatch):
-    import litloop.browser_pdf as bp
+    import litloop.browser.pdf as bp
     looks = []
     monkeypatch.setattr(bp, "find_page_pdf_link", lambda page, max_wait_s=0, doi="": looks.append(max_wait_s))
     monkeypatch.setattr(core.time, "sleep", lambda s: None)
@@ -136,7 +136,7 @@ def test_a_page_asking_to_log_in_is_not_waited_on(monkeypatch):
 
 
 def test_an_unclear_page_gets_the_long_look_and_a_reload(monkeypatch):
-    import litloop.browser_pdf as bp
+    import litloop.browser.pdf as bp
     looks = []
 
     def find(page, max_wait_s=0, doi=""):

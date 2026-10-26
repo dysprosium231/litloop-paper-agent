@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 import requests
 
-from litloop import publisher_access as pa
+from litloop.publishers import access as pa
 
 
 @pytest.fixture

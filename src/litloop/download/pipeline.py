@@ -81,7 +81,7 @@ def predict_channel(identifier: str) -> str:
     return "auto"
 
 
-from ..supplementary import fetch_supplementary
+from ..publishers.supplementary import fetch_supplementary
 
 _PDF_URL_HINT = re.compile(
     r"\.pdf($|[?#])|/pdf(/|\?|$)|article-pdf|/epdf/|/pdfdirect", re.IGNORECASE)
@@ -782,12 +782,12 @@ def run_lanes(
 
     if inst and allow_institution:
         from ..institutional.config_adapter import ConfigAdapter
-        from ..institutional.fetcher import PaperFetcher
+        from .fetcher import PaperFetcher
 
         _progress.update(phase="机构级联")
 
         def _inst_fetch_chunk(chunk: list[str]) -> list[dict[str, Any]]:
-            from ..browser_backend import shared
+            from ..browser.backend import shared
             with shared():  # the fetcher's browser serves every paper of the chunk
                 return _inst_fetch_chunk_inner(chunk)
 
@@ -906,7 +906,7 @@ def _fetch_si_for_results(results: list[dict[str, Any]], out: Path, config: dict
     manifest_lock = threading.Lock()
 
     def _si_one(row: dict[str, Any]) -> None:
-        from ..browser_backend import shared
+        from ..browser.backend import shared
         with shared():  # the pool thread's browser serves the next papers too
             _si_one_inner(row)
 
@@ -984,7 +984,7 @@ def _run_fast_lane(
                 # OA 直链被出版商反爬 403（如 Wiley pdfdirect 挡无指纹请求），
                 # 内容公开可得——浏览器指纹可过，回退常驻池浏览器捕获。
                 try:
-                    from ..browser_engine import download_pdf_via_browser
+                    from ..browser.engine import download_pdf_via_browser
 
                     bpath = out / _safe_name(e.identifier)
                     # One at a time (each worker thread would start its own visible

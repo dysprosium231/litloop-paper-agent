@@ -2,7 +2,7 @@
 
 import requests
 
-from litloop.session_heal import ensure_institutional_sessions, ensure_webvpn_session
+from litloop.institutional.session_heal import ensure_institutional_sessions, ensure_webvpn_session
 
 
 class FakeResponse:

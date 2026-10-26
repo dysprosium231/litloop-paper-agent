@@ -171,7 +171,7 @@ def ezproxy_login(config: dict[str, Any]) -> bool:
     """Open browser for EZProxy login. Tries stealth browser first, falls back to Selenium."""
     # Try stealth browser (stealth browser) first
     try:
-        from ..browser_login import ezproxy_login as _browser_ezproxy
+        from ..browser.login import ezproxy_login as _browser_ezproxy
         if _browser_ezproxy(config):
             return True
     except Exception as exc:
@@ -209,9 +209,9 @@ def try_ezproxy(doi: str, output_path: Path, config: dict[str, Any]) -> dict[str
     log.info(f"   [EZProxy] Trying {doi} via library proxy...")
 
     try:
-        from ..browser_backend import launch
-        from ..browser_backend import is_available as _browser_backend_available
-        from ..browser_engine import _build_browser_args
+        from ..browser.backend import launch
+        from ..browser.backend import is_available as _browser_backend_available
+        from ..browser.engine import _build_browser_args
         if not _browser_backend_available():
             log.info("   [EZProxy] no browser backend available")
             return None

@@ -11,7 +11,7 @@ from litloop.download.pipeline import QueueEntry
 
 
 def test_browser_fallback_is_short_and_one_at_a_time(tmp_path, monkeypatch):
-    import litloop.browser_engine as be
+    import litloop.browser.engine as be
     active, peak, timeouts = [0], [0], []
     lock = threading.Lock()
 

@@ -97,7 +97,7 @@ def login(
     config = load_config()
 
     if login_type == "cookies":
-        from .browser_cookies import extract_via_browser
+        from .browser.cookies import extract_via_browser
         target_url = url or "https://www.sciencedirect.com/"
         result = extract_via_browser(config, url=target_url)
         if result["success"]:
@@ -106,18 +106,18 @@ def login(
             print(f"  {result.get('message') or result.get('error', 'Failed')}")
             raise typer.Exit(1)
     elif login_type == "webvpn":
-        from .browser_login import webvpn_login
+        from .browser.login import webvpn_login
         success = webvpn_login(config)
         raise typer.Exit(0 if success else 1)
     elif login_type == "ezproxy":
-        from .browser_login import ezproxy_login
+        from .browser.login import ezproxy_login
         success = ezproxy_login(config)
         raise typer.Exit(0 if success else 1)
     elif login_type == "custom":
         if not url:
             print("  Error: --url is required for login_type=custom")
             raise typer.Exit(1)
-        from .browser_login import open_login_browser
+        from .browser.login import open_login_browser
         from .config import DATA_DIR
         cookie_file = Path(config.get("cache_dir", str(DATA_DIR / "cache"))) / "custom_cookies.json"
         success = open_login_browser(url, config, cookie_file=cookie_file)
@@ -156,7 +156,7 @@ def get_paper(
             md_path = pdf_to_markdown(result["file"])
             print(f"  Markdown: {md_path}")
         if si:
-            from .supplementary import fetch_supplementary
+            from .publishers.supplementary import fetch_supplementary
 
             out_dir = str(Path(result.get("file", output)).parent) if result.get("file") else output
             si_files = fetch_supplementary(identifier, out_dir, load_config())
@@ -184,8 +184,8 @@ def get_paper(
 def browser_status() -> None:
     """Check browser backend availability and which browser kernel is in effect."""
     from .config import load_config
-    from .browser_engine import is_available
-    from .browser_backend import browser_info
+    from .browser.engine import is_available
+    from .browser.backend import browser_info
     import importlib.metadata as _md
 
     config = load_config()
@@ -211,7 +211,7 @@ def browser_doctor_cmd() -> None:
     """Report reusable shared browser runtime options without installing anything."""
     import json as _json
 
-    from .browser_discovery import doctor
+    from .browser.runtime import doctor
 
     print(_json.dumps(doctor(), ensure_ascii=False))
 
@@ -220,7 +220,7 @@ def browser_doctor_cmd() -> None:
 def import_cookies_cmd(cookie_file: str = typer.Argument(help="Netscape-format cookie file path")) -> None:
     """Import Netscape cookies into browser context."""
     from .config import load_config
-    from .browser_engine import import_cookies, is_available
+    from .browser.engine import import_cookies, is_available
 
     config = load_config()
     if not is_available(config):
@@ -341,7 +341,7 @@ def setup_school(
         return
 
     if not school:
-        from .schools import list_schools
+        from .institutional.schools import list_schools
         schools = list_schools()
         print(f"  Available schools ({len(schools)} total):\n")
         for s in schools[:30]:
@@ -350,7 +350,7 @@ def setup_school(
             print(f"\n  ... and {len(schools) - 30} more. Use: litloop schools <query>")
         return
 
-    from .schools import search_schools
+    from .institutional.schools import search_schools
     matches = search_schools(school)
     if not matches:
         print(f"  No school matching '{school}' found.")
@@ -374,7 +374,7 @@ def list_schools_cmd(
     query: str = typer.Argument("", help="Search query (name, province, or host)"),
 ) -> None:
     """List or search available schools/institutions."""
-    from .schools import list_schools, search_schools
+    from .institutional.schools import list_schools, search_schools
 
     if query:
         results = search_schools(query)
@@ -404,7 +404,7 @@ def fetch_paper_cmd(
     """
     output = _default_output_dir(output)
     from .institutional.config_adapter import ConfigAdapter
-    from .institutional.fetcher import PaperFetcher
+    from .download.fetcher import PaperFetcher
 
     config = ConfigAdapter.load()
     config._config["output_dir"] = output
@@ -548,7 +548,7 @@ def batch_fetch_cmd(
 
     # Default: institutional cascade (PaperFetcher)
     from .institutional.config_adapter import ConfigAdapter
-    from .institutional.fetcher import PaperFetcher
+    from .download.fetcher import PaperFetcher
 
     config = ConfigAdapter.load()
     config._config["output_dir"] = output
@@ -622,7 +622,7 @@ def elsevier_setup(
         print(f"  Elsevier API key: saved")
         # 配置即验证：自检样本自动跑一遍，当场给出 key 画像
         try:
-            from .elsevier_check import check_key_profile
+            from .sources.elsevier_check import check_key_profile
 
             _rows, profile, advice = check_key_profile(config)
             print(f"  key 画像: {profile}")
@@ -663,7 +663,7 @@ def elsevier_check_cmd(
 
     from .download import progress as _pr
     from .config import load_config
-    from .elsevier_check import check_dois, check_key_profile
+    from .sources.elsevier_check import check_dois, check_key_profile
 
     config = load_config()
     console.print("[bold]Elsevier key 权限自检[/bold]")
@@ -709,7 +709,7 @@ def elsevier_check_cmd(
 def session_doctor() -> None:
     """Diagnose browser profile sessions and cookie health."""
     from .institutional.config_adapter import ConfigAdapter
-    from .institutional.profile_health import candidate_profile_dirs, inspect_browser_profile
+    from .browser.profile_health import candidate_profile_dirs, inspect_browser_profile
 
     config = ConfigAdapter.load()
     profiles = candidate_profile_dirs(config.chrome_profile_dir)
@@ -744,7 +744,7 @@ def federated_login(
     force: bool = typer.Option(False, "--force", help="Force re-login"),
 ) -> None:
     """Log in to a publisher via CARSI/Shibboleth federation."""
-    from .sources.carsi import CARSIClient
+    from .institutional.carsi_login import CARSIClient
     from .config import load_config
 
     config = load_config()

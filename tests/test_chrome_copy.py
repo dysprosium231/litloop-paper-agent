@@ -6,7 +6,7 @@ import shutil
 
 import pytest
 
-from litloop import chrome_copy
+from litloop.browser import chrome_copy
 
 
 def _install(root, version, *, alias=False):

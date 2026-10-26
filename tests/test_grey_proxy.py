@@ -1,7 +1,7 @@
 """Grey proxy routing for Sci-Hub and LibGen, browser PAC config, and Taylor & Francis book URLs."""
 
 import base64
-import litloop.browser_backend
+import litloop.browser.backend as browser_backend
 import litloop.network
 import litloop.sources.instsci
 
@@ -44,8 +44,8 @@ def test_browser_backend_direct_args_pac(monkeypatch):
         "host_proxy_url": "http://127.0.0.1:10808",
         "scihub_domains": ["https://sci-hub.ru", "https://sci-hub.se"],
     }
-    args = litloop.browser_backend._direct_args(
-        litloop.browser_backend.BACKEND_PATCHRIGHT, None, None, config
+    args = browser_backend._direct_args(
+        browser_backend.BACKEND_PATCHRIGHT, None, None, config
     )
     prefix = "--proxy-pac-url=data:application/x-ns-proxy-autoconfig;base64,"
     assert isinstance(args, list)
@@ -55,8 +55,8 @@ def test_browser_backend_direct_args_pac(monkeypatch):
     assert "sci-hub.ru" in decoded
     assert "127.0.0.1:10808" in decoded
 
-    empty_args = litloop.browser_backend._direct_args(
-        litloop.browser_backend.BACKEND_PATCHRIGHT, None, None, {}
+    empty_args = browser_backend._direct_args(
+        browser_backend.BACKEND_PATCHRIGHT, None, None, {}
     )
     assert "--no-proxy-server" in empty_args
 

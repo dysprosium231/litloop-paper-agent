@@ -8,11 +8,11 @@ from typing import Any
 
 import requests
 
-from .publisher_pdf_router import build_pdf_candidates, discover_pdf_candidates_from_html
-from .publisher_profiles import get_publisher_profile, list_publisher_profiles
+from .pdf_router import build_pdf_candidates, discover_pdf_candidates_from_html
+from .profiles import get_publisher_profile, list_publisher_profiles
 
-CATALOG_PATH = Path(__file__).parent / "data" / "publisher_access_catalog.json"
-INSTITUTIONAL_IDENTITY_POLICY_PATH = Path(__file__).parent / "data" / "institutional_identity_policy.json"
+CATALOG_PATH = Path(__file__).parent.parent / "data" / "publisher_access_catalog.json"
+INSTITUTIONAL_IDENTITY_POLICY_PATH = Path(__file__).parent.parent / "data" / "institutional_identity_policy.json"
 
 DEFAULT_HEADERS = {
     "User-Agent": (

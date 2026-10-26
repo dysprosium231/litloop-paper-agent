@@ -7,9 +7,9 @@ from pathlib import Path
 
 import requests
 
-from litloop import _publisher_strategies_core as core
-from litloop.publisher_strategies import StrategyRegistry
-from litloop.sources.carsi import detect_publisher
+from litloop.publishers.strategies import _core as core
+from litloop.publishers.strategies import StrategyRegistry
+from litloop.institutional.carsi_login import detect_publisher
 from litloop.sources.sage_cn import (
     extract_article_id,
     has_saved_sage_cn_session,
@@ -140,7 +140,7 @@ def test_try_sage_browser_prefers_authorized_cn_route(monkeypatch, tmp_path):
 
 
 def test_visible_browser_forwards_selected_backend_config(monkeypatch, tmp_path):
-    from litloop import browser_engine
+    from litloop.browser import engine as browser_engine
 
     config = {
         "cache_dir": str(tmp_path),

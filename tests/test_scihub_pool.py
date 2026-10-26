@@ -47,7 +47,7 @@ class PersistentPoolTests(unittest.TestCase):
         def fake_close():
             calls.append(threading.current_thread())
 
-        with patch("litloop.browser_engine.shutdown_shared_browser", fake_close):
+        with patch("litloop.browser.engine.shutdown_shared_browser", fake_close):
             # _close_my_browser imports lazily inside the worker; patch the
             # resolved module attribute it will find.
             scihub._shutdown_scihub_pool()
@@ -81,7 +81,7 @@ class PersistentPoolTests(unittest.TestCase):
         that as 'user asyncio code' and made _is_browser_available return
         False for every paper after the first — silently degrading whole
         batches to HTTP-only."""
-        from litloop import browser_engine as be
+        from litloop.browser import engine as be
 
         if not be.is_available({}):
             self.skipTest("no browser backend installed")

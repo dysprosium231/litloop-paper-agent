@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from litloop.browser_pdf import find_page_pdf_link
+from litloop.browser.pdf import find_page_pdf_link
 
 
 @pytest.fixture(scope="module")
 def page():
-    from litloop import browser_backend as bb
+    from litloop.browser import backend as bb
     try:
         b = bb.launch(headless=True)
     except Exception as e:  # no browser on this machine

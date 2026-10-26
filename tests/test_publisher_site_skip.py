@@ -34,7 +34,7 @@ class _Page:
 
 
 def test_browser_error_page():
-    from litloop._publisher_strategies_core import _is_browser_error_page
+    from litloop.publishers.strategies._core import _is_browser_error_page
     assert _is_browser_error_page(_Page("chrome-error://chromewebdata/", ""))
     assert _is_browser_error_page(_Page("https://papers.ssrn.com/x", "无法访问此网站"))
     assert not _is_browser_error_page(_Page("https://papers.ssrn.com/x", "Just a moment..."))

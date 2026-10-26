@@ -1,10 +1,10 @@
-"""Tests for school database and lookup helpers in litloop.schools."""
+"""Tests for school database and lookup helpers in litloop.institutional.schools."""
 
 from __future__ import annotations
 
 import pytest
 
-from litloop.schools import (
+from litloop.institutional.schools import (
     SchoolEntry,
     _DEFAULT_KEY,
     _parse_entry,

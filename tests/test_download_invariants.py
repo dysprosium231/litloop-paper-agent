@@ -16,7 +16,7 @@ import pytest
 
 import litloop.identifiers as ids
 import litloop.sources as src
-from litloop import _publisher_strategies_core as core
+from litloop.publishers.strategies import _core as core
 
 PDF = b"%PDF-1.4\n" + b"0" * 20000 + b"\n%%EOF"
 
@@ -26,7 +26,7 @@ def _offline(monkeypatch):
     monkeypatch.setattr(ids, "validate_doi", lambda doi: (True, ""))
     import litloop.citations.formats as cit
     monkeypatch.setattr(cit, "fetch_metadata", lambda *a, **k: {})  # no network
-    import litloop.session_heal as sh
+    import litloop.institutional.session_heal as sh
     monkeypatch.setattr(sh, "ensure_institutional_sessions", lambda *a, **k: {})
     monkeypatch.setattr(src, "_build_institutional_sources", lambda *a, **k: [])
     import litloop.download.pdf as pu
@@ -49,7 +49,7 @@ def _nothing(doi, output_path, config):
 
 
 def test_skip_stops_during_the_session_check(monkeypatch, tmp_path):
-    import litloop.session_heal as sh
+    import litloop.institutional.session_heal as sh
     reached = []
 
     def slow_heal(*a, **k):  # a session check that waits ~3 s (e.g. for a login)
@@ -109,8 +109,8 @@ def test_browser_error_does_not_leak_between_papers(tmp_path):
 
 def test_a_paper_closes_only_its_own_browsers(monkeypatch):
     from types import SimpleNamespace
-    import litloop.browser_backend as bb
-    import litloop.browser_engine as be
+    import litloop.browser.backend as bb
+    import litloop.browser.engine as be
     killed = []
     monkeypatch.setattr(be, "_tree_kill", lambda proc: killed.append(proc))
     monkeypatch.setattr(bb, "_LAUNCHED", [])
@@ -182,8 +182,8 @@ def test_a_browser_opened_in_a_pool_thread_belongs_to_the_paper(monkeypatch):
     the orchestrator's thread-locals; the window must still be the paper's."""
     from concurrent.futures import ThreadPoolExecutor
     from types import SimpleNamespace
-    import litloop.browser_backend as bb
-    import litloop.browser_engine as be
+    import litloop.browser.backend as bb
+    import litloop.browser.engine as be
     from litloop.sources import scihub
     killed = []
     monkeypatch.setattr(be, "_tree_kill", lambda proc: killed.append(proc))
@@ -211,7 +211,7 @@ def test_a_browser_opened_in_a_pool_thread_belongs_to_the_paper(monkeypatch):
 def test_a_pool_task_still_knows_its_paper(monkeypatch):
     """Shared or not, a task for a paper that has ended must not launch a browser."""
     from concurrent.futures import ThreadPoolExecutor
-    import litloop.browser_backend as bb
+    import litloop.browser.backend as bb
     from litloop.sources import scihub
     raw = ThreadPoolExecutor(max_workers=1)
     src._SOURCE_TLS.doi = "10.9999/pool.done"
@@ -244,7 +244,7 @@ def test_a_skip_is_used_up_so_a_retry_runs(monkeypatch, tmp_path):
 
 def test_dead_browsers_leave_the_registry(monkeypatch):
     from types import SimpleNamespace
-    import litloop.browser_backend as bb
+    import litloop.browser.backend as bb
     monkeypatch.setattr(bb, "_LAUNCHED", [])
 
     def fake(returncode):

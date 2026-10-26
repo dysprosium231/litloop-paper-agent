@@ -224,7 +224,7 @@ def diagnose_network(config: dict[str, Any] | None = None) -> dict[str, Any]:
 
     # Check CloakBrowser
     try:
-        from ..browser_engine import is_available as browser_avail
+        from ..browser.engine import is_available as browser_avail
         if browser_avail(config):
             report["tests"].append({"target": "CloakBrowser", "status": "available"})
         else:

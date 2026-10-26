@@ -20,7 +20,7 @@ def _load_publisher_cookies(session: requests.Session, config: dict[str, Any]) -
     from ..network import apply_host_proxy
     apply_host_proxy(session, config)
     try:
-        from ..browser_cookies import inject_cookies
+        from ..browser.cookies import inject_cookies
         inject_cookies(session, config)
     except Exception:
         pass
@@ -267,7 +267,7 @@ def try_publisher_direct(doi: str, output_path: Path, config: dict[str, Any]) ->
     # Phase 2: Browser-based download via camofox (handles anti-bot)
     publisher = get_publisher(doi)
     if publisher and config.get("camofox_enabled", True):
-        from ..camofox import is_available as _camofox_avail
+        from ..browser.camofox_api import is_available as _camofox_avail
         if _camofox_avail(config):
             log.info(f"   [PublisherDirect] Trying browser strategy for {publisher}")
             fn = _FN_MAP.get(f"{publisher}Browser") or _FN_MAP.get("GenericBrowser")
@@ -357,7 +357,7 @@ def try_science_direct(doi: str, output_path: Path, config: dict[str, Any]) -> d
     from ..download.pdf import is_pdf_file, success, _response_looks_pdf
 
     def _fetch_pdf_camofox(pdf_url: str) -> "requests.Response | None":  # type: ignore[name-defined]
-        from ..camofox import is_available as _camofox_avail, solve_url as _camofox_solve
+        from ..browser.camofox_api import is_available as _camofox_avail, solve_url as _camofox_solve
         if not _camofox_avail(config):
             return None
         result = _camofox_solve(pdf_url, config)
@@ -608,7 +608,7 @@ def get_publisher(doi: str) -> str:
 
 def _elsevier_api_fn() -> Any:
     """Lazy import of the Elsevier API download function."""
-    from ..publisher_strategies import try_elsevier_api
+    from ..publishers.strategies import try_elsevier_api
     return try_elsevier_api
 
 
@@ -618,8 +618,8 @@ def _browser_strategy(publisher: str) -> Any:
     Uses the new StrategyRegistry to validate the publisher, then returns
     the legacy ``try_*_browser`` function via the compatibility bridge.
     """
-    from ..publisher_strategies import StrategyRegistry
-    from .._publisher_strategies_core import try_generic_browser
+    from ..publishers.strategies import StrategyRegistry
+    from ..publishers.strategies._core import try_generic_browser
 
     strategy = StrategyRegistry.get_by_name(publisher)
     if not strategy:
@@ -629,7 +629,7 @@ def _browser_strategy(publisher: str) -> Any:
     # Standard naming: try_{publisher.lower()}_browser
     # Special cases handled by the strategy's aliases
     fn_name = f"try_{strategy.name.lower().replace(' ', '_')}_browser"
-    from .. import _publisher_strategies_core as _core
+    from ..publishers.strategies import _core
     return getattr(_core, fn_name, try_generic_browser)
 
 

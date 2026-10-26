@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # the CloakBrowser backend lives in browser_backend.py.
 # ---------------------------------------------------------------------------
 
-from .browser_backend import (  # noqa: E402
+from .backend import (  # noqa: E402
     BACKEND_CLOAKBROWSER,
     BACKEND_PATCHRIGHT,
     find_local_browser,  # noqa: F401  (re-exported for CLI diagnostics)
@@ -57,7 +57,7 @@ _HAS_BROWSER_BACKEND: bool | None = None
 
 def _check_browser_backend(config: dict[str, Any] | None = None) -> bool:
     """Check whether the resolved backend is importable (cached per backend)."""
-    from .browser_backend import (
+    from .backend import (
         BACKEND_CAMOUFOX,
         BACKEND_CLOAKBROWSER,
         BACKEND_PATCHRIGHT,
@@ -263,7 +263,7 @@ def _get_shared_browser(config: dict[str, Any] | None = None):
     # Platform compat shim + kernel override only apply to CloakBrowser
     if backend == BACKEND_CLOAKBROWSER:
         try:
-            from .institutional.cloakbrowser_compat import ensure_cloakbrowser_platform_compatible
+            from .cloakbrowser_compat import ensure_cloakbrowser_platform_compatible
             ensure_cloakbrowser_platform_compatible()
         except Exception:
             logger.debug("CloakBrowser platform shim not applied", exc_info=True)
@@ -882,7 +882,7 @@ def fetch_url(
 
     # The inline PDF viewer hides the body from the response listener; read it
     # from the paused response via CDP while the browser itself makes the request.
-    from .browser_pdf import capture_pdf_via_cdp
+    from .pdf import capture_pdf_via_cdp
     pdf_bytes = capture_pdf_via_cdp(page.context, page, url, timeout_s=max(timeout, 90.0))
     if pdf_bytes:
         return {"status": "ok", "bytes": len(pdf_bytes), "data": pdf_bytes}

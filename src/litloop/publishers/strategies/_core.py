@@ -17,14 +17,14 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .browser_backend import launch, launch_persistent_context
-    from .browser_backend import is_available as _browser_backend_available
+    from ...browser.backend import launch, launch_persistent_context
+    from ...browser.backend import is_available as _browser_backend_available
     _HAS_CLOAKBROWSER = _browser_backend_available()
 except ImportError:
     launch = None  # type: ignore[assignment]
     launch_persistent_context = None  # type: ignore[assignment]
     _HAS_CLOAKBROWSER = False
-from .log import get_logger
+from ...log import get_logger
 
 log = get_logger()
 
@@ -119,7 +119,7 @@ def _wait_for_pdf_link(page: Any, doi: str, publisher: str) -> tuple[str | None,
     - neither: the access check may still be running ("View PDF" came after
       15 s on ScienceDirect, 2026-10-18), so look longer and reload once.
     """
-    from .browser_pdf import find_page_pdf_link
+    from ...browser.pdf import find_page_pdf_link
     for attempt in range(2):
         try:
             page.wait_for_load_state("networkidle", timeout=10000)
@@ -254,8 +254,8 @@ def _resolve_doi_landing(doi: str) -> str:
     """Publisher landing URL for a DOI via the doi.org handle API ("" if unknown)."""
     import requests
     try:
-        from .config import load_config
-        from .network import apply_host_proxy
+        from ...config import load_config
+        from ...network import apply_host_proxy
         s = requests.Session()
         s.trust_env = False
         apply_host_proxy(s, load_config())
@@ -290,7 +290,7 @@ def _user_waiting(what: str = "verify", where: Any = None) -> None:
     institution's link, an SSO click that goes nowhere) are not the user's to
     wait for, and saying so would show a notice with nothing to log into."""
     try:
-        from .sources import SourceWaived, _source_may_continue, note_user_waiting
+        from ...sources import SourceWaived, _source_may_continue, note_user_waiting
     except Exception:
         return
     if where is not None and not _on_login_page(where):
@@ -342,7 +342,7 @@ def _show_window_for_user(what: str) -> None:
 
 
 def _get_profile_dir(config: dict[str, Any], publisher: str = "shared") -> Path:
-    from .config import DATA_DIR
+    from ...config import DATA_DIR
     cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache")))
     profile_dir = cache_dir / f"publisher_profile_{publisher.lower()}"
     profile_dir.mkdir(parents=True, exist_ok=True)
@@ -351,7 +351,7 @@ def _get_profile_dir(config: dict[str, Any], publisher: str = "shared") -> Path:
 
 def _restore_cookies_to_context(context: Any, config: dict[str, Any]) -> None:
     try:
-        from .browser_cookies import load_saved_cookies
+        from ...browser.cookies import load_saved_cookies
         saved = load_saved_cookies(config)
         if saved:
             pw_cookies = []
@@ -369,7 +369,7 @@ def _restore_cookies_to_context(context: Any, config: dict[str, Any]) -> None:
 @contextlib.contextmanager
 def _visible_browser(config: dict[str, Any], publisher: str, *, viewport: dict | None = None):
     """Open visible stealth browser with persistent profile. Falls back to ephemeral."""
-    from .browser_engine import close_shared_browser, is_available
+    from ...browser.engine import close_shared_browser, is_available
 
     # Any resolved backend works (camoufox included); the old _HAS_CLOAKBROWSER
     # gate wrongly required the cloakbrowser package.
@@ -426,8 +426,8 @@ def _save_all_cookie_formats(
     config: dict[str, Any],
 ) -> None:
     """Save cookies in all formats: JSON, Netscape, publisher subset, + bridge to browser-engine."""
-    from .config import DATA_DIR
-    from .browser_cookies import cookies_to_netscape, _save_cookies_json
+    from ...config import DATA_DIR
+    from ...browser.cookies import cookies_to_netscape, _save_cookies_json
 
     cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache")))
 
@@ -469,7 +469,7 @@ def _save_all_cookie_formats(
 
     # 4. Bridge to browser-engine headless service
     try:
-        from .browser_engine import import_cookies, is_available
+        from ...browser.engine import import_cookies, is_available
         if is_available(config):
             imported = import_cookies(str(netscape_file), config)
             log.info(f"   [{publisher}] bridged {imported} cookies to browser-engine service")
@@ -504,14 +504,14 @@ def _detect_paywall(html: str, status_code: int = 0) -> bool:
 def _has_publisher_cookies(config: dict[str, Any]) -> bool:
     """Check if we have saved publisher cookies for the current session."""
     try:
-        from .browser_cookies import load_saved_cookies
+        from ...browser.cookies import load_saved_cookies
         if len(load_saved_cookies(config)) > 0:
             return True
     except Exception:
         pass
     # Also check CARSI cookies
     try:
-        from .config import DATA_DIR
+        from ...config import DATA_DIR
         carsi_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache"))) / "carsi_cookies"
         if carsi_dir.is_dir() and any(carsi_dir.glob("*.json")):
             return True
@@ -522,8 +522,8 @@ def _has_publisher_cookies(config: dict[str, Any]) -> bool:
 
 def _inject_cookies_to_tab(tab_id: str, config: dict[str, Any], publisher: str) -> None:
     """Inject saved publisher + CARSI cookies into browser-engine session."""
-    from .browser_engine import import_cookies
-    from .config import DATA_DIR
+    from ...browser.engine import import_cookies
+    from ...config import DATA_DIR
     cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache")))
     total = 0
 
@@ -541,7 +541,7 @@ def _inject_cookies_to_tab(tab_id: str, config: dict[str, Any], publisher: str) 
         for cf in carsi_dir.glob("*.json"):
             try:
                 # Convert JSON → Netscape format
-                from .browser_cookies import cookies_to_netscape
+                from ...browser.cookies import cookies_to_netscape
                 cookies = json.loads(cf.read_text(encoding="utf-8"))
                 tmp = cache_dir / f"_tmp_{cf.stem}.txt"
                 tmp.write_text(cookies_to_netscape(cookies), encoding="utf-8")
@@ -574,7 +574,7 @@ def _visible_browser_download(
     Without a school set (carsi_idp_name) the login step is skipped: the window
     still passes human checks and uses the campus network's access.
     """
-    from .download.pdf import is_pdf_file, success
+    from ...download.pdf import is_pdf_file, success
     import base64
 
     idp_name = config.get("carsi_idp_name", "")
@@ -671,7 +671,7 @@ def _visible_browser_download(
 
         # Let interstitials ("Loading https://...") and auth hops finish before
         # reading the page; evaluating mid-navigation raises.
-        from .browser_pdf import capture_pdf_via_cdp, find_page_pdf_link, wait_page_settled, wait_url_stable
+        from ...browser.pdf import capture_pdf_via_cdp, find_page_pdf_link, wait_page_settled, wait_url_stable
         wait_url_stable(page)
         title, url = wait_page_settled(page)
         log.info(f"   [{publisher}] page: '{title[:40]}' {url[:60]}")
@@ -703,7 +703,7 @@ def _visible_browser_download(
                 return None
             log.info(f"   [{publisher}] page PDF link: {href[:80]}")
             try:  # as the headless path says it (2026-10-19: this one stayed on "opening the window")
-                from .download import progress as _pr
+                from ...download import progress as _pr
                 _pr.item_stage(doi, f"在 {publisher} 找到 PDF 链接，正在打开" if publisher not in ("", "Unknown")
                                else "在出版商官网找到 PDF 链接，正在打开")
             except Exception:
@@ -1520,9 +1520,9 @@ def _try_http_download(
     timeouts cost 52 s a paper and showed nowhere in the log)."""
     import requests
     from urllib.parse import urlparse
-    from .network import USER_AGENT
-    from .download.pdf import _response_looks_pdf, is_pdf_file
-    from .sources.publishers import _write_pdf_atomic, _load_publisher_cookies
+    from ...network import USER_AGENT
+    from ...download.pdf import _response_looks_pdf, is_pdf_file
+    from ...sources.publishers import _write_pdf_atomic, _load_publisher_cookies
 
     host = (urlparse(pdf_url).hostname or "").lower()
     stalled_at = _STALLED_HOSTS.get(host)
@@ -1638,8 +1638,8 @@ def _browser_download_with_fallback(
     window's profile keeps it. The window starts minimized and comes up only
     when the user has to log in or pass a check (``_show_window_for_user``).
     """
-    from .browser_engine import _is_pdf_url, is_available
-    from .download.pdf import is_pdf_file, success
+    from ...browser.engine import _is_pdf_url, is_available
+    from ...download.pdf import is_pdf_file, success
     _clear_error()
     if article_url.startswith("https://doi.org/"):
         article_url = _known_landing_url(doi) or article_url
@@ -1653,12 +1653,12 @@ def _browser_download_with_fallback(
         _set_error("browser_unavailable", "start_browser")
         return False
     try:
-        from .download import progress as _pr
+        from ...download import progress as _pr
         _pr.item_stage(doi, f"正在打开 {publisher} 的页面" if publisher not in ("", "Unknown") else "正在打开出版商官网")
     except Exception:
         pass
     try:
-        from .sources import SourceWaived
+        from ...sources import SourceWaived
     except Exception:  # pragma: no cover
         SourceWaived = ()  # type: ignore[assignment]
     try:
@@ -1688,7 +1688,7 @@ def _persist_api_cookies(session: Any, config: dict[str, Any]) -> int:
 
     Returns the number of cookies persisted.
     """
-    from .browser_cookies import merge_cookies
+    from ...browser.cookies import merge_cookies
 
     raw = []
     meaningful = 0
@@ -1901,7 +1901,7 @@ def _save_elsevier_pdf_content(
     *,
     reject_single_page: bool = False,
 ) -> dict[str, Any] | None:
-    from .download.pdf import is_pdf_file, success
+    from ...download.pdf import is_pdf_file, success
 
     if len(content) < config.get("min_pdf_size_bytes", 10000):
         log.info(f"   [ElsevierAPI] response too small ({len(content)} bytes)")
@@ -2087,14 +2087,14 @@ def _try_elsevier_text_fallback(
         log.info(f"   [ElsevierAPI] full text save failed: {e}")
         return None
     log.info(f"   [ElsevierAPI] saved {len(content)} bytes of full text as {txt_path.name}")
-    from .download.pdf import success
+    from ...download.pdf import success
     return success(doi, txt_path, "ElsevierAPI(Text)")
 
 
 def try_elsevier_api(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
-    from .sources.elsevier_api import fulltext_enabled
+    from ...sources.elsevier_api import fulltext_enabled
     if not fulltext_enabled(config):
         return None  # off in settings, or this key has no full-text entitlement
     return _try_elsevier_api(doi, output_path, config)
@@ -2136,7 +2136,7 @@ def _try_elsevier_api(
                  f"Run litloop_elsevier_setup to configure (free).")
         return None
 
-    from .network import USER_AGENT, proxy_dict, select_proxy_for_url
+    from ...network import USER_AGENT, proxy_dict, select_proxy_for_url
 
     url = f"https://api.elsevier.com/content/article/doi/{doi}"
 
@@ -2279,9 +2279,9 @@ def try_elsevier_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Elsevier/ScienceDirect/Cell Press browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
-    from .browser_engine import is_available as browser_available, download_pdf_via_browser
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
+    from ...browser.engine import is_available as browser_available, download_pdf_via_browser
 
     # Campus network fast-path: skip HTTP, go directly to CloakBrowser
     if _is_campus_network(config) and browser_available(config):
@@ -2340,8 +2340,8 @@ def _cell_press_showpdf_download(
     config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Download a Cell Press showPdf URL via browser network capture."""
-    from .browser_engine import create_tab, close_tab, fetch_url
-    from .download.pdf import success
+    from ...browser.engine import create_tab, close_tab, fetch_url
+    from ...download.pdf import success
 
     tab_id = create_tab("https://example.com", config, timeout=15.0)
     if not tab_id:
@@ -2415,7 +2415,7 @@ def _get_elsevier_pii(doi: str) -> str | None:
     """Get PII (Publisher Item Identifier) from Crossref API."""
     try:
         import requests
-        from .network import USER_AGENT
+        from ...network import USER_AGENT
         resp = requests.get(
             f"https://api.crossref.org/works/{doi}",
             timeout=10, verify=False,
@@ -2442,11 +2442,11 @@ def _resolve_elsevier_pii(doi: str, config: dict[str, Any]) -> str | None:
     import re
     try:
         import requests
-        from .network import USER_AGENT
+        from ...network import USER_AGENT
         s = requests.Session()
         s.trust_env = False
         s.headers.update({"User-Agent": USER_AGENT, "Accept": "text/html"})
-        from .network import apply_host_proxy
+        from ...network import apply_host_proxy
         apply_host_proxy(s, config)
         resp = s.get(f"https://doi.org/{doi}", timeout=10, allow_redirects=True)
         final_url = str(resp.url)
@@ -2478,9 +2478,9 @@ def try_wiley_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Wiley browser strategy with PDFDirect."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
-    from .browser_engine import is_available as browser_available, download_pdf_via_browser
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
+    from ...browser.engine import is_available as browser_available, download_pdf_via_browser
 
     # Campus network fast-path: skip HTTP, go directly to CloakBrowser
     if _is_campus_network(config) and browser_available(config):
@@ -2509,8 +2509,8 @@ def try_ieee_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """IEEE browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     article_url = f"https://doi.org/{doi}"
     if _browser_download_with_fallback(doi, article_url, output_path, config, "IEEE"):
@@ -2523,8 +2523,8 @@ def try_acs_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """ACS browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     # Try direct PDF URL first
     for url in _direct_pdf_urls(doi, "ACS"):
@@ -2543,8 +2543,8 @@ def try_rsc_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """RSC browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     for url in _direct_pdf_urls(doi, "RSC"):
         if _try_http_download(url, output_path, config):
@@ -2562,8 +2562,8 @@ def try_aip_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """AIP browser strategy with loading page wait."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     article_url = f"https://doi.org/{doi}"
     if _browser_download_with_fallback(doi, article_url, output_path, config, "AIP", wait_for_loading=10):
@@ -2576,8 +2576,8 @@ def try_springer_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Springer browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     # Try direct PDF URL first
     for url in _direct_pdf_urls(doi, "Springer"):
@@ -2596,8 +2596,8 @@ def try_aps_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """APS (Physical Review) browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     for url in _direct_pdf_urls(doi, "APS"):
         if _try_http_download(url, output_path, config):
@@ -2615,8 +2615,8 @@ def try_tandfonline_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Taylor & Francis browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     for url in _direct_pdf_urls(doi, "Tandfonline"):
         if _try_http_download(url, output_path, config):
@@ -2634,8 +2634,8 @@ def try_iop_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """IOP browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     for url in _direct_pdf_urls(doi, "IOP"):
         if _try_http_download(url, output_path, config):
@@ -2653,8 +2653,8 @@ def try_oxford_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Oxford Academic browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     for url in _direct_pdf_urls(doi, "Oxford"):
         if _try_http_download(url, output_path, config):
@@ -2672,8 +2672,8 @@ def try_acm_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """ACM browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     for url in _direct_pdf_urls(doi, "ACM"):
         if _try_http_download(url, output_path, config):
@@ -2691,8 +2691,8 @@ def try_nature_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Nature browser strategy (fallback when direct fails)."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     article_url = f"https://doi.org/{doi}"
     if _browser_download_with_fallback(doi, article_url, output_path, config, "Nature"):
@@ -2705,8 +2705,8 @@ def try_science_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Science/AAAS browser strategy."""
-    from .download.pdf import is_pdf_file
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...download.pdf import success
 
     article_url = f"https://doi.org/{doi}"
     if _browser_download_with_fallback(doi, article_url, output_path, config, "Science"):
@@ -2723,8 +2723,8 @@ def try_sage_browser(
     Supports journals.sagepub.com and sage.cnpereading.com regional frontends
     by resolving DOI first and using host-relative PDF candidates.
     """
-    from .download.pdf import is_pdf_file, success
-    from .sources.sage_cn import try_sage_cn_authorized
+    from ...download.pdf import is_pdf_file, success
+    from ...sources.sage_cn import try_sage_cn_authorized
 
     if try_sage_cn_authorized(doi, output_path, config):
         return success(doi, output_path, "SAGE-CN(CARSI)")
@@ -2749,7 +2749,7 @@ def try_asce_browser(
     ASCE challenges plain HTTP requests with Cloudflare, so browser path
     is the primary strategy. DOI case must be uppercased for ASCE URLs.
     """
-    from .download.pdf import is_pdf_file, success
+    from ...download.pdf import is_pdf_file, success
 
     for url in _direct_pdf_urls(doi, "ASCE"):
         if _try_http_download(url, output_path, config):
@@ -2776,7 +2776,7 @@ def try_royalsociety_browser(
     without anti-bot for many articles), then falls back to browser for
     paywalled or Cloudflare-protected content.
     """
-    from .download.pdf import is_pdf_file, success
+    from ...download.pdf import is_pdf_file, success
 
     for url in _direct_pdf_urls(doi, "Royal Society"):
         if _try_http_download(url, output_path, config):
@@ -2802,7 +2802,7 @@ def try_copernicus_direct(
     Copernicus (EGU journals) provides open-access PDFs at predictable URLs.
     Resolves DOI to article page, then constructs PDF URL from article path.
     """
-    from .download.pdf import is_pdf_file, success
+    from ...download.pdf import is_pdf_file, success
     import requests
 
     article_url = f"https://doi.org/{doi}"
@@ -2860,9 +2860,9 @@ def try_generic_browser(
     doi: str, output_path: Path, config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Generic browser fallback for unknown publishers."""
-    from .download.pdf import is_pdf_file
-    from .sources.publishers import get_publisher
-    from .download.pdf import success
+    from ...download.pdf import is_pdf_file
+    from ...sources.publishers import get_publisher
+    from ...download.pdf import success
 
     publisher = get_publisher(doi) or "Unknown"
     article_url = f"https://doi.org/{doi}"

@@ -10,7 +10,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from litloop import elsevier_check as ec
+from litloop.sources import elsevier_check as ec
 from litloop.sources import elsevier_api as ea
 
 CAMPUS_PROXY = "http://127.0.0.1:7890"

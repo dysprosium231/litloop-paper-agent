@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from litloop import _publisher_strategies_core as core
+from litloop.publishers.strategies import _core as core
 
 
 def test_publisher_site_goes_straight_to_its_window(monkeypatch, tmp_path):
-    import litloop.browser_engine as be
+    import litloop.browser.engine as be
     calls = []
     monkeypatch.setattr(be, "is_available", lambda config=None: True)
     monkeypatch.setattr(core, "_visible_browser_download",
@@ -20,7 +20,7 @@ def test_publisher_site_goes_straight_to_its_window(monkeypatch, tmp_path):
 
 
 def test_window_error_is_a_failure_with_a_reason(monkeypatch, tmp_path):
-    import litloop.browser_engine as be
+    import litloop.browser.engine as be
     monkeypatch.setattr(be, "is_available", lambda config=None: True)
 
     def boom(*a, **k):
@@ -69,7 +69,7 @@ def test_no_window_no_change():
 
 @pytest.fixture(scope="module")
 def page():
-    from litloop import browser_backend as bb
+    from litloop.browser import backend as bb
     try:
         b = bb.launch(headless=True)
     except Exception as e:  # no browser on this machine

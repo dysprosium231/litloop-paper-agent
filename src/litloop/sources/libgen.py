@@ -67,7 +67,7 @@ def _try_libgen_mirror(
 
         # Fallback to browser on Cloudflare/403
         if resp.status_code in (403, 503):
-            from ..browser_engine import solve_url, is_available
+            from ..browser.engine import solve_url, is_available
             if config.get("scihub_use_browser", True) and is_available(config):
                 result = solve_url(url, config)
                 if result:

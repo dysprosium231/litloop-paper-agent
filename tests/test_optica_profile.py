@@ -7,7 +7,7 @@ channel with no Optica-specific PDF routes.
 
 import unittest
 
-from litloop.publisher_profiles import (
+from litloop.publishers.profiles import (
     _PROFILE_ALIASES,
     get_publisher_profile,
     infer_publisher_profile,

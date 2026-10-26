@@ -646,7 +646,7 @@ def _resolve_launch_config(config: dict[str, Any] | None) -> dict[str, Any] | No
     if config is not None:
         return config
     try:
-        from .config import load_config
+        from ..config import load_config
         return load_config()
     except Exception:
         return None
@@ -664,7 +664,7 @@ def _direct_args(backend: str, proxy: Any, args: list[str] | None,
         return args
     args = list(args or [])
     if not any(a.startswith(("--no-proxy-server", "--proxy-server", "--proxy-pac-url")) for a in args):
-        from .network import grey_hosts, grey_proxy, host_proxy
+        from ..network import grey_hosts, grey_proxy, host_proxy
         url, hosts = host_proxy(config)
         grey = grey_proxy(config)
         if grey:  # Sci-Hub / LibGen pages opened in the browser go through it too
@@ -984,7 +984,7 @@ def close_browsers_since(t0: float = 0.0, owner: str | None = None) -> int:
     threads then fail fast, and the shared per-thread browser is relaunched on
     next use (browser_engine checks ``is_connected``).
     """
-    from .browser_engine import _tree_kill
+    from .engine import _tree_kill
 
     def hit(ts: float, who: str | None) -> bool:
         return ts >= t0 and (owner is None or who == owner)

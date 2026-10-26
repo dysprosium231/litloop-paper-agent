@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from litloop.download.pipeline import grey_allowed, run_lanes
-from litloop.publisher_strategies.registry import StrategyRegistry
+from litloop.publishers.strategies.registry import StrategyRegistry
 from litloop.download.pipeline import QueueEntry
 
 
@@ -69,7 +69,7 @@ class TestGetForDoiGenericFallback:
         assert strategy.name.lower() == "generic"
 
     def test_known_prefix_prefers_specific_strategy(self):
-        from litloop.publisher_strategies import StrategyRegistry as Reg
+        from litloop.publishers.strategies import StrategyRegistry as Reg
         generic = Reg._by_name.get("generic")
         strategy = Reg.get_for_doi("10.1016/j.foo.2026.01.001")
         assert strategy is not None

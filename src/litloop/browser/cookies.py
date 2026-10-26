@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .log import get_logger
+from ..log import get_logger
 
 log = get_logger()
 
@@ -65,7 +65,7 @@ PUBLISHER_LOGIN_URLS = {
 
 
 def _save_cookies_json(cookies: list[dict[str, Any]], output_path: Path) -> None:
-    from .session_store import keep_private
+    from ..institutional.session_store import keep_private
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(cookies, indent=2, ensure_ascii=False), encoding="utf-8")
     keep_private(output_path)
@@ -87,7 +87,7 @@ def cookies_to_netscape(cookies: list[dict[str, Any]]) -> str:
 
 
 def _save_cookies_netscape(cookies: list[dict[str, Any]], output_path: Path) -> None:
-    from .session_store import keep_private
+    from ..institutional.session_store import keep_private
     output_path.write_text(cookies_to_netscape(cookies), encoding="utf-8")
     keep_private(output_path)
 
@@ -115,8 +115,8 @@ def extract_via_browser(
         Result dict with success, cookies_count, domains, etc.
     """
     try:
-        from .browser_backend import launch
-        from .browser_backend import is_available as _browser_backend_available
+        from .backend import launch
+        from .backend import is_available as _browser_backend_available
         if not _browser_backend_available():
             return {
                 "success": False,
@@ -130,7 +130,7 @@ def extract_via_browser(
             "fix": "pip install patchright (or pip install cloakbrowser)",
         }
 
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache")))
     cookie_file = cache_dir / "publisher_cookies.json"
     netscape_file = cache_dir / "publisher_cookies.txt"
@@ -193,7 +193,7 @@ def extract_via_browser(
         # Import into CloakBrowser server if running
         browser_imported = 0
         try:
-            from .browser_engine import import_cookies, is_available
+            from .engine import import_cookies, is_available
             if is_available(config):
                 browser_imported = import_cookies(netscape_file, config)
         except Exception:
@@ -221,7 +221,7 @@ def extract_via_browser(
 
 def load_saved_cookies(config: dict[str, Any]) -> list[dict[str, Any]]:
     """Load previously saved publisher cookies, filtering out expired ones."""
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
     cookie_file = Path(config.get("cache_dir", str(DATA_DIR / "cache"))) / "publisher_cookies.json"
     if not cookie_file.exists():
         return []
@@ -259,7 +259,7 @@ def merge_cookies(new_cookies: list[dict[str, Any]], config: dict[str, Any]) -> 
 
     Returns the merged cookie list.
     """
-    from .config import DATA_DIR
+    from ..config import DATA_DIR
 
     cache_dir = Path(config.get("cache_dir", str(DATA_DIR / "cache")))
     cookie_file = cache_dir / "publisher_cookies.json"

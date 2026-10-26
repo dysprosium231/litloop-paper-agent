@@ -7,8 +7,8 @@ import time
 
 import pytest
 
-from litloop import _publisher_strategies_core as core
-from litloop import browser_pdf
+from litloop.publishers.strategies import _core as core
+from litloop.browser import pdf as browser_pdf
 
 
 class _GonePage:

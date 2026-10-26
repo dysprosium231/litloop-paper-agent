@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-import litloop.browser_backend as bb
+import litloop.browser.backend as bb
 
 
 @pytest.fixture

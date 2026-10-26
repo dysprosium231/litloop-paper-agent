@@ -97,7 +97,7 @@ def _get_browser_semaphore(config: dict[str, Any]) -> threading.Semaphore:
             if _browser_semaphore is None:
                 _browser_semaphore = threading.Semaphore(max_workers)
     return _browser_semaphore
-from .carsi_source import try_carsi
+from .carsi import try_carsi
 
 __all__ = ["download", "batch_download"]
 
@@ -175,7 +175,7 @@ def _try_source(
         ok = bool(result and result.get("success"))
         log.info(f"   [timing] {label}: {time.time() - t0:.1f}s, {'PDF' if ok else 'no PDF'}")
         if att is not None:
-            from .._publisher_strategies_core import get_last_error
+            from ..publishers.strategies._core import get_last_error
             att.add_step("school" if label in _STEP_TEXT else "free", label, time.time() - t0, result,
                          error=get_last_error())  # this thread's: _try_source_inner cleared it first
     if settled:
@@ -208,7 +208,7 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
         # thread otherwise read the latest error any lane reported, and the
         # Elsevier browser skipped its ScienceDirect attempt (0.0 s, no log)
         # because the previous paper had ended on a paywall (2026-10-17).
-        from .._publisher_strategies_core import _set_error
+        from ..publishers.strategies._core import _set_error
         _set_error("", "")
         sig = inspect.signature(source_fn)
         if "use_tor" in sig.parameters:
@@ -438,7 +438,7 @@ def _step_watchdog(doi: str, label: str, done: threading.Event, config: dict[str
     browsers it opened, so its blocked browser calls fail and the next route
     runs. 2026-10-17: a WebVPN browser step hung over 10 minutes on a page
     that never finished loading, with no timeout of its own firing."""
-    from ..browser_backend import close_browsers_since
+    from ..browser.backend import close_browsers_since
     limit = float(config.get("institutional_step_seconds", 240) or 240)
     since = time.perf_counter()  # close_browsers_since's clock
     deadline = time.time() + limit
@@ -576,7 +576,7 @@ def _run_tiers_parallel(
             # process exit — a long-lived MCP server accumulates Chromium
             # processes. Each worker closes its own browser before exiting.
             try:
-                from ..browser_engine import shutdown_shared_browser
+                from ..browser.engine import shutdown_shared_browser
                 shutdown_shared_browser()
             except Exception:
                 pass
@@ -1073,7 +1073,7 @@ def skip_download(identifier: str) -> bool:
     try:
         from ..download import progress as _pr
         _pr.clear_attention(f"wait:{key}")
-        from ..browser_backend import close_browsers_since
+        from ..browser.backend import close_browsers_since
         close_browsers_since(0.0, owner=key)  # its own windows only
     except Exception as exc:
         log.info(f"   Skip: browser cleanup skipped: {exc}")
@@ -1089,7 +1089,7 @@ def cancel_downloads() -> dict[str, Any]:
         _SETTLED.update(keys)  # sources still running drop results, launch nothing
     closed = 0
     try:
-        from ..browser_backend import close_browsers_since
+        from ..browser.backend import close_browsers_since
         closed = close_browsers_since(0.0)
     except Exception as exc:
         log.info(f"   Cancel: browser cleanup skipped: {exc}")
@@ -1104,7 +1104,7 @@ def _source_may_continue() -> bool:
         return False  # waived lane: its race already returned
     doi = getattr(_SOURCE_TLS, "doi", None)
     if not doi:  # a pool thread working for a source (Sci-Hub's mirror race)
-        from ..browser_backend import current_owner
+        from ..browser.backend import current_owner
         doi = current_owner()
     return not (doi and doi in _SETTLED)
 
@@ -1200,7 +1200,7 @@ def download(
         if steps and isinstance(result, dict):
             result.setdefault("attempts", steps)  # which ways were tried, how long, why they failed
         if result.get("success"):
-            from .._publisher_strategies_core import clear_no_access
+            from ..publishers.strategies._core import clear_no_access
             clear_no_access(key)
             _SKIPPED.discard(key)  # a skip that came too late must not skip the next try
         return result
@@ -1220,7 +1220,7 @@ def download(
         # browser windows open. Close what this download launched (its own
         # browsers only, so a concurrent download keeps its windows).
         try:
-            from ..browser_backend import close_browsers_since
+            from ..browser.backend import close_browsers_since
             n = close_browsers_since(t0, owner=key)
             if n:
                 log.info(f"   Closed {n} browser(s) left open by this download")
@@ -1426,7 +1426,7 @@ def _download_impl(
 
     # Phase 2: Institutional access — only when Phase 1 failed
     # Skip institutional fallback for grey_only/scihub_only strategy
-    from .._publisher_strategies_core import no_access
+    from ..publishers.strategies._core import no_access
     if _institutional and no_access(doi) and not config.get("school_routes_after_publisher_login", False):
         log.info("   Logged into the publisher as the school and still no full text: skipping the school routes")
         return fail(identifier, "the school does not subscribe: logged into the publisher with the school's identity, still no full text",
@@ -1437,7 +1437,7 @@ def _download_impl(
         # for 16 minutes and the WebVPN step queued 697 s behind it. Phase 1 is
         # over, so close what it opened before the school routes need a browser.
         try:
-            from ..browser_backend import close_browsers_since
+            from ..browser.backend import close_browsers_since
             n = close_browsers_since(p_phase, owner=getattr(_DL_TLS, "key", None) or doi)
             if n:
                 log.info(f"   Closed {n} browser(s) phase 1 left open")
@@ -1447,7 +1447,7 @@ def _download_impl(
         # before racing them (WebVPN only; CARSI self-heals inside login()).
         t_heal = time.time()
         try:
-            from ..session_heal import ensure_institutional_sessions
+            from ..institutional.session_heal import ensure_institutional_sessions
             heal_report = ensure_institutional_sessions(
                 config, use_vpnsci=use_vpnsci or bool(config.get("vpnsci_enabled")))
             for channel, state in heal_report.items():
@@ -1799,7 +1799,7 @@ def institutional_download(
     output_path = target_dir / f"{safe_filename(identifier)}.pdf"
     if heal:
         try:
-            from ..session_heal import ensure_institutional_sessions
+            from ..institutional.session_heal import ensure_institutional_sessions
             for channel, state in ensure_institutional_sessions(
                     config, use_vpnsci=use_vpnsci or bool(config.get("vpnsci_enabled"))).items():
                 log.info(f"   [session-heal] {channel}: {state.get('status')}")
@@ -1812,7 +1812,7 @@ def institutional_download(
     result = _run_institutional_sequence(inst_sources, doi, target_dir, output_path, config)
     if not result:
         return None
-    from .._publisher_strategies_core import clear_no_access
+    from ..publishers.strategies._core import clear_no_access
     clear_no_access(doi)  # the school routes got it: "not subscribed" was wrong
     _update_doi_index(target_dir, doi, Path(result.get("file", "")), source=result.get("source") or "",
                       strategy=config.get("download_strategy", ""), config=config)
@@ -2076,7 +2076,7 @@ def _close_batch_browsers(t0: float, identifiers: list[str]) -> None:
         log.info(f"Batch cleanup skipped: {len(foreign)} unrelated download(s) in flight")
         return
     try:
-        from ..browser_backend import close_browsers_since
+        from ..browser.backend import close_browsers_since
         n = close_browsers_since(t0)
         if n:
             log.info(f"Batch cleanup: closed {n} browser(s) left open by this batch")
@@ -2084,7 +2084,7 @@ def _close_batch_browsers(t0: float, identifiers: list[str]) -> None:
         log.info(f"Batch browser cleanup skipped: {exc}")
 
 try:
-    from .. import browser_backend as _bb
+    from ..browser import backend as _bb
     _bb.LAUNCH_GUARD = _source_may_continue
     # A browser belongs to the paper the launching thread works for.
     _bb.OWNER = lambda: getattr(_SOURCE_TLS, "doi", None) or getattr(_DL_TLS, "key", None)

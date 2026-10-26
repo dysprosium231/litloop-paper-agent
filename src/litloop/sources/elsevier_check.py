@@ -17,7 +17,7 @@ from typing import Any
 
 import requests
 
-from .network import configured_proxy
+from ..network import configured_proxy
 
 PREMIUM_DOI = "10.1016/S0140-6736(20)30183-5"        # Lancet 知名付费论文（2026-08 实测 200）
 OA_CONTROL_DOI = "10.1016/j.jenvman.2023.118901"      # 无 key 可得的公开对照（实测 200）

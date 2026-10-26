@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from litloop import domain_db
+from litloop.sources import scihub_domains as domain_db
 from litloop.download import pipeline
 from litloop.download.pipeline import QueueEntry
 from litloop.sources import scihub
@@ -75,7 +75,7 @@ class InstitutionalParallelTests(unittest.TestCase):
 
     def _run(self, dois, workers, mock_cls):
         entries = [QueueEntry(identifier=d, channel="institution") for d in dois]
-        with patch("litloop.institutional.fetcher.PaperFetcher", mock_cls), \
+        with patch("litloop.download.fetcher.PaperFetcher", mock_cls), \
              patch("litloop.institutional.config_adapter.ConfigAdapter") as mock_cfg:
             mock_cfg.load.return_value = MagicMock(_config={})
             pipeline.run_lanes(entries, self.out, config=self._cfg(workers), allow_grey=False)
@@ -175,7 +175,7 @@ class OaBrowserFallbackTests(unittest.TestCase):
         entries = [QueueEntry(identifier="10.1002/agg2.20145",
                               channel="oa", oa_url="https://onlinelibrary.wiley.com/doi/pdfdirect/x")]
         with patch.object(pipeline, "_download_url", return_value=None), \
-             patch("litloop.browser_engine.download_pdf_via_browser",
+             patch("litloop.browser.engine.download_pdf_via_browser",
                           return_value=True) as mock_browser, \
              patch("builtins.open", create=True):
             r = pipeline._run_fast_lane(entries, self.out, {"workers": 1})
@@ -188,7 +188,7 @@ class OaBrowserFallbackTests(unittest.TestCase):
                               channel="oa", oa_url="https://onlinelibrary.wiley.com/doi/pdfdirect/x")]
         cfg = {"workers": 1, "oa_browser_fallback": False}
         with patch.object(pipeline, "_download_url", return_value=None), \
-             patch("litloop.browser_engine.download_pdf_via_browser",
+             patch("litloop.browser.engine.download_pdf_via_browser",
                           side_effect=AssertionError("must not run when disabled")):
             r = pipeline._run_fast_lane(entries, self.out, cfg)
         self.assertFalse(r[0]["success"])

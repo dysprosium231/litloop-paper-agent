@@ -61,7 +61,7 @@ def _check_sources(config: dict[str, Any]) -> dict[str, Any]:
 
     # CloakBrowser
     try:
-        from .browser_engine import is_available
+        from .browser.engine import is_available
         cb_available = is_available(config)
         sources["cloakbrowser"] = cb_available
     except Exception:

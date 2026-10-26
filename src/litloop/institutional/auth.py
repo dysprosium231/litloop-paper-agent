@@ -14,9 +14,9 @@ from Crypto.Cipher import AES
 from .session_store import CookieStore
 
 try:
-    from .browser_backend import launch
-    from .browser_backend import BACKEND_CAMOUFOX, BACKEND_CLOAKBROWSER, BACKEND_PATCHRIGHT
-    from .browser_backend import is_available as _browser_backend_available
+    from ..browser.backend import launch
+    from ..browser.backend import BACKEND_CAMOUFOX, BACKEND_CLOAKBROWSER, BACKEND_PATCHRIGHT
+    from ..browser.backend import is_available as _browser_backend_available
     _HAS_CLOAKBROWSER = any(
         _browser_backend_available(b)
         for b in (BACKEND_PATCHRIGHT, BACKEND_CLOAKBROWSER, BACKEND_CAMOUFOX)
@@ -256,7 +256,7 @@ class WebVPNAuth:
             return False
 
         try:
-            from .browser_backend import launch_persistent_context
+            from ..browser.backend import launch_persistent_context
             profile_dir = _get_profile_dir(self.config)
             profile_dir.mkdir(parents=True, exist_ok=True)
             self._context = launch_persistent_context(

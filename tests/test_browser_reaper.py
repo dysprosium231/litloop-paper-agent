@@ -10,7 +10,7 @@ after a 200-paper batch: 2 browsers / 10 chrome processes survived.
 import unittest
 from unittest.mock import Mock, patch
 
-from litloop import browser_engine as be
+from litloop.browser import engine as be
 
 
 def _make_broken(proc):
@@ -33,7 +33,7 @@ class TreeKillTests(unittest.TestCase):
         proc = Mock()
         proc.poll.return_value = None
         proc.pid = 4242
-        with patch("litloop.browser_engine.os") as mock_os,              patch("litloop.browser_engine.subprocess.run") as run:
+        with patch("litloop.browser.engine.os") as mock_os,              patch("litloop.browser.engine.subprocess.run") as run:
             mock_os.name = "nt"
             be._tree_kill(proc)
         args = run.call_args[0][0]
@@ -43,8 +43,8 @@ class TreeKillTests(unittest.TestCase):
     def test_posix_uses_proc_kill(self):
         proc = Mock()
         proc.poll.return_value = None
-        with patch("litloop.browser_engine.os") as mock_os, \
-             patch("litloop.browser_engine.subprocess.run") as run:
+        with patch("litloop.browser.engine.os") as mock_os, \
+             patch("litloop.browser.engine.subprocess.run") as run:
             mock_os.name = "posix"
             be._tree_kill(proc)
         proc.kill.assert_called_once()
@@ -58,7 +58,7 @@ class TreeKillTests(unittest.TestCase):
         import multiprocessing as mp
 
         proc = mp.Process(target=lambda: None)  # never started → not alive
-        with patch("litloop.browser_engine.subprocess.run") as run:
+        with patch("litloop.browser.engine.subprocess.run") as run:
             be._tree_kill(proc)
         run.assert_not_called()  # dead (not started) → skipped
 
@@ -70,8 +70,8 @@ class TreeKillTests(unittest.TestCase):
         proc.start()
         try:
             self.assertTrue(proc.is_alive())
-            with patch("litloop.browser_engine.os") as mock_os, \
-                 patch("litloop.browser_engine.subprocess.run") as run:
+            with patch("litloop.browser.engine.os") as mock_os, \
+                 patch("litloop.browser.engine.subprocess.run") as run:
                 mock_os.name = "posix"
                 be._tree_kill(proc)
             run.assert_not_called()
@@ -95,7 +95,7 @@ class ReaperTests(unittest.TestCase):
     def test_graceful_close_no_kill(self):
         b = Mock()
         be._LIVE_BROWSERS.add(b)
-        with patch("litloop.browser_engine._tree_kill") as tk:
+        with patch("litloop.browser.engine._tree_kill") as tk:
             be._reap_browsers_at_exit()
         b.close.assert_called_once()
         tk.assert_called_once()  # verify-then-kill backstop still checks
@@ -105,7 +105,7 @@ class ReaperTests(unittest.TestCase):
         proc.poll.return_value = None
         b = _make_broken(proc)
         be._LIVE_BROWSERS.add(b)
-        with patch("litloop.browser_engine._tree_kill") as tk:
+        with patch("litloop.browser.engine._tree_kill") as tk:
             be._reap_browsers_at_exit()
         tk.assert_called_once_with(proc)
 
