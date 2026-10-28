@@ -311,12 +311,11 @@ def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str
         legal_sources.append((try_openalex_content_api, "OpenAlexContent"))
 
     # Grey / shadow-library sources (Sci-Hub, SciBban, LibGen) are all gated
-    # by scihub_enabled. The fallback mirrors config.DEFAULT_CONFIG (True):
-    # grey sources are a core, default-on capability and a partial config
-    # dict must not silently disable them. Opt-out is explicit
-    # (scihub_enabled=false / strategy=legal_only).
+    # by scihub_enabled and are off unless the user turned it on (CHARTER: the
+    # user must choose them explicitly; config.DEFAULT_CONFIG has False). A
+    # partial config dict without the key therefore means off, never on.
     grey_sources: list[tuple[Any, str]] = []
-    if config.get("scihub_enabled", True):
+    if config.get("scihub_enabled", False):
         from .scihub import recently_absent, too_new
         new = too_new(doi, config)  # published in or after scihub_skip_from_year
         if not new:
@@ -327,7 +326,7 @@ def _build_free_sources(doi: str, config: dict[str, Any]) -> list[tuple[Any, str
 
     if strategy == "scihub_only":
         # Only Sci-Hub (not SciBban, not LibGen)
-        return sort_sources([(try_scihub, "Sci-Hub")]) if config.get("scihub_enabled", True) else []
+        return sort_sources([(try_scihub, "Sci-Hub")]) if config.get("scihub_enabled", False) else []
     elif strategy == "grey_only":
         return sort_sources(grey_sources)
     elif strategy == "legal_only":
@@ -1702,7 +1701,7 @@ def _school_routes_each(failed_dois, output_dir, config, batch_id, results_map, 
             result = {"success": True, "doi": doi, "identifier": doi, "file": str(existing), "source": "local_cache"}
         else:
             log.info(f"   [Batch] Phase 2 (school routes): {doi}")
-            result = download(doi, output_dir, scihub_enabled=config.get("scihub_enabled", True), use_vpnsci=True,
+            result = download(doi, output_dir, scihub_enabled=config.get("scihub_enabled", False), use_vpnsci=True,
                               _institutional=True, _batch=True, _school_only=True)
         results_map[doi] = result
         _save_progress(batch_id, doi, result)

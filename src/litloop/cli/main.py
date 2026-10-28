@@ -529,7 +529,11 @@ def batch_fetch_cmd(
     # Auto-detect: if download_strategy is grey/scihub-oriented, switch to racing engine
     _cfg = _load_config()
     _strategy = _cfg.get("download_strategy", "fastest")
-    _auto_scihub = scihub or _strategy in ("scihub_only", "grey_only", "scihub_first")
+    # A grey-oriented strategy only switches engines when the user also allowed
+    # grey sources; scihub_enabled=false is a veto (download.pipeline.grey_allowed).
+    # --scihub on this command is itself the user's explicit choice.
+    _auto_scihub = scihub or (_strategy in ("scihub_only", "grey_only", "scihub_first")
+                              and bool(_cfg.get("scihub_enabled", False)))
     if not scihub and _auto_scihub:
         print(f"  Auto-switching to Sci-Hub racing engine (download_strategy={_strategy})")
 

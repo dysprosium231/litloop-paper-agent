@@ -82,7 +82,7 @@ def _check_sources(config: dict[str, Any]) -> dict[str, Any]:
     sources["carsi"] = bool(config.get("carsi_cookies"))
 
     # Sci-Hub
-    sources["scihub"] = config.get("scihub_enabled", True)
+    sources["scihub"] = config.get("scihub_enabled", False)
 
     return sources
 

@@ -3,6 +3,15 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-28：灰色来源保留、默认关闭；修好两处绕过开关的写法
+
+- **用户的决定**：Sci-Hub、LibGen、Tor 和自动化 WebVPN 登录不拆成单独的插件，功能保留，默认关闭（回答 2026-10-23 外部审查第 9 条）。
+- **现状**（2026-10-28 核对）：仓库公开；这些功能继承自原项目 scansci-pdf。`config.DEFAULT_CONFIG` 里 `scihub_enabled` 为 False，Sci-Hub、SciBban、LibGen 都由它控制，首次引导要用户明确选择，README 写明默认关闭。WebVPN 自动登录走学校授权的通道、登录由用户本人完成，和前三项不同。
+- **查出两处绕过“默认关闭”的写法，已修**：
+  - `sources/__init__.py` 里决定用不用灰色来源时写的是 `config.get("scihub_enabled", True)`，配置字典里没有这个键就当开启，旁边还留着原项目“灰色来源默认开启”的注释。正常启动时配置会和默认值合并，键一定在，所以平时没出事；但任何传入不完整配置的调用都会悄悄打开 Sci-Hub、LibGen。另两处（第二阶段学校通道、`cli/web.py` 的显示）也是同样写法。全部改成缺省为关。
+  - `litloop batch` 命令：`download_strategy` 设成 Sci-Hub 优先一类时，即使 `scihub_enabled` 为关，也会换用包含 Sci-Hub 的竞速引擎。其他路径（`download.pipeline.grey_allowed`）都把“关”当否决，这条没有。改为两者都满足才换；命令上明写 `--scihub` 仍算用户当次的明确选择。
+- **回归测试** `tests/test_grey_default_off.py`：不带这个键的配置里没有任何灰色来源；`batch` 在“策略偏向 Sci-Hub、开关为关”时不开 Sci-Hub、开关为开时才开。两条都核对过：把修复改回去时测试失败（第一版 `batch` 测试用的 DOI 被列表解析器拒掉，命令没走到那一步，改用真实 DOI 后才真正覆盖到）。
+
 ## 2026-10-26：Windows 上读共享文件偶尔失败
 
 - **发现**：07fa70a 的 CI 在 10 个任务里只挂了 Windows + Python 3.11 一个：`test_agent_runner.py::test_a_run_reports_the_session_it_saved` 读运行状态文件时 `PermissionError`。同一份源码在上一次 CI（15c08b2）里是过的，那次提交也没改源码，所以不是模块整理弄坏的。
