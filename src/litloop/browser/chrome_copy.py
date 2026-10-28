@@ -71,7 +71,7 @@ def is_chrome_copy(exe: Path) -> bool:
 def _copy_running() -> bool:
     try:
         out = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {_RUNNING_NAME}", "/NH"],
-                             capture_output=True, text=True, timeout=10).stdout
+                             capture_output=True, text=True, timeout=10, errors="replace").stdout or ""
     except Exception:
         return False
     return _RUNNING_NAME.lower() in out.lower()

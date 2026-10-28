@@ -3,6 +3,12 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-10-28：子进程输出解码失败不再崩溃
+
+- 现象：出版商官网（Elsevier）打开持久浏览器时报 `'NoneType' object has no attribute 'lower'`，退回临时浏览器。
+- 原因：`browser/chrome_copy.py` 用 `tasklist` 查浏览器副本是否在运行，输出是 GBK；在 UTF-8 模式（`PYTHONUTF8=1`）下解码失败，`stdout` 变成 `None`，再调用 `.lower()` 就崩了。`browser/backend.py` 读系统浏览器版本的 PowerShell 调用也有同样的写法。
+- 修复：两处都加 `errors="replace"`，并在没有输出时当作空字符串。测试 `tests/test_subprocess_decode.py`：去掉修复会失败。
+
 ## 2026-10-28：下载后核对是不是这篇论文
 
 - **发现**：整理工作目录时查 `~/.litloop/papers` 的 61 篇 PDF（只读）：57 篇前 3 页印着自己的 DOI；没印的 4 篇里，`Icin2021_Dye_Removal_…_10.1016_j.ceramint.2021.06.118.pdf` 实际是 JSTOR 上的葡萄牙语文学评论（Cacciari《Nomes de lugar: confim》），10-17 由“迟到捕获”收下。

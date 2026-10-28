@@ -145,8 +145,8 @@ def _probe_windows_versions() -> dict[str, str]:
     try:
         out = subprocess.run(
             ["powershell", "-NoProfile", "-Command", script],
-            capture_output=True, text=True, timeout=10,
-        ).stdout
+            capture_output=True, text=True, timeout=10, errors="replace",
+        ).stdout or ""
     except Exception:
         return {}
     result: dict[str, str] = {}
