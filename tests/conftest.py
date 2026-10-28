@@ -54,3 +54,13 @@ def _no_doi_check(monkeypatch):
     real = doi_check.registered
     monkeypatch.setattr(doi_check, "registered", lambda doi, timeout=6.0: None)
     doi_check._real_registered = real
+
+
+@pytest.fixture(autouse=True)
+def _no_title_lookup(monkeypatch):
+    """A downloaded PDF that does not print its DOI is checked against the title
+    from Crossref (download.pdf.paper_check); tests' made-up DOIs must not reach
+    the network, and with no title the check answers "unknown" (accepted).
+    A test of the check sets a title with download.pdf._TITLE_CACHE."""
+    from litloop.download import pdf
+    monkeypatch.setattr(pdf, "_title_of", lambda doi, config: pdf._TITLE_CACHE.get(doi, ""))

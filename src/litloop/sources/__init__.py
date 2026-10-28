@@ -154,6 +154,17 @@ def _cleanup_stale_files(target_dir: Path) -> None:
         log.info(f"Cleaned up {count} stale temp files")
 
 
+def _is_wrong_paper(path: Path, doi: str, config: dict[str, Any], label: str) -> bool:
+    """True when the PDF a source produced is a different paper (download.pdf.paper_check)."""
+    from ..download.pdf import paper_check
+    t = time.time()
+    verdict = paper_check(path, doi, config)
+    log.info(f"   [timing] {label} paper check: {(time.time() - t) * 1000:.0f}ms ({verdict})")
+    if verdict == "wrong":
+        log.info(f"   WRONG PAPER {label}: neither the DOI nor the title is on its first pages")
+    return verdict == "wrong"
+
+
 def _try_source(
     source_fn: Any, doi: str, output_path: Path, config: dict[str, Any], label: str, use_tor: bool = False
 ) -> dict[str, Any] | None:
@@ -229,6 +240,10 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
                         log.info(f"   SUSPICIOUS {label}: PDF appears to be a preview/cover page, not full text")
                         record_result(label, False, latency_ms, "suspicious_pdf")
                         return suspicious_pdf(doi, fp, label)
+                    if fp.exists() and _is_wrong_paper(fp, doi, config, label):
+                        record_result(label, False, latency_ms, "wrong_paper")
+                        from ..download.pdf import wrong_paper
+                        return wrong_paper(doi, fp, label)
                 record_result(label, True, latency_ms)
             else:
                 error_type = classify_error(result.get("status_code", 0))
@@ -243,7 +258,7 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
         # Check if a valid PDF was actually written to disk despite the exception
         # (common with Sci-Hub: browser download succeeds but post-download logic raises)
         from ..download.pdf import is_pdf_file as _is_pdf
-        if output_path.exists() and _is_pdf(output_path):
+        if output_path.exists() and _is_pdf(output_path) and not _is_wrong_paper(output_path, doi, config, label):
             log.info(f"   OK {label} (recovered after {error_type})")
             record_result(label, True, latency_ms)
             return {"success": True, "identifier": doi, "doi": doi,
@@ -722,6 +737,8 @@ def _run_tiers_parallel(
                 if is_suspicious_pdf(src_output, doi):
                     log.info(f"   SUSPICIOUS {label} (file scan): skipping suspicious PDF")
                     continue
+                if _is_wrong_paper(src_output, doi, config, f"{label} (file scan)"):
+                    continue
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 if output_path.exists():
                     output_path.unlink()
@@ -821,14 +838,8 @@ def _files_claimed_by_other_dois(target_dir: Path, doi: str) -> set[str]:
 
 def _pdf_mentions_doi(path: Path, doi: str, pages: int = 3) -> bool:
     """True when the DOI appears in the first pages' text (publisher PDFs print it)."""
-    try:
-        import pymupdf
-        with pymupdf.open(path) as pdf:
-            text = "".join(pdf[i].get_text() for i in range(min(pages, pdf.page_count)))
-    except Exception:
-        return False
-    flat = "".join(text.lower().split())
-    return doi.lower() in flat
+    from ..download.pdf import doi_printed
+    return doi_printed(path, doi, pages)
 
 
 def _same_dir(a: Path, b: Path) -> bool:
@@ -1272,6 +1283,12 @@ def _download_impl(
     cached = cache_get(identifier, config)
     if cached and cached.get("success"):
         cached_file = Path(cached.get("file", ""))
+        cached_doi = str(cached.get("doi") or "")
+        # A result cached before the paper check existed may be a different paper
+        # (a JSTOR essay came back from the cache for a Ceramics International DOI, 2026-10-28).
+        if cached_file.is_file() and cached_doi and _is_wrong_paper(cached_file, cached_doi, config, "cache"):
+            log.info("   The cached file is a different paper; downloading again")
+            cached_file = Path("")
         if cached_file.is_file() and not _same_dir(cached_file.parent, target_dir):
             # Got before into another folder (the save location has changed since,
             # 2026-10-19): the user expects it here. Copy it, no new download.
@@ -1482,8 +1499,12 @@ def _download_impl(
     # then scan for any PDFs that were saved to disk by racing threads.
     import time as _time
     _time.sleep(2)  # grace period for browser threads to finish writing
+    from ..download.pdf import is_pdf_file
     for p in target_dir.glob(f"{safe_filename(identifier)}*.pdf"):
-        if p.stat().st_size > 5000:
+        # Only a whole PDF of this very paper: a racing thread may have left a
+        # different paper under this name (Sci-Hub mapped a Ceramics
+        # International DOI to a JSTOR essay; it was taken here, 2026-10-17).
+        if p.stat().st_size > 5000 and is_pdf_file(p) and not _is_wrong_paper(p, doi, config, "late capture"):
             result = {
                 "success": True, "identifier": identifier, "doi": doi,
                 "file": str(p), "source": "late_capture",

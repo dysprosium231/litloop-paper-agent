@@ -124,6 +124,74 @@ def is_suspicious_pdf(path: Path, doi: str = "") -> bool:
         return False
 
 
+def _first_pages_text(path: Path, pages: int = 3) -> str:
+    try:
+        import pymupdf
+        with pymupdf.open(path) as pdf:
+            return "".join(pdf[i].get_text() for i in range(min(pages, pdf.page_count)))
+    except Exception:
+        return ""
+
+
+def doi_printed(path: Path, doi: str, pages: int = 3) -> bool:
+    """True when the DOI appears in the first pages' text (publisher PDFs print it)."""
+    return bool(doi) and doi.lower() in "".join(_first_pages_text(path, pages).lower().split())
+
+
+_TITLE_CACHE: dict[str, str] = {}
+_TITLE_SHARE = 0.6  # share of the title's words that must be on the first pages (own value)
+
+
+def _title_of(doi: str, config: dict[str, Any] | None) -> str:
+    """The paper's title from Crossref, asked once per DOI ("" when unknown)."""
+    if doi not in _TITLE_CACHE:
+        from ..citations.formats import fetch_metadata
+        meta = fetch_metadata(doi, config or {}) or {}
+        titles = meta.get("title") or []
+        _TITLE_CACHE[doi] = str(titles[0]) if titles else ""
+    return _TITLE_CACHE[doi]
+
+
+def paper_check(path: Path, doi: str, config: dict[str, Any] | None = None) -> str:
+    """Is this PDF the paper ``doi`` names?
+
+    "match": the DOI is printed in the first pages (57 of 61 downloaded papers,
+    2026-10-26), or, when it is not, most of the title's words are there.
+    "wrong": neither, and the title was there to compare (Sci-Hub served a JSTOR
+    essay for a Ceramics International DOI, 2026-10-28). "unknown": not a DOI,
+    no text to read (a scan without OCR) or no title to compare; accepted, since
+    the check must not block a download it cannot judge.
+    """
+    if not doi or not doi.startswith("10."):
+        return "unknown"
+    text = _first_pages_text(path)
+    if len(text.strip()) < 200:
+        return "unknown"
+    if doi.lower() in "".join(text.lower().split()):
+        return "match"
+    from ..terms.text import STOPWORDS, plain
+    words = {w for w in re.findall(r"[a-z0-9]+", plain(_title_of(doi, config)))
+             if len(w) >= 4 and w not in STOPWORDS}
+    if not words:
+        return "unknown"
+    page = plain(text)
+    found = sum(1 for w in words if w in page)
+    return "match" if found / len(words) >= _TITLE_SHARE else "wrong"
+
+
+def wrong_paper(identifier: str, file_path: Path, source_label: str) -> dict[str, Any]:
+    """Build a result dict for a PDF that is a different paper."""
+    return {
+        "success": False,
+        "identifier": identifier,
+        "doi": identifier,
+        "file": str(file_path),
+        "source": source_label,
+        "error_type": "wrong_paper",
+        "reason": "PDF is a different paper (neither its DOI nor its title is on the first pages)",
+    }
+
+
 def suspicious_pdf(identifier: str, file_path: Path, source_label: str) -> dict[str, Any]:
     """Build a result dict for a suspicious/preview PDF (not full text)."""
     return {
