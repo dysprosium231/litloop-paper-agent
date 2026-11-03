@@ -923,6 +923,51 @@ def _try_browser(
     return resp
 
 
+def _await_slow_pdfs(pending: dict[Any, tuple[str, Path]],
+                     config: dict[str, Any]) -> tuple[Any, dict[str, Any]] | None:
+    """Wait for backup lanes whose PDF is already streaming but missed the race.
+
+    Only lanes with a growing ``.part`` file are worth waiting for: a lane that
+    has not started writing is not about to deliver a PDF. Each waits at most
+    ``scihub_slow_pdf_seconds`` in total and is dropped after
+    ``scihub_slow_pdf_idle_seconds`` without new bytes.
+    """
+    total = float(config.get("scihub_slow_pdf_seconds", 90) or 0)
+    if total <= 0 or not pending:
+        return None
+    idle = float(config.get("scihub_slow_pdf_idle_seconds", 30) or 30)
+    deadline = time.monotonic() + total
+    last_size: dict[Any, int] = {}
+    grew_at: dict[Any, float] = {}
+    while pending:
+        now = time.monotonic()
+        for future in list(pending):
+            if future.done():
+                pending.pop(future)
+                try:
+                    result = future.result()
+                except Exception:
+                    result = None
+                if result and result.get("success"):
+                    return future, result
+                continue
+            src = pending[future][1]
+            part = src.with_suffix(src.suffix + ".part")
+            try:
+                size = part.stat().st_size
+            except OSError:
+                size = 0
+            if size > last_size.get(future, 0):
+                last_size[future] = size
+                grew_at[future] = now
+            elif future not in grew_at or now - grew_at[future] > idle:
+                pending.pop(future)  # never started writing, or it stalled
+        if not pending or time.monotonic() >= deadline:
+            break
+        time.sleep(0.5)
+    return None
+
+
 def download_pdf_from_scihub(
     url: str,
     output_path: Path,
@@ -1248,6 +1293,25 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
     pool = _race_pool(config)
     race_over = threading.Event()
 
+    def _adopt(domain: str, result: dict[str, Any]) -> dict[str, Any]:
+        final_path = Path(result.get("file", ""))
+        if final_path != output_path and final_path.exists():
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            if output_path.exists():
+                output_path.unlink()
+            final_path.rename(output_path)
+            result["file"] = str(output_path)
+        for _, other_path in futures.values():
+            if other_path != output_path and other_path.exists():
+                try:
+                    other_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+        record_result(domain, True, config)
+        log.info(f"   Sci-Hub: OK {domain}")
+        race_over.set()
+        return result
+
     futures = {}
     for domain in remaining:
         src_output = output_path.parent / f"{output_path.stem}_scihub_{domain.split('//')[1].replace('.', '_')}.pdf"
@@ -1263,23 +1327,7 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
             except Exception:
                 result = None
             if result and result.get("success"):
-                final_path = Path(result.get("file", ""))
-                if final_path != output_path and final_path.exists():
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    if output_path.exists():
-                        output_path.unlink()
-                    final_path.rename(output_path)
-                    result["file"] = str(output_path)
-                for _, other_path in futures.values():
-                    if other_path != output_path and other_path.exists():
-                        try:
-                            other_path.unlink(missing_ok=True)
-                        except OSError:
-                            pass
-                record_result(domain, True, config)
-                log.info(f"   Sci-Hub: OK {domain}")
-                race_over.set()
-                return result
+                return _adopt(domain, result)
             else:
                 if not _said_absent(domain, fail_notes):
                     record_result(domain, False, config)
@@ -1290,6 +1338,14 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
                         pass
     except TimeoutError:
         log.info("   Sci-Hub: backup domains timed out")
+    # A mirror that found the PDF but streams it slowly loses the 45 s race
+    # while its file is still growing on disk (sci.bban.top serves at a few
+    # hundred KB/s). Give those lanes a longer leash instead of calling the
+    # download a failure and fetching the paper again later.
+    pending = {f: v for f, v in futures.items() if not f.done()}
+    slow = _await_slow_pdfs(pending, config)
+    if slow is not None:
+        return _adopt(futures[slow[0]][0], slow[1])
     for _, src_output in futures.values():
         if src_output.exists():
             try:

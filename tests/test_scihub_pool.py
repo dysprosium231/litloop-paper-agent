@@ -147,5 +147,74 @@ class LateLaneCleanupTests(unittest.TestCase):
         self.assertTrue((self.dir / "final.pdf").exists())
 
 
+class SlowPdfTests(unittest.TestCase):
+    """A mirror still streaming its PDF at the 45 s mark gets more time."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.dir, ignore_errors=True))
+        self.src = self.dir / "10.1000_x_scihub_sci-hub_al.pdf"
+        self.part = self.src.with_suffix(".pdf.part")
+
+    def test_a_lane_still_writing_is_awaited(self):
+        from concurrent.futures import Future
+
+        future = Future()
+        self.part.write_bytes(b"x" * 10)
+
+        def writer():
+            import time
+
+            for _ in range(3):
+                time.sleep(0.2)
+                self.part.write_bytes(b"x" * (self.part.stat().st_size + 10))
+            self.part.rename(self.src)
+            future.set_result({"success": True, "file": str(self.src)})
+
+        threading.Thread(target=writer, daemon=True).start()
+        got = scihub._await_slow_pdfs(
+            {future: ("https://sci-hub.al", self.src)},
+            {"scihub_slow_pdf_seconds": 5, "scihub_slow_pdf_idle_seconds": 5},
+        )
+        self.assertIsNotNone(got)
+        self.assertEqual(got[0], future)
+        self.assertTrue(got[1]["success"])
+
+    def test_a_lane_that_never_started_writing_is_not_awaited(self):
+        from concurrent.futures import Future
+
+        future = Future()
+        got = scihub._await_slow_pdfs(
+            {future: ("https://sci-hub.al", self.src)},
+            {"scihub_slow_pdf_seconds": 5},
+        )
+        self.assertIsNone(got)
+
+    def test_a_stalled_download_is_dropped(self):
+        from concurrent.futures import Future
+
+        future = Future()
+        self.part.write_bytes(b"x" * 10)
+        got = scihub._await_slow_pdfs(
+            {future: ("https://sci-hub.al", self.src)},
+            {"scihub_slow_pdf_seconds": 5, "scihub_slow_pdf_idle_seconds": 0.2},
+        )
+        self.assertIsNone(got)
+
+    def test_the_extra_wait_can_be_switched_off(self):
+        from concurrent.futures import Future
+
+        future = Future()
+        self.part.write_bytes(b"x" * 10)
+        got = scihub._await_slow_pdfs(
+            {future: ("https://sci-hub.al", self.src)},
+            {"scihub_slow_pdf_seconds": 0},
+        )
+        self.assertIsNone(got)
+
+
 if __name__ == "__main__":
     unittest.main()
