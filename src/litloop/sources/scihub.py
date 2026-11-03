@@ -80,6 +80,28 @@ def _submit(pool: ThreadPoolExecutor, fn: Any, *args: Any, **kwargs: Any) -> Any
     return pool.submit(run, *args, **kwargs)
 
 
+def _lane_that_cleans_up(fn: Any, doi: str, domain: str, src_output: Path,
+                         config: dict[str, Any], use_tor: bool,
+                         fail_notes: list[str] | None, race_over: threading.Event) -> Any:
+    """One mirror lane of the Sci-Hub race.
+
+    The race returns as soon as a mirror delivers, and the other lanes keep
+    running in the background; the cleanup at that moment cannot see a file a
+    loser is still writing, so "<doi>_Sci-Hub_scihub_<mirror>.pdf" stayed in
+    the folder (2026-11-03). Each lane drops its own copy once the race is
+    over. A winner has already renamed its file to the download path, so
+    nothing left on the lane's own path is read by anyone.
+    """
+    try:
+        return fn(doi, domain, src_output, config, use_tor, fail_notes)
+    finally:
+        if race_over.is_set() and src_output.exists():
+            try:
+                src_output.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def _race_pool(config: dict[str, Any]) -> ThreadPoolExecutor:
     """Workers for the mirror race. With browsers, few (scihub_browser_workers:
     each may hold a window). Over HTTP only, plenty (scihub_http_workers):
@@ -1218,13 +1240,19 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
 
     log.info(f"   Sci-Hub: racing {len(remaining)} backup domains...")
     # Persistent pool — workers (and their browsers) are NOT torn down here.
-    # Losers that outlive the 10s collection window keep running in the
-    # background and are simply ignored; their temp files may linger.
+    # Losers that outlive the 45 s collection window keep streaming in the
+    # background and are simply ignored. Each lane deletes its own temp file
+    # once the race is over: cleanup here only sees the files that exist by
+    # then, and a loser writing its PDF afterwards used to leave
+    # "<doi>_Sci-Hub_scihub_<mirror>.pdf" behind (2026-11-03).
     pool = _race_pool(config)
+    race_over = threading.Event()
+
     futures = {}
     for domain in remaining:
         src_output = output_path.parent / f"{output_path.stem}_scihub_{domain.split('//')[1].replace('.', '_')}.pdf"
-        futures[_submit(pool, try_scihub_domain, doi, domain, src_output, config, use_tor, fail_notes)] = (domain, src_output)
+        futures[_submit(pool, _lane_that_cleans_up, try_scihub_domain, doi, domain, src_output,
+                        config, use_tor, fail_notes, race_over)] = (domain, src_output)
     try:
         # 10 s ended the race while the backups were still streaming PDFs they
         # had already found (sci.bban.top serves at a few hundred KB/s here).
@@ -1250,6 +1278,7 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
                             pass
                 record_result(domain, True, config)
                 log.info(f"   Sci-Hub: OK {domain}")
+                race_over.set()
                 return result
             else:
                 if not _said_absent(domain, fail_notes):
@@ -1267,6 +1296,8 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
                 src_output.unlink(missing_ok=True)
             except OSError:
                 pass
+    # Whatever still runs now deletes its own copy when it ends.
+    race_over.set()
 
     # Every mirror that answered said the paper is not there: Tor would ask the
     # same library again, only slower.

@@ -100,5 +100,52 @@ class PersistentPoolTests(unittest.TestCase):
             pool.submit(scihub._close_my_browser).result()
 
 
+class LateLaneCleanupTests(unittest.TestCase):
+    """A losing mirror lane must remove the copy it wrote after the race ended."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.dir, ignore_errors=True))
+        self.out = self.dir / "10.1000_x_Sci-Hub_scihub_sci-hub_al.pdf"
+
+    def _lane(self, race_over):
+        def fake(doi, domain, out_path, config, use_tor, fail_notes):
+            out_path.write_bytes(b"%PDF-1.4 fake")
+            return None
+
+        return scihub._lane_that_cleans_up(
+            fake, "10.1000/x", "https://sci-hub.al", self.out, {}, False, None, race_over
+        )
+
+    def test_late_loser_drops_its_copy(self):
+        done = threading.Event()
+        done.set()
+        self._lane(done)
+        self.assertFalse(self.out.exists(), "a lane that ends after the race leaves no file")
+
+    def test_lane_still_racing_keeps_its_copy(self):
+        racing = threading.Event()
+        self._lane(racing)
+        self.assertTrue(self.out.exists(), "the collector needs the file while the race runs")
+
+    def test_winner_who_moved_its_file_is_fine(self):
+        done = threading.Event()
+        done.set()
+
+        def fake(doi, domain, out_path, config, use_tor, fail_notes):
+            out_path.write_bytes(b"%PDF-1.4 fake")
+            out_path.rename(self.dir / "final.pdf")
+            return {"success": True, "file": str(self.dir / "final.pdf")}
+
+        result = scihub._lane_that_cleans_up(
+            fake, "10.1000/x", "https://sci-hub.al", self.out, {}, False, None, done
+        )
+        self.assertTrue(result["success"])
+        self.assertTrue((self.dir / "final.pdf").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
