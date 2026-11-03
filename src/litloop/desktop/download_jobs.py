@@ -386,10 +386,15 @@ def _run(job: str, only: list[str] | None = None, rounds: str = "all") -> None:
                         it.update(status="queued", retrying=False, stage=None, error=None)
                     elif r:
                         from . import error_text
+                        note = r.get("note") or it.get("note")
+                        if r.get("preprint"):
+                            # The file is a preprint of the paper, not the published
+                            # PDF: say so next to a green "done" (2026-11-03).
+                            note = note or f"{r['preprint']} 预印本，不是正式发表版"
                         it.update(status="done" if r.get("success") else "failed", retrying=False, stage=None, source=r.get("source"),
                                   file=r.get("file") or None,
                                   error=error_text.pick_failure(r) or (None if r.get("success") else it.get("error")),
-                                  note=r.get("note") or it.get("note"),
+                                  note=note,
                                   attempts=error_text.steps_for_app(r.get("attempts")) or it.get("attempts"))
                     elif it["status"] == "waiting" and state == "done":
                         if rounds == "single" and _CURRENT["cancelled"]:

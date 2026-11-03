@@ -244,6 +244,15 @@ def _try_source_inner(source_fn: Any, doi: str, output_path: Path, config: dict[
                         record_result(label, False, latency_ms, "wrong_paper")
                         from ..download.pdf import wrong_paper
                         return wrong_paper(doi, fp, label)
+                    if fp.exists():
+                        from ..download.pdf import preprint_mark
+                        mark = preprint_mark(fp, doi)
+                        if mark:
+                            # Still this paper, but not the version of record:
+                            # the race keeps the copy as a fallback and looks
+                            # for the published PDF (2026-11-03).
+                            result["preprint"] = mark
+                            log.info(f"   PREPRINT {label}: {mark} copy, not the published version")
                 record_result(label, True, latency_ms)
             else:
                 error_type = classify_error(result.get("status_code", 0))
@@ -573,6 +582,10 @@ def _run_tiers_parallel(
     submission_done = threading.Event()  # staggered scheduler finished launching lanes
     lanes_idle = threading.Event()       # every launched-so-far lane has answered
     shared_result: dict[str, Any] = {"result": None}
+    # A preprint copy of the right paper: kept, but a version of record wins
+    # (2026-10-26: the open-access route served the Research Square preprint
+    # for a Scientific Reports DOI and ended the race before the publisher).
+    preprint_result: dict[str, Any] = {"result": None}
     race_over = threading.Event()  # set when this race returns; waived lanes stop launching
 
     def _try_and_publish(fn, label, src_output):
@@ -601,11 +614,35 @@ def _run_tiers_parallel(
             _neg_record(label, doi, result)
             _record_source_failure(failures, label, result)
         if result and result.get("success"):
+            if result.get("preprint"):
+                # Not the version of record: hold it and keep the other lanes
+                # going. It is used only if none of them delivers one.
+                with result_lock:
+                    if preprint_result["result"] is None:
+                        preprint_result["result"] = (result, label, src_output)
+                log.info(f"   PREPRINT {label} ({result['preprint']}); still looking for the published version")
+                return result
             with result_lock:
                 if shared_result["result"] is None:
                     shared_result["result"] = (result, label, src_output)
                     cancel_event.set()
                     success_event.set()
+        return result
+
+    def _take_preprint() -> dict[str, Any] | None:
+        """The kept preprint copy, moved into place, when nothing better came back."""
+        item = preprint_result["result"]
+        if item is None:
+            return None
+        result, label, src_output = item
+        final_path = Path(result.get("file", ""))
+        if final_path != output_path and final_path.exists():
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            if output_path.exists():
+                output_path.unlink()
+            final_path.rename(output_path)
+            result["file"] = str(output_path)
+        log.info(f"   OK {label} (preprint only: {result.get('preprint')})")
         return result
 
     def _on_future_done(fut) -> None:
@@ -685,6 +722,9 @@ def _run_tiers_parallel(
             log.info(f"   OK {label}")
             return result
         if all_done_event.is_set():
+            preprint = _take_preprint()
+            if preprint is not None:
+                return preprint
             log.info("   All sources failed")
             return None
 
@@ -727,6 +767,9 @@ def _run_tiers_parallel(
             log.info(f"   OK {label} (late, after {time.time() - t_grace:.1f}s)")
             return result
         if all_done_event.is_set():
+            preprint = _take_preprint()
+            if preprint is not None:
+                return preprint
             log.info("   All sources failed")
             return None
 
@@ -747,6 +790,9 @@ def _run_tiers_parallel(
                 return {"success": True, "identifier": doi, "doi": doi,
                         "file": str(output_path), "source": label}
 
+        preprint = _take_preprint()
+        if preprint is not None:
+            return preprint
         log.info(f"   All sources failed")
     finally:
         # Never block termination on sources that refuse to return: cancel
@@ -908,6 +954,15 @@ def _auto_rename(result: dict[str, Any], identifier: str, config: dict[str, Any]
         if new_path and result.get("whole_book") and "整本书" not in new_path.stem:
             # A chapter delivered as its whole book says so in its name.
             tagged = new_path.with_name(f"{new_path.stem}（整本书）{new_path.suffix}")
+            try:
+                new_path.rename(tagged)
+                new_path = tagged
+            except OSError:
+                pass
+        if new_path and result.get("preprint") and "_preprint" not in new_path.stem:
+            # A preprint of the paper is not the published PDF: say so in the
+            # name, so it is not mistaken for the version of record later.
+            tagged = new_path.with_name(f"{new_path.stem}_preprint{new_path.suffix}")
             try:
                 new_path.rename(tagged)
                 new_path = tagged
@@ -1410,6 +1465,37 @@ def _download_impl(
 
     doi = normalize_doi(identifier)
 
+    # A preprint is a file for this DOI but not the version of record: keep it
+    # aside and let the later phases look for the published PDF (2026-11-03).
+    preprint_only: dict[str, Any] = {"result": None}
+
+    def _stash_preprint(res: dict[str, Any]) -> bool:
+        if not (res and res.get("preprint")):
+            return False
+        path = Path(res.get("file", ""))
+        marked = path.with_name(f"{path.stem}_preprint{path.suffix}")
+        if path.exists() and marked != path:
+            try:
+                path.replace(marked)
+                res["file"] = str(marked)
+            except OSError:
+                pass
+        preprint_only["result"] = res
+        log.info(f"   {res['preprint']} preprint of this paper; still looking for the published version")
+        return True
+
+    def _use_preprint() -> dict[str, Any] | None:
+        res = preprint_only["result"]
+        if res is None:
+            return None
+        if rename:
+            _auto_rename(res, identifier, config, doi=doi, target_dir=target_dir)
+        if bibtex:
+            from ..citations.bibtex_crossref import fetch_bibtex
+            res["bibtex"] = fetch_bibtex(doi, config)
+        log.info(f"   No version of record available; keeping the {res.get('preprint')} preprint")
+        return res
+
     # Phase 1: Free sources (OA + grey) — parallel race
     t_phase = time.time()
     p_phase = time.perf_counter()  # close_browsers_since's clock
@@ -1423,7 +1509,9 @@ def _download_impl(
         )
         log.info(f"   [timing] phase 1 (free sources and publisher site): {time.time() - t_phase:.1f}s, "
                  f"{'PDF' if result else 'no PDF'}")
-        if result:
+        if result and _stash_preprint(result):
+            pass
+        elif result:
             _update_doi_index(
                 target_dir,
                 doi,
@@ -1445,6 +1533,9 @@ def _download_impl(
     from ..publishers.strategies._core import no_access
     if _institutional and no_access(doi) and not config.get("school_routes_after_publisher_login", False):
         log.info("   Logged into the publisher as the school and still no full text: skipping the school routes")
+        preprint = _use_preprint()
+        if preprint is not None:
+            return preprint
         return fail(identifier, "the school does not subscribe: logged into the publisher with the school's identity, still no full text",
                     error_type="not_entitled", action="no_subscription")
     if _institutional and config.get("download_strategy") not in ("scihub_only", "grey_only") and not _cancelled():
@@ -1478,7 +1569,9 @@ def _download_impl(
             log.info("   Phase 1 failed, trying institutional access...")
             result = _run_institutional_sequence(inst_sources, doi, target_dir, output_path, config,
                                                  failures=race_failures)
-            if result:
+            if result and _stash_preprint(result):
+                pass
+            elif result:
                 _update_doi_index(
                     target_dir,
                     doi,
@@ -1500,7 +1593,10 @@ def _download_impl(
     import time as _time
     _time.sleep(2)  # grace period for browser threads to finish writing
     from ..download.pdf import is_pdf_file
+    held = Path(preprint_only["result"]["file"]) if preprint_only["result"] else None
     for p in target_dir.glob(f"{safe_filename(identifier)}*.pdf"):
+        if held is not None and p == held:
+            continue  # the kept preprint is not a late capture of the published PDF
         # Only a whole PDF of this very paper: a racing thread may have left a
         # different paper under this name (Sci-Hub mapped a Ceramics
         # International DOI to a JSTOR essay; it was taken here, 2026-10-17).
@@ -1516,6 +1612,12 @@ def _download_impl(
                 from ..citations.bibtex_crossref import fetch_bibtex
                 result["bibtex"] = fetch_bibtex(identifier, config)
             return result
+
+    # Nothing delivered the published PDF: a preprint of this paper is better
+    # than reporting failure, and its file name says what it is.
+    preprint = _use_preprint()
+    if preprint is not None:
+        return preprint
 
     # What this paper's own browser strategies reported (never another paper's).
     att = _attempt.get(getattr(_DL_TLS, "key", None))

@@ -3,6 +3,17 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-03：预印本另存，正式版优先
+
+- 现象：`10.1038/s41598-024-67653-y` 下到的是 Research Square 的 21 页预印本（首页 `Page 1/21`、`Posted Date:`、`DOI: 10.21203/rs.3.rs-3810170/v1`），不是 Scientific Reports 的正式版。两个版本标题相同，2026-10-28 加的标题核对认作同一篇，拦不住。
+- 做法：
+  - `download/pdf.py` 新增 `preprint_mark(path, doi)`：读第 1 页文本。**首页印着目标 DOI 就是正式版**，直接放行；否则在首页前 1500 字符里找预印本平台的印记——DOI 前缀（10.21203 Research Square、10.48550 arXiv、10.1101 bioRxiv、10.26434 ChemRxiv、10.2139 SSRN、10.36227 TechRxiv、10.31219 OSF、10.20944 Preprints.org、10.22541 Authorea）、平台名、以及 `Posted Date:` / `Additional Declarations:` / “has not been peer reviewed” 这类预印本页眉。返回平台名或 `preprint`；看不出则返回空。
+  - `sources/__init__.py`：`_try_source_inner` 成功时打上 `result["preprint"]`；竞速里**带预印本的结果不结束竞速**，只存进兜底槽，等其他通道的正式版；全部通道都没结果时才用兜底槽，并把文件挪到目标路径。这样「先到的是预印本」不会再让正式版的机会被取消。
+  - `_auto_rename` 在文件名后缀前加 `_preprint`，与「整本书」标记同一位置。
+- 为什么不用「首页没有 DOI 就算预印本」：老论文和扫描件的首页常常没有 DOI（2026-10-28 那 61 篇里就有），会被误标；预印本平台自己的印记更可靠。
+- 测试 `tests/test_preprint_pdf.py`（7 个）：Research Square 首页、正式版首页提到 arXiv 不误判、arXiv 侧栏、扫描页；竞速两条（预印本先到但正式版后到 → 取正式版；只有预印本 → 取预印本并挪到 `out.pdf`）；改名一条。
+- 还没做的：真实重下一次这篇，确认出版商通道拿回 12 页正式版（TODO「下载」）。
+
 ## 2026-10-28：子进程输出解码失败不再崩溃
 
 - 现象：出版商官网（Elsevier）打开持久浏览器时报 `'NoneType' object has no attribute 'lower'`，退回临时浏览器。

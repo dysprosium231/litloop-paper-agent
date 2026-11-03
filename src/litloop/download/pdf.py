@@ -152,6 +152,88 @@ def _title_of(doi: str, config: dict[str, Any] | None) -> str:
     return _TITLE_CACHE[doi]
 
 
+# Preprint servers, in the order their marks are looked for. The DOI prefixes
+# are the ones a preprint PDF prints in its own header (Research Square's
+# 10.21203/rs.3.rs-... on 2026-10-26), not the DOI the article was asked for.
+_PREPRINT_DOI_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("10.21203", "Research Square"),
+    ("10.48550", "arXiv"),
+    ("10.1101", "bioRxiv"),
+    ("10.26434", "ChemRxiv"),
+    ("10.2139", "SSRN"),
+    ("10.36227", "TechRxiv"),
+    ("10.31219", "OSF Preprints"),
+    ("10.20944", "Preprints.org"),
+    ("10.22541", "Authorea"),
+)
+_PREPRINT_NAMES: tuple[tuple[str, str], ...] = (
+    ("research square", "Research Square"),
+    ("arxiv", "arXiv"),
+    ("biorxiv", "bioRxiv"),
+    ("medrxiv", "medRxiv"),
+    ("chemrxiv", "ChemRxiv"),
+    ("techrxiv", "TechRxiv"),
+    ("ssrn", "SSRN"),
+    ("preprints.org", "Preprints.org"),
+    ("authorea", "Authorea"),
+    ("osf preprints", "OSF Preprints"),
+)
+# Phrases only a preprint prints (Research Square: "Posted Date:", "Additional
+# Declarations:"; others say they are not peer reviewed). "Preprint submitted
+# to Elsevier" is an author manuscript, also not the version of record.
+_PREPRINT_PHRASES: tuple[str, ...] = (
+    "posted date:",
+    "additional declarations:",
+    "this is a preprint",
+    "has not been peer reviewed",
+    "not been peer-reviewed",
+    "preprint submitted to",
+)
+_PREPRINT_CACHE: dict[tuple[str, float], str] = {}
+
+
+def preprint_mark(path: Path, doi: str = "") -> str:
+    """The preprint server a PDF came from, or "" for a version of record.
+
+    Read from the first page's header: the preprint server's own DOI prefix,
+    its name, or a phrase only a preprint prints (2026-10-26: for
+    10.1038/s41598-024-67653-y the open-access route served the Research
+    Square preprint, which title-matching cannot tell from the published
+    version). A PDF that prints ``doi`` itself is the version of record.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return ""
+    key = (str(path), stat.st_mtime)
+    if key in _PREPRINT_CACHE:
+        return _PREPRINT_CACHE[key]
+    text = _first_pages_text(path, 1)
+    mark = ""
+    if len(text.strip()) >= 100 and not (doi and doi.lower() in "".join(text.lower().split())):
+        head = text[:1500].lower()
+        squash = "".join(head.split())
+        for prefix, name in _PREPRINT_DOI_PREFIXES:
+            if prefix in squash:
+                mark = name
+                break
+        # The platform's name or a preprint phrase counts only near the top of
+        # the page: a published paper's references can name arXiv or SSRN too.
+        top = " ".join(text[:800].lower().split())
+        if not mark:
+            for needle, name in _PREPRINT_NAMES:
+                if needle in top:
+                    mark = name
+                    break
+        if not mark:
+            for phrase in _PREPRINT_PHRASES:
+                if phrase in top:
+                    mark = "preprint"
+                    break
+    _PREPRINT_CACHE[key] = mark
+    return mark
+
+
 def paper_check(path: Path, doi: str, config: dict[str, Any] | None = None) -> str:
     """Is this PDF the paper ``doi`` names?
 
