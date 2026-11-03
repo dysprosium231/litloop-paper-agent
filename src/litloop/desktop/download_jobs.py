@@ -321,33 +321,50 @@ def _fill_meta(path: Path, wait_s: float = 10.0, publishers: bool = False) -> No
     t.join(wait_s)
 
 
+def _alias_map(dois: list[str]) -> dict[str, str]:
+    """Every key a paper answers to (an arXiv id or its DOI) -> the item's DOI.
+
+    The engine reports progress under whatever identifier it was handed, which
+    for a pasted arXiv id is the bare number while the job item is stored under
+    ``10.48550/arxiv.<id>``; without the mapping those rows never update.
+    """
+    aliases: dict[str, str] = {}
+    for d in dois:
+        for key in same_paper(d):
+            aliases.setdefault(key, d)
+    return aliases
+
+
 def _run(job: str, only: list[str] | None = None, rounds: str = "all") -> None:
     """Download the job's papers not yet done (``only``: these), with the
     engine's ``rounds`` (``server._batch_download_impl``)."""
     path = job_path(job)
     dois = only or [i["doi"] for i in store.read_json(path)["items"] if i["status"] != "done"]  # not the ones already here
-    wanted = set(dois)
+    wanted = _alias_map(dois)
+
+    def item_of(current: str) -> str | None:
+        return wanted.get(canonical_doi(current or ""))
 
     def on_item(ok: bool, current: str) -> None:
         # A lane that fails hands the paper to the next one (grey, institutional,
         # a cooled-down retry), so a failure here is not final: the engine's
         # results at the end say what failed. Until then the paper is retrying.
-        doi = canonical_doi(current or "")
-        if doi in wanted:
+        doi = item_of(current)
+        if doi:
             if ok:
                 _mark(job, doi, status="done", retrying=False, stage=None)
             else:
                 _mark(job, doi, retrying=True)
 
     def on_stage(current: str, text: str) -> None:
-        doi = canonical_doi(current or "")
-        if doi in wanted:
+        doi = item_of(current)
+        if doi:
             _mark(job, doi, stage=text)
 
     def on_result(current: str, r: dict) -> None:
         # Final for this paper: show it now, as the end of the job would.
-        doi = canonical_doi(current or "")
-        if doi in wanted:
+        doi = item_of(current)
+        if doi:
             ok = bool(r.get("success"))
             from . import error_text
             _mark(job, doi, status="done" if ok else "failed", retrying=False, stage=None,
@@ -379,7 +396,10 @@ def _run(job: str, only: list[str] | None = None, rounds: str = "all") -> None:
         progress_reporter.remove_result_listener(on_result)
         try:
             with store.update(path, indent=1) as data:
-                by_doi = {canonical_doi(r.get("doi") or r.get("identifier") or ""): r for r in results}
+                by_doi: dict[str, dict[str, Any]] = {}
+                for r in results:  # an arXiv id and its DOI are the same paper
+                    for key in same_paper(r.get("doi") or r.get("identifier") or ""):
+                        by_doi.setdefault(key, r)
                 for it in data["items"]:
                     r = by_doi.get(it["doi"])
                     if r and r.get("queued"):

@@ -1475,3 +1475,27 @@ def test_the_job_lookup_also_names_each_papers_publisher(tmp_path, monkeypatch):
     items = store.read_json(path)["items"]
     assert items[0]["publisher"] == "Elsevier"
     assert "publisher" not in items[1]  # OpenAlex does not know it: asked again next time
+
+
+def test_alias_map_knows_arxiv_ids():
+    aliases = download_jobs._alias_map(["10.48550/arxiv.2301.12345", "10.1000/plain"])
+    assert aliases["2301.12345"] == "10.48550/arxiv.2301.12345"
+    assert aliases["10.48550/arxiv.2301.12345"] == "10.48550/arxiv.2301.12345"
+    assert aliases["10.1000/plain"] == "10.1000/plain"
+
+
+def test_an_arxiv_id_reported_barely_still_updates_its_item(tmp_path, monkeypatch):
+    """The engine reports a pasted arXiv id as-is; the job item is its DOI form."""
+    item_doi = "10.48550/arxiv.2301.12345"
+
+    def engine(dois, batch_id=None, keep_attempts=False, rounds="all"):
+        progress_reporter.advance(True, current="2301.12345")
+        return json.dumps({"results": [{"doi": "2301.12345", "success": True, "source": "arxiv",
+                                        "file": None}]})
+
+    monkeypatch.setattr(server, "_batch_download_impl", engine)
+    info = download_jobs.start([{"doi": item_doi, "title": "An arXiv paper"}], title="arXiv Job")
+    data = wait_job(info["job"])
+    assert data["state"] == "done"
+    item = data["items"][0]
+    assert item["status"] == "done" and item["source"] == "arxiv"
