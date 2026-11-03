@@ -539,7 +539,7 @@ export function JobPane({ id, live, busy, onChanged, onStarted, onBack }: {
             <div className="min-w-0 flex-1">
               <div className="line-clamp-2 text-sm">{it.title}</div>
               <div className="text-xs text-muted-foreground">
-                {[metaLine(it), it.source && it.status === "done" ? `来源：${it.source}` : null].filter(Boolean).join(" · ") || it.doi}
+                {[metaLine(it), it.source && it.status === "done" ? `来源：${stepName(it.source)}` : null].filter(Boolean).join(" · ") || it.doi}
               </div>
               {it.status === "waiting" && running && (skipping.has(it.doi.toLowerCase()) || cancelling) && (
                 <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -601,6 +601,9 @@ function stepName(source: string): string {
   const named: Record<string, string> = {
     "WebVPN-HTTP": "WebVPN 直接下载", WebVPN: "WebVPN 浏览器", CARSI: "CARSI", EZProxy: "EZProxy",
     GenericBrowser: "出版商官网", "Sci-Hub": "Sci-Hub", OpenAlexContent: "OpenAlex 全文", LibGen: "LibGen",
+    local_cache: "之前已下载", late_capture: "超时后捕获", late_file: "超时后落盘",
+    oa_url: "开放获取链接", oa_browser: "开放获取（浏览器）", elsevier_api: "Elsevier API",
+    springer_tdm: "Springer", mdpi_cdn: "MDPI",
   }
   if (named[source]) return named[source]
   const m = /^(.+)Browser$/.exec(source)

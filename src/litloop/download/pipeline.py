@@ -819,7 +819,11 @@ def run_lanes(
                 for rows in ex.map(_inst_fetch_chunk, chunks):
                     results.extend(rows)
 
+    adopted = _adopt_late_files(results, out, config)
+    if adopted:
+        logger.info(f"  {adopted} 篇的 PDF 在超时之后才落盘，按已有文件算成功")
     _transient_retry(results, entries, out, config)
+    _adopt_late_files(results, out, config)  # files that landed while the retry cooled down
     _progress.finish()
     _fetch_si_for_results(results, out, config)
 
@@ -841,6 +845,47 @@ def run_lanes(
         results.append({"doi": e.identifier, "success": False,
                         "error": reason, "source": "none"})
     return results
+
+
+def _adopt_late_files(results: list[dict[str, Any]], out: Path,
+                      config: dict[str, Any]) -> int:
+    """Count PDFs that landed after their paper was already marked failed.
+
+    A browser lane can finish a minute after its paper's race window: the file
+    lands under ``"<doi>_<source>.pdf"`` while the result says failure, and the
+    cooling retry (or the next run) fetches the same paper again. Adopt the
+    file instead — same paper, no second download. Files are named after the
+    DOI, but a name is not proof, so the PDF has to pass ``paper_check`` too.
+    """
+    from ..download.pdf import is_pdf_file, is_suspicious_pdf, paper_check
+    from ..identifiers import safe_filename
+
+    adopted = 0
+    owned = {str(r.get("file") or "") for r in results if r.get("success")}
+    for r in results:
+        doi = str(r.get("doi") or "")
+        if r.get("success") or not doi:
+            continue
+        cands = [p for p in out.glob(f"{safe_filename(doi)}*.pdf")
+                 if p.is_file() and str(p) not in owned and is_pdf_file(p)
+                 and not is_suspicious_pdf(p, doi)]
+        if not cands:
+            continue
+        cand = max(cands, key=lambda p: p.stat().st_mtime)
+        if paper_check(cand, doi, config) == "wrong":
+            continue
+        r.update({"success": True, "identifier": r.get("identifier") or doi,
+                  "doi": doi, "file": str(cand), "source": "late_file"})
+        for key in ("error", "reason"):
+            r.pop(key, None)
+        owned.add(str(cand))
+        adopted += 1
+        try:
+            from ..sources import _auto_rename
+            _auto_rename(r, r["identifier"], config, target_dir=out)
+        except Exception:
+            pass  # a nicer name is optional; the file is already the paper
+    return adopted
 
 
 def _transient_retry(results: list[dict[str, Any]], entries: list[QueueEntry],
