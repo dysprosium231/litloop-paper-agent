@@ -3,6 +3,15 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-04：第一个 Windows 安装包（113 MB）
+
+- 新增 `scripts/build_release.py`（只用标准库）：下载官方 embeddable Python（版本钉在 `PYTHON_VERSION = "3.14.3"`）解压到 `build/runtime`，用当前 Python 把 `pyproject.toml` 里的必需依赖 `pip install --target build/runtime/Lib/site-packages`，把 `src/litloop` 复制进同一个目录，重写 `python314._pth`（`python314.zip`、`.`、`Lib\site-packages`、`import site`），最后跑一遍 `import litloop, pymupdf, fastapi, mcp` 自检。`--clean` 重来一遍，`--bundle` 顺带打包。
+- 运行时 **356 MB**（`pymupdf-layout` 被 `pymupdf4llm` 拉进来，占了 onnxruntime + networkx 那 67 MB）。
+- Tauri 配置：`bundle.targets` 从 `"all"` 收窄为 `["nsis"]`（只做计划里的 NSIS），`bundle.resources` 把 `../../build/runtime/` 映射成安装目录里的 `python/`（与 `lib.rs` 的 `resolve_python()` 第 ② 条一致），并加 `windows.nsis.installMode: "both"`。
+- 构建：`npm run tauri build`，Rust release 编译 3 分 05 秒，NSIS 自动下载 3.13 与 tauri-utils 后出包——`app/src-tauri/target/release/bundle/nsis/LitLoop_0.1.0_x64-setup.exe`，**113.38 MiB**。
+- 验证（不装系统）：`target/release/python/python.exe` 报 litloop 1.18.0 / Python 3.14.3；用它跑 `-m litloop.desktop.server --token t0k --port 8799`，`X-LitLoop-Token: t0k` 请求 `/api/health` 返回 `{"version":"1.18.0","schema":1}`、`/api/settings` 正常读出现有配置。
+- 还没做：版面分析（67 MB）从包里拆出去改成首次按需下载；图标、名称、开始菜单这些安装器细节；更新插件与发版脚本；卸载时问是否保留 `~/.litloop`；干净 Windows 验收；`build/runtime` 是生成物（`.gitignore` 已忽略 `build/`）。
+
 ## 2026-11-04：桌面壳先找程序目录里的 Python
 
 - 发布计划里有一条「`lib.rs` 改为启动程序目录里的 Python（开发时仍可用 `LITLOOP_PYTHON`）」。
