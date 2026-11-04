@@ -40,6 +40,20 @@ _LOCK = threading.Lock()
 _PROCS: dict[str, subprocess.Popen] = {}
 _CANCELLED: set[str] = set()
 _SESSION_TOOLS = frozenset({"litloop_screening", "litloop_deep_search"})
+# Backend B runs in a thread of this process instead of a child process.
+_BUILTIN: dict[str, threading.Thread] = {}
+_STOP: dict[str, threading.Event] = {}
+_BUILTIN_TOOLS = {
+    "search": "正在检索",
+    "deep_search_start": "深度检索：正在构建候选池",
+    "deep_search_next": "深度检索：正在生成下一批",
+    "deep_search_status": "深度检索：正在查看进度",
+    "screening_save": "正在保存评分",
+}
+
+
+class _Cancelled(Exception):
+    pass
 
 
 def runs_dir() -> Path:
@@ -108,6 +122,11 @@ def _command() -> list[str]:
     return [exe, *args]
 
 
+def _backend() -> str:
+    """Which backend runs a search started here: the agent command or a model API."""
+    return "builtin" if str(_config.load_config().get("agent_backend") or "") == "builtin" else "command"
+
+
 def _write(run: str, data: dict[str, Any]) -> None:
     store.write_json(_path(run), {k: v for k, v in data.items() if not k.startswith("_")}, indent=1)
 
@@ -117,7 +136,7 @@ def get(run: str) -> dict[str, Any] | None:
     if not p.exists():
         return None
     d = store.read_json(p)
-    if d.get("state") == "running" and run not in _PROCS:
+    if d.get("state") == "running" and run not in _PROCS and run not in _BUILTIN:
         d["state"] = "interrupted"  # the app was closed while it ran
     return d
 
@@ -134,7 +153,10 @@ def list_runs(limit: int = 20) -> list[dict[str, Any]]:
 
 def running() -> str | None:
     with _LOCK:
-        return next((r for r, p in _PROCS.items() if p.poll() is None), None)
+        for r, p in _PROCS.items():
+            if p.poll() is None:
+                return r
+        return next((r for r, t in _BUILTIN.items() if t.is_alive()), None)
 
 
 def start(form: dict[str, Any]) -> dict[str, Any]:
@@ -148,6 +170,17 @@ def start(form: dict[str, Any]) -> dict[str, Any]:
             "form": form, "prompt": prompt, "doing": "正在启动 Agent", "events": [],
             "session": None, "agent_session": None, "result": None, "error": None}
     _write(run, data)
+    if _backend() == "builtin":
+        if not str(_config.load_config().get("builtin_agent_model") or "").strip():
+            data.update(state="failed", doing=None,
+                        error="无法开始检索：还没有填内置 Agent 的模型名。在「设置 → 内置 Agent」里填写")
+            _write(run, data)
+            return data
+        thread = threading.Thread(target=_run_builtin, args=(run, data, prompt), daemon=True)
+        with _LOCK:
+            _BUILTIN[run] = thread
+        thread.start()
+        return data
     cmd = _command()
     try:
         proc = subprocess.Popen(
@@ -311,9 +344,79 @@ def _follow(run: str, proc: subprocess.Popen, prompt: str, data: dict[str, Any])
             _CANCELLED.discard(run)
 
 
+def _session_of(result: Any) -> str | None:
+    """The screening session a built-in tool reported (deep search or screening save)."""
+    if isinstance(result, dict):
+        obj: Any = result
+    else:
+        try:
+            obj = json.loads(str(result or ""))
+        except ValueError:
+            return None
+    if isinstance(obj, dict):
+        for key in ("session", "id"):
+            value = obj.get(key)
+            if isinstance(value, str) and value:
+                return value
+    return None
+
+
+def _run_builtin(run: str, data: dict[str, Any], prompt: str) -> None:
+    """Backend B: this process asks the model and runs the tools itself."""
+    stop = threading.Event()
+    with _LOCK:
+        _STOP[run] = stop
+    last = [0.0]
+
+    def on_event(kind: str, ev: dict[str, Any]) -> None:
+        if stop.is_set():
+            raise _Cancelled()
+        if kind == "tool":
+            name = str(ev.get("name") or "")
+            data["doing"] = _BUILTIN_TOOLS.get(name, f"正在调用 {name}")
+            _event(data, data["doing"])
+        elif kind == "result":
+            session = _session_of(ev.get("result"))
+            if session:
+                data["session"] = session
+        elif kind == "error":
+            _event(data, f"{ev.get('name')} 出错：{str(ev.get('detail') or '')[:200]}")
+        elif kind == "text":
+            data["doing"] = "正在整理结论"
+        if time.time() - last[0] > 1.0:  # the app polls this file
+            _write(run, data)
+            last[0] = time.time()
+
+    try:
+        from ..agents import FUNCTIONS, TOOLS, run_task
+
+        out = run_task(prompt, TOOLS, functions=FUNCTIONS, on_event=on_event)
+        data["result"] = str(out.get("text") or "").strip() or None
+        data["state"] = "cancelled" if stop.is_set() else "done"
+    except _Cancelled:
+        data["state"] = "cancelled"
+    except Exception as e:
+        data.update(state="failed", error=f"无法完成检索：{type(e).__name__}: {e}")
+    finally:
+        data["doing"] = None
+        data["finished"] = datetime.now().isoformat(timespec="seconds")
+        _write(run, data)
+        with _LOCK:
+            _BUILTIN.pop(run, None)
+            _STOP.pop(run, None)
+            _CANCELLED.discard(run)
+
+
 def cancel(run: str) -> bool:
     with _LOCK:
         proc = _PROCS.get(run)
+        thread = _BUILTIN.get(run)
+        stop = _STOP.get(run)
+    if thread is not None and thread.is_alive():
+        _CANCELLED.add(run)
+        if stop is not None:
+            stop.set()  # the loop checks it before the next step
+        return True
     if not proc or proc.poll() is not None:
         return False
     _CANCELLED.add(run)

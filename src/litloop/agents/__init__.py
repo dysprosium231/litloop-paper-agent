@@ -7,5 +7,7 @@ DeepSeek, 通义千问, Kimi, 智谱 GLM, OpenRouter, Ollama and vLLM speak.
 """
 
 from .client import PROVIDERS, chat, model_config, test_model
+from .runner import ToolError, run_task
+from .tools import FUNCTIONS, TOOLS
 
-__all__ = ["PROVIDERS", "chat", "model_config", "test_model"]
+__all__ = ["FUNCTIONS", "PROVIDERS", "TOOLS", "ToolError", "chat", "model_config", "run_task", "test_model"]

@@ -86,7 +86,7 @@ def _parse(cfg: dict[str, str], data: dict[str, Any]) -> dict[str, Any]:
             if block.get("type") == "text":
                 out["text"] += block.get("text", "")
             elif block.get("type") == "tool_use":
-                out["tool_calls"].append({"name": block.get("name", ""),
+                out["tool_calls"].append({"id": block.get("id", ""), "name": block.get("name", ""),
                                           "arguments": block.get("input") or {}})
         out["stop"] = data.get("stop_reason") or ""
         return out
@@ -100,7 +100,8 @@ def _parse(cfg: dict[str, str], data: dict[str, Any]) -> dict[str, Any]:
                 args = json.loads(raw) if isinstance(raw, str) else dict(raw)
             except ValueError:
                 args = {}
-            out["tool_calls"].append({"name": fn.get("name", ""), "arguments": args})
+            out["tool_calls"].append({"id": call.get("id", ""), "name": fn.get("name", ""),
+                                      "arguments": args})
         out["stop"] = choice.get("finish_reason") or ""
     return out
 

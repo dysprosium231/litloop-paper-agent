@@ -197,6 +197,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # message (agent_runner.py); the prompt goes on stdin. Claude Code by default:
     # stream-json lets the app show which tool it is using; only the litloop
     # tools and skills are allowed, since nobody is there to approve anything.
+    # Which backend runs a search started in the app: "command" (backend A,
+    # the agent above) or "builtin" (backend B, the model API configured below).
+    "agent_backend": "command",
     "agent_command": "claude",
     # An agent run that prints nothing for this long is stopped (it hung or
     # waits on a prompt nobody sees). A deep-search batch takes ~1-3 minutes.

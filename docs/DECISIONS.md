@@ -10,6 +10,17 @@
 - 结果：运行时 291 MB，重新打包后 **99.59 MiB**（上一版 113.38 MiB）；打包后的 `python.exe` 导入 `litloop`、`pymupdf4llm` 都正常。
 - 还没做：这两个组件改成 app 里第一次需要时按需下载（发布计划那一项），现在只能手工装。
 
+## 2026-11-04：内置 Agent 接手 app 发起的检索
+
+- 设置里加「用哪个后端」`agent_backend`：`command`（后端 A，起 `agent_command` 子进程，用用户自己的账号）或 `builtin`（后端 B，app 自己调模型接口）。默认仍是 `command`，装好就能用。
+- `agents/tools.py` 把 app 需要的五个工具包成函数与 JSON schema：`search`、`deep_search_start`、`deep_search_next`、`deep_search_status`、`screening_save`。检索结果只留 `doi/title/year/journal/cited_by_count/is_oa/retracted`，一篇几十个字；评分先校验（相关度只有四档、DOI 不能空），错在模型这边就带文字报回去，让模型自己改。
+- `agents/runner.py` 是循环：问模型 → 有工具调用就执行 → 结果按协议塞回消息 → 再问，最多 8 步。工具抛异常只变成一段「出错：…」文字，不中断任务（和 Agent 命令那条路一样，任务不该因为一次检索失败就死掉）。工具没给 id 时补 `call_{step}_{index}`，两种协议都能对上。
+- `desktop/agent_runner.py` 选了内置后端时起一个线程跑循环，而不是子进程：每秒钟最多写一次运行记录（app 轮询这个文件），工具事件翻成中文进度（「深度检索：正在生成下一批」），工具结果里的 `session` 抓到就记下来，取消用 `threading.Event` 在每次工具后检查。
+- 没填模型名时 `start()` 直接失败并说清去哪里填，不浪费一次请求。
+- 测试：`tests/test_agent_loop.py` 5 个（两种协议的消息形状、未知工具、工具异常、步数上限与补 id）、`tests/test_agent_tools.py` 5 个、`tests/test_agent_builtin.py` 4 个（缺模型名、session 与结果回填、模型报错、取消）。
+- 待实测：填一个真 Key，在 app 里用内置后端跑一次快速查找和一次深度检索，看进度文案与 session 是否落到筛选页。
+- 还没做：按任务分模型、用测试集比较各模型的评分质量、「先给检索词再由用户确认」的确认点（后端 A 的提示词里已有这个规矩）。
+
 ## 2026-11-04：内置 Agent 的模型客户端
 
 - 后端 B 的第一步：app 自己调模型接口，不依赖本机装没装 `claude`。新增 `src/litloop/agents/`，`client.py` 把两种协议收成一套调用。

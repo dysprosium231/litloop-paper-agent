@@ -31,7 +31,8 @@ def test_defaults_to_the_openai_compatible_api():
 
 def test_anthropic_request_and_reply(monkeypatch):
     seen = _capture(monkeypatch, {"content": [{"type": "text", "text": "好的"},
-                                              {"type": "tool_use", "name": "search", "input": {"q": "SiC"}}],
+                                              {"type": "tool_use", "id": "toolu_1", "name": "search",
+                                               "input": {"q": "SiC"}}],
                                   "stop_reason": "tool_use", "usage": {"input_tokens": 12}})
     out = client.chat([{"role": "system", "content": "你是助手"}, {"role": "user", "content": "查 SiC"}],
                       [{"name": "search", "description": "检索", "parameters": {"type": "object"}}],
@@ -43,14 +44,15 @@ def test_anthropic_request_and_reply(monkeypatch):
     assert seen["body"]["messages"] == [{"role": "user", "content": "查 SiC"}]
     assert seen["body"]["tools"][0]["input_schema"] == {"type": "object"}
     assert out["text"] == "好的"
-    assert out["tool_calls"] == [{"name": "search", "arguments": {"q": "SiC"}}]
+    assert out["tool_calls"] == [{"id": "toolu_1", "name": "search", "arguments": {"q": "SiC"}}]
     assert out["stop"] == "tool_use"
 
 
 def test_openai_request_and_reply(monkeypatch):
     seen = _capture(monkeypatch, {"choices": [{"message": {
         "content": "我查一下",
-        "tool_calls": [{"function": {"name": "search", "arguments": json.dumps({"q": "PDC"})}}]},
+        "tool_calls": [{"id": "call_1", "function": {"name": "search",
+                                        "arguments": json.dumps({"q": "PDC"})}}]},
         "finish_reason": "tool_calls"}]})
     out = client.chat([{"role": "user", "content": "查 PDC"}],
                       [{"name": "search", "parameters": {"type": "object"}}],
@@ -62,7 +64,7 @@ def test_openai_request_and_reply(monkeypatch):
     assert seen["body"]["messages"][0] == {"role": "system", "content": "你是助手"}
     assert seen["body"]["tools"][0]["type"] == "function"
     assert seen["body"]["tools"][0]["function"]["name"] == "search"
-    assert out["tool_calls"] == [{"name": "search", "arguments": {"q": "PDC"}}]
+    assert out["tool_calls"] == [{"id": "call_1", "name": "search", "arguments": {"q": "PDC"}}]
     assert out["stop"] == "tool_calls"
 
 
@@ -71,7 +73,7 @@ def test_bad_tool_arguments_do_not_crash(monkeypatch):
         {"function": {"name": "search", "arguments": "{not json"}}]}}]})
     out = client.chat([{"role": "user", "content": "x"}], config={
         "builtin_agent_api_key": "k", "builtin_agent_model": "m"})
-    assert out["tool_calls"] == [{"name": "search", "arguments": {}}]
+    assert out["tool_calls"] == [{"id": "", "name": "search", "arguments": {}}]
 
 
 def test_a_missing_model_name_is_reported_not_raised(monkeypatch):

@@ -97,6 +97,10 @@ GROUPS: list[dict[str, Any]] = [
     {
         "id": "agent", "title": "Agent",
         "fields": [
+            {"key": "agent_backend", "label": "用哪个后端", "type": "select",
+             "options": [["command", "Agent 命令（在后端 A 里跑，用你自己的账号）"],
+                         ["builtin", "内置 Agent（app 直接调模型接口）"]],
+             "help": "内置 Agent 的接口和模型在下面一组里设置"},
             {"key": "agent_command", "label": "Agent 命令", "type": "text", "placeholder": "claude",
              "help": "在 app 里发起检索时，把检索要求发给这个 Agent"},
             {"key": "agent_args", "label": "命令参数", "type": "text",
