@@ -22,7 +22,7 @@
 | app：地基 | ✅ | |
 | app：筛选页 | 🔶 | 深度链接（待办池「app」）；完成通知 2026-11-04 做了（待实测 12） |
 | app：任务层 + 后端 A（外部 Agent） | 🔶 | 待实测 5（真实检索） |
-| app：后端 B（内置 Agent，多家模型） | ⬜ | 待办池「app」 |
+| app：后端 B（内置 Agent，多家模型） | 🔶 | 模型客户端与设置已完成，任务运行器待做；待办池「app」 |
 | app：初次引导与设置 | ✅ | 后端 B 的模型配置随后端 B 做 |
 | app：术语表 | 🔶 | 待实测 7 |
 | app：下载队列与 Zotero | 🔶 | 待实测 1–5 |
@@ -83,7 +83,9 @@
 
 ### app
 - [ ] 下次发版后删掉 `src/litloop/app_server.py`：模块整理时留下的唯一转发，给已装好、还在启动 `python -m litloop.app_server` 的桌面 app 用（15c08b2）；删时把 `scripts/import_smoke.py` 里的 `litloop.app_server` 和 LAYOUT.md 顶层那句一起去掉。
-- [ ] 后端 B：内置 Agent（设计见 CHARTER「可视化 app → 任务与后端」）：app 直接调模型 API，Anthropic 原生接口和 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、本地 Ollama / vLLM）；设置里按服务商、地址、Key、模型名配置，可按任务分模型，测试按钮检查工具调用；用测试集存档比较各模型的评分质量。2026-10-26 补记：原来只写在 CHARTER 的「顺序」里，TODO 漏了这一项。
+- [~] 后端 B：内置 Agent（设计见 CHARTER「可视化 app → 任务与后端」）：app 直接调模型 API，Anthropic 原生接口和 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、本地 Ollama / vLLM）；设置里按服务商、地址、Key、模型名配置，可按任务分模型，测试按钮检查工具调用；用测试集存档比较各模型的评分质量。2026-10-26 补记：原来只写在 CHARTER 的「顺序」里，TODO 漏了这一项。
+  - 已完成（2026-11-04）：模型客户端 `agents/client.py`——两种协议一套返回（文本、工具调用、停止原因、用量），`test_model()` 让模型当场调一个 `ping` 工具来验工具调用；设置页新增「内置 Agent」一组（接口、地址、Key、模型名）与对应测试；配置项 `builtin_agent_*`。见 DECISIONS「内置 Agent 的模型客户端」。**还没实测**：真实 Key 点一次「测试」。
+  - 下一步：任务运行器（把提示词模板、工具清单和确认点接上 `chat()`）、设置里按任务分模型、app 里选后端 A/B、用测试集存档比较各模型的评分质量。
 - [ ] 安装包与自动更新（评审 12；设计和验收见 CHARTER「可视化 app → 发布」，2026-10-26 用户定了安装范围、签名、分发和浏览器的做法，见 DECISIONS「作为标准 Windows 程序分发」）。模块整理做完后开始，大致步骤：
   - [x] 先摸底：核心依赖 **336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 跑起 `litloop.desktop.server`，合计约 **358 MB**（DECISIONS「发布摸底（2）」）；NSIS 安装包实测 **113.38 MiB**（DECISIONS「第一个 Windows 安装包」）。还剩：用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净 Windows 验收；
   - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时，Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出安装包；去掉版面分析后是 **99.59 MiB**（DECISIONS「第一个 Windows 安装包」「版面分析不进安装包」）。

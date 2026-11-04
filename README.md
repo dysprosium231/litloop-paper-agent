@@ -129,7 +129,7 @@
 
 ## 安装与启动
 
-桌面 app 目前只能从源码运行，还没有安装包。需要：Python 3.11+、Git、Node.js、Rust（Windows 上用 MSVC 工具链）。
+桌面 app 可以从源码运行，也可以自己打安装包。从源码运行需要：Python 3.11+、Git、Node.js、Rust（Windows 上用 MSVC 工具链）。
 
 1. **装 Python 后台。** 最省事的办法是对 Claude Code、Codex 或 ZCode 里的 Agent 说：
 
@@ -149,6 +149,18 @@
    第一次编译 Rust 需要几分钟，之后约半分钟出窗口。环境变量 `LITLOOP_PYTHON` 可指向装了 LitLoop 的 Python。开发说明和重启脚本见 [app/README.md](app/README.md)。
 
 3. **走一遍首次引导。** 至少填 OpenAlex Key 和联系邮箱；要下订阅论文就在「学校认证」里选学校。
+
+### 自己打一个安装包
+
+```bash
+python scripts/build_release.py --bundle
+```
+
+先装配嵌入式 Python 运行时（`build/runtime`：官方 embeddable 发行版 + 核心依赖 + `uv.exe`），再调用 `npm run tauri build`。产物在 `app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`，约 110 MiB，自带 Python 和依赖，目标机器不用装任何东西。
+
+- 安装需要管理员权限（`installMode: both`）。
+- 安装包**没有签名**：Windows 会先弹 SmartScreen「已阻止不认识的应用」，点「更多信息 → 仍要运行」；有的公司电脑策略不允许，需要放行。
+- 版面分析（约 65 MB，只影响 PDF 转 Markdown 的排版）不在安装包里，设置 → 可选组件里点「安装」按需下载；下载慢可在同一处填国内镜像。
 
 ### 依赖与 Key
 
@@ -237,7 +249,7 @@ MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、�
 
 按计划顺序排列，详细进度见 [TODO.md](TODO.md)。
 
-1. **桌面 app**：安装包与自动更新；app 里填表发起检索、确认检索方案，Agent 可以是外部的（Claude Code 等），也可以是 app 内置的（可接 DeepSeek 等模型）。
+1. **桌面 app**：安装包能打出来了，还差自动更新和签名；app 里填表发起检索、确认检索方案，Agent 可以是外部的（Claude Code 等），也可以是 app 内置的（可接 DeepSeek 等模型）。
 2. **系统综述支持**：记录每个数据源的检索量、去重数、纳入和排除的数量及理由，生成 PRISMA 式统计，中断后可以接着做。
 3. **定期追踪**：保存检索式，定期运行，只推送上次之后的新文章。
 4. **分析归纳**：PDF 转 Markdown 已经有了；下一步从全文抽取要点、做对比表、起草综述。

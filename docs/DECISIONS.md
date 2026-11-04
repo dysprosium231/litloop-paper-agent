@@ -10,6 +10,16 @@
 - 结果：运行时 291 MB，重新打包后 **99.59 MiB**（上一版 113.38 MiB）；打包后的 `python.exe` 导入 `litloop`、`pymupdf4llm` 都正常。
 - 还没做：这两个组件改成 app 里第一次需要时按需下载（发布计划那一项），现在只能手工装。
 
+## 2026-11-04：内置 Agent 的模型客户端
+
+- 后端 B 的第一步：app 自己调模型接口，不依赖本机装没装 `claude`。新增 `src/litloop/agents/`，`client.py` 把两种协议收成一套调用。
+- 两种协议：Anthropic Messages API（`POST {base}/v1/messages`，`x-api-key` + `anthropic-version: 2023-06-01`，`system` 单独一个字段，工具用 `input_schema`）与 OpenAI 兼容（`POST {base}/chat/completions`，`Authorization: Bearer`，`system` 塞进 messages，工具是 `{"type":"function","function":{...}}`，参数是 JSON 字符串）。返回统一成 `{"text", "tool_calls": [{"name","arguments"}], "stop", "usage"}`，参数解析失败按 `{}` 处理，不让坏输出把任务带崩。
+- 配置：`builtin_agent_provider`（默认 `openai`，也覆盖 DeepSeek、通义、Kimi、GLM、OpenRouter、Ollama、vLLM）、`builtin_agent_base_url`（留空用官方地址，本地模型填 `http://127.0.0.1:11434/v1` 这类）、`builtin_agent_api_key`、`builtin_agent_model`。设置页新增「内置 Agent」一组，字段与上面四项对应。
+- 测试按钮：`test_model()` 发一句「调用 ping，n 用 1」，带一个 `ping` 工具定义——**模型能发起工具调用才算可用**，只回文本的模型报「没有发起工具调用，不能用来跑任务」，并给出耗时。设置页那一组的检测就调它；没填模型名时显示「还没有填」，不算失败。
+- 本机代理：`git`/`requests` 走 `network_proxy`，但 127.0.0.1、localhost、::1 三个主机名一律直连（本地 Ollama、vLLM 不该走代理）。
+- 测试 `tests/test_agent_client.py` 8 个：默认值、Anthropic 请求与解析、OpenAI 请求与解析、坏 JSON 参数、缺模型名、HTTP 401 报错、只回文本判不可用、确实调了工具判可用。
+- 待实测：真实 Key（DeepSeek 或 Claude）点一次「测试」。
+
 ## 2026-11-04：版面分析改成按需安装
 
 - 背景：安装包从 113 MB 降到 99.59 MiB 的办法是把版面分析（`pymupdf-layout` + `onnxruntime` + `networkx`，约 65 MB）拆出去；拆掉后 PDF 转 Markdown 按纯文本顺序，表格和分栏会乱。现在把它做成第一次需要时按需装回来。

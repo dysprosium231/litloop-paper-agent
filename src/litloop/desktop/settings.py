@@ -104,6 +104,23 @@ GROUPS: list[dict[str, Any]] = [
         ],
     },
     {
+        # Backend B: no agent command, the app talks to a model API itself.
+        "id": "builtin_agent", "title": "内置 Agent", "test": "builtin_agent",
+        "intro": "不装 Agent 命令，让 app 自己调模型接口。模型必须支持工具调用，点「测试」会当场验证。",
+        "fields": [
+            {"key": "builtin_agent_provider", "label": "接口", "type": "select",
+             "options": [["openai", "OpenAI 兼容（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、Ollama、vLLM）"],
+                         ["anthropic", "Anthropic（Claude）"]],
+             "help": "OpenAI 兼容接口只要填对地址，本地模型也走这一项"},
+            {"key": "builtin_agent_base_url", "label": "地址", "type": "text",
+             "placeholder": "留空用官方地址，例如 http://127.0.0.1:11434/v1"},
+            {"key": "builtin_agent_api_key", "label": "Key", "type": "secret",
+             "help": "本机 Ollama、vLLM 不用填"},
+            {"key": "builtin_agent_model", "label": "模型名", "type": "text",
+             "placeholder": "例如 deepseek-chat、claude-sonnet-4-5"},
+        ],
+    },
+    {
         # What is installed, checked on opening (TESTS["components"]); the mirror
         # only matters when installing a component from there.
         "id": "components", "title": "可选组件", "test": "components", "auto": True, "fields": [
@@ -494,8 +511,19 @@ def test_components() -> list[dict[str, Any]]:
     return out
 
 
+def test_builtin_agent() -> list[dict[str, Any]]:
+    """Whether the configured model is there and can call a tool."""
+    from ..agents import test_model
+
+    cfg = _config.load_config()
+    reply = test_model(cfg)
+    detail = str(reply.get("detail") or "")
+    ok: bool | None = True if reply.get("ok") else (None if detail.startswith("还没有") else False)
+    return [_result("模型", ok, detail)]
+
+
 TESTS = {"sources": test_sources, "downloads": test_downloads, "network": test_network, "zotero": test_zotero,
-         "screening": test_screening, "components": test_components}
+         "screening": test_screening, "components": test_components, "builtin_agent": test_builtin_agent}
 
 
 def run_test(group: str) -> dict[str, Any]:

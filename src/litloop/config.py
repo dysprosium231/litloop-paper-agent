@@ -202,6 +202,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # waits on a prompt nobody sees). A deep-search batch takes ~1-3 minutes.
     "agent_idle_minutes": 15,
     "agent_args": "-p --output-format stream-json --verbose --allowedTools mcp__litloop Skill Read",
+    # Backend B: the app calls a model API itself instead of starting an agent
+    # command. "openai" also covers DeepSeek, 通义, Kimi, GLM, OpenRouter, Ollama
+    # and vLLM; the address is what points at the one you use.
+    "builtin_agent_provider": "openai",
+    "builtin_agent_base_url": "",
+    "builtin_agent_api_key": "",
+    "builtin_agent_model": "",
     "translation_provider": "deepseek",
     "deepseek_api_key": "",
     "deepl_api_key": "",
