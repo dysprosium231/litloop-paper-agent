@@ -178,7 +178,10 @@ def size_of(path: Path) -> int:
 def bundle() -> None:
     npm = "npm.cmd" if os.name == "nt" else "npm"
     step("building the installer (npm run tauri build)")
-    subprocess.run([npm, "run", "tauri", "build"], cwd=ROOT / "app", check=True)
+    # The runtime only exists after staging, so the resources that pull it into
+    # the bundle live in a separate overlay the plain `cargo check` never sees.
+    subprocess.run([npm, "run", "tauri", "build", "--", "--config", "src-tauri/tauri.release.json"],
+                   cwd=ROOT / "app", check=True)
 
 
 def main() -> None:

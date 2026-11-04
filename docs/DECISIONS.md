@@ -3,6 +3,13 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-04：运行时的资源清单单独放，`cargo check` 不再要求它存在
+
+- 现象：CI 的 `app` 任务从 492dddd（安装包带 Python 运行时）起一直红，报 `resource path ../../build/runtime doesn't exist`。Tauri 的 build script 在编译期校验 `bundle.resources` 里列出的每个路径，而 `build/runtime` 是 `scripts/build_release.py` 现场装配的、不进仓库，CI 只跑 `cargo check`，自然没有这个目录。
+- 改法：`app/src-tauri/tauri.conf.json` 只留开发与检查要用的配置（窗口、CSP、NSIS 安装方式、图标），把 `bundle.resources: {"../../build/runtime/": "python/"}` 移到 `app/src-tauri/tauri.release.json`；`scripts/build_release.py --bundle` 调 `npm run tauri build -- --config src-tauri/tauri.release.json` 合并进来。
+- 为什么不在 CI 里 `mkdir build/runtime`：那会把「空的运行时」打进去，掩盖真正的问题；也不能把资源改成可选——路径写错了宁可编译时就报。
+- 验证：把 `build/runtime` 移走后 `cargo check` 通过（22.5 秒）；带 overlay 重新打包出 `LitLoop_0.1.0_x64-setup.exe` 109.83 MiB，与之前一致。
+
 ## 2026-11-04：流程统计能导出成 Markdown
 
 - 系统综述要把「检索到多少、去重后多少、纳入多少」写进手稿，所以除了历史页上的一行，再给一份文件：`screening.prisma_markdown(session)` 出 Markdown（阶段/篇数表、每次检索的时间与新增数、前 10 条排除理由），`citations/session_export.prisma_export(session)` 写到 `<output_dir>/exports/<session>-prisma-<时间>.md`。

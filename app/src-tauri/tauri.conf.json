@@ -26,9 +26,6 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "resources": {
-      "../../build/runtime/": "python/"
-    },
     "windows": {
       "nsis": {
         "installMode": "both"
