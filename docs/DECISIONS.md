@@ -3,6 +3,17 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-04：深度检索一轮跑完发通知
+
+- 背景：CHARTER 的筛选页要求「深度链接与这一轮跑完的通知」。下载的系统通知 2026-10-23 做了，检索这边一直没有：Agent 在后台跑完一轮、新一批出来了，用户要自己切回筛选页才看得到。
+- 做法：
+  - `store.latest_round_notice()`：在 `~/.litloop/screening/` 里挑 `updated` 最新的 `<会话>.progress.json`，连同该会话 summary 里的问题、批次数一起返回（summary 缺了也不报错）。深度检索写进度本来就是给 app 看的（`store.Progress`），这里是同一份文件。
+  - `GET /api/screening/notice` 暴露它，和 `/api/downloads/notice` 并列。
+  - `app/src/hooks/use-system-notices.ts` 每 3 秒轮询一次：**先看到 running、再看到 idle/failed** 才发一次通知（app 刚打开时已经结束的轮次不补发），失败发「这一轮失败了」。和下载通知一样，用 app 自己的名字和图标。
+- 为什么放 app 侧轮询：Agent（MCP）和 app 是两个进程，共用状态只有磁盘上的 progress 文件；Tauri 通知只能在 app 进程里发，app 没开就不发（和下载一致）。
+- 测试 `tests/test_app_server.py` 3 个：没有进度时为 null、取最新一轮并带上问题与批次数、summary 缺失也能返回；前端 `npm run build` 与 `npm run lint:copy` 通过。
+- 待实测：app 开着放在别的页面，让 Agent 跑完一轮，看是否弹、同一轮是否只弹一次。
+
 ## 2026-11-03：停止规则重放（第 2 个材料测试集：PDC 气凝胶）
 
 - 命令：`python -u scripts/eval_deep_search.py pdc_aerogel_review --max 180 --past-stop`（`--past-stop` 表示规则建议停之后继续读）。会话 `20261103-232847-…`，花 556 OpenAlex 积分、376 秒，候选池 1897 篇。

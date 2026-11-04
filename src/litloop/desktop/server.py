@@ -455,6 +455,11 @@ def create_app(token: str) -> FastAPI:
         from ..download import progress as progress_reporter
         return progress_reporter.latest_notice()
 
+    @app.get("/api/screening/notice")
+    def screening_notice() -> dict[str, Any] | None:
+        """Polled on every page for the system notifications (a deep-search round finished)."""
+        return store.latest_round_notice()
+
     @app.get("/api/downloads/pending")
     def downloads_pending() -> list[dict[str, Any]]:
         """Papers picked 选中下载 in screening that no job has downloaded yet (or holds in a queue), by session."""

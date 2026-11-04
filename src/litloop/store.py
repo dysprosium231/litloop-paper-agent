@@ -165,3 +165,47 @@ def read_progress(session: str) -> dict[str, Any] | None:
         return read_json(progress_path(session))
     except (OSError, ValueError):
         return None
+
+
+def latest_round_notice() -> dict[str, Any] | None:
+    """The most recently touched deep-search round, for the app's system notices.
+
+    A round the agent (or the app) runs writes ``<session>.progress.json``;
+    the desktop app watches it and tells the user when a new batch is ready,
+    the same way it does for downloads. The session's question and batch
+    count come along so the notice can name what finished.
+    """
+    best: tuple[float, dict[str, Any]] | None = None
+    try:
+        paths = list(_screening_dir().glob("*.progress.json"))
+    except OSError:
+        return None
+    for path in paths:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            stamp = float(data.get("updated") or data.get("started") or 0)
+        except (OSError, ValueError, TypeError):
+            continue
+        if not isinstance(data, dict) or not data.get("session"):
+            continue
+        if best is None or stamp > best[0]:
+            best = (stamp, data)
+    if best is None:
+        return None
+    data = best[1]
+    session = str(data["session"])
+    try:
+        summary = read_json(summary_path(session))
+    except (OSError, ValueError):
+        summary = {}
+    return {
+        "session": session,
+        "question": summary.get("question") or "",
+        "batches": len(summary.get("batches") or []),
+        "event": data.get("event"),
+        "state": data.get("state"),
+        "phase": (data.get("phase") or {}).get("name") if isinstance(data.get("phase"), dict) else None,
+        "started": data.get("started"),
+        "updated": data.get("updated"),
+        "seconds": data.get("seconds"),
+    }

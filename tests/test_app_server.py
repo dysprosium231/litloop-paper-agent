@@ -131,3 +131,27 @@ def test_glossary_builtin_lookup_and_switch(client):
     assert r == {"id": "element:Al", "disabled": True}
     assert client.get("/api/glossary/builtin", params={"q": "Al"}).json()["elements"][0]["disabled"]
     assert client.post("/api/glossary/builtin", json={"id": "element:Xx", "enabled": False}).status_code == 404
+
+
+def test_round_notice_is_none_without_a_deep_search(client):
+    assert client.get("/api/screening/notice").json() is None
+
+
+def test_round_notice_names_the_newest_round(client, tmp_path):
+    store.write_json(store.progress_path("s-old"), {
+        "session": "s-old", "event": "next", "state": "idle", "started": 100.0, "updated": 200.0})
+    store.write_json(store.progress_path("s-new"), {
+        "session": "s-new", "event": "next", "state": "running", "started": 300.0, "updated": 400.0})
+    store.write_json(store.summary_path("s-new"), {
+        "session": "s-new", "question": "稀土药物载体", "batches": [{}, {}, {}]})
+
+    n = client.get("/api/screening/notice").json()
+    assert n["session"] == "s-new" and n["state"] == "running"
+    assert n["question"] == "稀土药物载体" and n["batches"] == 3 and n["started"] == 300.0
+
+
+def test_round_notice_survives_a_missing_summary(client):
+    store.write_json(store.progress_path("s1"), {
+        "session": "s1", "event": "start", "state": "idle", "started": 1.0, "updated": 2.0})
+    n = client.get("/api/screening/notice").json()
+    assert n["session"] == "s1" and n["question"] == "" and n["batches"] == 0

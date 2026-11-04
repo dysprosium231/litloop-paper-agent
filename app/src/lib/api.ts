@@ -100,6 +100,19 @@ export interface Progress {
   seconds?: number
 }
 
+/** The latest deep-search round from any process (system notifications). */
+export interface RoundNotice {
+  session: string
+  question: string
+  batches: number
+  event: "start" | "next" | null
+  state: "running" | "idle" | "failed" | null
+  phase: string | null
+  started: number | null
+  updated: number | null
+  seconds: number | null
+}
+
 interface BackendInfo {
   port: number
   token: string
@@ -151,6 +164,7 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 
 export const api = {
   sessions: () => call<SessionListEntry[]>("/api/sessions"),
+  roundNotice: () => call<RoundNotice | null>("/api/screening/notice"),
   session: (id: string) => call<{ record: SessionRecord; summary: Summary | null }>(`/api/sessions/${encodeURIComponent(id)}`),
   progress: (id: string) => call<Progress | null>(`/api/sessions/${encodeURIComponent(id)}/progress`),
   rate: (id: string, paper: { doi?: string; title: string }, relevance: Relevance | null) =>
