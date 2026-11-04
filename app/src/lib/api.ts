@@ -431,6 +431,8 @@ export interface PrismaSummary {
 export const historyApi = {
   list: () => call<HistoryEntry[]>("/api/history"),
   prisma: (id: string) => call<PrismaSummary>(`/api/sessions/${encodeURIComponent(id)}/prisma`),
+  prismaExport: (id: string) =>
+    call<{ file: string }>(`/api/sessions/${encodeURIComponent(id)}/prisma/export`, {}),
   export: (id: string, format: "bibtex" | "ris" | "doi", which: "selected" | "high" = "selected") =>
     call<{ file: string; count: number }>(`/api/sessions/${encodeURIComponent(id)}/export`, { format, which }),
 }

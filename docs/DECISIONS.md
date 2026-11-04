@@ -3,6 +3,20 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-04：流程统计能导出成 Markdown
+
+- 系统综述要把「检索到多少、去重后多少、纳入多少」写进手稿，所以除了历史页上的一行，再给一份文件：`screening.prisma_markdown(session)` 出 Markdown（阶段/篇数表、每次检索的时间与新增数、前 10 条排除理由），`citations/session_export.prisma_export(session)` 写到 `<output_dir>/exports/<session>-prisma-<时间>.md`。
+- 入口：历史记录展开区「检索流程」右侧的「导出流程」，走 `POST /api/sessions/{id}/prisma/export`；没有做成 SVG 流程图——用户要的是能贴进稿子的数字，Markdown 表直接可用，画图可以以后再补。
+- 测试一条（`tests/test_screening.py::test_prisma_export_writes_a_markdown_table`，用临时 `output_dir`）。
+
+## 2026-11-04：追踪（保存检索式，只报新文章）
+
+- 阶段 4 的第一块，只做数据与接口，界面下一块：`src/litloop/search/watches.py`，文件 `~/.litloop/watches.json`（`store` 加锁、整份替换），条目记 `question/query/core_terms/session/created/checked/last_new/seen`。
+- 已见文章按 `doi:<DOI>` 记，没有 DOI 退回 `title:<归一化标题>`；`seen` 最多留 5000 条（够一个课题追很多年）；列表接口不返回 `seen`，只给 `seen_count`，免得一条追踪拖几百 KB 给前端。
+- `check(wid)`：用保存的检索式跑一次快速检索（`sort="date"`、50 条），把没见过的挑出来返回，同时把这批全部记进 `seen`——同一篇不会报两次；网络或积分错误由服务端转成 502。
+- 接口：`GET /api/watches`、`POST /api/watches`（从某个检索会话取问题、最后一次检索式与核心词，会话里的文章都算已见）、`DELETE /api/watches/{id}`、`POST /api/watches/{id}/check`；会话没有检索式时退回用问题当检索式。
+- 测试：`tests/test_watches.py` 6 个（只报新的、重启后还在、列表不含 seen、空检索式、删除与未知 id、无 DOI 按标题记），`tests/test_app_server.py` 加 1 个（从会话保存、检查、删除、未知 id 404）。
+
 ## 2026-11-04：检索记录能数清从命中到纳入的流程
 
 - 系统综述要的 PRISMA 统计，第一块先做「数得出来」：`search/screening.prisma(session)` 从已有筛选记录算 `identified`（各次检索的结果数之和）、`duplicates`（其中已在会话里的）、`screened`（用户看过的篇数）、`included`/`excluded`（用户点过「加入下载」/「排除」的）、`low_without_decision`（Agent 评为低或无关、用户还没决定的）、以及排在前 10 的排除理由。

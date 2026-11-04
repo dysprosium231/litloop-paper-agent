@@ -315,3 +315,20 @@ def render_markdown(data: dict[str, Any]) -> str:
                      f"{venue.replace('|', '/')} | {flags}{str(it.get('reason') or '').replace('|', '/')} | "
                      f"{_DECISION.get(it.get('decision'), '')} |")
     return "\n".join(lines) + "\n"
+
+
+def prisma_markdown(session: str) -> str:
+    """The flow counts as a Markdown table, for a manuscript's record."""
+    d = prisma(session)
+    lines = [f"# 检索流程：{d['question'] or '（没有记录检索问题）'}", "",
+             "| 阶段 | 篇数 |", "| --- | --- |",
+             f"| 检索命中 | {d['identified']} |", f"| 去重后 | {d['screened']} |",
+             f"| 已筛 | {d['screened']} |", f"| 纳入 | {d['included']} |",
+             f"| 排除 | {d['excluded']} |", f"| 低相关未定 | {d['low_without_decision']} |", ""]
+    if d["searches"]:
+        lines += ["## 检索", "", "| 时间 | 检索词 | 返回 | 新增 |", "| --- | --- | --- | --- |"]
+        lines += [f"| {s['time']} | {s['query']} | {s['results']} | {s['new']} |" for s in d["searches"]]
+        lines.append("")
+    if d["reasons"]:
+        lines += ["## 排除理由", ""] + [f"- {r['reason']}（{r['count']} 篇）" for r in d["reasons"]] + [""]
+    return "\n".join(lines)

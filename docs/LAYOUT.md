@@ -7,7 +7,7 @@
 | 子包 | 管什么 | 模块（括号里是 2026-10-25 之前的名字） |
 |---|---|---|
 | `terms/` | 检索用词：归一化、英美拼写、术语表 | `text.py`、`spelling.py`、`glossary.py` |
-| `search/` | 检索与筛选 | `quick.py`（search.py）、`deep.py`（deep_search.py）、`scansci_find.py`（discovery.py）、`abstracts.py`、`title_to_doi.py`（resolver.py）、`screening.py` |
+| `search/` | 检索与筛选 | `quick.py`（search.py）、`deep.py`（deep_search.py）、`scansci_find.py`（discovery.py）、`abstracts.py`、`title_to_doi.py`（resolver.py）、`screening.py`、`watches.py`（定期追踪） |
 | `download/` | 下载流程 | `fetcher.py`、`pipeline.py`、`pdf.py`（pdf_utils.py）、`rename.py`、`doi_check.py`、`progress.py`（progress_reporter.py）、`markdown.py`（md_export.py） |
 | `publishers/` | 出版商 | `profiles.py`（publisher_profiles.py）、`access.py`（publisher_access.py）、`pdf_router.py`（publisher_pdf_router.py）、`supplementary.py`、`strategies/`（publisher_strategies/，其中 `_core.py` 原为 _publisher_strategies_core.py） |
 | `browser/` | 浏览器 | `backend.py`、`engine.py`、`login.py`、`cookies.py`、`pdf.py`、`runtime.py`（browser_discovery.py）、`chrome_copy.py`、`profile_health.py`、`camofox_api.py`（camofox.py，云端 API 客户端）、`cloakbrowser_compat.py`（合并了顶层和 institutional/ 下的两份） |

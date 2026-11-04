@@ -170,3 +170,19 @@ def test_round_notice_survives_a_missing_summary(client):
         "session": "s1", "event": "start", "state": "idle", "started": 1.0, "updated": 2.0})
     n = client.get("/api/screening/notice").json()
     assert n["session"] == "s1" and n["question"] == "" and n["batches"] == 0
+
+
+def test_a_watch_is_saved_from_a_session_and_checked(client, session, monkeypatch):
+    from litloop.search import quick, watches
+    monkeypatch.setattr(watches, "path", lambda: screening._config.DATA_DIR / "watches.json")
+    screening.save("q", [{"doi": "10.1/a", "title": "A", "relevance": "低"},
+                            {"doi": "10.1/b", "title": "B", "relevance": "高"}],
+                   query="aerogel 2024..2026", session=session)
+    got = client.post("/api/watches", json={"session": session}).json()
+    assert got["query"] == "aerogel 2024..2026" and got["seen_count"] == 2
+    monkeypatch.setattr(quick, "search_papers_v2",
+                        lambda *a, **k: [{"doi": "10.1/a", "title": "A"}, {"doi": "10.1/z", "title": "Z"}])
+    checked = client.post(f"/api/watches/{got['id']}/check").json()
+    assert [p["doi"] for p in checked["new"]] == ["10.1/z"]
+    assert client.delete(f"/api/watches/{got['id']}").json() == {"removed": True}
+    assert client.post("/api/watches/nope/check").status_code == 404

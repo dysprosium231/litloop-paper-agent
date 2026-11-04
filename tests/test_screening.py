@@ -103,3 +103,13 @@ def test_prisma_counts_the_flow_from_hits_to_picks():
     assert d["included"] == 1 and d["excluded"] == 1
     assert d["reasons"] and d["reasons"][0]["count"] >= 1
     assert [s["new"] for s in d["searches"]] == [3, 1]
+
+
+def test_prisma_export_writes_a_markdown_table(tmp_path, monkeypatch):
+    from litloop.citations import session_export
+    monkeypatch.setattr(session_export, "load_config", lambda: {"output_dir": str(tmp_path)})
+    sid = screening.save("q", ITEMS, query="first")["session"]
+    out = session_export.prisma_export(sid)
+    text = open(out["file"], encoding="utf-8").read()
+    assert out["file"].endswith(".md")
+    assert "| 检索命中 | 3 |" in text and "| 纳入 | 0 |" in text and "| 排除 | 0 |" in text

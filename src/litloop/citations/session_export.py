@@ -82,3 +82,13 @@ def export(session: str, fmt: str = "bibtex", which: str = "selected") -> dict[s
     path = folder / name
     path.write_text(text, encoding="utf-8", newline="\n")
     return {"file": str(path), "count": len(items)}
+
+
+def prisma_export(session: str) -> dict[str, Any]:
+    """Write the session's flow counts as Markdown under <output_dir>/exports/."""
+    text = screening.prisma_markdown(session)
+    folder = Path(str(load_config().get("output_dir") or "")).expanduser() / "exports"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{session[:15]}-prisma-{time.strftime('%H%M%S')}.md"
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return {"file": str(path)}

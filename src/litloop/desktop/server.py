@@ -140,6 +140,11 @@ class Export(BaseModel):
     which: str = "selected"  # selected | high
 
 
+class Watch(BaseModel):
+    session: str
+    query: str = ""
+
+
 class Decision(BaseModel):
     doi: str | None = None
     title: str | None = None
@@ -296,6 +301,52 @@ def create_app(token: str) -> FastAPI:
     def history() -> list[dict[str, Any]]:
         """Every screening session with its counts and its final picks (the app's history page)."""
         return screening.history()
+
+    @app.get("/api/watches")
+    def watches() -> list[dict[str, Any]]:
+        """Saved searches, newest check first (定期追踪)."""
+        from ..search import watches as saved
+        return saved.list_watches()
+
+    @app.post("/api/watches")
+    def add_watch(body: Watch) -> dict[str, Any]:
+        """Remember this session's last search so later checks report only new papers."""
+        from ..search import watches as saved
+        record = screening.load(body.session)
+        searches = record.get("searches") or []
+        last = searches[-1] if searches else {}
+        core = list((last.get("params") or {}).get("core_terms") or [])
+        query = body.query or str(last.get("query") or "") or str(record.get("question") or "")
+        try:
+            return saved.add(record.get("question", ""), query,
+                             core, record.get("items") or [], body.session)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.delete("/api/watches/{wid}")
+    def delete_watch(wid: str) -> dict[str, Any]:
+        from ..search import watches as saved
+        if not saved.remove(wid):
+            raise HTTPException(404, "没有这个追踪")
+        return {"removed": True}
+
+    @app.post("/api/watches/{wid}/check")
+    def check_watch(wid: str) -> dict[str, Any]:
+        """Run the saved search now; only papers this watch has not seen come back."""
+        from ..search import watches as saved
+        try:
+            return saved.check(wid)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except Exception as exc:  # network, quota, source outage
+            raise HTTPException(502, f"无法检查追踪：{exc}") from exc
+
+    @app.post("/api/sessions/{session}/prisma/export")
+    def export_prisma(session: str) -> dict[str, Any]:
+        """Write the session's flow counts as Markdown under <output_dir>/exports."""
+        from ..citations import session_export as export
+        _record_path(session)
+        return export.prisma_export(session)
 
     @app.post("/api/sessions/{session}/export")
     def export_session(session: str, body: Export) -> dict[str, Any]:

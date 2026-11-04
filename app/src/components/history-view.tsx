@@ -82,7 +82,7 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
       </div>
       {open && (
         <div className="space-y-3 border-t bg-canvas/60 px-5 py-3">
-          <PrismaLine session={s.session} />
+          <PrismaLine session={s.session} onNote={setNote} />
           <ol className="space-y-1.5">
             {s.selected.map((p, i) => (
               <li key={p.doi ?? p.title} className="flex gap-3 text-sm">
@@ -121,7 +121,9 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
 }
 
 /** How the papers moved from search hits to picks, for the review's record. */
-function PrismaLine({ session }: { session: string }) {
+function PrismaLine({ session, onNote }: {
+  session: string; onNote: (note: { text: string; folder?: string; bad?: boolean }) => void
+}) {
   const [d, setD] = React.useState<PrismaSummary | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   React.useEffect(() => {
@@ -136,9 +138,16 @@ function PrismaLine({ session }: { session: string }) {
     ["排除", d.excluded],
     ["低相关未定", d.low_without_decision],
   ]
+  const exportFlow = () =>
+    historyApi.prismaExport(session).then((r) => {
+      onNote({ text: `已导出检索流程：${r.file}`, folder: r.file.replace(/[\/][^\/]+$/, "") })
+    }).catch((e) => onNote({ text: errorMessage(e), bad: true }))
   return (
     <div className="rounded-md border bg-background px-3 py-2">
-      <div className="text-xs font-medium text-muted-foreground">检索流程</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-medium text-muted-foreground">检索流程</div>
+        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={exportFlow}>导出流程</Button>
+      </div>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm tabular-nums">
         {counts.map(([label, n]) => (
           <span key={label} className="whitespace-nowrap">
