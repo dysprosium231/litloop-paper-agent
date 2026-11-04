@@ -58,3 +58,44 @@ def test_markdown_quality_scan_flags_replacement_chars():
     warnings = markdown_quality_scan("good text \ufffd broken")
     assert any("替换字符" in w for w in warnings)
     assert markdown_quality_scan("clean text") == []
+
+
+def _fake_pymupdf4llm(monkeypatch, missing: str):
+    """A pymupdf4llm whose layout path needs `missing`; text order always works."""
+    import sys
+    import types
+
+    calls = {"layout": True}
+    fake = types.ModuleType("pymupdf4llm")
+
+    def to_markdown(path):
+        if calls["layout"]:
+            raise ModuleNotFoundError(f"No module named '{missing}'", name=missing)
+        return "# text order\nbody\n"
+
+    fake.to_markdown = to_markdown
+    fake.use_layout = lambda yes: calls.__setitem__("layout", bool(yes))
+    monkeypatch.setitem(sys.modules, "pymupdf4llm", fake)
+    return calls
+
+
+def test_a_missing_layout_component_falls_back_to_text_order(tmp_path, monkeypatch):
+    from litloop.download.markdown import pdf_to_markdown_detailed
+
+    calls = _fake_pymupdf4llm(monkeypatch, "onnxruntime")
+    text, warnings = pdf_to_markdown_detailed(tmp_path / "x.pdf", write=False)
+    assert text.startswith("# text order")
+    assert calls["layout"] is False
+    assert any("版面分析" in w for w in warnings)
+
+
+def test_an_unrelated_missing_module_is_not_swallowed(tmp_path, monkeypatch):
+    from litloop.download.markdown import pdf_to_markdown_detailed
+
+    _fake_pymupdf4llm(monkeypatch, "somethingelse")
+    try:
+        pdf_to_markdown_detailed(tmp_path / "x.pdf", write=False)
+    except ModuleNotFoundError as exc:
+        assert exc.name == "somethingelse"
+    else:  # pragma: no cover
+        raise AssertionError("a missing unrelated module must not be treated as the layout part")

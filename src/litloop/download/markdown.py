@@ -20,6 +20,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from pathlib import Path
+from typing import Any
 
 # Diacritic marks that pymupdf4llm sometimes wraps in <sup> when the PDF font
 # decomposed them: <sup>ˇ</sup> -> U+030C (combining caron), etc. NFC then
@@ -100,11 +101,30 @@ def pdf_to_markdown_detailed(pdf_path: str | Path, write: bool = True) -> tuple[
         ) from exc
 
     src = Path(pdf_path)
-    raw_md = pymupdf4llm.to_markdown(str(src))
+    warnings: list[str] = []
+    raw_md = _to_markdown(pymupdf4llm, src, warnings)
     md_text = clean_markdown_text(raw_md)
-    warnings = markdown_quality_scan(md_text)
+    warnings += markdown_quality_scan(md_text)
     if not write:
         return md_text, warnings
     out = src.with_suffix(".md")
     out.write_text(md_text, encoding="utf-8")
     return out, warnings
+
+
+def _to_markdown(pymupdf4llm: Any, src: Path, warnings: list[str]) -> str:
+    """pymupdf4llm's markdown, without the layout model when it is not installed.
+
+    pymupdf4llm 2.x routes ``to_markdown`` through pymupdf-layout, which needs
+    onnxruntime (and networkx): about 67 MB of the install. When that optional
+    part is missing — a trimmed install, or a download of it that failed — the
+    text-only path still reads the PDF, with tables and columns less tidy.
+    """
+    try:
+        return str(pymupdf4llm.to_markdown(str(src)))
+    except ModuleNotFoundError as exc:
+        if not (exc.name or "").startswith(("onnxruntime", "networkx")):
+            raise
+        pymupdf4llm.use_layout(False)
+        warnings.append("版面分析组件没有安装，按纯文本顺序转换（表格和分栏可能不规整）")
+        return str(pymupdf4llm.to_markdown(str(src)))

@@ -3,6 +3,16 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-04：发布摸底（1）核心依赖 336 MB，版面分析占 67 MB
+
+- 方法：在 `D:/litloop-probe/env` 用 `pip install --target` 只装 `pyproject.toml` 的必需依赖（不含任何可选 extras），再用 `python -S` + `PYTHONPATH` 把系统 site-packages 挡掉，确认这套东西能自己跑起来、不依赖开发环境。
+- 体积：**336 MB**。大头 `pymupdf` 105、`onnxruntime` 48、`numpy` 56（35 + 21 的 `numpy.libs`）、`networkx` 19、`cryptography` 12、`pygments` 11、`Cryptodome` 9.4、`pywin32` 约 10。
+- 关键发现：`pymupdf4llm` 2.1 把 `pymupdf-layout` 列为依赖并自动装上，`to_markdown` 默认走版面分析路径（需要 onnxruntime），所以“核心依赖”里必然带着这 67 MB，除非换 pymupdf4llm 版本或把它拆成按需组件。
+- 拆掉后的对照：去掉 `onnxruntime` + `networkx`（保留 numpy，`pymupdf4llm` 本身要用）后 **271 MB**。同一篇 PDF（2021 年 IJPAMT 论文）转 Markdown：带版面 **71,542 字符 / 24.5 秒**；纯文本路径 **78,213 字符 / 2.7 秒**（快 9 倍）。纯文本路径要先 `pymupdf4llm.use_layout(False)`，否则直接抛 `ModuleNotFoundError: onnxruntime`。
+- 代码：`download/markdown.py` 的 `_to_markdown` 现在捕获 `onnxruntime` / `networkx` 缺失，自动切纯文本并在 `markdown_warnings` 里说明「版面分析组件没有安装，按纯文本顺序转换」；其它模块缺失照旧抛出（测试 2 个）。
+- 对发布的意义：核心安装包按 336 MB 估，压缩后与 Defender 误报还要实测；版面分析可以做成第一次需要时下载的按需组件，省 67 MB，代价是表格和分栏不规整、但对摘要级阅读影响不大。
+- 还没做：用官方 embeddable Python 跑这套依赖并启动 `litloop.desktop.server`；量安装包压缩后大小；Defender 扫描；干净机器验收。
+
 ## 2026-11-04：深度检索一轮跑完发通知
 
 - 背景：CHARTER 的筛选页要求「深度链接与这一轮跑完的通知」。下载的系统通知 2026-10-23 做了，检索这边一直没有：Agent 在后台跑完一轮、新一批出来了，用户要自己切回筛选页才看得到。
