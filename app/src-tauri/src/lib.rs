@@ -24,13 +24,35 @@ fn backend(state: tauri::State<Backend>) -> Result<BackendInfo, String> {
     state.info.clone()
 }
 
-/// Start `python -m litloop.desktop.server` and wait for the line that names its port.
+/// The interpreter to start the backend with.
 ///
-/// The interpreter is `LITLOOP_PYTHON` when set (the Python environment
-/// LitLoop is installed in), otherwise `python` on PATH. The installed app
-/// will ship its own backend instead (TODO: PyInstaller sidecar).
+/// `LITLOOP_PYTHON` wins (the Python environment a developer runs LitLoop
+/// from). The installed app ships the official embeddable Python next to its
+/// executable, either as a plain `python/` folder beside the .exe or in the
+/// bundle's `resources/python/`; both are checked before falling back to
+/// whatever `python` PATH has.
+fn resolve_python() -> String {
+    if let Ok(p) = std::env::var("LITLOOP_PYTHON") {
+        if !p.trim().is_empty() {
+            return p;
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            for rel in ["python/python.exe", "resources/python/python.exe"] {
+                let cand = dir.join(rel);
+                if cand.is_file() {
+                    return cand.to_string_lossy().into_owned();
+                }
+            }
+        }
+    }
+    "python".into()
+}
+
+/// Start `python -m litloop.desktop.server` and wait for the line that names its port.
 fn start_backend() -> (Result<BackendInfo, String>, Option<Child>) {
-    let python = std::env::var("LITLOOP_PYTHON").unwrap_or_else(|_| "python".into());
+    let python = resolve_python();
     let token = uuid::Uuid::new_v4().simple().to_string();
     let mut cmd = Command::new(&python);
     cmd.args(["-m", "litloop.desktop.server", "--token", &token])

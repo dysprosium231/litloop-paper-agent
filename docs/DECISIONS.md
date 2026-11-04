@@ -3,6 +3,12 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-04：桌面壳先找程序目录里的 Python
+
+- 发布计划里有一条「`lib.rs` 改为启动程序目录里的 Python（开发时仍可用 `LITLOOP_PYTHON`）」。
+- 做法：`app/src-tauri/src/lib.rs` 新增 `resolve_python()`，顺序是 ①`LITLOOP_PYTHON`（开发时指向项目环境）②可执行文件旁边的 `python/python.exe` ③`resources/python/python.exe`（Tauri 打包资源的位置）④PATH 上的 `python`。找不到时仍按原来的方式启动并报错。
+- 验收：`cargo check` 通过（2.26 秒）。还没打包，所以 ②③ 两条路径要等安装包里真的放了运行时才能实测。
+
 ## 2026-11-04：发布摸底（2）官方嵌入式 Python 跑通
 
 - 用官方 embeddable 发行包 `python-3.14.3-embed-amd64.zip`（12.0 MB，解压 22 MB），把 `python314._pth` 追加两行路径（`../env`、仓库的 `src`）并打开 `import site`，然后直接：

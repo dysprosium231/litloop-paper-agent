@@ -86,7 +86,7 @@
 - [ ] 后端 B：内置 Agent（设计见 CHARTER「可视化 app → 任务与后端」）：app 直接调模型 API，Anthropic 原生接口和 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、本地 Ollama / vLLM）；设置里按服务商、地址、Key、模型名配置，可按任务分模型，测试按钮检查工具调用；用测试集存档比较各模型的评分质量。2026-10-26 补记：原来只写在 CHARTER 的「顺序」里，TODO 漏了这一项。
 - [ ] 安装包与自动更新（评审 12；设计和验收见 CHARTER「可视化 app → 发布」，2026-10-26 用户定了安装范围、签名、分发和浏览器的做法，见 DECISIONS「作为标准 Windows 程序分发」）。模块整理做完后开始，大致步骤：
   - [~] 先摸底：核心依赖（不含可选组件）脱离系统 site-packages 能导入并转 Markdown——**336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 直接跑起 `litloop.desktop.server`，`/api/health` 正常，合计约 **358 MB**（DECISIONS「发布摸底（2）」）。还剩：NSIS 打包与压缩后大小、用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净机器验收；
-  - 安装包带嵌入式 Python 和核心依赖，`lib.rs` 改为启动程序目录里的 Python（开发时仍可用 `LITLOOP_PYTHON`）；
+  - [~] 安装包带嵌入式 Python 和核心依赖：`lib.rs` 已改成先找程序目录里的 Python（DECISIONS「桌面壳先找程序目录里的 Python」）；还没把运行时放进安装包、`_pth` 里的路径还是开发机的；
   - 按需组件（patchright 和浏览器、CloakBrowser、版面分析）第一次需要时用 uv 下载，可配国内镜像，失败只影响这一项；
   - NSIS `installMode: "both"`，图标、名称、开始菜单；系统通知显示 LitLoop 自己的名称和图标（用户 2026-10-23 要求；开发模式下借用的是 PowerShell 的）；
   - 按需下载都要有进度和失败提示；
