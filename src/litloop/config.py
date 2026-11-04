@@ -211,6 +211,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "zotero_mcp_python": "",
     "zotero_mcp_env_script": "",
     "zotero_push_timeout": 900,
+    # Where on-demand components (the layout model) come from. Empty = PyPI,
+    # which is slow from some networks; a mirror URL avoids a 65 MB download
+    # crawling. Set in 设置 → 可选组件.
+    "package_index_url": "",
     # Desktop app: push a download job to Zotero when it finishes (off: the
     # user pushes from the job page), into <root>/<the job's title>.
     "zotero_auto_push": False,

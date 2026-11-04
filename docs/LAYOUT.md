@@ -20,7 +20,7 @@
 | `zotero/` | Zotero | `client.py`（zotero.py）、`bridge.py`（zotero_bridge.py，在 zotero-mcp 的 Python 里按文件路径运行，不能 import litloop） |
 | `extractors/` | 从 HTML、PDF 抽内容 | 未变 |
 
-顶层：`server.py`（MCP 服务）、`config.py`、`store.py`、`network.py`、`http_utils.py`、`identifiers.py`、`models.py`、`quota.py`、`updates.py`、`cache.py`、`deps.py`、`log.py`、`_source_hygiene.py`、`__init__.py`、`__main__.py`；`app_server.py` 只转发到 `desktop/server.py`，给已装好、还在启动 `python -m litloop.app_server` 的桌面 app 用，过一个版本后删（见 TODO）。
+顶层：`server.py`（MCP 服务）、`config.py`、`store.py`、`network.py`、`http_utils.py`、`identifiers.py`、`models.py`、`quota.py`、`updates.py`、`cache.py`、`deps.py`、`log.py`、`optional.py`（按需安装的组件：版面分析，装进 `<数据目录>/packages` 并加进 `sys.path`）、`_source_hygiene.py`、`__init__.py`、`__main__.py`；`app_server.py` 只转发到 `desktop/server.py`，给已装好、还在启动 `python -m litloop.app_server` 的桌面 app 用，过一个版本后删（见 TODO）。
 
 固定的入口：命令 `litloop`（`litloop.cli.main:main`）、`python -m litloop`、桌面壳启动的 `python -m litloop.desktop.server`（`app/src-tauri/src/lib.rs`）、`from litloop import search_papers`、`from litloop import batch_download`。`from litloop import download` 已去掉（2026-10-26，和子包 `download/` 重名），用 `from litloop.sources import download`。
 

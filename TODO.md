@@ -87,7 +87,7 @@
 - [ ] 安装包与自动更新（评审 12；设计和验收见 CHARTER「可视化 app → 发布」，2026-10-26 用户定了安装范围、签名、分发和浏览器的做法，见 DECISIONS「作为标准 Windows 程序分发」）。模块整理做完后开始，大致步骤：
   - [x] 先摸底：核心依赖 **336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 跑起 `litloop.desktop.server`，合计约 **358 MB**（DECISIONS「发布摸底（2）」）；NSIS 安装包实测 **113.38 MiB**（DECISIONS「第一个 Windows 安装包」）。还剩：用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净 Windows 验收；
   - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时，Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出安装包；去掉版面分析后是 **99.59 MiB**（DECISIONS「第一个 Windows 安装包」「版面分析不进安装包」）。
-  - [ ] 按需组件：版面分析（`pymupdf-layout` + `onnxruntime` + `networkx`，约 65 MB）第一次需要时用 uv 装到 `~/.litloop/packages` 并加进 `sys.path`（`download/markdown.py` 已有缺组件时的纯文本回退）；下载要有进度和失败提示，可配国内镜像。
+  - [x] 按需组件：版面分析（`pymupdf-layout` + `onnxruntime` + `networkx`，约 65 MB）用 uv 装到 `~/.litloop/packages` 并加进 `sys.path`（2026-11-04，`src/litloop/optional.py`、设置页「可选组件」的「安装」按钮、`POST /api/components/{key}/install`、镜像配置 `package_index_url`；uv.exe 由 `scripts/build_release.py` 放进安装包；见 DECISIONS「版面分析改成按需安装」）。还没实测：在装了安装包的机器上点一次安装、看进度与失败提示；失败提示目前是 uv 输出末尾 15 行，没有百分比进度。
   - NSIS `installMode: "both"`，图标、名称、开始菜单；系统通知显示 LitLoop 自己的名称和图标（用户 2026-10-23 要求；开发模式下借用的是 PowerShell 的）；
   - 按需下载都要有进度和失败提示；
   - 更新插件读 GitHub Releases，`passive` 模式；发版流程（打包、生成更新清单、上传）写成脚本；

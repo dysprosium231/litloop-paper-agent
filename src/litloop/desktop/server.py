@@ -436,6 +436,18 @@ def create_app(token: str) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(404, "无法完成检测：此分组没有检测项") from exc
 
+    @app.post("/api/components/{key}/install")
+    def component_install(key: str) -> dict[str, Any]:
+        """Download an optional component (the layout model) into the data dir."""
+        from .. import optional
+        if key not in optional.COMPONENTS:
+            raise HTTPException(404, "没有这个组件")
+        from ..config import load_config
+        try:
+            return optional.install(key, index_url=str(load_config().get("package_index_url") or ""))
+        except KeyError as exc:
+            raise HTTPException(404, "没有这个组件") from exc
+
     # Downloads: jobs started from the app (download_jobs), one at a time.
     @app.get("/api/downloads")
     def downloads() -> dict[str, Any]:

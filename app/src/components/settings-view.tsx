@@ -246,6 +246,8 @@ function Page({ id, title, intro, action, children }: {
 export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intro?: string; onSaved: (f: SettingField) => void }) {
   const [results, setResults] = React.useState<TestResult[] | null>(null)
   const [testing, setTesting] = React.useState(false)
+  const [installing, setInstalling] = React.useState<string | null>(null)
+  const [installLog, setInstallLog] = React.useState<{ key: string; text: string } | null>(null)
   const test = async () => {
     setTesting(true)
     try {
@@ -256,8 +258,24 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
       setTesting(false)
     }
   }
-  // A group with nothing to set is only its check: run it on opening.
-  React.useEffect(() => { if (group.test && group.fields.length === 0) test() }, [group.id])
+  // Installing an optional component runs uv in the backend; when it works the
+  // check runs again so the row turns green, otherwise its log is shown.
+  const install = async (key: string) => {
+    setInstalling(key)
+    setInstallLog(null)
+    try {
+      const out = await settingsApi.installComponent(key)
+      if (out.ok) await test()
+      else setInstallLog({ key, text: out.log || "安装失败" })
+    } catch (e) {
+      setInstallLog({ key, text: errorMessage(e) })
+    } finally {
+      setInstalling(null)
+    }
+  }
+  // A group with nothing to set is only its check: run it on opening (so is a
+  // group that asks for the check to run by itself, like 可选组件).
+  React.useEffect(() => { if (group.test && (group.fields.length === 0 || group.auto)) test() }, [group.id])
   const action = group.test && (
     <Button variant="outline" size="sm" onClick={test} disabled={testing}>
       {testing && <LoaderIcon className="animate-spin" />}检测
@@ -272,8 +290,16 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
               <div className="flex items-start gap-2 text-sm">
                 <ResultIcon ok={r.ok} />
                 <span className="w-32 shrink-0">{r.name}</span>
-                <span className="text-muted-foreground">{r.detail}{r.cost && <span className="ml-1 text-xs">（{r.cost}）</span>}</span>
+                <span className="min-w-0 flex-1 text-muted-foreground">{r.detail}{r.cost && <span className="ml-1 text-xs">（{r.cost}）</span>}</span>
+                {r.action && (
+                  <Button variant="outline" size="sm" disabled={installing === r.action.key} onClick={() => install(r.action!.key)}>
+                    {installing === r.action.key && <LoaderIcon className="animate-spin" />}{r.action.label}
+                  </Button>
+                )}
               </div>
+              {installLog?.key === r.action?.key && (
+                <pre className="ml-6 max-h-40 overflow-auto rounded-md bg-muted p-2 text-xs whitespace-pre-wrap text-destructive">{installLog?.text}</pre>
+              )}
               {r.guides?.map((g) => (
                 <section key={g.title} className="ml-6 min-w-0 space-y-3 rounded-lg border bg-canvas p-4">
                   <h3 className="text-sm font-medium">{g.title}</h3>

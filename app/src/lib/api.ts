@@ -254,6 +254,8 @@ export interface SettingGroup {
   id: string
   title: string
   test?: string
+  /** Run the check as soon as the group opens, even when it has fields. */
+  auto?: boolean
   fields: SettingField[]
 }
 
@@ -263,6 +265,8 @@ export interface TestResult {
   detail: string
   cost?: string
   guides?: Guide[]
+  /** Something to install or fix from here (e.g. the layout model). */
+  action?: { key: string; label: string }
 }
 
 export interface Guide {
@@ -288,6 +292,7 @@ export const settingsApi = {
   onboarding: () => call<{ done: boolean; steps: { group: string; intro: string }[] }>("/api/onboarding"),
   finishOnboarding: () => call<{ done: boolean }>("/api/onboarding", { done: true }),
   test: (group: string) => call<{ results: TestResult[]; seconds: number }>(`/api/settings/test/${group}`, {}),
+  installComponent: (key: string) => call<{ ok: boolean; log: string }>(`/api/components/${key}/install`, {}),
   updates: () => call<{ name: string; installed: string; latest: string; how: string }[]>("/api/updates"),
   quota: () => call<Record<string, ProviderUsage>>("/api/quota"),
   openalex: (fresh = false) => call<{ credits_used?: number; credits_remaining?: number; credits_limit?: number; resets_at?: string; has_key?: boolean; error?: string } | null>(`/api/quota/openalex${fresh ? "?fresh=true" : ""}`),

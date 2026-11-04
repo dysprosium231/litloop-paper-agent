@@ -104,8 +104,12 @@ GROUPS: list[dict[str, Any]] = [
         ],
     },
     {
-        # Nothing to set: what is installed, checked on opening (TESTS["components"]).
-        "id": "components", "title": "可选组件", "test": "components", "fields": [],
+        # What is installed, checked on opening (TESTS["components"]); the mirror
+        # only matters when installing a component from there.
+        "id": "components", "title": "可选组件", "test": "components", "auto": True, "fields": [
+            {"key": "package_index_url", "label": "组件下载镜像", "type": "text", "placeholder": "留空用 PyPI，例如 https://pypi.tuna.tsinghua.edu.cn/simple",
+             "help": "安装版面分析时从这里下载；默认的 PyPI 在国内可能很慢"},
+        ],
     },
     {
         "id": "zotero", "title": "Zotero", "test": "zotero",
@@ -478,6 +482,12 @@ def test_components() -> list[dict[str, Any]]:
                else _result("SOCKS 代理", None, "未安装：不能使用 SOCKS 代理和 Tor。运行 pip install \"requests[socks]\""))
     out.append(_result("Tor", True, "已安装") if embedded_tor.is_tor_installed(cfg)
                else _result("Tor", None, "未安装：只在经 Tor 访问 Sci-Hub、LibGen 时需要"))
+    from .. import optional
+    if optional.installed("layout"):
+        out.append(_result("版面分析", True, "已安装：PDF 转 Markdown 会按版面整理表格和分栏"))
+    else:
+        out.append(_result("版面分析", None, "未安装：PDF 转 Markdown 按纯文本顺序，表格和分栏可能不规整",
+                           action={"key": "layout", "label": "安装（约 65 MB）"}))
     cmd = str(cfg.get("agent_command") or "claude").strip()
     out.append(_result("Agent 命令", True, f"找到 {cmd}") if shutil.which(cmd)
                else _result("Agent 命令", None, f"找不到 {cmd}：在 app 里发起检索需要它，可在「设置 → Agent」中修改"))

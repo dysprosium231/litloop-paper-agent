@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -50,20 +51,36 @@ def core_dependencies() -> list[str]:
     return list(data["project"]["dependencies"])
 
 
-def fetch_python_zip() -> Path:
-    """The official embeddable distribution, downloaded once into build/cache."""
-    name = f"python-{PYTHON_VERSION}-embed-amd64.zip"
-    dest = CACHE / name
+def download(url: str, dest: Path, timeout: int = 300) -> Path:
+    """Fetch `url` into `dest` (cached). curl when urllib cannot verify a proxy.
+
+    A corporate or local proxy hands out a self-signed certificate: urllib
+    refuses it, curl trusts the Windows certificate store, so it is the fallback.
+    """
     if dest.is_file():
         return dest
     CACHE.mkdir(parents=True, exist_ok=True)
-    url = f"https://www.python.org/ftp/python/{PYTHON_VERSION}/{name}"
-    step(f"downloading {url}")
     tmp = dest.with_suffix(".part")
-    with urllib.request.urlopen(url, timeout=120) as resp, tmp.open("wb") as out:
-        shutil.copyfileobj(resp, out)
+    step(f"downloading {url}")
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp, tmp.open("wb") as out:
+            shutil.copyfileobj(resp, out)
+    except urllib.error.URLError as exc:
+        curl = shutil.which("curl")
+        if not curl:
+            sys.exit(f"[release] cannot download {url}: {exc}")
+        step(f"urllib could not ({exc.reason}); trying curl")
+        done = subprocess.run([curl, "-L", "--fail", "--silent", "--show-error", "-o", str(tmp), url])
+        if done.returncode != 0:
+            sys.exit(f"[release] curl could not download {url} (exit {done.returncode})")
     tmp.replace(dest)
     return dest
+
+
+def fetch_python_zip() -> Path:
+    """The official embeddable distribution, downloaded once into build/cache."""
+    name = f"python-{PYTHON_VERSION}-embed-amd64.zip"
+    return download(f"https://www.python.org/ftp/python/{PYTHON_VERSION}/{name}", CACHE / name, timeout=120)
 
 
 def unpack_python(zip_path: Path) -> None:
@@ -110,6 +127,25 @@ def drop_layout(site: Path) -> None:
     step(f"dropped the layout model ({freed / 1e6:.0f} MB); plain text order is used instead")
 
 
+UV_URL = "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip"
+
+
+def fetch_uv() -> Path:
+    """uv.exe ships next to python.exe: the app installs optional components with it."""
+    return download(UV_URL, CACHE / "uv-x86_64-pc-windows-msvc.zip")
+
+
+def install_uv() -> None:
+    step("adding uv.exe to the runtime")
+    with zipfile.ZipFile(fetch_uv()) as zf:
+        for name in zf.namelist():
+            if name.rsplit("/", 1)[-1] == "uv.exe":
+                with zf.open(name) as src, (RUNTIME / "uv.exe").open("wb") as out:
+                    shutil.copyfileobj(src, out)
+                return
+    sys.exit("[release] uv-x86_64-pc-windows-msvc.zip has no uv.exe")
+
+
 def write_path_file() -> None:
     """`python314._pth` decides what the embeddable interpreter can see."""
     major, minor = PYTHON_VERSION.split(".")[:2]
@@ -151,6 +187,8 @@ def main() -> None:
     ap.add_argument("--bundle", action="store_true", help="run npm run tauri build afterwards")
     ap.add_argument("--with-layout", action="store_true",
                     help="keep pymupdf-layout and onnxruntime (about 67 MB) in the runtime")
+    ap.add_argument("--no-uv", action="store_true",
+                    help="do not ship uv.exe (optional components can then not be installed in the app)")
     args = ap.parse_args()
 
     if args.clean and RUNTIME.exists():
@@ -164,6 +202,8 @@ def main() -> None:
     install_litloop(site)
     if not args.with_layout:
         drop_layout(site)
+    if not args.no_uv:
+        install_uv()
     write_path_file()
     verify()
     step(f"runtime is {size_of(RUNTIME) / 1e6:.0f} MB at {RUNTIME}")

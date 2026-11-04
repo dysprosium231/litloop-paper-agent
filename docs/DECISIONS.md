@@ -10,6 +10,16 @@
 - 结果：运行时 291 MB，重新打包后 **99.59 MiB**（上一版 113.38 MiB）；打包后的 `python.exe` 导入 `litloop`、`pymupdf4llm` 都正常。
 - 还没做：这两个组件改成 app 里第一次需要时按需下载（发布计划那一项），现在只能手工装。
 
+## 2026-11-04：版面分析改成按需安装
+
+- 背景：安装包从 113 MB 降到 99.59 MiB 的办法是把版面分析（`pymupdf-layout` + `onnxruntime` + `networkx`，约 65 MB）拆出去；拆掉后 PDF 转 Markdown 按纯文本顺序，表格和分栏会乱。现在把它做成第一次需要时按需装回来。
+- 做法：新增 `src/litloop/optional.py`——`COMPONENTS` 记每个组件的包名、检测用的模块名、体积；`packages_dir()` 是 `<数据目录>/packages`（`LITLOOP_DATA_DIR` 跟着走）；`ensure_on_path()` 把它插到 `sys.path` 最前面（`__init__.py` 启动时调一次，包坏了也不影响启动）；`installed(key)` 用 `importlib.util.find_spec`；`uv_command()` 依次找 `LITLOOP_UV`、`sys.executable` 旁的 `uv.exe`（安装包里带的）、PATH；`install(key)` 用 `uv pip install --python <自身解释器> --target <packages>`，环境里加 `UV_LINK_MODE=copy`、按需加 `UV_INDEX_URL`，串行（`_INSTALL_LOCK`），返回 `{ok, log}`，log 是 uv 输出末尾 15 行。
+- 为什么用 uv：要装进指定目录、不能污染自带解释器，uv 支持 `--target` 且比 pip 快；安装包里的 uv 直接跑在嵌入式 Python 上（实测 `uv 0.13.7` + `six` 6 毫秒装进临时目录）。
+- 入口：设置 → 可选组件里多一行「版面分析」——已装显示「已安装：PDF 转 Markdown 会按版面整理表格和分栏」，未装显示「未安装…」并带「安装（约 65 MB）」按钮；`POST /api/components/{key}/install`，未知组件 404；镜像填 `package_index_url`（留空用 PyPI）。这个分组带字段后仍要自动检测，所以分组多了 `auto: true`（界面里 `group.fields.length === 0 || group.auto` 时自动跑检测）。
+- 打包：`scripts/build_release.py` 新增 `install_uv()`（GitHub `uv-x86_64-pc-windows-msvc.zip` 取 `uv.exe` 放到运行时根目录，`--no-uv` 可跳过），并把下载抽成 `download(url, dest)`——urllib 遇到代理自签证书失败时改用 `curl -L`（curl 信任 Windows 证书库）。重新打包 **109.85 MiB**（多出 uv 约 10 MiB）。
+- 测试：`tests/test_optional.py` 7 个（目录、`sys.path` 首位且幂等、目录不存在不插、未知组件、找不到 uv、uv 命令与镜像、失败日志）；`tests/test_app_server.py` 一个（接口透传 + 404）。
+- 待实测：在真机（装好的 app）里点一次「安装」，看下载时间、失败提示；失败提示只有 uv 输出，没有百分比进度。
+
 ## 2026-11-04：第一个 Windows 安装包（113 MB）
 
 - 新增 `scripts/build_release.py`（只用标准库）：下载官方 embeddable Python（版本钉在 `PYTHON_VERSION = "3.14.3"`）解压到 `build/runtime`，用当前 Python 把 `pyproject.toml` 里的必需依赖 `pip install --target build/runtime/Lib/site-packages`，把 `src/litloop` 复制进同一个目录，重写 `python314._pth`（`python314.zip`、`.`、`Lib\site-packages`、`import site`），最后跑一遍 `import litloop, pymupdf, fastapi, mcp` 自检。`--clean` 重来一遍，`--bundle` 顺带打包。

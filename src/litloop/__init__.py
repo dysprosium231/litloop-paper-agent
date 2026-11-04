@@ -45,6 +45,14 @@ def _fix_ssl_cert_file() -> None:
 
 _fix_ssl_cert_file()
 
+# Components installed on demand (the layout model) live in <data dir>/packages;
+# make them importable before anything tries `import pymupdf4llm`.
+try:
+    from .optional import ensure_on_path as _ensure_on_path
+    _ensure_on_path()
+except Exception:  # a broken component folder must not stop LitLoop from starting
+    pass
+
 __version__ = "1.18.0"
 
 __all__ = [

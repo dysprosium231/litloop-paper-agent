@@ -95,6 +95,21 @@ def test_download_folder_test(client, config_home, tmp_path):
     assert client.post("/api/settings/test/nope").status_code == 404
 
 
+def test_component_install_goes_through_uv(client, monkeypatch):
+    from litloop import optional
+    seen = {}
+
+    def fake_install(key, *, index_url=""):
+        seen.update(key=key, index_url=index_url)
+        return {"ok": True, "log": "installed"}
+
+    monkeypatch.setattr(optional, "install", fake_install)
+    got = client.post("/api/components/layout/install").json()
+    assert got == {"ok": True, "log": "installed"}
+    assert seen["key"] == "layout"
+    assert client.post("/api/components/nope/install").status_code == 404
+
+
 def test_openalex_live_count_is_kept_two_minutes(client, monkeypatch):
     from litloop import quota
     calls = []
