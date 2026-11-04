@@ -3,6 +3,15 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-04：发布摸底（2）官方嵌入式 Python 跑通
+
+- 用官方 embeddable 发行包 `python-3.14.3-embed-amd64.zip`（12.0 MB，解压 22 MB），把 `python314._pth` 追加两行路径（`../env`、仓库的 `src`）并打开 `import site`，然后直接：
+  - `py/python.exe -c "import litloop, pymupdf"` → litloop 1.18.0、pymupdf 2.1，全部从程序目录里的那份依赖加载；
+  - `py/python.exe -m litloop.desktop.server --token t0k --port 8791` → `/api/health` 带令牌返回 `{"version":"1.18.0","schema":1}`，不带令牌 401。
+- 合计装机体积：嵌入式 Python 22 MB + 核心依赖 336 MB ≈ **358 MB**（未压缩、未打包；压缩后和 NSIS 安装包还没量）。
+- Defender：这台机器 Defender 的实时保护与防病毒都是关的（SecurityCenter 里生效的是 Kaspersky），所以「Defender 扫一遍」**没法在本机验**，要换一台 Defender 开着的机器；不用 PyInstaller 本来就是为了降低误报风险。
+- 还没做：NSIS 打包、压缩后大小、更新清单与 `passive` 更新、干净机器验收；`_pth` 里现在写的是开发机路径，到时候要改成程序目录里代码的实际位置。
+
 ## 2026-11-04：发布摸底（1）核心依赖 336 MB，版面分析占 67 MB
 
 - 方法：在 `D:/litloop-probe/env` 用 `pip install --target` 只装 `pyproject.toml` 的必需依赖（不含任何可选 extras），再用 `python -S` + `PYTHONPATH` 把系统 site-packages 挡掉，确认这套东西能自己跑起来、不依赖开发环境。
