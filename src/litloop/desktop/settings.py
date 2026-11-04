@@ -114,7 +114,7 @@ GROUPS: list[dict[str, Any]] = [
         "fields": [
             {"key": "builtin_agent_provider", "label": "接口", "type": "select",
              "options": [["openai", "OpenAI 兼容（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、Ollama、vLLM）"],
-                         ["anthropic", "Anthropic（Claude）"]],
+                         ["anthropic", "Anthropic (Claude)"]],
              "help": "OpenAI 兼容接口只要填对地址，本地模型也走这一项"},
             {"key": "builtin_agent_base_url", "label": "地址", "type": "text",
              "placeholder": "留空用官方地址，例如 http://127.0.0.1:11434/v1"},

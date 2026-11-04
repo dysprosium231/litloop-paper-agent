@@ -9,6 +9,13 @@
 - 入口：历史记录展开区「检索流程」右侧的「导出流程」，走 `POST /api/sessions/{id}/prisma/export`；没有做成 SVG 流程图——用户要的是能贴进稿子的数字，Markdown 表直接可用，画图可以以后再补。
 - 测试一条（`tests/test_screening.py::test_prisma_export_writes_a_markdown_table`，用临时 `output_dir`）。
 
+## 2026-11-04：追踪在 app 打开时自动检查
+
+- `search/watches.py` 的 `check_due(config)`：只检查「上次检查早于 `watch_check_days`（默认 7 天）」的追踪，一次 `_DUE_LOCK` 保证不会重入；单个追踪报错记进结果继续下一个（一个坏检索式不该让整轮检查失败）。返回 `{"checked": [...], "new_total": N}`。
+- 接口 `POST /api/watches/check-due`；app 每次打开调一次（`use-system-notices.ts` 的 `pollWatches`），`new_total > 0` 时发系统通知「追踪有新文献：N 篇新文献：课题 1、课题 2」。
+- 为什么不用定时器在后台轮询：追踪是「隔几天看一次」的东西，打开 app 时查一次已经够；常驻轮询会在用户没在用的时候花额度（每次检查是 50 条检索）。
+- 测试：`tests/test_watches.py::test_check_due_only_runs_watches_older_than_the_configured_days`（30 天前的检查、1 天前的不检查）。
+
 ## 2026-11-04：追踪（保存检索式，只报新文章）
 
 - 阶段 4 的第一块，只做数据与接口，界面下一块：`src/litloop/search/watches.py`，文件 `~/.litloop/watches.json`（`store` 加锁、整份替换），条目记 `question/query/core_terms/session/created/checked/last_new/seen`。

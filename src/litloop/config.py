@@ -225,6 +225,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # which is slow from some networks; a mirror URL avoids a 65 MB download
     # crawling. Set in 设置 → 可选组件.
     "package_index_url": "",
+    "watch_check_days": 7,
     # Desktop app: push a download job to Zotero when it finishes (off: the
     # user pushes from the job page), into <root>/<the job's title>.
     "zotero_auto_push": False,

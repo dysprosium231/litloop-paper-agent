@@ -330,6 +330,12 @@ def create_app(token: str) -> FastAPI:
             raise HTTPException(404, "没有这个追踪")
         return {"removed": True}
 
+    @app.post("/api/watches/check-due")
+    def check_due_watches() -> dict[str, Any]:
+        """Check the watches that are older than watch_check_days (the app calls this once on open)."""
+        from ..search import watches
+        return watches.check_due()
+
     @app.post("/api/watches/{wid}/check")
     def check_watch(wid: str) -> dict[str, Any]:
         """Run the saved search now; only papers this watch has not seen come back."""

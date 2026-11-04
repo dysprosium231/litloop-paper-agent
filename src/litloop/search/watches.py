@@ -109,3 +109,45 @@ def check(wid: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
                 w["checked"] = now
                 w["last_new"] = len(fresh)
     return {"id": wid, "checked": now, "found": len(hits), "new": fresh}
+
+
+_DUE_LOCK = __import__("threading").Lock()
+
+
+def check_due(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Check the watches whose last check is older than `watch_check_days`.
+
+    Called once when the app opens, so a followed topic does not need a click;
+    the default (7 days) keeps the OpenAlex credits spent on this small. Returns
+    the per-watch outcome and how many new papers came back in total.
+    """
+    from datetime import datetime, timedelta
+
+    from ..config import load_config
+    config = config or load_config()
+    days = float(config.get("watch_check_days") or 7)
+    if not _DUE_LOCK.acquire(blocking=False):
+        return {"checked": [], "new_total": 0, "busy": True}
+    try:
+        now = datetime.now()
+        done: list[dict[str, Any]] = []
+        total = 0
+        for w in _data()["watches"]:
+            checked = str(w.get("checked") or "")
+            if checked:
+                try:
+                    if now - datetime.fromisoformat(checked) < timedelta(days=days):
+                        continue
+                except ValueError:
+                    pass
+            try:
+                r = check(str(w["id"]), config)
+            except Exception as exc:  # one broken search must not stop the rest
+                done.append({"id": w["id"], "question": w.get("question") or w.get("query"), "error": str(exc)})
+                continue
+            done.append({"id": r["id"], "question": w.get("question") or w.get("query"),
+                         "found": r["found"], "new": len(r["new"])})
+            total += len(r["new"])
+        return {"checked": done, "new_total": total}
+    finally:
+        _DUE_LOCK.release()

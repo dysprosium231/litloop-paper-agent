@@ -66,3 +66,23 @@ def test_remove_and_unknown_ids():
 def test_papers_without_a_doi_are_tracked_by_title():
     assert watches.key({"title": "Same  Title", "doi": ""}) == "title:same title"
     assert watches.key({"doi": "10.1/ABC"}) == "doi:10.1/abc"
+
+
+def test_check_due_only_runs_watches_older_than_the_configured_days(monkeypatch):
+    from datetime import datetime, timedelta
+    old = watches.add("旧课题", "old topic", [], [])
+    fresh = watches.add("新课题", "new topic", [], [])
+    data = json.loads((watches.path()).read_text(encoding="utf-8"))
+    for w in data["watches"]:
+        w["checked"] = (datetime.now() - timedelta(days=1 if w["id"] == fresh["id"] else 30)).isoformat(timespec="seconds")
+    (watches.path()).write_text(json.dumps(data), encoding="utf-8")
+    seen: list[str] = []
+
+    def fake_check(wid, config=None):
+        seen.append(wid)
+        return {"id": wid, "checked": "", "found": 2, "new": [{"doi": "10.1/x"}]}
+
+    monkeypatch.setattr(watches, "check", fake_check)
+    out = watches.check_due({"watch_check_days": 7})
+    assert seen == [old["id"]]
+    assert out["new_total"] == 1 and out["checked"][0]["question"] == "旧课题"

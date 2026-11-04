@@ -1,6 +1,6 @@
 import * as React from "react"
 
-import { api, downloadsApi, type DownloadNotice, type RoundNotice } from "@/lib/api"
+import { api, downloadsApi, watchesApi, type DownloadNotice, type RoundNotice } from "@/lib/api"
 
 /**
  * Windows notifications, on every page.
@@ -64,8 +64,22 @@ export function useSystemNotices() {
         n.state === "failed" ? `${n.question || "深度检索"}：这一轮失败了`
           : `${n.question || "深度检索"}：第 ${Math.max(1, n.batches)} 批已就绪`)
     }
+    // Once per open: saved searches older than watch_check_days are checked in the
+    // background; anything new is announced, so a followed topic needs no clicking.
+    const pollWatches = async () => {
+      let r: Awaited<ReturnType<typeof watchesApi.checkDue>>
+      try {
+        r = await watchesApi.checkDue()
+      } catch {
+        return
+      }
+      if (stopped || !r.new_total) return
+      const topics = r.checked.filter((w) => w.new > 0).map((w) => w.question).filter(Boolean)
+      notify("追踪有新文献", `${r.new_total} 篇新文献` + (topics.length ? `：${topics.slice(0, 2).join("、")}` : ""))
+    }
     poll()
     pollRounds()
+    pollWatches()
     const t = setInterval(poll, 3000)
     const r = setInterval(pollRounds, 3000)
     return () => { stopped = true; clearInterval(t); clearInterval(r) }

@@ -143,10 +143,10 @@ export function errorMessage(e: unknown): string {
   return "无法连接后台。重启 LitLoop 后重试"
 }
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
+async function call<T>(path: string, body?: unknown, method?: string): Promise<T> {
   const { port, token } = await getBackend()
   const res = await fetch(`http://127.0.0.1:${port}${path}`, {
-    method: body === undefined ? "GET" : "POST",
+    method: method ?? (body === undefined ? "GET" : "POST"),
     headers: { "X-LitLoop-Token": token, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
@@ -426,6 +426,38 @@ export interface PrismaSummary {
   excluded: number
   low_without_decision: number
   reasons: { reason: string; count: number }[]
+}
+
+/** What one check of a saved search brought back (a quick-search hit). */
+export interface SearchHit {
+  doi?: string | null
+  title: string
+  year?: number | null
+  journal?: string | null
+}
+
+export interface Watch {
+  id: string
+  question: string
+  query: string
+  session: string
+  created: string
+  checked: string
+  last_new: number
+  seen_count: number
+}
+
+/** Saved searches: check one to get only the papers it has not shown yet. */
+export const watchesApi = {
+  list: () => call<Watch[]>("/api/watches"),
+  add: (session: string) => call<Watch>("/api/watches", { session }),
+  remove: (id: string) => call<{ removed: boolean }>(`/api/watches/${encodeURIComponent(id)}`, undefined, "DELETE"),
+  /** Check the watches that are older than the configured days (once, when the app opens). */
+  checkDue: () =>
+    call<{ checked: { id: string; question: string; found?: number; new: number; error?: string }[]; new_total: number }>(
+      "/api/watches/check-due", {}),
+  check: (id: string) =>
+    call<{ id: string; checked: string; found: number; new: SearchHit[] }>(`/api/watches/${encodeURIComponent(id)}/check`, {}),
 }
 
 export const historyApi = {

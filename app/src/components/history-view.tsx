@@ -3,7 +3,7 @@ import { ChevronDownIcon, ChevronRightIcon, FolderOpenIcon } from "lucide-react"
 
 import { Card, Empty, PageBody, PageHeader } from "@/components/page"
 import { Button } from "@/components/ui/button"
-import { downloadsApi, errorMessage, historyApi, type HistoryEntry, type PrismaSummary } from "@/lib/api"
+import { downloadsApi, errorMessage, historyApi, watchesApi, type HistoryEntry, type PrismaSummary, type Watch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const MODE = { quick: "快速检索", deep: "深度检索" } as Record<string, string>
@@ -30,6 +30,7 @@ export function HistoryPage({ onBack, onOpen, onDownloaded }: {
       </PageHeader>
       <PageBody wide>
         {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+        <WatchesCard />
         {entries && groups.length === 0 && <Card><Empty title="暂无检索记录" /></Card>}
         {!entries && !error && <p className="text-sm text-muted-foreground">正在读取…</p>}
         {groups.map(([question, sessions]) => (
@@ -58,6 +59,9 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
       const folder = r.file.replace(/[\\/][^\\/]+$/, "")
       setNote({ text: `已导出 ${r.count} 篇：${r.file}`, folder })
     }).catch((e) => setNote({ text: errorMessage(e), bad: true }))
+  const watch = () =>
+    watchesApi.add(s.session).then(() => setNote({ text: "已加入追踪，以后在「追踪」里检查新文献" }))
+      .catch((e) => setNote({ text: errorMessage(e), bad: true }))
   const download = () =>
     downloadsApi.start(s.selected.flatMap((p) => (p.doi ? [{ ...p, doi: p.doi }] : [])), s.question || s.session, s.session)
       .then((j) => onDownloaded(j.job)).catch((e) => setNote({ text: errorMessage(e), bad: true }))
@@ -101,7 +105,8 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
             <Button size="sm" variant="outline" onClick={() => exportAs("bibtex")}>BibTeX</Button>
             <Button size="sm" variant="outline" onClick={() => exportAs("ris")}>RIS</Button>
             <Button size="sm" variant="outline" onClick={() => exportAs("doi")}>DOI 列表</Button>
-            <Button size="sm" className="ml-auto" onClick={download}>加入下载</Button>
+            <Button size="sm" variant="outline" className="ml-auto" onClick={watch}>追踪这个检索式</Button>
+            <Button size="sm" onClick={download}>加入下载</Button>
           </div>
           {note && (
             <p className={cn("flex items-center gap-2 text-xs", note.bad ? "text-destructive" : "text-muted-foreground")}>
@@ -117,6 +122,57 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
         </div>
       )}
     </li>
+  )
+}
+
+/**
+ * Saved searches (定期追踪): each one is checked by hand for now; only papers it
+ * has not shown before come back, so a topic can be followed without re-reading.
+ */
+function WatchesCard() {
+  const [items, setItems] = React.useState<Watch[] | null>(null)
+  const [busy, setBusy] = React.useState<string | null>(null)
+  const [note, setNote] = React.useState<{ text: string; bad?: boolean } | null>(null)
+  const load = React.useCallback(() => {
+    watchesApi.list().then(setItems).catch((e) => setNote({ text: errorMessage(e), bad: true }))
+  }, [])
+  React.useEffect(() => { load() }, [load])
+  const check = (w: Watch) => {
+    setBusy(w.id)
+    watchesApi.check(w.id)
+      .then((r) => {
+        setNote({ text: r.new.length ? `「${w.question || w.query}」找到 ${r.new.length} 篇新文献` : "没有新文献" })
+        load()
+      })
+      .catch((e) => setNote({ text: errorMessage(e), bad: true }))
+      .finally(() => setBusy(null))
+  }
+  const remove = (w: Watch) => {
+    watchesApi.remove(w.id).then(load).catch((e) => setNote({ text: errorMessage(e), bad: true }))
+  }
+  if (!items?.length) return null
+  return (
+    <Card>
+      <div className="border-b px-5 py-3 text-sm font-medium">追踪</div>
+      <ul className="divide-y">
+        {items.map((w) => (
+          <li key={w.id} className="flex items-center gap-4 px-5 py-3">
+            <div className="min-w-0 flex-1">
+              <div className="line-clamp-1 text-sm">{w.question || w.query}</div>
+              <div className="text-xs text-muted-foreground">
+                {w.query} · 已见 {w.seen_count} 篇 · {w.checked ? `上次检查 ${w.checked.slice(0, 16)}` : "还没检查过"}
+                {w.checked && ` · 新增 ${w.last_new}`}
+              </div>
+            </div>
+            <Button size="sm" variant="outline" disabled={busy === w.id} onClick={() => check(w)}>
+              {busy === w.id ? "正在检查…" : "检查"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => remove(w)}>删除</Button>
+          </li>
+        ))}
+      </ul>
+      {note && <p className={cn("px-5 py-2 text-xs", note.bad ? "text-destructive" : "text-muted-foreground")}>{note.text}</p>}
+    </Card>
   )
 }
 
