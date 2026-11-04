@@ -3,7 +3,7 @@
 > 这是项目唯一的进度表，只留没做完的事。每完成一步就更新，并和对应代码放在同一个提交里；做完的事、实验结论和用户做的决定写进 [docs/DECISIONS.md](docs/DECISIONS.md)，这里只留一句和链接。日期一律写绝对日期。
 > 设计与验收标准见 [CHARTER.md](CHARTER.md)，代码布局见 [docs/LAYOUT.md](docs/LAYOUT.md)。2026-10-19 重构前的 TODO 原文归档在 DECISIONS 末尾。
 >
-> 分五块：**路线图**（CHARTER 各部分的状态）、**正在做**（Agent 在推进）、**待用户决定**、**待实测**（代码已改，要用户配合在真实环境里验）、**待办池**（还没开始）。CHARTER 里还没达到验收标准的部分，路线图里都要有一行。
+> 分六块：**路线图**（CHARTER 各部分的状态）、**正在做**（Agent 在推进）、**待用户决定**、**待实测**（代码已改，要用户配合在真实环境里验）、**待办池**（还没开始）、**推广**（让需要的人找到它；用户 2026-11-04 要求记下）。CHARTER 里还没达到验收标准的部分，路线图里都要有一行。
 
 ## 路线图
 
@@ -114,3 +114,39 @@
 
 ### 期刊分区插件
 见 [litloop-journal-rank 的 TODO](https://github.com/dysprosium231/litloop-journal-rank/blob/main/TODO.md)（机构数据、公开发布前移除分区数据等）。
+
+## 推广
+
+对这类工具，曝光度等于被搜到：GitHub 搜索、PyPI、MCP 目录、小红书/知乎/公众号的搜索结果，以及别人写方法部分时的引用。按性价比排，先做 1–3（都不需要用户操作），再发内容。
+
+### 1. 能被搜到（先做，约半天）
+
+- [ ] 补仓库元信息：英文一句话 description（Search, screen, download and file papers into Zotero — 21 tools for Claude, Cursor and Codex）、topics（`mcp`、`mcp-server`、`literature-review`、`academic-research`、`systematic-review`、`zotero`、`claude`、`cursor`、`pdf`、`python`）、社交预览图。
+- [ ] 英文 `README.md` + 中文 `README.zh-CN.md`（现在只有中文，国际流量基本拿不到）；两个 README 顶部互相链接。
+- [ ] 打第一个正式 Release（`v1.0.0`），附上安装包与校验值；`.github/workflows/release.yml` 在打 tag 时构建 exe 并建草稿 Release，顺带解决「exe 只有本机能打」的问题。
+- [ ] 发上 PyPI（`pip install litloop`），`litloop run` 一行装好 MCP——现在要 Python + Git + 虚拟环境，门槛太高。
+- [ ] 90 秒演示 GIF 放 README 顶部（一句话 → 30 篇 → 下载 → Zotero），替换现在 4 张静态截图的位置。
+
+### 2. MCP 生态（当下最大的杠杆）
+
+- [ ] 写 `server.json` / `smithery.yaml`，从 `litloop.cli` 的 21 个工具自动导出 schema。
+- [ ] 提交到 Smithery、Glama、mcp.so、PulseMCP、awesome-mcp-servers。定位一句话：「Search, screen, download, and file papers into Zotero — 21 tools」。
+
+### 3. 中文社区种草（决定早期用户量）
+
+- [ ] 小红书：「一句话查全一个课题」录屏 + 前后对比，标题打痛点（读不完 300 篇摘要）。
+- [ ] B 站：5–8 分钟完整流程（检索 → 筛选 → 下载 → Zotero）。
+- [ ] 知乎：回答「如何高效做文献调研/系统综述」并附工具对比。
+- [ ] 少数派 / 科研公众号投稿：一篇「我用它做了什么课题」的实测文，要有数字（SiC/Al 150 篇找到 17/19 这类）。
+- [ ] V2EX「分享创造」、即刻：一句话 + 截图。
+- 素材原则：讲一个真实课题的结果，不讲功能列表；数字从 `docs/DECISIONS.md` 里挑三个做成图。
+
+### 4. 先修掉会劝退新用户的硬门槛
+
+- [ ] 安装包没签名，SmartScreen 会拦（README 已写怎么继续，但多数人到这里就走了）：评估买代码签名证书（个人开发者约 ¥1000+/年）。
+- [ ] 保证「不填任何 Key 也能跑一次快速检索」，引导里给 OpenAlex Key 申请的直达链接（没有 Key 一天 1000 积分，一次深度检索就可能用完）。
+- [ ] 宣传里主动写清楚 Sci-Hub、LibGen 默认关闭、只用合法途径，避免被平台判违规限流。
+
+### 5. 长期：可被引用
+
+- [ ] 工具论文或预印本（ChemRxiv / Zenodo + DOI），别人写方法部分时会引；成本高，但比任何平台都持久。
