@@ -90,9 +90,6 @@ def _save(sid: str, existing: bool, question: str, items: list[dict[str, Any]], 
                 "question": question, "mode": mode, "criteria": [], "searches": [], "items": []}
     if criteria:
         data["criteria"] = [criteria] if isinstance(criteria, str) else list(criteria)
-    if query:
-        data["searches"].append({"query": query, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                                 "params": search_params or {}, "results": len(items)})
     by_key = {_key(it): it for it in data["items"]}
     added = 0
     for raw in items:
@@ -118,6 +115,11 @@ def _save(sid: str, existing: bool, question: str, items: list[dict[str, Any]], 
     data["items"].sort(key=lambda it: (_RANK[it["relevance"]], -(it.get("cited_by_count") or 0)))
     for n, it in enumerate(data["items"], 1):
         it["n"] = n
+    if query:
+        # "new" is what survived de-duplication, so the review's flow can say how
+        # many records each search added and how many were already known.
+        data["searches"].append({"query": query, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                 "params": search_params or {}, "results": len(items), "new": added})
     paths = _write(data)
     # Items are re-sorted by relevance, so the numbers the user picks from are
     # these, not the order they were sent in: show the user this list.
@@ -227,6 +229,42 @@ def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
                     "items": len(d.get("items", [])),
                     "selected": sum(1 for it in d.get("items", []) if it.get("decision") == "selected")})
     return out
+
+
+def prisma(session: str) -> dict[str, Any]:
+    """The review's flow counts from what this session recorded (PRISMA-style).
+
+    Records identified are what the searches returned; duplicates are those that
+    were already in the session; screening is every paper the user was shown.
+    Exclusions are counted separately for the user's "不要" and for the low
+    ratings the agent gave without the user deciding, with the reasons attached.
+    """
+    data = load(session)
+    items = data.get("items", [])
+    searches = [{"query": s.get("query", ""), "time": s.get("time", ""),
+                 "results": int(s.get("results") or 0), "new": int(s.get("new") or 0)}
+                for s in data.get("searches", [])]
+    selected = [it for it in items if it.get("decision") == "selected"]
+    rejected = [it for it in items if it.get("decision") == "rejected"]
+    low = [it for it in items if it.get("decision") is None and _rating(it) in ("低", "不相关")]
+    reasons: dict[str, int] = {}
+    for it in rejected + low:
+        text = " ".join(str(it.get("reason") or "").split())[:120]
+        if text:
+            reasons[text] = reasons.get(text, 0) + 1
+    return {
+        "session": data.get("id", session), "question": data.get("question", ""),
+        "mode": data.get("mode", "quick"), "created": data.get("created", ""),
+        "updated": data.get("updated", ""), "searches": searches,
+        "identified": sum(s["results"] for s in searches),
+        "duplicates": sum(max(0, s["results"] - s["new"]) for s in searches) if searches else 0,
+        "screened": len(items),
+        "by_relevance": {r: sum(1 for it in items if _rating(it) == r) for r in RELEVANCE},
+        "included": len(selected),
+        "excluded": len(rejected),
+        "low_without_decision": len(low),
+        "reasons": [{"reason": k, "count": v} for k, v in sorted(reasons.items(), key=lambda kv: -kv[1])[:10]],
+    }
 
 
 def history(limit: int = 500) -> list[dict[str, Any]]:

@@ -240,6 +240,11 @@ def create_app(token: str) -> FastAPI:
         _record_path(session)
         return store.read_progress(session)
 
+    @app.get("/api/sessions/{session}/prisma")
+    def prisma_view(session: str) -> dict[str, Any]:
+        _record_path(session)
+        return screening.prisma(session)
+
     @app.post("/api/sessions/{session}/rating")
     def rate(session: str, body: Rating) -> dict[str, Any]:
         if body.relevance is not None and body.relevance not in screening.RELEVANCE:

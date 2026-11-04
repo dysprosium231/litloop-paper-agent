@@ -412,8 +412,25 @@ export interface HistoryEntry {
   selected: { doi?: string; title: string; year?: number | null; journal?: string | null; journal_rank?: string | null }[]
 }
 
+/** How a screening session's papers moved from hits to picks (PRISMA-style). */
+export interface PrismaSummary {
+  session: string
+  question: string
+  mode: string
+  searches: { query: string; time: string; results: number; new: number }[]
+  identified: number
+  duplicates: number
+  screened: number
+  by_relevance: Record<string, number>
+  included: number
+  excluded: number
+  low_without_decision: number
+  reasons: { reason: string; count: number }[]
+}
+
 export const historyApi = {
   list: () => call<HistoryEntry[]>("/api/history"),
+  prisma: (id: string) => call<PrismaSummary>(`/api/sessions/${encodeURIComponent(id)}/prisma`),
   export: (id: string, format: "bibtex" | "ris" | "doi", which: "selected" | "high" = "selected") =>
     call<{ file: string; count: number }>(`/api/sessions/${encodeURIComponent(id)}/export`, { format, which }),
 }

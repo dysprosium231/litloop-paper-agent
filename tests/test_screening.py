@@ -89,3 +89,17 @@ def test_decide_with_unknown_number_records_nothing():
     r = screening.decide(sid, selected=["2", "13"])
     assert r["unknown"] == ["13"] and "error" in r and len(r["numbering"]) == 3
     assert [it["decision"] for it in screening.load(sid)["items"]] == ["selected", None, None]
+
+
+def test_prisma_counts_the_flow_from_hits_to_picks():
+    first = screening.save("q", ITEMS, query="first", mode="deep")["session"]
+    screening.save("q", [ITEMS[0], {"doi": "10.1/new", "title": "New", "relevance": "高",
+                                    "reason": "符合"}] + ITEMS[1:2], query="second", session=first)
+    screening.decide(first, [2], [1])  # pick one, reject one (by their numbers)
+    d = screening.prisma(first)
+    assert d["identified"] == 6  # 3 + 3 records came back from the two searches
+    assert d["duplicates"] == 2  # two of them were already in the session
+    assert d["screened"] == 4
+    assert d["included"] == 1 and d["excluded"] == 1
+    assert d["reasons"] and d["reasons"][0]["count"] >= 1
+    assert [s["new"] for s in d["searches"]] == [3, 1]

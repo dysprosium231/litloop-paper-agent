@@ -3,6 +3,15 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-04：检索记录能数清从命中到纳入的流程
+
+- 系统综述要的 PRISMA 统计，第一块先做「数得出来」：`search/screening.prisma(session)` 从已有筛选记录算 `identified`（各次检索的结果数之和）、`duplicates`（其中已在会话里的）、`screened`（用户看过的篇数）、`included`/`excluded`（用户点过「加入下载」/「排除」的）、`low_without_decision`（Agent 评为低或无关、用户还没决定的）、以及排在前 10 的排除理由。
+- 为此在每次检索的记录里加 `"new": added`（去重后真正新增的篇数）。只有排序之后才知道 `added`，所以这条记录改成排完序再追加，而不是一开始就写。
+- 不另建 PRISMA 文件：这些数字都能从已有记录推出来，旧会话也能立刻看到统计（老记录没有 `new`，重复数按 0 算）。
+- 入口：`GET /api/sessions/{id}/prisma`；「历史记录」里展开一个会话，顶部多一行「检索流程：检索命中 / 去重后 / 纳入 / 排除 / 低相关未定」，下面列前 3 条排除理由。
+- 测试：`tests/test_screening.py::test_prisma_counts_the_flow_from_hits_to_picks`（两次检索、两次重复、一纳入一排除）。
+- 还没做：导出 PRISMA 流程图（SVG/表格）、中断后续跑、把排除理由做成可选项而不是自由文本。
+
 ## 2026-11-04：版面分析不进安装包（99.59 MiB）
 
 - `scripts/build_release.py` 装配完默认删掉 `onnxruntime`、`networkx` 和 `pymupdf_layout` 的 dist-info（共 65 MB），`--with-layout` 保留。

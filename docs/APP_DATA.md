@@ -35,7 +35,7 @@
   "question": "含稀土（镧系）元素、以非晶/无定形为主的纳米材料作为药物递送载体：…",
   "mode": "deep",
   "criteria": [],
-  "searches": [{"query": "lanthanide coordination polymer … | …", "time": "…", "params": {"core_terms": […], "seeds": […]}, "results": 0}],
+  "searches": [{"query": "lanthanide coordination polymer … | …", "time": "…", "params": {"core_terms": […], "seeds": […]}, "results": 0, "new": 0}],
   "items": [
     {
       "n": 1,

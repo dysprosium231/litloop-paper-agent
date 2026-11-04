@@ -3,7 +3,7 @@ import { ChevronDownIcon, ChevronRightIcon, FolderOpenIcon } from "lucide-react"
 
 import { Card, Empty, PageBody, PageHeader } from "@/components/page"
 import { Button } from "@/components/ui/button"
-import { downloadsApi, errorMessage, historyApi, type HistoryEntry } from "@/lib/api"
+import { downloadsApi, errorMessage, historyApi, type HistoryEntry, type PrismaSummary } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const MODE = { quick: "快速检索", deep: "深度检索" } as Record<string, string>
@@ -82,6 +82,7 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
       </div>
       {open && (
         <div className="space-y-3 border-t bg-canvas/60 px-5 py-3">
+          <PrismaLine session={s.session} />
           <ol className="space-y-1.5">
             {s.selected.map((p, i) => (
               <li key={p.doi ?? p.title} className="flex gap-3 text-sm">
@@ -116,5 +117,42 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
         </div>
       )}
     </li>
+  )
+}
+
+/** How the papers moved from search hits to picks, for the review's record. */
+function PrismaLine({ session }: { session: string }) {
+  const [d, setD] = React.useState<PrismaSummary | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    historyApi.prisma(session).then(setD).catch((e) => setError(errorMessage(e)))
+  }, [session])
+  if (error) return <p className="text-xs text-destructive">{error}</p>
+  if (!d) return <p className="text-xs text-muted-foreground">正在统计检索流程…</p>
+  const counts: [string, number][] = [
+    ["检索命中", d.identified],
+    ["去重后", d.screened],
+    ["纳入", d.included],
+    ["排除", d.excluded],
+    ["低相关未定", d.low_without_decision],
+  ]
+  return (
+    <div className="rounded-md border bg-background px-3 py-2">
+      <div className="text-xs font-medium text-muted-foreground">检索流程</div>
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm tabular-nums">
+        {counts.map(([label, n]) => (
+          <span key={label} className="whitespace-nowrap">
+            <span className="text-muted-foreground">{label}</span> {n}
+          </span>
+        ))}
+      </div>
+      {d.reasons.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+          {d.reasons.slice(0, 3).map((r) => (
+            <li key={r.reason} className="truncate" title={r.reason}>{r.reason} × {r.count}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
