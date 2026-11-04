@@ -3,6 +3,13 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-04：版面分析不进安装包（99.59 MiB）
+
+- `scripts/build_release.py` 装配完默认删掉 `onnxruntime`、`networkx` 和 `pymupdf_layout` 的 dist-info（共 65 MB），`--with-layout` 保留。
+- 依据：pymupdf4llm 2.x 只有版面模式（`to_markdown` 默认路径）需要它们；缺了就落到 `download/markdown.py` 的纯文本回退，并带一条「表格和分栏可能不规整」的警告。同一篇 PDF 实测纯文本 78,213 字符、2.7 秒，比带版面的 71,542 字符 / 24.5 秒还多、还快。
+- 结果：运行时 291 MB，重新打包后 **99.59 MiB**（上一版 113.38 MiB）；打包后的 `python.exe` 导入 `litloop`、`pymupdf4llm` 都正常。
+- 还没做：这两个组件改成 app 里第一次需要时按需下载（发布计划那一项），现在只能手工装。
+
 ## 2026-11-04：第一个 Windows 安装包（113 MB）
 
 - 新增 `scripts/build_release.py`（只用标准库）：下载官方 embeddable Python（版本钉在 `PYTHON_VERSION = "3.14.3"`）解压到 `build/runtime`，用当前 Python 把 `pyproject.toml` 里的必需依赖 `pip install --target build/runtime/Lib/site-packages`，把 `src/litloop` 复制进同一个目录，重写 `python314._pth`（`python314.zip`、`.`、`Lib\site-packages`、`import site`），最后跑一遍 `import litloop, pymupdf, fastapi, mcp` 自检。`--clean` 重来一遍，`--bundle` 顺带打包。

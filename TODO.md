@@ -86,8 +86,8 @@
 - [ ] 后端 B：内置 Agent（设计见 CHARTER「可视化 app → 任务与后端」）：app 直接调模型 API，Anthropic 原生接口和 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、本地 Ollama / vLLM）；设置里按服务商、地址、Key、模型名配置，可按任务分模型，测试按钮检查工具调用；用测试集存档比较各模型的评分质量。2026-10-26 补记：原来只写在 CHARTER 的「顺序」里，TODO 漏了这一项。
 - [ ] 安装包与自动更新（评审 12；设计和验收见 CHARTER「可视化 app → 发布」，2026-10-26 用户定了安装范围、签名、分发和浏览器的做法，见 DECISIONS「作为标准 Windows 程序分发」）。模块整理做完后开始，大致步骤：
   - [x] 先摸底：核心依赖 **336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 跑起 `litloop.desktop.server`，合计约 **358 MB**（DECISIONS「发布摸底（2）」）；NSIS 安装包实测 **113.38 MiB**（DECISIONS「第一个 Windows 安装包」）。还剩：用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净 Windows 验收；
-  - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时（356 MB），Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出 **LitLoop_0.1.0_x64-setup.exe（113.38 MiB）**；打包后的 Python 跑得起 `litloop.desktop.server`（DECISIONS「第一个 Windows 安装包」）。
-  - [ ] 版面分析（`pymupdf-layout`，约 67 MB）从安装包拆出去，改成第一次需要时用 uv 下载（`download/markdown.py` 已有缺组件时的纯文本回退）；
+  - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时，Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出安装包；去掉版面分析后是 **99.59 MiB**（DECISIONS「第一个 Windows 安装包」「版面分析不进安装包」）。
+  - [ ] 按需组件：版面分析（`pymupdf-layout` + `onnxruntime` + `networkx`，约 65 MB）第一次需要时用 uv 装到 `~/.litloop/packages` 并加进 `sys.path`（`download/markdown.py` 已有缺组件时的纯文本回退）；下载要有进度和失败提示，可配国内镜像。
   - NSIS `installMode: "both"`，图标、名称、开始菜单；系统通知显示 LitLoop 自己的名称和图标（用户 2026-10-23 要求；开发模式下借用的是 PowerShell 的）；
   - 按需下载都要有进度和失败提示；
   - 更新插件读 GitHub Releases，`passive` 模式；发版流程（打包、生成更新清单、上传）写成脚本；

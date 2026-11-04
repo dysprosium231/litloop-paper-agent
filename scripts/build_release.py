@@ -91,6 +91,25 @@ def install_litloop(site: Path) -> None:
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
 
 
+def drop_layout(site: Path) -> None:
+    """Leave the layout model out: it is 67 MB and the app can do without it.
+
+    pymupdf4llm 2.x pulls pymupdf-layout, which needs onnxruntime and networkx.
+    Without them PDF-to-markdown falls back to plain reading order (see
+    `download/markdown.py`), and the component is a download-on-demand item in
+    the release plan. `--with-layout` keeps it for a local comparison.
+    """
+    freed = 0
+    for pattern in ("onnxruntime", "networkx", "pymupdf_layout"):
+        for path in [p for p in site.glob(pattern) if p.is_dir()]:
+            freed += size_of(path)
+            shutil.rmtree(path, ignore_errors=True)
+        for path in [p for p in site.glob(f"{pattern}-*.dist-info") if p.is_dir()]:
+            freed += size_of(path)
+            shutil.rmtree(path, ignore_errors=True)
+    step(f"dropped the layout model ({freed / 1e6:.0f} MB); plain text order is used instead")
+
+
 def write_path_file() -> None:
     """`python314._pth` decides what the embeddable interpreter can see."""
     major, minor = PYTHON_VERSION.split(".")[:2]
@@ -108,7 +127,7 @@ def write_path_file() -> None:
 
 def verify() -> None:
     exe = RUNTIME / "python.exe"
-    check = "import litloop, pymupdf, fastapi, mcp; print(litloop.__version__)"
+    check = "import litloop, pymupdf, pymupdf4llm, fastapi, mcp; print(litloop.__version__)"
     step("checking the runtime can import litloop")
     out = subprocess.run([str(exe), "-c", check], capture_output=True, text=True)
     if out.returncode != 0:
@@ -130,6 +149,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--clean", action="store_true", help="delete build/runtime and stage it again")
     ap.add_argument("--bundle", action="store_true", help="run npm run tauri build afterwards")
+    ap.add_argument("--with-layout", action="store_true",
+                    help="keep pymupdf-layout and onnxruntime (about 67 MB) in the runtime")
     args = ap.parse_args()
 
     if args.clean and RUNTIME.exists():
@@ -141,6 +162,8 @@ def main() -> None:
     unpack_python(fetch_python_zip())
     install_dependencies(site)
     install_litloop(site)
+    if not args.with_layout:
+        drop_layout(site)
     write_path_file()
     verify()
     step(f"runtime is {size_of(RUNTIME) / 1e6:.0f} MB at {RUNTIME}")
