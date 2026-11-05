@@ -133,7 +133,9 @@ def _clean_text(text: str) -> str:
     for i, line in enumerate(lines):
         stripped = line.strip()
         if not stripped:
-            result.append("")
+            # Keep the paragraph break: a bare "" would vanish when the lines
+            # are joined back together.
+            result.append("\n")
         elif (
             i + 1 < len(lines)
             and lines[i + 1].strip()
