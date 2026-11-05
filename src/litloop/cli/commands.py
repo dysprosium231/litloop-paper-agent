@@ -115,7 +115,13 @@ CLOAKBROWSER_RECOMMENDED_MIN = "0.5.9"
 def _parse_version_tuple(v: str) -> tuple[int, ...]:
     parts: list[int] = []
     for token in (v or "").split("."):
-        digits = "".join(ch for ch in token if ch.isdigit())
+        # Only the leading digits count: "3b1" is release 3 of a pre-release,
+        # not 31, which would compare higher than a plain "3".
+        digits = ""
+        for ch in token:
+            if not ch.isdigit():
+                break
+            digits += ch
         parts.append(int(digits) if digits else 0)
     return tuple(parts)
 

@@ -3,6 +3,11 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-05：CLI 的版本号比较把预发布当成了更大的版本（已修）
+
+- 写 `tests/test_cli_commands.py`（14 个：学校类型标签、DOI 文件、版本元组、cloakbrowser 版本检查三种结果、`_apply_school_config` 清另一通道、`_access_url`、机构名解析与自动提示、路径状态）时发现 `_parse_version_tuple("1.2.3b1")` 得 `(1, 2, 31)`：它把 token 里的所有数字都拼起来，`3b1` 变成 31，于是预发布版看起来比正式版新，`doctor` 的 cloakbrowser 版本下限检查会漏报。
+- 改法：只取 token 开头的连续数字，`3b1` → 3，`b1` → 0。影响面仅限 `CLOAKBROWSER_RECOMMENDED_MIN` 的比较。
+
 ## 2026-11-05：远程协助页面一直打不开（已修）
 
 - 写 `tests/test_remote_assist.py`（8 个：找一个空闲端口、`url`/`lan_url`、首页含出版商名、`/api/status` 字段、`POST /api/done` 唤醒等待者、超时、404、重复 `stop()`）时发现：`_PAGE_TEMPLATE.format(...)` 会去解析页面里的 CSS 与 JavaScript 大括号，`* { box-sizing: ... }` 直接抛 `KeyError: ' box-sizing'`，首页永远 500。也就是说「手机扫码确认验证」这条路径从上线起就没能用过，只是没人打开过页面。
