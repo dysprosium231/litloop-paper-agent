@@ -3,13 +3,19 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-05：远程协助页面一直打不开（已修）
+
+- 写 `tests/test_remote_assist.py`（8 个：找一个空闲端口、`url`/`lan_url`、首页含出版商名、`/api/status` 字段、`POST /api/done` 唤醒等待者、超时、404、重复 `stop()`）时发现：`_PAGE_TEMPLATE.format(...)` 会去解析页面里的 CSS 与 JavaScript 大括号，`* { box-sizing: ... }` 直接抛 `KeyError: ' box-sizing'`，首页永远 500。也就是说「手机扫码确认验证」这条路径从上线起就没能用过，只是没人打开过页面。
+- 改法：模板改成 `string.Template`，占位符用 `$publisher`/`$status_class`/`$status_text`/`$browser_url`，`_serve_page` 改用 `substitute()`；顺带 `html.escape()` 出版商名与浏览器地址（地址来自网页，不该直接拼进 HTML）。
+- 影响：`litloop_login` 走到 SSO/人机验证时给用户的局域网页面现在能正常显示并接收「完成」信号。
+
 ## 2026-11-05：PDF 提取的段落分隔被重新拼没了（已修）
 
 - 写 `tests/test_pdf_extractor.py`（9 个：真实小 PDF 的取文本、坏文件与缺文件、字节流、图注匹配与短句过滤、连字符折行、列表行、空白压缩）时发现 `_clean_text()` 有 bug：空行被压成 `""` 放进结果列表，最后 `"".join()` 一拼就没了，所以「保留段落分隔」这句注释与实际行为不符——提取出来的全文里段落全连在一起。
 - 改法：空行改成往结果里放 `"\n"`，拼接后就是空行；`_clean_text("a\n\n\n\nb")` 现在得 `"a\n\nb"`。
 - 影响：PDF 提取出的纯文本段落结构恢复；`download/markdown.py` 与摘要翻译读到的文本会多出空行，属于更接近原文。
 
-
+## 2026-11-05：数据模型有了测试，顺手去掉一处多余空行
 
 - `models.py`（266 行）是 Agent 看到的两种结果形状（`Paper`、`FetchResult`），一直没有测试。
 - `tests/test_models.py` 12 个：JSON 往返、未知字段被丢掉、Markdown 只写有值的字段、`to_text` 只含标题摘要正文、`_content_quality` 的五种值、`FetchResult.from_paper` 的五条分支（成功 / 只有 PDF / 没配学校 / 配了学校要登录 / 摘要或短文本）、尝试记录与下一步动作的序列化。

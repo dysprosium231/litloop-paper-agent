@@ -14,8 +14,10 @@ Usage pattern:
 
 from __future__ import annotations
 
+import html
 import json
 import socket
+import string
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -25,8 +27,9 @@ from ..log import get_logger
 
 log = get_logger()
 
-# HTML template for the remote assist page
-_PAGE_TEMPLATE = """<!DOCTYPE html>
+# HTML template for the remote assist page. string.Template rather than str.format:
+# the page carries CSS and JavaScript, whose braces str.format would read as fields.
+_PAGE_TEMPLATE = string.Template("""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -60,15 +63,15 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <body>
 <div class="card">
   <h1>🔐 Remote Assist</h1>
-  <div class="publisher">{publisher}</div>
-  <div class="status {status_class}" id="status">{status_text}</div>
+  <div class="publisher">$publisher</div>
+  <div class="status $status_class" id="status">$status_text</div>
   <div class="instructions">
     <ol>
       <li>Complete the login/verification in the browser window on the host machine</li>
       <li>After verification is done, click the button below</li>
     </ol>
   </div>
-  <div class="url-box">{browser_url}</div>
+  <div class="url-box">$browser_url</div>
   <button class="btn btn-primary" id="doneBtn" onclick="signalDone()">
     ✅ Verification Complete — Continue
   </button>
@@ -98,7 +101,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }, 2000);
 </script>
 </body>
-</html>"""
+</html>""")
 
 
 class _RequestHandler(BaseHTTPRequestHandler):
@@ -129,16 +132,16 @@ class _RequestHandler(BaseHTTPRequestHandler):
         state = self._state
         status_class = "done" if state.get("completed") else "waiting"
         status_text = "✅ Verification complete!" if state.get("completed") else "⏳ Waiting for verification..."
-        html = _PAGE_TEMPLATE.format(
-            publisher=state.get("publisher", "Unknown"),
+        page = _PAGE_TEMPLATE.substitute(
+            publisher=html.escape(str(state.get("publisher", "Unknown"))),
             status_class=status_class,
             status_text=status_text,
-            browser_url=state.get("browser_url", ""),
+            browser_url=html.escape(str(state.get("browser_url", ""))),
         )
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
-        self.wfile.write(html.encode())
+        self.wfile.write(page.encode())
 
     def _serve_status(self):
         state = self._state
