@@ -100,7 +100,7 @@
 - [ ] 深度链接：Agent 在对话里给 `litloop://` 链接，点开直达对应会话（Tauri deep-link 插件）。
 
 ### 测试
-- [ ] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；其余模块待补。
+- [~] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；2026-11-05 又补 `bib_import`、`bibtex_crossref`、`http_utils`、`europepmc`、`oa_discovery`、`models`、`pdf_extractor`、`profile_health`、`remote_assist`、`camofox_api`、`cloakbrowser_compat`、`cli/commands` 的辅助函数。顺手修了四个真 bug（citekey 撞键、`to_text` 多空行、PDF 段落分隔被拼掉、远程协助页面 500）。还剩 `extractors/` 与 `desktop/` 的一些分支。
 
 ### 分析归纳
 - [ ] 从全文抽取要点、做对比表、起草综述（现成的 `extractors.extract_figures` 可抽图注）；app 的分析归纳页。
@@ -123,7 +123,7 @@
 
 - [x] 补仓库元信息：description 与 16 个 topics 已于 2026-11-05 用 `gh repo edit` 设好（「学术文献 Agent：检索 → 筛选 → 下载（校园网 / CARSI / WebVPN）→ Zotero 归档 | 21 MCP tools for Claude, Cursor and Codex」）。社交预览图还没做。
 - [x] 英文 `README.md` + 中文 `README.zh-CN.md`，两份顶部互相链接（2026-11-05）。
-- [~] 打第一个正式 Release：`.github/workflows/release.yml` 已写（tag `v*` 触发、校验 tag 与版本、生成 SHA256SUMS、上传 exe；手动触发只出 artifact）。版本号已从 0.1.0 统一到 1.18.0，安装包会是 `LitLoop_1.18.0_x64-setup.exe`。**卡在 GitHub Actions 账单锁定**：2026-11-05 起每次 run 都在 5 秒内报 `The job was not started because your account is locked due to a billing issue`，要用户先处理账单。
+- [~] 打第一个正式 Release：`.github/workflows/release.yml` 已写（tag `v*` 触发、校验 tag 与版本、生成 SHA256SUMS、上传 exe；手动触发只出 artifact）。版本号已统一到 **1.18.1**（7 个版本来源 + `server.json`，一致性检查会验），安装包会是 `LitLoop_1.18.1_x64-setup.exe`。账单锁定已于 2026-11-05 加卡后解除（CI 重跑全绿），**只差打 tag** `v1.18.1`：Actions 目前在排队，等队列消化或本机 `python scripts/build_release.py --bundle` + `gh release create` 手动发。
 - [~] 发上 PyPI（`pip install litloop`）：`pyproject.toml` 补了 keywords 与 11 条 classifiers；`python -m build` 出 sdist 818 KB + wheel 707 KB（170 个文件），`twine check` 都 PASSED，装进临时目录后 `import litloop` 与 `litloop.agents.TOOLS` 正常；`server.json` 已按官方注册表格式写好并纳入一致性检查。**只剩上传**：需要用户的 PyPI API token。
 - [ ] 90 秒演示 GIF 放 README 顶部（一句话 → 30 篇 → 下载 → Zotero），替换现在 4 张静态截图的位置。
 
