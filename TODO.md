@@ -119,6 +119,8 @@
 
 对这类工具，曝光度等于被搜到：GitHub 搜索、PyPI、MCP 目录、小红书/知乎/公众号的搜索结果，以及别人写方法部分时的引用。按性价比排，先做 1–3（都不需要用户操作），再发内容。
 
+**现在卡在用户这边的三件事**：①PyPI 的 API token（有了就能 `twine upload dist/*`，之后 `uvx litloop run` 才成立）；②Smithery / Glama / mcp.so / PulseMCP 的账号（提交目录用）；③录屏用的真机运行（90 秒 GIF，或由我起草分镜你来录）。其余我能自己往前推。
+
 ### 1. 能被搜到（先做，约半天）
 
 - [x] 补仓库元信息：description 与 16 个 topics 已于 2026-11-05 用 `gh repo edit` 设好（「学术文献 Agent：检索 → 筛选 → 下载（校园网 / CARSI / WebVPN）→ Zotero 归档 | 21 MCP tools for Claude, Cursor and Codex」）。社交预览图还没做。
