@@ -3,7 +3,7 @@ import { ChevronDownIcon, ChevronRightIcon, FolderOpenIcon } from "lucide-react"
 
 import { Card, Empty, PageBody, PageHeader } from "@/components/page"
 import { Button } from "@/components/ui/button"
-import { downloadsApi, errorMessage, historyApi, watchesApi, type HistoryEntry, type PrismaSummary, type Watch } from "@/lib/api"
+import { downloadsApi, errorMessage, historyApi, watchesApi, type HistoryEntry, type PrismaSummary, type SearchHit, type Watch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const MODE = { quick: "快速检索", deep: "深度检索" } as Record<string, string>
@@ -133,6 +133,7 @@ function WatchesCard() {
   const [items, setItems] = React.useState<Watch[] | null>(null)
   const [busy, setBusy] = React.useState<string | null>(null)
   const [note, setNote] = React.useState<{ text: string; bad?: boolean } | null>(null)
+  const [fresh, setFresh] = React.useState<Record<string, SearchHit[]>>({})
   const load = React.useCallback(() => {
     watchesApi.list().then(setItems).catch((e) => setNote({ text: errorMessage(e), bad: true }))
   }, [])
@@ -141,6 +142,7 @@ function WatchesCard() {
     setBusy(w.id)
     watchesApi.check(w.id)
       .then((r) => {
+        setFresh((old) => ({ ...old, [w.id]: r.new }))
         setNote({ text: r.new.length ? `「${w.question || w.query}」找到 ${r.new.length} 篇新文献` : "没有新文献" })
         load()
       })
@@ -150,26 +152,55 @@ function WatchesCard() {
   const remove = (w: Watch) => {
     watchesApi.remove(w.id).then(load).catch((e) => setNote({ text: errorMessage(e), bad: true }))
   }
+  const download = (w: Watch) => {
+    const papers = (fresh[w.id] ?? []).filter((p) => p.doi).map((p) => ({ doi: p.doi as string, title: p.title, year: p.year, journal: p.journal }))
+    if (!papers.length) return setNote({ text: "这些新文献没有 DOI，无法加入下载", bad: true })
+    downloadsApi.start(papers, `追踪 · ${w.question || w.query}`)
+      .then(() => setNote({ text: `${papers.length} 篇新文献已加入下载队列` }))
+      .catch((e) => setNote({ text: errorMessage(e), bad: true }))
+  }
   if (!items?.length) return null
   return (
     <Card>
       <div className="border-b px-5 py-3 text-sm font-medium">追踪</div>
       <ul className="divide-y">
-        {items.map((w) => (
-          <li key={w.id} className="flex items-center gap-4 px-5 py-3">
-            <div className="min-w-0 flex-1">
-              <div className="line-clamp-1 text-sm">{w.question || w.query}</div>
-              <div className="text-xs text-muted-foreground">
-                {w.query} · 已见 {w.seen_count} 篇 · {w.checked ? `上次检查 ${w.checked.slice(0, 16)}` : "还没检查过"}
-                {w.checked && ` · 新增 ${w.last_new}`}
+        {items.map((w) => {
+          const papers = fresh[w.id] ?? []
+          return (
+            <li key={w.id} className="px-5 py-3">
+              <div className="flex items-center gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="line-clamp-1 text-sm">{w.question || w.query}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {w.query} · 已见 {w.seen_count} 篇 · {w.checked ? `上次检查 ${w.checked.slice(0, 16)}` : "还没检查过"}
+                    {w.checked && ` · 新增 ${w.last_new}`}
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" disabled={busy === w.id} onClick={() => check(w)}>
+                  {busy === w.id ? "正在检查…" : "检查"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => remove(w)}>删除</Button>
               </div>
-            </div>
-            <Button size="sm" variant="outline" disabled={busy === w.id} onClick={() => check(w)}>
-              {busy === w.id ? "正在检查…" : "检查"}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => remove(w)}>删除</Button>
-          </li>
-        ))}
+              {papers.length > 0 && (
+                <div className="mt-2 rounded-md border bg-background px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-medium text-muted-foreground">这次的新文献</div>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => download(w)}>加入下载</Button>
+                  </div>
+                  <ul className="mt-1 space-y-1">
+                    {papers.slice(0, 20).map((p, i) => (
+                      <li key={`${w.id}-${i}`} className="line-clamp-1 text-sm">
+                        {p.title}
+                        <span className="ml-2 text-xs text-muted-foreground">{[p.year, p.journal].filter(Boolean).join(" · ")}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {papers.length > 20 && <p className="mt-1 text-xs text-muted-foreground">还有 {papers.length - 20} 篇</p>}
+                </div>
+              )}
+            </li>
+          )
+        })}
       </ul>
       {note && <p className={cn("px-5 py-2 text-xs", note.bad ? "text-destructive" : "text-muted-foreground")}>{note.text}</p>}
     </Card>

@@ -3,6 +3,14 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-05：追踪检查后直接列出新文献
+
+- 现象：`watches.check()` 早就返回了新文献列表（`new` 是论文数组），但历史页只显示「找到 N 篇新文献」，看不到是哪些，要用还得自己去别处搜。
+- 改法：`WatchesCard` 把每次检查返回的 `new` 存进组件状态（按追踪 id），在该行下面渲染「这次的新文献」——标题、`年份 · 期刊`，最多列 20 条（多出的提示还有几篇），右上角「加入下载」把带 DOI 的条目交给 `downloadsApi.start(papers, 追踪 · 问题)`；没有 DOI 的条目不进队列并给出提示。
+- 为什么不落盘：这只是「刚才那次检查看到了什么」的展示，已见集合已经在 `watches.json` 里；再存一份会多一个要同步的状态。
+- 测试：这次只改前端，`npm run build` 与 `npm run lint:copy`（No issues found）通过；后端行为不变。
+- 还没实测：要真实检索额度才能看到列表。
+
 ## 2026-11-04：运行时的资源清单单独放，`cargo check` 不再要求它存在
 
 - 现象：CI 的 `app` 任务从 492dddd（安装包带 Python 运行时）起一直红，报 `resource path ../../build/runtime doesn't exist`。Tauri 的 build script 在编译期校验 `bundle.resources` 里列出的每个路径，而 `build/runtime` 是 `scripts/build_release.py` 现场装配的、不进仓库，CI 只跑 `cargo check`，自然没有这个目录。

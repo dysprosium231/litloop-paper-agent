@@ -257,7 +257,7 @@ In planned order; progress is tracked in [TODO.md](TODO.md).
 
 1. **Desktop app**: the installer can be built; auto-update and signing remain. The built-in agent (the app calling Anthropic / OpenAI-compatible APIs itself) can already run searches started in the app; per-task model choice and a test-set comparison against an external agent are still open.
 2. **Systematic-review support**: flow counts (identified, deduplicated, included, excluded, with reasons) and Markdown export are done; resuming an interrupted review is not.
-3. **Watched searches**: saving a query, checking when the app opens and notifying are done; opening a check in the app to see the new-papers list is not.
+3. **Watched searches**: saving a query, checking when the app opens, notifying, and listing the new papers with a one-click "add to downloads" are done; feeding those papers straight into a screening session is not.
 4. **Analysis and synthesis**: PDF to Markdown exists; extracting findings from full text, building comparison tables and drafting a review are next.
 5. **Chinese literature**: CNKI and Wanfang.
 6. **Publishing the quartile plugin**: the data is licensed, so it must be opened up to user-supplied data first.
