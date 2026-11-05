@@ -3,6 +3,15 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-05：内置 Agent 现在的样子（盘点）
+
+- 已有的：`agents/client.py`（Anthropic 原生 + OpenAI 兼容两套协议、统一返回、本机地址不走代理、`test_model()` 用一次 `ping` 工具调用验连通）、`agents/runner.py`（问模型 → 跑工具 → 再问，工具出错转成文字不中断）、`agents/tools.py`（`search`、`deep_search_start`、`deep_search_next`、`deep_search_status`、`screening_save` 五个）、`desktop/agent_runner.py` 里的内置分支（进度文案、抓 session、每秒最多写一次盘、取消）、设置页「内置 Agent」一组与 `agent_backend` 开关；22 个测试。
+- 盘出来的三处缺口（写进 TODO 待办池「app → 后端 B」）：
+  1. **提示词借的是后端 A 的**：`_run_builtin()` 把 `build_prompt()` 的产物当用户消息，第一句是「用 litloop 技能…」，而内置模型没有技能文档；调 `run_task()` 时也没传 `system`（默认空串），所以模型只看到五个工具的简短描述，没有评分口径与批次流程。
+  2. **步数上限 8 对深度检索偏紧**：一次深度检索是「建池 → 每批保存 → 取下一批」，三批就接近上限，会以「到 8 步还没有给出结论」收尾。
+  3. **从未用真实 Key 跑过**：全部验证都是假模型（含一条真实 HTTP 结构的桩）。
+- 判断：管线是通的、可切换可取消、失败有提示，但「能跑」和「跑得和后端 A 一样」之间差的就是这段系统提示词；先用自测把提示词和步数改好，再做真实 Key 实测与两个后端的评分质量比较。
+
 ## 2026-11-05：`_core.py` 抽出 Elsevier 文章 API 一段（2873 → 2340 行）
 
 - 背景：`src/litloop/publishers/strategies/_core.py` 2873 行，是「不拆」约定里最大的一块；但它里面至少有一整段是**自成一体的**——ScienceDirect 的文章 API：发请求、解析 XML 附件、挑 PDF、落盘。这一段不碰浏览器、不碰 DOM、不依赖 `_core` 的模块级状态，正好是最安全的切口。
