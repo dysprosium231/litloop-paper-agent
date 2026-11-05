@@ -121,8 +121,11 @@ def _make_cite_key(msg: dict[str, Any], doi: str) -> str:
         if words:
             first_word = words[0][:6]
 
-    key = f"{first_author}{year}{first_word}".lower()
-    return key or doi.replace("/", "_").replace(".", "_")
+    if not (first_author or first_word):
+        # Crossref gave us no author and no title: a bare "xxxx" key would
+        # collide with every other such entry, so lean on the DOI instead.
+        return re.sub(r"[^A-Za-z0-9]+", "_", doi).strip("_").lower() or "ref"
+    return f"{first_author}{year}{first_word}".lower()
 
 
 def _clean(text: str) -> str:

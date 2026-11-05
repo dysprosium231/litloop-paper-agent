@@ -3,6 +3,12 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-05：BibTeX 引用键在缺作者缺标题时改用 DOI
+
+- 现象：`citations/bibtex_crossref._make_cite_key()` 在 Crossref 既没给作者、也没给标题时算出 `"xxxx"`（年份占位），`or doi…` 那句兜底永远走不到——几条这样的记录会共用一个引用键，BibTeX 里出现重复 key。
+- 改法：作者和标题都空时，用 DOI 归一化成 `10_1016_j_ceramint_2021_06_118` 这样的键；其它情况仍是「作者前 6 个字母 + 年份 + 标题首词前 6 个字母」。
+- 测试：`tests/test_bibtex_crossref.py` 13 个（整条字段、8 种类型映射、转义、无日期、键兜底、网络成功/空/异常）。
+
 ## 2026-11-05：排除文献时可以顺手写个理由
 
 - 现象：`screening.prisma()` 的「排除理由」一直只有 Agent 的 `reason`——用户自己按「排除」只留了 `decision: "rejected"`，导出给投稿用的流程图时说不清为什么排除。
