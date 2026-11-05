@@ -8,8 +8,10 @@ Asserts that the version is identical across:
 - .codex-plugin/plugin.json
 - zcode-plugin/.zcode-plugin/plugin.json
 - zcode-plugin/marketplace.json
+- app/src-tauri/tauri.conf.json (the installer's file name and version)
+- server.json (the MCP registry entry, when present)
 
-and that the MCP tool surface is still 20 tools and the skill no longer
+and that the MCP tool surface is still 21 tools and the skill no longer
 references retired tool names. Exit code 1 with a diff report on any mismatch.
 
 Usage (from the repo root):
@@ -81,6 +83,14 @@ def _read_version_sources() -> list[tuple[str, str]]:
         if plugin.get("name") == "litloop":
             sources.append(("zcode-plugin/marketplace.json", str(plugin.get("version", ""))))
             break
+
+    tauri = json.loads((ROOT / "app" / "src-tauri" / "tauri.conf.json").read_text(encoding="utf-8"))
+    sources.append(("app/src-tauri/tauri.conf.json", str(tauri.get("version", ""))))
+
+    registry = ROOT / "server.json"
+    if registry.exists():
+        data = json.loads(registry.read_text(encoding="utf-8"))
+        sources.append(("server.json", str(data.get("version", ""))))
 
     return sources
 

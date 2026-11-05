@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.dysprosium231/litloop",
+  "description": "Academic literature agent: search, screen, download PDFs, file into Zotero.",
+  "title": "LitLoop",
+  "websiteUrl": "https://github.com/dysprosium231/litloop-paper-agent",
+  "repository": {
+    "url": "https://github.com/dysprosium231/litloop-paper-agent",
+    "source": "github"
+  },
+  "version": "1.18.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "litloop",
+      "version": "1.18.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "run"
+        }
+      ]
+    }
+  ]
+}

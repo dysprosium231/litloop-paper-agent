@@ -27,6 +27,30 @@ dependencies = [
     "abbreviations>=0.2.5",
 ]
 
+keywords = [
+    "mcp",
+    "mcp-server",
+    "literature-review",
+    "systematic-review",
+    "zotero",
+    "academic-papers",
+    "research-tools",
+    "pdf",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing :: Markup :: HTML",
+]
+
 [project.urls]
 Homepage = "https://github.com/dysprosium231/litloop-paper-agent"
 Repository = "https://github.com/dysprosium231/litloop-paper-agent"

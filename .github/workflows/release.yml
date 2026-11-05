@@ -1,0 +1,86 @@
+name: Release
+
+# Push a tag like v1.18.0 to build the Windows installer and attach it to a
+# GitHub release. The tag must match the version in pyproject.toml; the release
+# is unsigned, so the notes say how to get past SmartScreen.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      - name: The tag must match the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $match = Select-String -Path pyproject.toml -Pattern '^version = "(.*)"' | Select-Object -First 1
+          $version = $match.Matches[0].Groups[1].Value
+          if ("v$version" -ne "${{ github.ref_name }}") {
+            throw "tag ${{ github.ref_name }} does not match version $version in pyproject.toml"
+          }
+          Write-Host "tag and version agree: v$version"
+
+      - name: Install the UI dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Stage the runtime and build the installer
+        run: python scripts/build_release.py --bundle
+
+      - name: Write the checksum
+        shell: pwsh
+        run: |
+          $nsis = "app/src-tauri/target/release/bundle/nsis"
+          Get-ChildItem "$nsis/*.exe" | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)"
+          } | Out-File -Encoding utf8 "$nsis/SHA256SUMS.txt"
+          Get-Content "$nsis/SHA256SUMS.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: litloop-windows
+          path: |
+            app/src-tauri/target/release/bundle/nsis/*.exe
+            app/src-tauri/target/release/bundle/nsis/SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: |
+            app/src-tauri/target/release/bundle/nsis/*.exe
+            app/src-tauri/target/release/bundle/nsis/SHA256SUMS.txt
+          draft: false
+          generate_release_notes: true
+          body: |
+            Windows 安装包（未签名）。安装需要管理员权限。
+
+            第一次运行会被 SmartScreen 拦住：点「更多信息」→「仍要运行」。
+
+            安装包自带 Python 运行时和全部核心依赖，目标机器不用装 Python、Node 或 Rust。
+            版面分析（PDF 转 Markdown 的排版，约 65 MB）不在安装包里，需要时在
+            「设置 → 可选组件」里点「安装」。
