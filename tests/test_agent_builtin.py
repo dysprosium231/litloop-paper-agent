@@ -80,4 +80,9 @@ def test_cancel_stops_a_builtin_run(builtin, monkeypatch):
     d = _wait(run)
     release.set()
     assert d["state"] == "cancelled"
+    # The state flips before the worker clears itself from the running table,
+    # so give that a moment instead of reading it once.
+    deadline = time.monotonic() + 5.0
+    while agent_runner.running() is not None and time.monotonic() < deadline:
+        time.sleep(0.02)
     assert agent_runner.running() is None
