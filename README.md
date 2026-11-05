@@ -59,6 +59,7 @@ Take "rare-earth-doped amorphous nanomaterials as drug carriers" as an example:
 ### Screening
 
 - **Batch list**: title, journal, year, the agent's score and one sentence of reasoning; filter to this batch, or search titles and journals.
+- **Excluding**: when you exclude a paper you can pick a reason (off topic, not a research paper, wrong material or system, unreliable data, duplicate) or skip it; a reason you give shows up in the review flow's exclusion reasons and in the export.
 - **Details**: full abstract, journal quartile (CAS and JCR, needs the companion plugin), citation count, DOI; the abstract can be translated automatically.
 - **Translation**: under Settings → Screening choose the scope (high only, high and medium, everything, or off) and the service. DeepSeek and DeepL use your own key and translate when a paper is opened, without spending chat quota; choosing "agent" translates along with scoring.
 - **Continue search**: after the agent stops, build the next batch from all scores so far; you score it first and the agent fills in its own scores once you return to the chat.
