@@ -148,7 +148,8 @@ _FIELDS = {f["key"]: f for g in GROUPS for f in g["fields"]}
 # The first-run guide: settings groups in the order a new user needs them, each
 # with why it matters. Every step can be checked on the spot or skipped.
 STEPS = [
-    {"group": "sources", "intro": "检索和补摘要靠这些接口。OpenAlex Key 免费，没有时每天的检索额度很少；"
+    {"group": "sources", "intro": "检索和补摘要靠这些接口。什么都不填也能先试一次快速检索（退回 Crossref）；"
+                                  "要长期用，OpenAlex Key 免费，在 help.openalex.org 申请，没有时每天的检索额度很少。"
                                   "Elsevier Key 用于 ScienceDirect 全文和 Scopus 摘要，对深度检索影响很大。"
                                   "联系邮箱只发给 Crossref、OpenAlex、Unpaywall，它们要求填写。"},
     {"group": "screening", "intro": "筛选时可把摘要翻译成中文。填 DeepSeek 或 DeepL 的 Key 后由 app 翻译，不占用对话额度；也可以以后再设置。"},
