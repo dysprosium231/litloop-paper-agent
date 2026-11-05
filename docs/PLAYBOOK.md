@@ -17,7 +17,7 @@
 
 ## 镜像健康：唯一权威存储
 
-**所有验证墙/结构性冷却状态存于 `domain_db.py` 的 `wall_state` 表**（`domain_stats.db`，SQLite + WAL），由 `scihub.py` 的 `_wall_guard / _wall_pace / _note_wall / _note_wall_success / _note_structural` 读写。**不要再造平行的内存 dict 或 JSON 健康存储。**
+**所有验证墙/结构性冷却状态存于 `sources/scihub_domains.py` 的 `wall_state` 表**（`domain_stats.db`，SQLite + WAL），由 `sources/scihub.py` 的 `_wall_guard / _wall_pace / _note_wall / _note_wall_success / _note_structural` 读写。**不要再造平行的内存 dict 或 JSON 健康存储。**
 
 - 连接模式是"每操作开闭"——不要改回线程本地长连接（Windows 文件锁会让调用方的临时目录清理失败）。
 - 剪枝条件用 `last_solve`（一天未动），**不要用 `cooldown_until`**（0 是合法的健康态）。
@@ -91,12 +91,12 @@ sci-hub.ru 按**出口 IP** 限速：代理用户共享一个出口，很快被�
 ## 浏览器生命周期
 
 - **常驻工作池**：`sources/scihub.py` 的 `_race_pool`（线程数 = `scihub_browser_workers`），整批共享浏览器，禁止在每篇论文的 finally 里关浏览器（历史事故：闪窗 + 丢弃 Cloudflare 通行证）。
-- **退出收割**：`browser_engine._reap_browsers_at_exit`（atexit）——优雅关闭失败则 tree-kill。
+- **退出收割**：`browser/engine.py` 的 `_reap_browsers_at_exit`（atexit）——优雅关闭失败则 tree-kill。
 - **无头开关**：`scihub_browser_headless` 只影响竞速浏览器；Turnstile 人工点一次需要它为 false。
 
 ## SI 附件
 
-`supplementary.py`；批量开关 `download_si`（默认关）；成功论文抓 SI 存 `{DOI}_SI{n}.{ext}` + `si_manifest.json`。**灰色源没有 SI**（资产模型 = 正文单 PDF），SI 只在出版商页面——所以 SI 命中率与出版商反爬强度相关，与正文下载能力相关但不同步。浏览器兜底走常驻池。
+`publishers/supplementary.py`；批量开关 `download_si`（默认关）；成功论文抓 SI 存 `{DOI}_SI{n}.{ext}` + `si_manifest.json`。**灰色源没有 SI**（资产模型 = 正文单 PDF），SI 只在出版商页面——所以 SI 命中率与出版商反爬强度相关，与正文下载能力相关但不同步。浏览器兜底走常驻池。
 
 ## 已知镜像状态（2026-08-31 实测，必然过期）
 
