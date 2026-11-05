@@ -3,6 +3,12 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-05：Europe PMC 与 PMC 的候选链接有了测试
+
+- 这两个来源一直没有测试（`grep` 扫出的空洞清单里 `sources/europepmc.py` 81 行），改起来心里没底。
+- `tests/test_europepmc.py` 9 个：候选链接只认「`documentStyle == pdf` 且 URL 看着像 PDF」、单个对象形式的 URL、畸形 payload、取第一个候选下载并回填 DOI、一个都下不到返回 None、PMC 先问 idconv 再拼 `/pmc/articles/<pmcid>/pdf/`、占位邮箱（`@example.invalid`）不随请求发出、查询抛异常当没找到、DOI 里的斜杠按 `quote` 默认规则不转义。
+- 顺带确认的既有行为：`urllib.parse.quote` 默认 `safe="/"`，所以 Europe PMC 查询串里的斜杠是原样发出去的。
+
 ## 2026-11-05：BibTeX 引用键在缺作者缺标题时改用 DOI
 
 - 现象：`citations/bibtex_crossref._make_cite_key()` 在 Crossref 既没给作者、也没给标题时算出 `"xxxx"`（年份占位），`or doi…` 那句兜底永远走不到——几条这样的记录会共用一个引用键，BibTeX 里出现重复 key。
