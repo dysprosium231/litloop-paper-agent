@@ -54,6 +54,21 @@ def test_decision(client, session):
     assert client.post(f"/api/sessions/{session}/decision", json={"doi": "10.1/b", "decision": "maybe"}).status_code == 400
 
 
+def test_a_rejection_reason_is_kept_until_the_paper_is_taken_back(client, session):
+    r = client.post(f"/api/sessions/{session}/decision",
+                    json={"doi": "10.1/a", "decision": "rejected", "reason": "主题不相关"}).json()
+    assert r["item"]["reject_reason"] == "主题不相关"
+    assert screening.prisma(session)["reasons"] == [{"reason": "主题不相关", "count": 1}]
+    # un-picking takes the reason with it
+    r = client.post(f"/api/sessions/{session}/decision", json={"doi": "10.1/a", "decision": None}).json()
+    assert "reject_reason" not in r["item"]
+    # ... and so does a pick, or a rejection without a reason
+    client.post(f"/api/sessions/{session}/decision",
+                json={"doi": "10.1/a", "decision": "rejected", "reason": "重复文献"})
+    r = client.post(f"/api/sessions/{session}/decision", json={"doi": "10.1/a", "decision": "selected"}).json()
+    assert "reject_reason" not in r["item"]
+
+
 def test_progress_is_none_when_nothing_runs(client, session):
     assert client.get(f"/api/sessions/{session}/progress").json() is None
 

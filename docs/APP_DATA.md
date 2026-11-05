@@ -60,6 +60,7 @@
 - 只有用户评过、Agent 还没评的文献（app 里「继续检索」出的批次）：**app 写**，`reason` 为空，`relevance` 和 `user_relevance` 都是用户的评分；Agent 之后评分时填上自己的 `relevance` 和 `reason`，`user_relevance` 保留。`litloop_deep_search(action="status")` 的 `unrated` 列出最近一批里 Agent 还没评的。
 - `user_relevance`：**app 写**。用户改过的评分，覆盖 Agent 的（排序、停止判断都用它）；Agent 再评同一篇时不会抹掉它。没改过就没有这个字段。
 - `decision`：**app 写**（或 Agent 按用户的话写）。`selected`（选中下载）、`rejected`（排除）或 `null`。
+- `reject_reason`：**app 写**，可选。用户排除这篇时选的理由（「主题不相关」等，最多 60 字）。只有 `decision` 为 `rejected` 时才有；改成选中、取消排除或不写理由时删掉。`screening.prisma()` 的「排除理由」优先用它，没有才用 Agent 的 `reason`。
 - `n`：条目按相关度排序后的编号，每次保存会重排；app 定位条目用 `doi`，没有 DOI 的用标题。
 - 一篇算哪一档：`user_relevance`，没有就用 `relevance`（`screening._rating(item)`）。
 

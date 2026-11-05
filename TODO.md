@@ -76,7 +76,7 @@
 - [ ] 阶段 2 剩余：速度（下次真实检索看 `rounds` 里的 `abstracts_wait_seconds`，再定要不要做 OpenAlex 按参考文献缓存）；深度检索 → 批量下载 → 按分类推送 Zotero 走通一次。
 - [~] 类别多、彼此引用少的课题（评审 5）：建池时稀土测试集漏的 7 篇里 3 篇不在候选池；排序在这类综述上也弱（SYNERGY 的 Moran_2021 读 200 篇只找到 8%）。离线对比“每个子方向单写检索词”和“按类别配额出批”，看读到第 60 篇找到几篇目标。SYNERGY（`scripts/eval_synergy.py`）评不了建候选池和材料领域，这两项仍靠 `tests/acceptance/`。**按类别配额出批已排除**（2026-11-03，`scripts/replay_batching.py` 在 PDC 池上对比，现行 rank 全面更好，见 DECISIONS「离线回放分批策略」）；还剩“每个子方向单写检索词”，等稀土测试集跑完再看。
 - [ ] 停止规则校准（评审 8）：每轮已记下规则和估计（`stop_checks`），`scripts/stop_calibration.py` 汇总；SYNERGY 上可离线试（`eval_synergy.py run --knee/--patience`），攒够数据再改。
-- [~] 阶段 3：系统综述支持。已完成：`screening.prisma()` 的流程统计（命中/去重/纳入/排除/低相关未定 + 排除理由）、`GET /api/sessions/{id}/prisma`、历史记录展开时显示「检索流程」、`prisma_markdown()` 导出成 Markdown 表（「导出流程」按钮，2026-11-04）。还差：中断后续跑、排除理由做成可选项。
+- [~] 阶段 3：系统综述支持。已完成：`screening.prisma()` 的流程统计（命中/去重/纳入/排除/低相关未定 + 排除理由）、`GET /api/sessions/{id}/prisma`、历史记录展开时显示「检索流程」、`prisma_markdown()` 导出成 Markdown 表（「导出流程」按钮，2026-11-04）；排除时可选理由（「主题不相关」「不是研究文献」「材料或体系不符」「数据不可靠」「重复文献」或不写，2026-11-05，存在条目的 `reject_reason`，流程统计优先用它）。还差：中断后续跑。
 - [x] 阶段 4：定期追踪（2026-11-04～05）。`search/watches.py`（`~/.litloop/watches.json`，按 DOI/标题记已见文章）、`GET/POST /api/watches`、`POST /api/watches/{id}/check`（重跑检索式、只回没见过的）、`DELETE /api/watches/{id}`；历史页「追踪」卡片与每个会话展开区的「追踪这个检索式」按钮；`watches.check_due()` 与 `POST /api/watches/check-due`——app 打开时检查超过 `watch_check_days`（默认 7 天）的追踪并通知。2026-11-05 补上最后一块：检查后卡片里直接列出这次的新文献（标题、年份、期刊，前 20 条）并可以「加入下载」。还没实测（要真实检索额度）。
 - [ ] 中文文献（知网、万方）。
 - [ ] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。

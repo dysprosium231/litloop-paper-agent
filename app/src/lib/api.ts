@@ -23,7 +23,12 @@ export interface Item {
   reason: string
   user_relevance?: Relevance
   decision?: "selected" | "rejected" | null
+  /** Why the user excluded it, when they said (prisma counts these). */
+  reject_reason?: string
 }
+
+/** Offered when excluding a paper; the user may also write none. */
+export const REJECT_REASONS = ["主题不相关", "不是研究文献", "材料或体系不符", "数据不可靠", "重复文献"]
 
 export interface BatchPaper {
   n: number
@@ -170,9 +175,9 @@ export const api = {
   rate: (id: string, paper: { doi?: string; title: string }, relevance: Relevance | null) =>
     call<{ item: Item | null; edited: number }>(`/api/sessions/${encodeURIComponent(id)}/rating`,
       { doi: paper.doi ?? null, title: paper.title, relevance }),
-  decide: (id: string, paper: { doi?: string; title: string }, decision: Item["decision"]) =>
+  decide: (id: string, paper: { doi?: string; title: string }, decision: Item["decision"], reason?: string) =>
     call<{ item: Item }>(`/api/sessions/${encodeURIComponent(id)}/decision`,
-      { doi: paper.doi ?? null, title: paper.title, decision }),
+      { doi: paper.doi ?? null, title: paper.title, decision, reason: reason ?? null }),
   translation: () => call<TranslationInfo>("/api/translation"),
   next: (id: string) => call<{ started: boolean }>(`/api/sessions/${encodeURIComponent(id)}/next`, {}),
   translate: (id: string, paper: { doi?: string; title: string }) =>

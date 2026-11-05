@@ -4,7 +4,8 @@ import { LanguagesIcon, LoaderIcon, RotateCcwIcon } from "lucide-react"
 import { Card } from "@/components/page"
 import { RelevanceBadge } from "@/components/relevance-badge"
 import { Button } from "@/components/ui/button"
-import { RELEVANCE, errorMessage, rating, type BatchPaper, type Item, type Relevance, type TranslationInfo } from "@/lib/api"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { RELEVANCE, REJECT_REASONS, errorMessage, rating, type BatchPaper, type Item, type Relevance, type TranslationInfo } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 /** A paper as shown: what the batch or record says about it, plus its rating if it has one. */
@@ -26,7 +27,7 @@ export function DetailPane({
   paper: Paper | null
   onRate: (rel: Relevance) => void
   onSelect: () => void
-  onExclude: () => void
+  onExclude: (reason?: string) => void
   translation: TranslationInfo | null
   onTranslate: () => Promise<void>
 }) {
@@ -127,7 +128,22 @@ export function DetailPane({
                 </button>
               )}
               <div className="ml-auto flex gap-2">
-                <Button variant="outline" disabled={!item} onClick={onExclude}>{item?.decision === "rejected" ? "取消排除" : "排除"}</Button>
+                {item?.decision === "rejected" ? (
+                  <Button variant="outline" onClick={() => onExclude()}>取消排除</Button>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" disabled={!item}>排除</Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      {REJECT_REASONS.map((r) => (
+                        <DropdownMenuItem key={r} onSelect={() => onExclude(r)}>{r}</DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => onExclude()}>不写理由</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
                 <Button className="min-w-28" disabled={!item} variant={item?.decision === "selected" ? "outline" : "default"} onClick={onSelect}>
                   {item?.decision === "selected" ? "移出下载" : "加入下载"}
                 </Button>

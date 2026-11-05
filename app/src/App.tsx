@@ -284,9 +284,9 @@ export default function App() {
     api.decide(sid, paper, paper.item.decision === "selected" ? null : "selected").then(reload)
       .catch((e) => setError(errorMessage(e)))
   }, [sid, paper, reload])
-  const exclude = React.useCallback(() => {
+  const exclude = React.useCallback((reason?: string) => {
     if (!sid || !paper?.item) return
-    api.decide(sid, paper, paper.item.decision === "rejected" ? null : "rejected").then(reload)
+    api.decide(sid, paper, paper.item.decision === "rejected" ? null : "rejected", reason).then(reload)
       .catch((e) => setError(errorMessage(e)))
   }, [sid, paper, reload])
 

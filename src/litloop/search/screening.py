@@ -249,7 +249,8 @@ def prisma(session: str) -> dict[str, Any]:
     low = [it for it in items if it.get("decision") is None and _rating(it) in ("低", "不相关")]
     reasons: dict[str, int] = {}
     for it in rejected + low:
-        text = " ".join(str(it.get("reason") or "").split())[:120]
+        # The user's own reason outranks the agent's when they gave one.
+        text = " ".join(str(it.get("reject_reason") or it.get("reason") or "").split())[:120]
         if text:
             reasons[text] = reasons.get(text, 0) + 1
     return {

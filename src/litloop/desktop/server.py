@@ -149,6 +149,7 @@ class Decision(BaseModel):
     doi: str | None = None
     title: str | None = None
     decision: str | None = None  # "selected", "rejected" or None
+    reason: str | None = None  # why, when rejecting; optional
 
 
 _OPENALEX: dict[str, Any] = {"at": 0.0, "data": None}  # see /api/quota/openalex
@@ -400,6 +401,11 @@ def create_app(token: str) -> FastAPI:
         with store.update(_record_path(session), indent=2) as data:
             item = _find(data["items"], body.doi, body.title)
             item["decision"] = body.decision
+            reason = " ".join((body.reason or "").split())[:60]
+            if body.decision == "rejected" and reason:
+                item["reject_reason"] = reason
+            else:  # a pick, an un-pick, or "no reason": the old one must not linger
+                item.pop("reject_reason", None)
         return {"item": item}
 
     @app.get("/api/glossary")
