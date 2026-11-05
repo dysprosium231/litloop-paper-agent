@@ -12,7 +12,7 @@
 
 - run `42012227521`（tag `v1.18.1`）在「Stage the runtime and build the installer」失败：`ImportError: No module named 'numpy._core._multiarray_umath'`，numpy 报「`_multiarray_umath.cp313-win_amd64.pyd` 与 python cpython-314 不兼容」。原因是 CI 的 `setup-python` 用 3.13 跑 `pip install --target build/runtime/...`，`--target` 不改变解释器，于是把 cp313 的 wheel 铺进了 3.14 的嵌入式运行时；本机是 3.14，所以一直没暴露。
 - 改法：装配脚本先把 `uv.exe` 放进运行时，再用 `uv pip install --python build/runtime/python.exe --target ...` 按**嵌入式解释器**解析依赖（`UV_CACHE_DIR` 指到 `build/cache/uv`，默认的 `~/.cache/uv` 在某些机器上不可写，实测本机 `D:\Echo\.cache\uv\.lock` 拒绝访问）；没装 uv 时退回 pip，但显式给 `--only-binary :all: --platform win_amd64 --implementation cp --python-version 3.14`。
-- 验证：本机两条分支都跑通，运行时 283 MB（uv）/ 292 MB（pip），`verify()` 导入 litloop、pymupdf、pymupdf4llm、fastapi、mcp 正常。tag `v1.18.1` 删掉重打，等流水线重跑。
+- 验证：本机两条分支都跑通，运行时 283 MB（uv）/ 292 MB（pip），`verify()` 导入 litloop、pymupdf、pymupdf4llm、fastapi、mcp 正常。已经发出去的 tag 不能直接改，于是把版本升到 **1.18.2**、重新打 tag `v1.18.2`，让流水线对着修好的脚本再跑一遍。
 
 ## 2026-11-05：远程协助页面一直打不开（已修）
 
