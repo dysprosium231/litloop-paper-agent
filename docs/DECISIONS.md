@@ -8,6 +8,13 @@
 - 写 `tests/test_cli_commands.py`（14 个：学校类型标签、DOI 文件、版本元组、cloakbrowser 版本检查三种结果、`_apply_school_config` 清另一通道、`_access_url`、机构名解析与自动提示、路径状态）时发现 `_parse_version_tuple("1.2.3b1")` 得 `(1, 2, 31)`：它把 token 里的所有数字都拼起来，`3b1` 变成 31，于是预发布版看起来比正式版新，`doctor` 的 cloakbrowser 版本下限检查会漏报。
 - 改法：只取 token 开头的连续数字，`3b1` → 3，`b1` → 0。影响面仅限 `CLOAKBROWSER_RECOMMENDED_MIN` 的比较。
 
+## 2026-11-05：第一个正式 Release 发出去了（v1.18.2）
+
+- tag `v1.18.2` 触发 `release.yml`（run `42013235542`），整条流水线约 20 分钟跑完：npm 构建、装配嵌入式运行时、Tauri release 编译、写 SHA256SUMS、发 Release。
+- 产物：`LitLoop_1.18.2_x64-setup.exe`（106,757,379 字节 = 101.8 MiB）与 `SHA256SUMS.txt`（96 字节），挂在 https://github.com/dysprosium231/litloop-paper-agent/releases/tag/v1.18.2 ，`draft=false`。
+- 第一次 tag `v1.18.1` 失败的原因已单列一条（依赖装错解释器），修好后没有改历史 tag，而是把版本升到 1.18.2 重发——已经推上去的 tag 不删。
+- 两份 README 的「安装与启动」改成先给下载链接（约 102 MiB、未签名要过 SmartScreen），体积数字从 110 MiB 更正为实测值。
+
 ## 2026-11-05：发布流水线第一次失败——运行时装进了 3.13 的轮子（已修）
 
 - run `42012227521`（tag `v1.18.1`）在「Stage the runtime and build the installer」失败：`ImportError: No module named 'numpy._core._multiarray_umath'`，numpy 报「`_multiarray_umath.cp313-win_amd64.pyd` 与 python cpython-314 不兼容」。原因是 CI 的 `setup-python` 用 3.13 跑 `pip install --target build/runtime/...`，`--target` 不改变解释器，于是把 cp313 的 wheel 铺进了 3.14 的嵌入式运行时；本机是 3.14，所以一直没暴露。

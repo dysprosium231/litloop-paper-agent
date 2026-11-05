@@ -135,7 +135,9 @@
 
 ## 安装与启动
 
-桌面 app 可以从源码运行，也可以自己打安装包。从源码运行需要：Python 3.11+、Git、Node.js、Rust（Windows 上用 MSVC 工具链）。
+桌面 app 可以直接下载安装包，也可以从源码运行，或自己打一个。**最新安装包：[Releases](https://github.com/dysprosium231/litloop-paper-agent/releases/latest)**（`LitLoop_1.18.2_x64-setup.exe`，约 102 MB，自带 Python 运行时；未签名，首次运行需要过 SmartScreen「更多信息 → 仍要运行」）。
+
+从源码运行需要：Python 3.11+、Git、Node.js、Rust（Windows 上用 MSVC 工具链）。
 
 1. **装 Python 后台。** 最省事的办法是对 Claude Code、Codex 或 ZCode 里的 Agent 说：
 
@@ -162,7 +164,7 @@
 python scripts/build_release.py --bundle
 ```
 
-先装配嵌入式 Python 运行时（`build/runtime`：官方 embeddable 发行版 + 核心依赖 + `uv.exe`），再调用 `npm run tauri build`。产物在 `app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`，约 110 MiB，自带 Python 和依赖，目标机器不用装任何东西。
+先装配嵌入式 Python 运行时（`build/runtime`：官方 embeddable 发行版 + 核心依赖 + `uv.exe`），再调用 `npm run tauri build`。产物在 `app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`，约 102 MiB（1.18.2 实测 101.8 MiB），自带 Python 和依赖，目标机器不用装任何东西。
 
 - 安装需要管理员权限（`installMode: both`）。
 - 安装包**没有签名**：Windows 会先弹 SmartScreen「已阻止不认识的应用」，点「更多信息 → 仍要运行」；有的公司电脑策略不允许，需要放行。
@@ -241,7 +243,7 @@ MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、�
 | 深度检索 | 多组检索词 + 共同引用建池，分批筛选，按评分持续重新排序，高相关文章自动滚雪球 |
 | 下载 | 开放获取、出版商官网、学校通道依次尝试；WebVPN、CARSI、EZProxy；文件名带 DOI，不会把一篇论文的 PDF 当成另一篇；只拿到预印本时文件名加 `_preprint` |
 | Zotero | 本地写入，几秒一篇；检查附件是不是空的 |
-| 桌面 app | 筛选、下载、Zotero、设置与额度、内置 Agent、追踪已能用；安装包能自己打（约 110 MiB，自带 Python 运行时）；还差自动更新和签名 |
+| 桌面 app | 筛选、下载、Zotero、设置与额度、内置 Agent、追踪已能用；安装包能自己打，也发了第一个 Release（约 102 MiB，自带 Python 运行时）；还差自动更新和签名 |
 
 ### 已知限制
 

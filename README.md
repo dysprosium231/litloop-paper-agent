@@ -136,7 +136,9 @@ Publisher and institutional configuration, proxy setup and troubleshooting are i
 
 ## Install and run
 
-You can run the app from source, or build your own installer. Running from source needs Python 3.11+, Git, Node.js and Rust (the MSVC toolchain on Windows).
+You can install the desktop app from a download, run it from source, or build your own installer. **Latest installer: [Releases](https://github.com/dysprosium231/litloop-paper-agent/releases/latest)** (`LitLoop_1.18.2_x64-setup.exe`, about 102 MB, ships its own Python runtime; it is not signed, so the first run has to get past SmartScreen via "More info → Run anyway").
+
+Running from source needs Python 3.11+, Git, Node.js and Rust (the MSVC toolchain on Windows).
 
 1. **Install the Python side.** The easiest way is to tell an agent in Claude Code, Codex or ZCode:
 
@@ -163,7 +165,7 @@ You can run the app from source, or build your own installer. Running from sourc
 python scripts/build_release.py --bundle
 ```
 
-It first stages an embedded Python runtime in `build/runtime` (the official embeddable distribution, the core dependencies and `uv.exe`), then calls `npm run tauri build`. The result is `app/src-tauri/target/release/bundle/nsis/LitLoop_<version>_x64-setup.exe`, about 110 MiB, with Python and the dependencies inside — the target machine needs nothing installed.
+It first stages an embedded Python runtime in `build/runtime` (the official embeddable distribution, the core dependencies and `uv.exe`), then calls `npm run tauri build`. The result is `app/src-tauri/target/release/bundle/nsis/LitLoop_<version>_x64-setup.exe`, about 102 MiB (101.8 MiB for 1.18.2), with Python and the dependencies inside — the target machine needs nothing installed.
 
 - Installing needs administrator rights (`installMode: both`).
 - The installer is **unsigned**: Windows shows the SmartScreen "unrecognised app" prompt, where you click "More info → Run anyway"; some company machines block this by policy.
@@ -242,7 +244,7 @@ Run end to end on a real topic (precursor-derived SiBCN ceramics for insulation 
 | Deep search | Multiple query variants plus co-citation build the pool, batch screening, re-ranking from your scores, high-relevance papers snowball |
 | Download | Open access, publisher sites, campus routes in turn; WebVPN, CARSI, EZProxy; DOI in the file name, one paper per file; preprints are marked `_preprint` |
 | Zotero | Local writing, a few seconds per paper; checks for empty attachments |
-| Desktop app | Screening, downloads, Zotero, settings and quota, built-in agent and watched searches all work; you can build the installer (about 110 MiB, Python runtime included); auto-update and code signing are still missing |
+| Desktop app | Screening, downloads, Zotero, settings and quota, built-in agent and watched searches all work; you can build the installer and the first release is out (about 102 MiB, Python runtime included); auto-update and code signing are still missing |
 
 ### Known limits
 

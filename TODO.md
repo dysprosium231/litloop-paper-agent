@@ -123,7 +123,7 @@
 
 - [x] 补仓库元信息：description 与 16 个 topics 已于 2026-11-05 用 `gh repo edit` 设好（「学术文献 Agent：检索 → 筛选 → 下载（校园网 / CARSI / WebVPN）→ Zotero 归档 | 21 MCP tools for Claude, Cursor and Codex」）。社交预览图还没做。
 - [x] 英文 `README.md` + 中文 `README.zh-CN.md`，两份顶部互相链接（2026-11-05）。
-- [~] 打第一个正式 Release：`.github/workflows/release.yml` 已写（tag `v*` 触发、校验 tag 与版本、生成 SHA256SUMS、上传 exe；手动触发只出 artifact）。版本号已到 **1.18.2**（7 个版本来源 + `server.json`）。2026-11-05 首次 tag `v1.18.1` 的流水线失败，原因是 CI 用 3.13 的 pip 往 3.14 的嵌入式运行时里装依赖（numpy cp313 轮子），已改成先用 uv 按嵌入式解释器装（见 DECISIONS）；`v1.18.2` 的 tag 已推送，流水线在队列里，等它出 `LitLoop_1.18.2_x64-setup.exe` 与 SHA256SUMS。不想等队列时可本机 `python scripts/build_release.py --bundle` + `gh release create v1.18.2` 手动发。
+- [x] 打第一个正式 Release（2026-11-05）：tag `v1.18.2` 跑通 `release.yml`，发布 [v1.18.2](https://github.com/dysprosium231/litloop-paper-agent/releases/tag/v1.18.2)，产物 `LitLoop_1.18.2_x64-setup.exe`（106,757,379 字节 = 101.8 MiB）与 `SHA256SUMS.txt`。第一次 tag `v1.18.1` 失败是 CI 用 3.13 的 pip 往 3.14 的嵌入式运行时装依赖（numpy cp313 轮子），改成先用 uv 按嵌入式解释器装后通过（见 DECISIONS）。后续发版只需打 tag。
 - [~] 发上 PyPI（`pip install litloop`）：`pyproject.toml` 补了 keywords 与 11 条 classifiers；`python -m build` 出 sdist 818 KB + wheel 707 KB（170 个文件），`twine check` 都 PASSED，装进临时目录后 `import litloop` 与 `litloop.agents.TOOLS` 正常；`server.json` 已按官方注册表格式写好并纳入一致性检查。**只剩上传**：需要用户的 PyPI API token。
 - [ ] 90 秒演示 GIF 放 README 顶部（一句话 → 30 篇 → 下载 → Zotero），替换现在 4 张静态截图的位置。
 
