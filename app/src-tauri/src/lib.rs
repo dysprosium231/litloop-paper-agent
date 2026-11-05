@@ -5,7 +5,7 @@ use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 
-use tauri::{Manager, RunEvent};
+use tauri::{Emitter, Manager, RunEvent};
 
 #[derive(Clone, serde::Serialize)]
 struct BackendInfo {
@@ -95,6 +95,17 @@ fn start_backend() -> (Result<BackendInfo, String>, Option<Child>) {
 pub fn run() {
     let (info, child) = start_backend();
     let app = tauri::Builder::default()
+        // Registered first: a link clicked while LitLoop is open must reach the
+        // running window instead of starting a second copy.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            for arg in argv.iter().filter(|a| a.starts_with("litloop://")) {
+                let _ = app.emit("litloop-url", arg.clone());
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())

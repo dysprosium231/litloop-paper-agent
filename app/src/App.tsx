@@ -16,6 +16,7 @@ import { SearchPage } from "@/components/search-view"
 import { ProgressStrip } from "@/components/progress-strip"
 import { useSystemNotices } from "@/hooks/use-system-notices"
 import { onOpenUrl } from "@tauri-apps/plugin-deep-link"
+import { listen as tauriListen } from "@tauri-apps/api/event"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import {
   DropdownMenu,
@@ -176,23 +177,27 @@ export default function App() {
   }, [])
   // litloop://session/<id> — an agent, a note or a web page can open one
   // screening session directly instead of asking the user to find it.
-  React.useEffect(() => {
-    let stop: (() => void) | undefined
-    onOpenUrl((urls) => {
-      for (const url of urls) {
-        const hit = /^litloop:\/\/session\/([^/?#]+)/.exec(url)
-        if (!hit) continue
-        setSid(decodeURIComponent(hit[1]))
-        setSection("screen")
-        setHistory(true)
-        setNewSearch(false)
-        setGlossary(false)
-      }
-    })
-      .then((unlisten) => { stop = unlisten })
-      .catch(() => {})  // not running under Tauri (vite preview), nothing to listen to
-    return () => stop?.()
+  const openLink = React.useCallback((url: string) => {
+    const hit = /^litloop:\/\/session\/([^/?#]+)/.exec(url)
+    if (!hit) return
+    setSid(decodeURIComponent(hit[1]))
+    setSection("screen")
+    setHistory(true)
+    setNewSearch(false)
+    setGlossary(false)
   }, [])
+  React.useEffect(() => {
+    const stops: (() => void)[] = []
+    onOpenUrl((urls) => urls.forEach(openLink))
+      .then((unlisten) => stops.push(unlisten))
+      .catch(() => {})  // not running under Tauri (vite preview), nothing to listen to
+    // A link clicked while the app is open comes through the single-instance
+    // plugin as an event instead of a fresh launch.
+    tauriListen<string>("litloop-url", (event) => openLink(event.payload))
+      .then((unlisten) => stops.push(unlisten))
+      .catch(() => {})
+    return () => stops.forEach((stop) => stop())
+  }, [openLink])
   const openGuide = React.useCallback(() => {
     settingsApi.onboarding().then((o) => setGuide(o.steps)).catch((e) => setError(errorMessage(e)))
   }, [])

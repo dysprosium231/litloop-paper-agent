@@ -97,7 +97,7 @@
   - 卸载时问是否保留 `~/.litloop`；README 写 SmartScreen 提示怎么继续；
   - 在干净的 Windows 上验收（另找一台电脑或虚拟机）。
 - [x] 完成通知：一轮深度检索跑完（agent 或 app 发起）发一次系统通知，见 DECISIONS「深度检索一轮跑完发通知」。
-- [~] 深度链接（2026-11-05）：`litloop://session/<会话 id>` 打开 app 并跳到该会话的筛选页。插件 `tauri-plugin-deep-link` 注册了 `litloop` 协议（安装时写注册表），前端用 `onOpenUrl` 解析。**还差**：①实测（装一次安装包、点链接）；②已经开着 app 时点链接会再开一个实例，要加 `tauri-plugin-single-instance` 把 URL 转发给现有窗口；③Agent 的提示词/技能文档里还没告诉 Agent 可以给这个链接。
+- [~] 深度链接（2026-11-05）：`litloop://session/<会话 id>` 打开 app 并跳到该会话的筛选页。插件 `tauri-plugin-deep-link` 注册了 `litloop` 协议（安装时写注册表），前端用 `onOpenUrl` 解析。已经开着 app 时点链接会由 `tauri-plugin-single-instance` 转发给现有窗口（事件 `litloop-url`）。**还差**：①实测（装一次安装包、点链接）；②Agent 的提示词/技能文档里还没告诉 Agent 可以给这个链接。
 
 ### 测试
 - [~] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；2026-11-05 又补 `bib_import`、`bibtex_crossref`、`http_utils`、`europepmc`、`oa_discovery`、`models`、`pdf_extractor`、`profile_health`、`remote_assist`、`camofox_api`、`cloakbrowser_compat`、`cli/commands` 的辅助函数。顺手修了四个真 bug（citekey 撞键、`to_text` 多空行、PDF 段落分隔被拼掉、远程协助页面 500）。还剩 `extractors/` 与 `desktop/` 的一些分支。
