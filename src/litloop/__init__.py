@@ -53,7 +53,7 @@ try:
 except Exception:  # a broken component folder must not stop LitLoop from starting
     pass
 
-__version__ = "1.18.1"
+__version__ = "1.18.2"
 
 __all__ = [
     "__version__",

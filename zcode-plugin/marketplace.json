@@ -10,7 +10,7 @@
       "source": "./",
       "icon": "https://raw.githubusercontent.com/dysprosium231/litloop-paper-agent/main/zcode-plugin/icon.png",
       "description": "LitLoop 学术论文 Agent（衍生自 litloop）:大清单嗅探分类(sort)、单篇/批量下载、机构渠道(Elsevier API/WebVPN/CARSI)、检索发现、诊断排障。携带 litloop MCP server,即装即用。",
-      "version": "1.18.1",
+      "version": "1.18.2",
       "author": {
         "name": "dysprosium231"
       },
