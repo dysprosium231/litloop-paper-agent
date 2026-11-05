@@ -154,7 +154,7 @@ You can run the app from source, or build your own installer. Running from sourc
 
    The first Rust build takes a few minutes, later ones about half a minute before a window appears. The `LITLOOP_PYTHON` environment variable can point at a Python that has LitLoop installed. Development notes and restart scripts are in [app/README.md](app/README.md).
 
-3. **Walk through the first-run guide.** At minimum fill in an OpenAlex key and a contact email; to download subscription papers, pick your university under "Campus login".
+3. **Walk through the first-run guide.** At minimum fill in an OpenAlex key and a contact email; to download subscription papers, pick your university under "Campus login". Nothing has to be filled in to try it: with an empty config a quick search falls back to Crossref — a five-result query took five seconds when measured on 2026-11-05.
 
 ### Building an installer
 
