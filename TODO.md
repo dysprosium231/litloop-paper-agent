@@ -26,16 +26,24 @@
 | app：初次引导与设置 | ✅ | 后端 B 的模型配置随后端 B 做 |
 | app：术语表 | 🔶 | 待实测 7 |
 | app：下载队列与 Zotero | 🔶 | 待实测 1–5 |
-| 发布：标准 Windows 程序（安装包与自动更新） | ⬜ | 待办池「app」；做法已定（2026-10-26），模块整理完再开始 |
+| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | NSIS 安装包已随 v1.18.2 发布；还差 MSI 安装包（2026-11-05 用户定）、自动更新、诊断包、签名（暂不做）、干净机验收 |
 | 完整流程（真实课题从检索到 Zotero 不用手动补救） | 🔶 | 待办池「阶段 2 剩余」：深度检索 → 批量下载 → 推送 Zotero 连起来走一遍 |
 
 ## 正在做
 
-（无。代码整理 2026-10-26 做完，见 DECISIONS「模块按领域分子包」；下一步按路线图选，建议先和用户做一轮实测。）
+（无。2026-11-05 的缺口盘点已整理进本文档、CHARTER 与 DECISIONS；下一步等用户定：分析归纳的验收标准、深度检索的第三路候选、还是先补技术债。）
 
 ## 待用户决定
 
+- [ ] **要不要重议「不拆大文件」这条约定**（2026-11-05 提出）：`src/litloop/sources/__init__.py` 2112 行，预印本兜底、车道晚到文件、Sci-Hub 慢速镜像三处新逻辑这周都加在里面；抽出一个 `download/race.py` 的风险可控，但会动竞速与兜底的主干。`server.py` 与 `publishers/strategies/_core.py` 维持「不拆」。
 - [ ] 停止规则改成“连续 2 批才停”：SYNERGY 10 个综述上都更好（见 DECISIONS「SYNERGY 离线评测（第二批，共 10 个综述）」）。用户 2026-10-28 要求先在自己的 3 个材料测试集上重放看看；重放要花 OpenAlex 积分（每天 10,000），三个都已跑完。**三个材料集上“连续 2 批”都是多读 0 篇**：SiC/Al 现行规则 180 篇停、已找全 19 篇，多读 30 篇还是 19；PDC 现行规则 150 篇停（25/26），180 篇仍是 25/26；稀土现行规则 120 篇停（2/9），读到 150、180 篇仍是 2/9。建议不改（综述类样本上的收益没有在材料课题上复现），等用户定（见 DECISIONS「停止规则重放」三条）。
+- [ ] **「分析归纳」的验收标准**（CHARTER 里这条一直写「待定」，不先定就做不出可验收的东西）。我拟的最小版本，请用户确认或改：
+  1. 输入：一次检索里标为「高」并已下载 PDF 的文献（至少 10 篇，其中混 2 篇故意放进去的无关文献）。
+  2. 输出：一张 Markdown 表，每行一篇，列固定为「文献（作者年份）/ 材料体系 / 制备或表征方法 / 关键性能数字（带单位）/ 出处（页码或章节）/ 备注」；抽不到的格写「文中未见」，不猜。
+  3. 定量指标：数字类字段准确率 ≥90%（人工抽 30 格核对）；每篇至少有 3 格非「文中未见」；无关文献必须被标成「与本课题无关」。
+  4. 可追溯：每一格都能点回 PDF 的那一页；表能导出 Markdown/CSV。
+  5. 时间：30 篇 PDF 在 10 分钟内出表（本机，不含模型费用）；失败的 PDF 单独列出原因，不中断整批。
+  6. 不做：不写综述正文、不替人下结论（那是人的事，见 CHARTER 第一条原则）。
 
 ## 待实测（要用户配合）
 
@@ -76,10 +84,10 @@
 - [ ] 阶段 2 剩余：速度（下次真实检索看 `rounds` 里的 `abstracts_wait_seconds`，再定要不要做 OpenAlex 按参考文献缓存）；深度检索 → 批量下载 → 按分类推送 Zotero 走通一次。
 - [~] 类别多、彼此引用少的课题（评审 5）：建池时稀土测试集漏的 7 篇里 3 篇不在候选池；排序在这类综述上也弱（SYNERGY 的 Moran_2021 读 200 篇只找到 8%）。离线对比“每个子方向单写检索词”和“按类别配额出批”，看读到第 60 篇找到几篇目标。SYNERGY（`scripts/eval_synergy.py`）评不了建候选池和材料领域，这两项仍靠 `tests/acceptance/`。**按类别配额出批已排除**（2026-11-03，`scripts/replay_batching.py` 在 PDC 池上对比，现行 rank 全面更好，见 DECISIONS「离线回放分批策略」）；还剩“每个子方向单写检索词”，等稀土测试集跑完再看。
 - [ ] 停止规则校准（评审 8）：每轮已记下规则和估计（`stop_checks`），`scripts/stop_calibration.py` 汇总；SYNERGY 上可离线试（`eval_synergy.py run --knee/--patience`），攒够数据再改。
-- [~] 阶段 3：系统综述支持。已完成：`screening.prisma()` 的流程统计（命中/去重/纳入/排除/低相关未定 + 排除理由）、`GET /api/sessions/{id}/prisma`、历史记录展开时显示「检索流程」、`prisma_markdown()` 导出成 Markdown 表（「导出流程」按钮，2026-11-04）；排除时可选理由（「主题不相关」「不是研究文献」「材料或体系不符」「数据不可靠」「重复文献」或不写，2026-11-05，存在条目的 `reject_reason`，流程统计优先用它）。还差：中断后续跑。
-- [x] 阶段 4：定期追踪（2026-11-04～05）。`search/watches.py`（`~/.litloop/watches.json`，按 DOI/标题记已见文章）、`GET/POST /api/watches`、`POST /api/watches/{id}/check`（重跑检索式、只回没见过的）、`DELETE /api/watches/{id}`；历史页「追踪」卡片与每个会话展开区的「追踪这个检索式」按钮；`watches.check_due()` 与 `POST /api/watches/check-due`——app 打开时检查超过 `watch_check_days`（默认 7 天）的追踪并通知。2026-11-05 补上最后一块：检查后卡片里直接列出这次的新文献（标题、年份、期刊，前 20 条）并可以「加入下载」。还没实测（要真实检索额度）。
-- [ ] 中文文献（知网、万方）。
-- [ ] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。
+- [~] 阶段 3：系统综述支持。已完成：`screening.prisma()` 的流程统计（命中/去重/纳入/排除/低相关未定 + 排除理由）、`GET /api/sessions/{id}/prisma`、历史记录展开时显示「检索流程」、`prisma_markdown()` 导出成 Markdown 表（「导出流程」按钮，2026-11-04）；排除时可选理由（「主题不相关」「不是研究文献」「材料或体系不符」「数据不可靠」「重复文献」或不写，2026-11-05，存在条目的 `reject_reason`，流程统计优先用它）。还差（2026-11-05 盘点评）：**中断后续跑**（深度检索停在哪、下次接着读）、**双人筛选与一致性**（两份决策的 Cohen's κ、分歧清单）、**检索式与复现存档**（每次检索的检索词、日期、数据源版本写进会话，导出时带上），这三项凑齐才算「PRISMA 式」。前一项是实现问题，后两项要先定验收标准再动手。
+- [x] 阶段 4：定期追踪（2026-11-04～05）。`search/watches.py`（`~/.litloop/watches.json`，按 DOI/标题记已见文章）、`GET/POST /api/watches`、`POST /api/watches/{id}/check`（重跑检索式、只回没见过的）、`DELETE /api/watches/{id}`；历史页「追踪」卡片与每个会话展开区的「追踪这个检索式」按钮；`watches.check_due()` 与 `POST /api/watches/check-due`——app 打开时检查超过 `watch_check_days`（默认 7 天）的追踪并通知。2026-11-05 补上最后一块：检查后卡片里直接列出这次的新文献（标题、年份、期刊，前 20 条）并可以「加入下载」。还没实测（要真实检索额度）。**已知半闭环**：新文献只能直接进下载队列，不能并回原会话的筛选列表让人逐篇评分；自动检查只发生在打开 app 时。
+- [ ] 中文文献（知网、万方、维普，以及各校学位论文库）：现在只有 OpenAlex/Crossref 等英文源的覆盖，国内学位论文和中文期刊完全不在候选池，中文课题只能靠英文源的少量覆盖。要先解决「从哪拿、能不能拿」（大多没有开放 API，或要机构订阅），再谈取舍与去重。
+- [ ] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。**没有任何缓存**：同一课题反复查会重复付网络与额度，先做「同一天同检索式的结果缓存」是最省事的一档。
 
 ### app
 - [ ] 下次发版后删掉 `src/litloop/app_server.py`：模块整理时留下的唯一转发，给已装好、还在启动 `python -m litloop.app_server` 的桌面 app 用（15c08b2）；删时把 `scripts/import_smoke.py` 里的 `litloop.app_server` 和 LAYOUT.md 顶层那句一起去掉。
@@ -91,6 +99,8 @@
   - [x] 先摸底：核心依赖 **336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 跑起 `litloop.desktop.server`，合计约 **358 MB**（DECISIONS「发布摸底（2）」）；NSIS 安装包实测 **113.38 MiB**（DECISIONS「第一个 Windows 安装包」）。还剩：用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净 Windows 验收；
   - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时，Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出安装包；去掉版面分析后是 **99.59 MiB**（DECISIONS「第一个 Windows 安装包」「版面分析不进安装包」）。
   - [x] 按需组件：版面分析（`pymupdf-layout` + `onnxruntime` + `networkx`，约 65 MB）用 uv 装到 `~/.litloop/packages` 并加进 `sys.path`（2026-11-04，`src/litloop/optional.py`、设置页「可选组件」的「安装」按钮、`POST /api/components/{key}/install`、镜像配置 `package_index_url`；uv.exe 由 `scripts/build_release.py` 放进安装包；见 DECISIONS「版面分析改成按需安装」）。还没实测：在装了安装包的机器上点一次安装、看进度与失败提示；失败提示目前是 uv 输出末尾 15 行，没有百分比进度。
+  - [ ] **MSI 安装包**（2026-11-05 用户定）：`bundle.targets` 加 `msi`，安装时可选安装位置、按机器安装；同一份 `build/runtime` 复用，Release 里两个安装包一起给，`SHA256SUMS.txt` 覆盖两者；发版流程里两个包各装一遍、卸载一遍。
+  - [ ] **诊断包**：设置里「导出诊断包」（版本、系统信息、最近一次任务日志、脱敏后的设置；不含 PDF 与凭据），见 CHARTER「发布」。
   - NSIS `installMode: "both"`，图标、名称、开始菜单；系统通知显示 LitLoop 自己的名称和图标（用户 2026-10-23 要求；开发模式下借用的是 PowerShell 的）；
   - 按需下载都要有进度和失败提示；
   - 更新插件读 GitHub Releases，`passive` 模式；发版流程（打包、生成更新清单、上传）写成脚本；
@@ -103,8 +113,17 @@
 - [~] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；2026-11-05 又补 `bib_import`、`bibtex_crossref`、`http_utils`、`europepmc`、`oa_discovery`、`models`、`pdf_extractor`、`profile_health`、`remote_assist`、`camofox_api`、`cloakbrowser_compat`、`cli/commands` 的辅助函数。顺手修了四个真 bug（citekey 撞键、`to_text` 多空行、PDF 段落分隔被拼掉、远程协助页面 500）。还剩 `extractors/` 与 `desktop/` 的一些分支。
 
 ### 分析归纳
-- [ ] 从全文抽取要点、做对比表、起草综述（现成的 `extractors.extract_figures` 可抽图注）；app 的分析归纳页。
+- [ ] 先定验收标准再动手（草案在「待用户决定」），做到「表格级」可用（材料体系 / 方法 / 关键数字 / 出处页码），不写综述正文。
+- [ ] 从全文抽取要点、做对比表（现成的 `extractors.extract_figures` 可抽图注）；app 的分析归纳页。
   - 抽取性质数据考虑用 [ChemDataExtractor2](https://github.com/CambridgeMolecularEngineering/ChemDataExtractor2)（2026-10-25 用户提出；MIT，剑桥维护，能从材料与化学论文的正文和表格里抽化合物、性质数值、光谱）。它要求 Python ≤ 3.12、numpy < 2，依赖 transformers、stanza 等，几个 GB，和 LitLoop 的环境（Python 3.14、numpy 2）冲突：单独建一个环境，LitLoop 用子进程调用它（像 zotero-mcp 那样）。它的缩写识别没有用于术语表：600 篇材料摘要上实测不如 `abbreviations`（见 DECISIONS「术语表」）。
+
+### 工程债（2026-11-05 盘点，用户认可，先记账不动手）
+- [ ] **三个巨型文件**：`src/litloop/publishers/strategies/_core.py` 2873 行、`src/litloop/sources/__init__.py` 2112 行、`src/litloop/server.py` 1731 行。「不拆」是继承来的约定，但这周新逻辑仍在往里加（预印本兜底、车道晚到文件、Sci-Hub 慢速镜像全在 `sources/__init__.py`）。建议至少把竞速/兜底抽成 `download/race.py`，其余保持。
+- [ ] **数据层换 SQLite**：现在是 JSON + 文件锁，候选池 1600–3400 篇是几 MB 的整份读整份写，会议话越攒越大越慢；`store.SCHEMA` 只有版本号、没有迁移机制。先做「会话/候选池/决策/追踪」四张表，再补迁移。
+- [ ] **真实世界回归**：测试多但都打桩，下载链路（竞速、迟到落盘、慢镜像、预印本）只有真网络能验。做一组录制的真实响应（HTML + 状态码 + 小 PDF）在本地回放，再加一条「装好的 exe 起得来 + `/api/health` 通」的冒烟脚本。
+- [ ] **筛选页批量与撤销**：30 篇只能逐篇点；缺「按 Agent 理由批量接受/排除」、多选、撤销、列表内按年份/期刊过滤与搜索。
+- [ ] **错误提示补「下一步」**：文案已统一成「无法…：原因」，但下载失败后没给动作（去设置填学校 / 开代理 / 跳过这篇），只在日志里。
+- [ ] **体积与冷启动**：安装包 101.8 MiB、启动要起 Python 子进程；可做后端懒加载与首屏预热。
 
 ### 不做
 - 不重写下载引擎；不把排序换成大模型打分；没有测试集不调排序参数（2026-10-18 评审）。
