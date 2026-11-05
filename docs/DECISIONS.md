@@ -3,6 +3,14 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-05：`_core.py` 抽出 Elsevier 文章 API 一段（2873 → 2340 行）
+
+- 背景：`src/litloop/publishers/strategies/_core.py` 2873 行，是「不拆」约定里最大的一块；但它里面至少有一整段是**自成一体的**——ScienceDirect 的文章 API：发请求、解析 XML 附件、挑 PDF、落盘。这一段不碰浏览器、不碰 DOM、不依赖 `_core` 的模块级状态，正好是最安全的切口。
+- 做法：新增 `src/litloop/publishers/strategies/_elsevier_api.py`，原样搬走 `_elsevier_header` … `_try_elsevier_api` 共 18 个名字（`try_elsevier_api`、`_extract_elsevier_pdf_attachment_eids` 等）；`_core.py` 在原位置放一行 `from ._elsevier_api import (...)` 回导，**所有调用处不用改**（`sources/publishers.py`、策略注册表、测试都还从 `_core` 导入）。
+- 唯一的方向问题：这一段有三处调 `_persist_api_cookies`，它是 `_core` 里管 cookie 的。为避免循环导入，`_elsevier_api.py` 里放了一个同名薄包装，函数内 `from ._core import _persist_api_cookies` 再转发；两个模块之间因此没有模块级循环。
+- 验证：`196 passed, 1 skipped`（`-k "elsevier or publisher or fork_fixes or strategies"`）；`import litloop.publishers.strategies._core` 正常，`try_elsevier_api.__module__` 已是新模块；全量与一致性检查见提交前的运行结果。
+- 没动的部分：`_visible_browser_download`（约 400 行）、`_browser_download_with_fallback`、`_visible_browser` 以及与浏览器状态互相引用的那批函数仍留在 `_core.py`；各出版商的具体策略在 `publishers/strategies/<publisher>.py` 里（`_core` 里没有类），它们大量调用这些函数，切开的风险远大于收益，等有真实网络回归手段再说。
+
 ## 2026-11-05：安装包再加一个 MSI，并把诊断包写进发布要求
 
 - 用户 2026-11-05 定：除了 NSIS，再出一个标准的 MSI 安装包，让用户能选安装位置（NSIS 的 `installMode: "both"` 已经给「装给所有人 / 只装给自己」，但目录是固定的）。理由：企业/实验室部署习惯用 MSI，也方便以后进软件分发渠道。

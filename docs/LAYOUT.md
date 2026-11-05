@@ -9,7 +9,7 @@
 | `terms/` | 检索用词：归一化、英美拼写、术语表 | `text.py`、`spelling.py`、`glossary.py` |
 | `search/` | 检索与筛选 | `quick.py`（search.py）、`deep.py`（deep_search.py）、`scansci_find.py`（discovery.py）、`abstracts.py`、`title_to_doi.py`（resolver.py）、`screening.py`、`watches.py`（定期追踪） |
 | `download/` | 下载流程 | `fetcher.py`、`pipeline.py`、`pdf.py`（pdf_utils.py）、`rename.py`、`doi_check.py`、`progress.py`（progress_reporter.py）、`markdown.py`（md_export.py） |
-| `publishers/` | 出版商 | `profiles.py`（publisher_profiles.py）、`access.py`（publisher_access.py）、`pdf_router.py`（publisher_pdf_router.py）、`supplementary.py`、`strategies/`（publisher_strategies/，其中 `_core.py` 原为 _publisher_strategies_core.py） |
+| `publishers/` | 出版商 | `profiles.py`（publisher_profiles.py）、`access.py`（publisher_access.py）、`pdf_router.py`（publisher_pdf_router.py）、`supplementary.py`、`strategies/`（publisher_strategies/，其中 `_core.py` 原为 _publisher_strategies_core.py；`_elsevier_api.py` 是 2026-11-05 从 `_core.py` 抽出的 ScienceDirect 文章 API 一段，`_core.py` 仍回导它的名字，调用处不用改） |
 | `browser/` | 浏览器 | `backend.py`、`engine.py`、`login.py`、`cookies.py`、`pdf.py`、`runtime.py`（browser_discovery.py）、`chrome_copy.py`、`profile_health.py`、`camofox_api.py`（camofox.py，云端 API 客户端）、`cloakbrowser_compat.py`（合并了顶层和 institutional/ 下的两份） |
 | `institutional/` | 学校认证 | `auth.py`、`schools.py`、`session_heal.py`、`session_store.py`、`remote_assist.py`、`proxy_check.py`、`carsi_login.py`（sources/carsi.py）、`config_adapter.py` |
 | `sources/` | 下载来源 | 各来源；`carsi.py`（原 carsi_source.py）、`elsevier_check.py`、`scihub_domains.py`（domain_db.py） |

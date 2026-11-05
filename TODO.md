@@ -118,7 +118,7 @@
   - 抽取性质数据考虑用 [ChemDataExtractor2](https://github.com/CambridgeMolecularEngineering/ChemDataExtractor2)（2026-10-25 用户提出；MIT，剑桥维护，能从材料与化学论文的正文和表格里抽化合物、性质数值、光谱）。它要求 Python ≤ 3.12、numpy < 2，依赖 transformers、stanza 等，几个 GB，和 LitLoop 的环境（Python 3.14、numpy 2）冲突：单独建一个环境，LitLoop 用子进程调用它（像 zotero-mcp 那样）。它的缩写识别没有用于术语表：600 篇材料摘要上实测不如 `abbreviations`（见 DECISIONS「术语表」）。
 
 ### 工程债（2026-11-05 盘点，用户认可，先记账不动手）
-- [ ] **三个巨型文件**：`src/litloop/publishers/strategies/_core.py` 2873 行、`src/litloop/sources/__init__.py` 2112 行、`src/litloop/server.py` 1731 行。「不拆」是继承来的约定，但这周新逻辑仍在往里加（预印本兜底、车道晚到文件、Sci-Hub 慢速镜像全在 `sources/__init__.py`）。建议至少把竞速/兜底抽成 `download/race.py`，其余保持。
+- [~] **三个巨型文件**：`src/litloop/publishers/strategies/_core.py`（2873 → **2340** 行，2026-11-05 抽出 `_elsevier_api.py`，见 DECISIONS）、`src/litloop/sources/__init__.py` 2112 行、`src/litloop/server.py` 1731 行。「不拆」是继承来的约定，但新逻辑仍在往里加（预印本兜底、车道晚到文件、Sci-Hub 慢速镜像全在 `sources/__init__.py`）。建议至少把竞速/兜底抽成 `download/race.py`，其余保持。
 - [ ] **数据层换 SQLite**：现在是 JSON + 文件锁，候选池 1600–3400 篇是几 MB 的整份读整份写，会议话越攒越大越慢；`store.SCHEMA` 只有版本号、没有迁移机制。先做「会话/候选池/决策/追踪」四张表，再补迁移。
 - [ ] **真实世界回归**：测试多但都打桩，下载链路（竞速、迟到落盘、慢镜像、预印本）只有真网络能验。做一组录制的真实响应（HTML + 状态码 + 小 PDF）在本地回放，再加一条「装好的 exe 起得来 + `/api/health` 通」的冒烟脚本。
 - [ ] **筛选页批量与撤销**：30 篇只能逐篇点；缺「按 Agent 理由批量接受/排除」、多选、撤销、列表内按年份/期刊过滤与搜索。
