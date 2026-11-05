@@ -203,6 +203,8 @@ LitLoop 同时是一个 MCP 服务器（21 个工具）和命令行工具。装�
 
 app 和 Agent 用的是同一份数据：Agent 存下的评分在 app 里看得到，你在 app 里改的评分和选择 Agent 也看得到（格式见 [docs/APP_DATA.md](docs/APP_DATA.md)）。
 
+Agent 还可以把会话链接给你：`litloop://session/<会话 id>`。点开直接跳到那次筛选，app 没开就打开它，已经开着就把链接送到当前窗口。
+
 命令行：
 
 ```bash

@@ -204,6 +204,8 @@ This download failed, help me diagnose it
 
 The app and the agent share one store: scores the agent saved show up in the app, and changes you make in the app are visible to the agent (format in [docs/APP_DATA.md](docs/APP_DATA.md)).
 
+The agent can also hand you a session link: `litloop://session/<session id>`. Opening it jumps straight to that screening — starting the app if needed, or handing the link to the window that is already open.
+
 Command line:
 
 ```bash
