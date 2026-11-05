@@ -168,7 +168,7 @@ litloop 是一个 MCP 服务器，提供 **21 个高层工具**，覆盖学术�
    - **拿不准时往高评**：漏掉一篇相关文章的代价比多读一篇大得多。只有标题、但标题明确符合时也可以评高，理由里注明“仅凭标题”。
    - 用户定过的判定规则（如“某某路线算目标”）优先于上面的通用规则，并前后一致地用在所有批次上。
 4. **保存**：`litloop_screening(action="save", question=..., criteria=[...], query=..., mode="quick"|"deep", items=[{doi, title, year, journal, journal_rank, cited_by_count, abstract_missing, retracted, concern, relevance, reason}, ...])`。同一课题的后续检索传 `session=` 合并进同一会话。
-5. **呈现**：中文表格，列为 序号、相关度、文章、年份、期刊/分区、理由。**序号和顺序一律用 save 返回的 `numbering`**（保存时会按相关度重排），不要用自己发送时的顺序。`retracted` 标“⚠已撤稿”，`concern` 标“⚠关注声明”，`journal_warning` 标“⚠预警期刊”。不相关的文章也列出（可折叠在最后），**不替用户删除任何文章**。附上会话的 Markdown 文件路径。
+5. **呈现**：中文表格，列为 序号、相关度、文章、年份、期刊/分区、理由。 装了 app 的话，可以把会话链接给用户：`litloop://session/<session>`，点开直接跳到这次筛选（和表格一起给）。**序号和顺序一律用 save 返回的 `numbering`**（保存时会按相关度重排），不要用自己发送时的顺序。`retracted` 标“⚠已撤稿”，`concern` 标“⚠关注声明”，`journal_warning` 标“⚠预警期刊”。不相关的文章也列出（可折叠在最后），**不替用户删除任何文章**。附上会话的 Markdown 文件路径。
 6. **用户选择**：用户说“要 1、3、5”后调用 `litloop_screening(action="decide", session=..., selected=[...], rejected=[...], out_file=...)` 记录。每次 decide 记录的是**完整选择**，会覆盖上一次；用户追加或改选时传入全部选中项。把返回的 `chosen` 列表（序号 + 标题）念给用户核对，再按需要下载（`litloop_batch_download`）或推送 Zotero。
 
 ### 深度检索（要把一个课题查全时）

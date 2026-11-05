@@ -14,7 +14,8 @@
 - 做法：Tauri 的 `tauri-plugin-deep-link`（`app/src-tauri/Cargo.toml`、`lib.rs` 里 `.plugin(tauri_plugin_deep_link::init())`、`capabilities/default.json` 加 `deep-link:default`），协议名在 `tauri.conf.json` 的 `plugins.deep-link.desktop.schemes = ["litloop"]`，安装包会在安装时写注册表。前端 `app/src/App.tsx` 用 `onOpenUrl` 监听，正则 `/^litloop:\/\/session\/([^/?#]+)/` 取会话 id，然后 `setSid` + `setSection("screen")` + `setHistory(true)`；不在 Tauri 里（vite preview）时 `onOpenUrl` 被拒绝，静默忽略。
 - 为什么只支持「打开会话」一种：这是唯一有稳定 id、用户会想直接跳过去的东西；检索词、下载任务都还要先决定用哪个后端，先不做。
 - 开着 app 时点链接：`tauri-plugin-single-instance` 必须最先注册，它把带 `litloop://` 的命令行参数以 `litloop-url` 事件发给现有窗口（顺带取消最小化并抢焦点），前端同一个 `openLink()` 处理两种来源。
-- 还没做：安装包实测；技能文档还没告诉 Agent 可以给这个链接。
+- 技能文档（`skills-src/shared/screening.md` 第 5 步）告诉 Agent 把 `litloop://session/<session>` 和表格一起给用户，`scripts/build_skills.py` 重新生成。
+- 还没做：安装包实测（要装一次、点一次链接）。
 
 ## 2026-11-05：第一个正式 Release 发出去了（v1.18.2）
 
