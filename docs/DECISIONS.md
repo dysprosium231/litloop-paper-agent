@@ -8,6 +8,13 @@
 - 写 `tests/test_cli_commands.py`（14 个：学校类型标签、DOI 文件、版本元组、cloakbrowser 版本检查三种结果、`_apply_school_config` 清另一通道、`_access_url`、机构名解析与自动提示、路径状态）时发现 `_parse_version_tuple("1.2.3b1")` 得 `(1, 2, 31)`：它把 token 里的所有数字都拼起来，`3b1` 变成 31，于是预发布版看起来比正式版新，`doctor` 的 cloakbrowser 版本下限检查会漏报。
 - 改法：只取 token 开头的连续数字，`3b1` → 3，`b1` → 0。影响面仅限 `CLOAKBROWSER_RECOMMENDED_MIN` 的比较。
 
+## 2026-11-05：`litloop://session/<id>` 直接打开某个筛选会话
+
+- 目标：Agent 在对话里可以给一条链接（或用户把链接存进笔记），点开就跳到对应的筛选会话，不用在「历史」里翻。
+- 做法：Tauri 的 `tauri-plugin-deep-link`（`app/src-tauri/Cargo.toml`、`lib.rs` 里 `.plugin(tauri_plugin_deep_link::init())`、`capabilities/default.json` 加 `deep-link:default`），协议名在 `tauri.conf.json` 的 `plugins.deep-link.desktop.schemes = ["litloop"]`，安装包会在安装时写注册表。前端 `app/src/App.tsx` 用 `onOpenUrl` 监听，正则 `/^litloop:\/\/session\/([^/?#]+)/` 取会话 id，然后 `setSid` + `setSection("screen")` + `setHistory(true)`；不在 Tauri 里（vite preview）时 `onOpenUrl` 被拒绝，静默忽略。
+- 为什么只支持「打开会话」一种：这是唯一有稳定 id、用户会想直接跳过去的东西；检索词、下载任务都还要先决定用哪个后端，先不做。
+- 还没做：已经开着 app 时点链接会再开一个实例（要 `tauri-plugin-single-instance` 转发 URL）；技能文档还没告诉 Agent 可以给这个链接。
+
 ## 2026-11-05：第一个正式 Release 发出去了（v1.18.2）
 
 - tag `v1.18.2` 触发 `release.yml`（run `42013235542`），整条流水线约 20 分钟跑完：npm 构建、装配嵌入式运行时、Tauri release 编译、写 SHA256SUMS、发 Release。

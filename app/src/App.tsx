@@ -15,6 +15,7 @@ import { HistoryPage } from "@/components/history-view"
 import { SearchPage } from "@/components/search-view"
 import { ProgressStrip } from "@/components/progress-strip"
 import { useSystemNotices } from "@/hooks/use-system-notices"
+import { onOpenUrl } from "@tauri-apps/plugin-deep-link"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import {
   DropdownMenu,
@@ -172,6 +173,25 @@ export default function App() {
   const [guide, setGuide] = React.useState<{ group: string; intro: string }[] | null>(null)
   React.useEffect(() => {
     settingsApi.onboarding().then((o) => { if (!o.done) setGuide(o.steps) }).catch(() => {})
+  }, [])
+  // litloop://session/<id> — an agent, a note or a web page can open one
+  // screening session directly instead of asking the user to find it.
+  React.useEffect(() => {
+    let stop: (() => void) | undefined
+    onOpenUrl((urls) => {
+      for (const url of urls) {
+        const hit = /^litloop:\/\/session\/([^/?#]+)/.exec(url)
+        if (!hit) continue
+        setSid(decodeURIComponent(hit[1]))
+        setSection("screen")
+        setHistory(true)
+        setNewSearch(false)
+        setGlossary(false)
+      }
+    })
+      .then((unlisten) => { stop = unlisten })
+      .catch(() => {})  // not running under Tauri (vite preview), nothing to listen to
+    return () => stop?.()
   }, [])
   const openGuide = React.useCallback(() => {
     settingsApi.onboarding().then((o) => setGuide(o.steps)).catch((e) => setError(errorMessage(e)))
