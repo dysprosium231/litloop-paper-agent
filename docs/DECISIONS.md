@@ -3,6 +3,17 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-05：数据模型有了测试，顺手去掉一处多余空行
+
+- `models.py`（266 行）是 Agent 看到的两种结果形状（`Paper`、`FetchResult`），一直没有测试。
+- `tests/test_models.py` 12 个：JSON 往返、未知字段被丢掉、Markdown 只写有值的字段、`to_text` 只含标题摘要正文、`_content_quality` 的五种值、`FetchResult.from_paper` 的五条分支（成功 / 只有 PDF / 没配学校 / 配了学校要登录 / 摘要或短文本）、尝试记录与下一步动作的序列化。
+- 顺带修的 bug：`FetchResult.to_text()` 在非成功状态下，`Paper.to_text()` 只返回标题时会带一个尾换行，拼上 `"\n\n"` 后正文中间多出一行空白；现在先 `strip()` 再拼。
+
+## 2026-11-05：内置 Agent 取消用例的竞态
+
+- CI 上 `tests/test_agent_builtin.py::test_cancel_stops_a_builtin_run` 偶发失败（ubuntu 3.11）：`cancel()` 之后状态先写成 `cancelled`，工作线程的 `finally` 才把自己从 `_BUILTIN` 里删掉，测试在 `_wait()` 返回后立刻断言 `running() is None` 就撞上中间态。
+- 改法：断言前用带 5 秒截止的轮询等待 `running()` 变空（与同文件 `_wait()` 同一套路），不改产品代码。
+
 ## 2026-11-05：OpenAIRE 与 DOAJ 的取链规则有了测试
 
 - `tests/test_oa_discovery.py` 8 个：OpenAIRE 只认 `bestaccessright == OPEN` 的记录、取 children 里的 `instance.url`、没有就退回 `webresource.url`、下载时 `require_pdf_like_url=False`、503 直接放弃、全无链接返回 None；DOAJ 只认 `type == fulltext` 的链接、第一条下不到就试第二条、无结果返回 None。

@@ -217,6 +217,9 @@ class FetchResult:
         text = self.paper.to_text()
         if self.status == "success":
             return text
+        # Paper.to_text() ends with a newline when it only has a title; without
+        # this strip the joined text gets a blank line in the middle.
+        text = text.strip()
         parts = [text] if text else []
         if self.next_action:
             parts.append(f"Next action: {self.next_action.message}")
