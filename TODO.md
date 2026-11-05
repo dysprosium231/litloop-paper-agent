@@ -123,7 +123,7 @@
 
 - [x] 补仓库元信息：description 与 16 个 topics 已于 2026-11-05 用 `gh repo edit` 设好（「学术文献 Agent：检索 → 筛选 → 下载（校园网 / CARSI / WebVPN）→ Zotero 归档 | 21 MCP tools for Claude, Cursor and Codex」）。社交预览图还没做。
 - [x] 英文 `README.md` + 中文 `README.zh-CN.md`，两份顶部互相链接（2026-11-05）。
-- [~] 打第一个正式 Release：`.github/workflows/release.yml` 已写（tag `v*` 触发、校验 tag 与版本、生成 SHA256SUMS、上传 exe；手动触发只出 artifact）。版本号已统一到 **1.18.1**（7 个版本来源 + `server.json`，一致性检查会验），安装包会是 `LitLoop_1.18.1_x64-setup.exe`。账单锁定已于 2026-11-05 加卡后解除（CI 重跑全绿），**只差打 tag** `v1.18.1`：Actions 目前在排队，等队列消化或本机 `python scripts/build_release.py --bundle` + `gh release create` 手动发。
+- [~] 打第一个正式 Release：`.github/workflows/release.yml` 已写（tag `v*` 触发、校验 tag 与版本、生成 SHA256SUMS、上传 exe；手动触发只出 artifact）。版本号已统一到 **1.18.1**（7 个版本来源 + `server.json`，一致性检查会验）。账单锁定已于 2026-11-05 加卡后解除，**tag `v1.18.1` 已推送**（2026-11-05 19:13），流水线在 GitHub 队列里等跑；跑完会出 `LitLoop_1.18.1_x64-setup.exe` 与 SHA256SUMS。不想等队列时可以本机 `python scripts/build_release.py --bundle` + `gh release create v1.18.1` 手动发。
 - [~] 发上 PyPI（`pip install litloop`）：`pyproject.toml` 补了 keywords 与 11 条 classifiers；`python -m build` 出 sdist 818 KB + wheel 707 KB（170 个文件），`twine check` 都 PASSED，装进临时目录后 `import litloop` 与 `litloop.agents.TOOLS` 正常；`server.json` 已按官方注册表格式写好并纳入一致性检查。**只剩上传**：需要用户的 PyPI API token。
 - [ ] 90 秒演示 GIF 放 README 顶部（一句话 → 30 篇 → 下载 → Zotero），替换现在 4 张静态截图的位置。
 
