@@ -121,16 +121,16 @@
 
 ### 1. 能被搜到（先做，约半天）
 
-- [ ] 补仓库元信息：英文一句话 description（Search, screen, download and file papers into Zotero — 21 tools for Claude, Cursor and Codex）、topics（`mcp`、`mcp-server`、`literature-review`、`academic-research`、`systematic-review`、`zotero`、`claude`、`cursor`、`pdf`、`python`）、社交预览图。
-- [ ] 英文 `README.md` + 中文 `README.zh-CN.md`（现在只有中文，国际流量基本拿不到）；两个 README 顶部互相链接。
-- [ ] 打第一个正式 Release（`v1.0.0`），附上安装包与校验值；`.github/workflows/release.yml` 在打 tag 时构建 exe 并建草稿 Release，顺带解决「exe 只有本机能打」的问题。
-- [ ] 发上 PyPI（`pip install litloop`），`litloop run` 一行装好 MCP——现在要 Python + Git + 虚拟环境，门槛太高。
+- [x] 补仓库元信息：description 与 16 个 topics 已于 2026-11-05 用 `gh repo edit` 设好（「学术文献 Agent：检索 → 筛选 → 下载（校园网 / CARSI / WebVPN）→ Zotero 归档 | 21 MCP tools for Claude, Cursor and Codex」）。社交预览图还没做。
+- [x] 英文 `README.md` + 中文 `README.zh-CN.md`，两份顶部互相链接（2026-11-05）。
+- [~] 打第一个正式 Release：`.github/workflows/release.yml` 已写（tag `v*` 触发、校验 tag 与版本、生成 SHA256SUMS、上传 exe；手动触发只出 artifact）。版本号已从 0.1.0 统一到 1.18.0，安装包会是 `LitLoop_1.18.0_x64-setup.exe`。**卡在 GitHub Actions 账单锁定**：2026-11-05 起每次 run 都在 5 秒内报 `The job was not started because your account is locked due to a billing issue`，要用户先处理账单。
+- [~] 发上 PyPI（`pip install litloop`）：`pyproject.toml` 补了 keywords 与 11 条 classifiers；`python -m build` 出 sdist 818 KB + wheel 707 KB（170 个文件），`twine check` 都 PASSED，装进临时目录后 `import litloop` 与 `litloop.agents.TOOLS` 正常；`server.json` 已按官方注册表格式写好并纳入一致性检查。**只剩上传**：需要用户的 PyPI API token。
 - [ ] 90 秒演示 GIF 放 README 顶部（一句话 → 30 篇 → 下载 → Zotero），替换现在 4 张静态截图的位置。
 
 ### 2. MCP 生态（当下最大的杠杆）
 
-- [ ] 写 `server.json` / `smithery.yaml`，从 `litloop.cli` 的 21 个工具自动导出 schema。
-- [ ] 提交到 Smithery、Glama、mcp.so、PulseMCP、awesome-mcp-servers。定位一句话：「Search, screen, download, and file papers into Zotero — 21 tools」。
+- [~] 写 `server.json` / `smithery.yaml`：`server.json` 已写（pypi、`uvx litloop run`、stdio）；`smithery.yaml` 等 PyPI 发布后再补，Smithery 要能拉到包才算数。
+- [ ] 提交到 Smithery、Glama、mcp.so、PulseMCP、awesome-mcp-servers。定位一句话：「Search, screen, download, and file papers into Zotero — 21 tools」。需要各站账号，排到 PyPI 之后。
 
 ### 3. 中文社区种草（决定早期用户量）
 
@@ -144,7 +144,7 @@
 ### 4. 先修掉会劝退新用户的硬门槛
 
 - [ ] 安装包没签名，SmartScreen 会拦（README 已写怎么继续，但多数人到这里就走了）：评估买代码签名证书（个人开发者约 ¥1000+/年）。
-- [ ] 保证「不填任何 Key 也能跑一次快速检索」，引导里给 OpenAlex Key 申请的直达链接（没有 Key 一天 1000 积分，一次深度检索就可能用完）。
+- [ ] 保证「不填任何 Key 也能跑一次快速检索」，引导里给 OpenAlex Key 申请的直达链接（没有 Key 一天 1000 积分，一次深度检索就可能用完）。2026-11-05 已实测：空数据目录、没有 Key 的情况下 `search_papers()` 5.0 秒返回 5 条，这条路是通的。
 - [ ] 宣传里主动写清楚 Sci-Hub、LibGen 默认关闭、只用合法途径，避免被平台判违规限流。
 
 ### 5. 长期：可被引用

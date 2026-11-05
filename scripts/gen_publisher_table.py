@@ -1,10 +1,10 @@
 """Generate the publisher coverage table from the live StrategyRegistry.
 
-The registry is the source of truth; this script keeps the README table from
-drifting. Usage:
+The registry is the source of truth; this script keeps the table in
+docs/DOWNLOAD.md from drifting. Usage:
 
     python scripts/gen_publisher_table.py              # print markdown
-    python scripts/gen_publisher_table.py --update README.md
+    python scripts/gen_publisher_table.py --update docs/DOWNLOAD.md
 """
 
 from __future__ import annotations

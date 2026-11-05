@@ -1,272 +1,275 @@
+[English](README.md) · [简体中文](README.zh-CN.md)
+
 <div align="center">
   <img src="assets/brand/litloop-icon.png" width="88" alt="LitLoop" />
   <h1>LitLoop</h1>
-  <p><strong>文献检索、筛选、下载、归档的桌面 app</strong> · Agent 在后台检索和评分，你在 app 里做决定</p>
+  <p><strong>A desktop app for finding, screening, downloading and filing papers</strong> · an agent searches and scores in the background, you make the calls in the app</p>
 
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0F766E?style=flat-square" /></a>
   <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/MCP-21%20tools-111827?style=flat-square" /></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square" />
-  <img alt="Status" src="https://img.shields.io/badge/%E7%8A%B6%E6%80%81-%E5%BC%80%E5%8F%91%E4%B8%AD-F59E0B?style=flat-square" />
+  <img alt="Status" src="https://img.shields.io/badge/status-in%20development-F59E0B?style=flat-square" />
 
-  [截图](#截图) · [为什么用它](#为什么用它) · [一次完整的流程](#一次完整的流程) · [app 的四个页面](#app-的四个页面) · [深度检索](#深度检索怎么查全) · [下载](#下载怎么拿到全文) · [安装与启动](#安装与启动) · [搭配 Agent 使用](#搭配-agent-使用) · [项目状态](#项目状态)
+  [Screenshots](#screenshots) · [Why](#why-litloop) · [One full run](#one-full-run) · [The four screens](#the-four-screens) · [Deep search](#deep-search-how-it-gets-the-whole-topic) · [Downloading](#downloading-how-it-gets-the-pdf) · [Install](#install-and-run) · [Using it with an agent](#using-it-with-an-agent) · [Status](#project-status)
 </div>
 
-> **项目还在开发中。** 检索、筛选、下载、存进 Zotero 这条流程已经能用，并在真实课题和测试集上验收过；桌面 app 的筛选、下载、Zotero、设置、内置 Agent 和追踪已经能用，也能自己打安装包。系统综述目前只做到流程统计和导出，分析归纳还没做。详见[项目状态](#项目状态)。
+> **Still in development.** Search → screening → download → Zotero works end to end and has been checked against real topics and a small test set. The desktop app covers screening, downloads, Zotero, settings, the built-in agent and watched searches, and you can build your own installer. Systematic-review support stops at flow counts and export; analysis and synthesis are not built yet. See [Project status](#project-status).
 >
-> LitLoop 是 [Rimagination/scansci-pdf](https://github.com/Rimagination/scansci-pdf)（Apache-2.0）的独立衍生项目，由 [dysprosium231](https://github.com/dysprosium231) 维护，与原作者无隶属关系。下载和机构通道的大部分能力来自原项目，LitLoop 的改动见 [NOTICE](NOTICE)。
+> LitLoop is an independent derivative of [Rimagination/scansci-pdf](https://github.com/Rimagination/scansci-pdf) (Apache-2.0), maintained by [dysprosium231](https://github.com/dysprosium231); it is not affiliated with the original author. Most of the download and institutional-access machinery comes from that project; LitLoop's changes are listed in [NOTICE](NOTICE).
 
-## 截图
+## Screenshots
 
-| 筛选：Agent 的评分和理由，你来拍板 | 下载：待下载队列，逐篇显示进度 |
+| Screening: the agent's score and reason, your call | Downloads: the queue, one paper at a time |
 |:---:|:---:|
-| ![筛选](assets/screenshots/screening.png) | ![下载](assets/screenshots/downloads.png) |
-| **Zotero：按下载批次推送到分类** | **设置：每组设置都能检测** |
-| ![Zotero](assets/screenshots/zotero.png) | ![设置](assets/screenshots/settings.png) |
+| ![Screening](assets/screenshots/screening.png) | ![Downloads](assets/screenshots/downloads.png) |
+| **Zotero: push a download batch into a collection** | **Settings: every group has a test button** |
+| ![Zotero](assets/screenshots/zotero.png) | ![Settings](assets/screenshots/settings.png) |
 
-## 为什么用它
+## Why LitLoop
 
-做一个课题的文献调研，通常卡在四个地方。LitLoop 分别这样处理：
+Literature work on a new topic usually gets stuck in four places. LitLoop handles each of them:
 
-| 卡在哪里 | LitLoop 怎么做 |
+| Where it sticks | What LitLoop does |
 |---|---|
-| **检索结果又多又杂**，前几页一半离题 | 去重、去掉离题标题和垃圾记录，预印本并入正式版；每条带清洗过的完整摘要、真实被引数，标出撤稿和关注声明 |
-| **读不过来**，几百篇摘要不知道先看哪篇 | Agent 读摘要，逐篇评为高 / 中 / 低 / 不相关并写一句理由；深度检索按你的评分持续重新排序，最可能相关的排在前面 |
-| **下载难**，开放获取、出版商、学校 WebVPN、CARSI 一个个试 | 一次点击：先拿开放获取，再试出版商官网，最后逐个走学校通道；需要你登录或过人机验证时，app 会提醒并等你 |
-| **整理费事**，一篇篇拖进 Zotero、改文件名 | 按 `作者年份_标题_DOI.pdf` 命名，按下载批次推送到 Zotero 分类，库里已有的复用，并检查附件是否为空 |
+| **Results are noisy** — half of the first pages are off-topic | Deduplicates, drops off-topic titles and junk records, folds preprints into the published version; every hit carries a cleaned abstract, the real citation count, and retraction or expression-of-concern flags |
+| **Too much to read** — hundreds of abstracts, no idea where to start | An agent reads the abstracts and scores each paper high / medium / low / irrelevant with one sentence of reasoning; deep search keeps re-ranking from your scores so the likeliest papers come first |
+| **Downloading is a chore** — open access, publisher site, campus WebVPN, CARSI, one after another | One click: open access first, then the publisher's own site, then each campus route in turn; when you need to log in or solve a captcha the app tells you and waits |
+| **Filing is tedious** — dragging papers into Zotero and renaming files | Files are named `author-year_title-words_DOI.pdf`, pushed into a Zotero collection by download batch, reused when the item already exists, and checked for empty attachments |
 
-几条原则：
+A few rules it follows:
 
-- **你拍板。** Agent 只给评分和理由，选哪篇、下哪篇由你决定；你改过的评分覆盖 Agent 的。
-- **登录在你自己的浏览器里完成。** 学校账号、密码、人机验证都由你操作，LitLoop 不保存密码，也不绕过验证。
-- **数据都在本机。** 筛选记录、下载记录、PDF 都在 `~/.litloop/` 和你选的文件夹里；Zotero 走本机写入。
-- **用多少接口额度看得见。** 各接口的官方限额集中写在 [docs/API_LIMITS.md](docs/API_LIMITS.md)，app 的设置页显示今天的用量。
+- **You decide.** The agent only scores and explains; which paper to keep and which to download is your call, and your score overrides the agent's.
+- **Logins happen in your own browser.** Campus account, password and captcha are all yours to handle. LitLoop stores no passwords and does not bypass verification.
+- **Data stays on your machine.** Screening records, download history and PDFs live in `~/.litloop/` and the folder you pick; Zotero writes go through the local interface.
+- **API quota is visible.** Official limits are collected in [docs/API_LIMITS.md](docs/API_LIMITS.md), and the settings screen shows today's usage.
 
-## 一次完整的流程
+## One full run
 
-以“稀土掺杂的非晶纳米材料作药物载体”为例：
+Take "rare-earth-doped amorphous nanomaterials as drug carriers" as an example:
 
-1. **提出问题。** 在 app 的「筛选」页点「新建检索」填写问题和纳入标准，或者直接对 Agent（Claude Code、Codex 等）说：“把稀土掺杂非晶纳米载体做药物递送的文献尽量查全，分批给我筛”。不想开对话时，在「设置 → 内置 Agent」填一个支持工具调用的模型，app 就自己跑检索，不用外部 Agent。
-2. **Agent 检索和评分。** 快速检索几秒出结果；深度检索先建候选池（几千篇），每批推给你 30 篇，Agent 先评一遍。
-3. **你在 app 里筛。** 左边是本批列表，右边是摘要（可译成中文）、期刊分区、被引数和 Agent 的理由。键盘上 `↑`/`↓` 换篇、`1`–`4` 评分、`空格` 加入下载。评完点「继续检索」生成下一批，不用回到对话。
-4. **下载。** 「下载」页汇总了各次检索里选中、还没下到的文章，点「全部下载」。每篇显示它正在做什么、最后从哪里下到；需要你登录学校账号或点人机验证时，页面顶部出现琥珀色提示。
-5. **进 Zotero。** 「Zotero」页按下载批次列出待推送的文献，选好分类点「推送」。
-6. **回看。** 「筛选」页右上角的「历史」按课题列出每次检索读了多少、选了哪些，每个课题能看到「检索流程」（命中、去重、纳入、排除）并导出成 Markdown，最终清单可以导出 BibTeX / RIS / DOI 列表。把检索式加入「追踪」后，app 每次打开会检查有没有新文章。
+1. **Ask the question.** In the app's Screening screen, click "New search" and fill in the question and inclusion criteria — or just tell an agent (Claude Code, Codex, etc.): "find as much of the literature on rare-earth-doped amorphous nanocarriers for drug delivery as you can, and hand it to me in batches". If you would rather not keep a chat open, fill in a tool-calling model under Settings → Built-in agent and the app runs the search itself.
+2. **The agent searches and scores.** Quick search answers in seconds; deep search first builds a candidate pool (a few thousand papers) and then hands you 30 at a time, already scored.
+3. **You screen in the app.** The batch list is on the left, the abstract (translatable to Chinese), journal quartile, citation count and the agent's reason on the right. `↑`/`↓` moves, `1`–`4` scores, `space` adds to downloads. Click "Continue search" for the next batch without going back to the chat.
+4. **Download.** The Downloads screen collects everything you picked across searches that has not been downloaded yet; click "Download all". Each paper shows what it is doing and where it finally came from; when it needs your campus login or a captcha, an amber banner appears at the top.
+5. **Into Zotero.** The Zotero screen lists downloaded papers by batch; pick a collection and push.
+6. **Look back.** "History" in the top right groups every search by topic, with how many papers were read and which ones you kept. Each topic shows the review flow (identified, deduplicated, included, excluded) and can export it as Markdown; the final list exports as BibTeX / RIS / a DOI list. Add a search to "Watched" and the app checks for new papers each time it opens.
 
-## app 的四个页面
+## The four screens
 
-### 筛选
+### Screening
 
-- **本批列表**：标题、期刊、年份、Agent 的评分和一句理由；可只看本批，或搜索标题和期刊。
-- **详情**：完整摘要、期刊分区（中科院、JCR，需配套插件）、被引数、DOI；摘要可自动译成中文。
-- **翻译**：在「设置 → 筛选」选范围（评为高、高和中、全部或不自动翻译）和服务。DeepSeek、DeepL 用你自己的 Key，由 app 在打开文献时翻译并保存译文，不耗对话额度；选 Agent 则在评分时顺带翻译。
-- **继续检索**：Agent 停下后，按目前全部评分生成下一批；这一批你先评，回到对话后 Agent 会补上它的评分。
-- **深度检索进度**：顶部显示已评篇数 / 候选池大小、每批高相关比例的小柱图、各阶段进度和预计剩余时间；到了建议停止的时候会提示。
-- **历史**：按课题分组，每次检索读了多少、选了哪些；每个课题展开后有一行「检索流程」：检索命中、去重后、已筛、纳入、排除、低相关未定，可以导出成 Markdown（贴进综述的方法部分）。可导出清单或一键加入下载，也可以把这次检索的检索式加进「追踪」。
-- **追踪**：保存检索式后，app 打开时自动检查（间隔在设置里改，默认 7 天），有新文章发一条系统通知，列表里显示每个课题新增了几篇。
-- **术语表**：同一个意思的几种写法（如 `PDC = polymer-derived ceramic`），检索时一起搜，每次检索写明展开了什么。深度检索会从读过的摘要里找出常见缩写作为建议，你确认后才生效；英美拼写（aluminium / aluminum）和元素符号与名称（Al / aluminum）内置，可以搜索，展开不对时可单条停用。
+- **Batch list**: title, journal, year, the agent's score and one sentence of reasoning; filter to this batch, or search titles and journals.
+- **Details**: full abstract, journal quartile (CAS and JCR, needs the companion plugin), citation count, DOI; the abstract can be translated automatically.
+- **Translation**: under Settings → Screening choose the scope (high only, high and medium, everything, or off) and the service. DeepSeek and DeepL use your own key and translate when a paper is opened, without spending chat quota; choosing "agent" translates along with scoring.
+- **Continue search**: after the agent stops, build the next batch from all scores so far; you score it first and the agent fills in its own scores once you return to the chat.
+- **Deep-search progress**: papers scored / pool size, a small bar chart of the high-relevance share per batch, stage progress and an estimate of the time left; when it looks like a good place to stop, it says so.
+- **History**: grouped by topic, how many papers each search read and which ones you kept. Expanding a topic shows one line of review flow — identified, after deduplication, screened, included, excluded, low-relevance undecided — exportable as Markdown for the methods section. The list can be exported or added to downloads in one click, and the search's query can be added to "Watched".
+- **Watched**: saves a query; each time the app opens it checks (default every 7 days, configurable) and sends a system notification when there is something new, with a per-topic count of new papers.
+- **Glossary**: several spellings of the same thing (e.g. `PDC = polymer-derived ceramic`) are searched together, and every search reports what it expanded. Deep search suggests abbreviations that recur in the abstracts it has read, and nothing takes effect until you confirm it. British/American spellings (aluminium / aluminum) and element symbols versus names (Al / aluminum) are built in; a bad expansion can be switched off individually.
 
-### 下载
+### Downloads
 
-- **待下载**：跨检索汇总、去重、编号；可以按检索分别开始，也可以全部下载。
-- **每篇的状态**：正在做什么（如“正在打开 Elsevier 的页面”“正在走学校通道：WebVPN 浏览器”）、最后的来源和文件；失败时写明原因和下一步（如“学校没有订阅：已用学校身份登录出版商网站，仍没有全文”）。
-- **需要你时**：登录学校账号、通过人机验证时页面顶部出现琥珀色提示，程序会一直等你；不想等的那篇点「跳过」，整个任务可以「取消」。
-- **结果**：打开 PDF、打开所在文件夹、重试没下到的。
+- **Queue**: collected across searches, deduplicated and numbered; start one search's papers or all of them.
+- **Per-paper state**: what it is doing right now (e.g. "opening Elsevier", "campus route: WebVPN browser"), the final source and file; failures say why and what to do next (e.g. "the institution does not subscribe: logged in through the institution and there is still no full text").
+- **When it needs you**: campus login or captcha puts an amber banner at the top and the program waits; skip that one paper, or cancel the whole task.
+- **Results**: open the PDF, open its folder, retry what failed.
 
 ### Zotero
 
-- 显示 Zotero、zotero-mcp 是否就绪和写入方式；不是本地写入时可一键授权（本地写入几秒一篇）。
-- **推送队列**：按下载批次列出已下载、还没进 Zotero 的文献，选分类后推送，不存在的分类自动新建。
-- **附件检查**：找出某个分类里缺失或为空的 PDF 附件，确认后用本机的 PDF 重新附加，或加入下载。
-- **推送记录**：逐篇回看结果（新建、库里已有、PDF 没附上、失败）。
+- Shows whether Zotero and zotero-mcp are ready and how writing is done; if it is not local writing, authorise in one click (local writing takes a few seconds per paper).
+- **Push queue**: downloaded papers not yet in Zotero, grouped by download batch; pick a collection and push — a missing collection is created.
+- **Attachment check**: finds missing or empty PDF attachments in a collection, then re-attaches them from the local PDF or adds the papers to downloads.
+- **Push history**: per-paper results (created, already in the library, PDF not attached, failed).
 
-### 设置
+### Settings
 
-- 检索接口 Key、筛选与翻译、接口额度、下载、网络、学校认证、Agent、Zotero，每组都有「检测」按钮。
-- **内置 Agent**：不装 Agent 命令也能用。填 Anthropic 或 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、Ollama、vLLM 等）的地址、Key 和模型名，点「检测」会当场验证模型会不会发起工具调用——不会发起的模型不能用来跑任务。填好后「用哪个后端」选「内置 Agent」，app 里发起的检索就由它来做。
-- **可选组件**：版面分析（约 65 MB，只影响 PDF 转 Markdown 的排版）默认不装，需要时在同一组点「安装」，下载慢可以填国内镜像。
-- **接口额度**：各接口今天的用量和官方限额。
-- **网络**：识别 v2rayN、Clash 等代理软件是否开了 TUN 模式，并给出直连规则的设置步骤；“电脑连在校园网上”打开后直接按学校 IP 下载。
-- **首次引导**：第一次打开时逐步填写检索接口、翻译、下载、网络、学校认证、Zotero，每步可检测、可跳过，之后可在设置页重新运行。
-- 浅色和深色主题跟随系统；左侧导航可收起只留图标。
+- Search API keys, screening and translation, API quota, downloads, network, campus login, agent, Zotero — every group has a "Test" button.
+- **Built-in agent**: works without any agent command installed. Fill in an Anthropic or OpenAI-compatible endpoint (DeepSeek, Qwen, Kimi, GLM, OpenRouter, Ollama, vLLM …) with its key and model name; "Test" checks on the spot that the model actually issues tool calls — a model that does not cannot run tasks. Set "Which backend" to "Built-in agent" and searches started in the app run on it.
+- **Optional components**: layout analysis (about 65 MB, only affects how PDFs are converted to Markdown) is not installed by default; click "Install" in the same group when needed, and set a mirror if the download is slow.
+- **API quota**: today's usage and the official limit for each API.
+- **Network**: detects whether v2rayN, Clash and friends are in TUN mode and shows how to set direct rules; "this computer is on campus" makes downloads go straight out through the campus IP.
+- **First-run guide**: on first launch it walks through search APIs, translation, downloads, network, campus login and Zotero; every step can be tested or skipped, and it can be re-run from settings later.
+- Light and dark themes follow the system; the sidebar collapses to icons.
 
-## 深度检索：怎么查全
+## Deep search: how it gets the whole topic
 
-要把一个课题查全时用深度检索。Agent 给出问题、4–8 组英文检索词、核心词和几篇种子文章；你在 Zotero 里已经有这个课题的分类时，也可以把整个分类当种子。
+Deep search is for covering a topic properly. The agent produces the question, 4–8 English query variants, core terms and a few seed papers; if you already have a Zotero collection for the topic, the whole collection can serve as seeds.
 
-1. **建候选池**：每组检索词各取 100 条，再加上和种子共同引用较多、且标题或摘要含核心词的文章。核心词可以写几条，每条都必须出现；同一概念的不同写法用 `|` 连起来，如 `Al|aluminum|aluminium`。
-2. **分批筛选**：每批 30 篇。第一批按“共同引用 + 检索词匹配”排序；之后由一个轻量模型按你和 Agent 的全部评分重新排序（系统综述筛选常用的持续主动学习）。
-3. **滚雪球**：评为“高”的文章自动成为新种子，再往外扩展；你给的种子权重最高，避免越滚越偏。
-4. **补摘要**：缺摘要的候选同时问 Semantic Scholar、Scopus、Crossref，先答先用，没有摘要的文章也不会被埋没。
-5. **建议停止**：最近一批的高相关比例降到最好一批的 1/6 以下，或已筛满 200 篇时提示停止，并估计还剩多少相关文章没读到。
+1. **Build the pool**: take 100 hits per query variant, plus papers that share many references with the seeds and mention a core term in title or abstract. Several core terms can be required and all of them must appear; different spellings of one concept are joined with `|`, e.g. `Al|aluminum|aluminium`.
+2. **Batch screening**: 30 papers per batch. The first batch is ranked by co-citation plus query match; afterwards a lightweight model re-ranks by all of your and the agent's scores (continuous active learning, as used in systematic-review screening).
+3. **Snowballing**: papers scored "high" become new seeds and expand outwards; your own seeds carry the highest weight so the drift does not run away.
+4. **Abstracts**: candidates without one are looked up in Semantic Scholar, Scopus and Crossref simultaneously, first answer wins, so a paper is not buried just because it arrived without an abstract.
+5. **Suggesting a stop**: when the high-relevance share of the last batch falls below 1/6 of the best batch, or 200 papers have been screened, it suggests stopping and estimates how many relevant papers are still unread.
 
-**自测结果**（测试集和判断标准在 `tests/acceptance/`，可用 `scripts/eval_deep_search.py` 重放）。测试集只有 3 个，目标 9–26 篇，取自作者自己的 Zotero 分类和一篇综述，评分由 Agent 给出：只说明在这几个课题上的表现，不代表一般水平。
+**Self-test results** (test sets and criteria in `tests/acceptance/`, replayable with `scripts/eval_deep_search.py`). There are only three test sets, 9–26 target papers each, drawn from the author's own Zotero collections and one review, with scores from the agent: they say something about these topics, not about the general case.
 
-| 测试集 | 读了多少篇 | 找到目标 |
+| Test set | Papers read | Targets found |
 |---|---|---|
-| SiC/Al 无压浸渗 | 150 | 19 篇中的 17 篇 |
-| PDC 陶瓷气凝胶 | 120 | 26 篇中的 24 篇 |
-| 稀土药物载体 | 150 | 9 篇中的 2 篇（分支多、彼此少引用，还在改进） |
+| SiC/Al pressureless infiltration | 150 | 17 of 19 |
+| PDC ceramic aerogels | 120 | 24 of 26 |
+| Rare-earth drug carriers | 150 | 2 of 9 (many branches, little cross-citation; still being improved) |
 
-详细的参数和额度控制见 [docs/AGENT.md](docs/AGENT.md#检索与筛选)。
+Parameters and quota control are documented in [docs/AGENT.md](docs/AGENT.md#检索与筛选).
 
-## 下载：怎么拿到全文
+## Downloading: how it gets the PDF
 
-点「全部下载」后，30 篇以内的清单按下面的顺序走（更大的清单走批量车道）：
+After "Download all", a list of up to 30 papers goes through these steps in order (longer lists go through the batch lanes):
 
 ```
-① 开放获取     开放获取直链、MDPI / SciOpen 等按 DOI 拼出的地址，几篇同时下
-② Sci-Hub      仅在你开启时；2024 年及以后发表的跳过（基本没收录）；线路设为“谁快用谁”时先测速
-③ 逐篇下载     免费来源和出版商官网同时尝试 → 没拿到再逐个走学校通道
-               学校通道：WebVPN 直接下载 → WebVPN 浏览器 → CARSI → EZProxy
+1  Open access     direct OA links, DOI-built URLs for MDPI / SciOpen and similar, several at once
+2  Sci-Hub         only when you turn it on; papers from 2024 on are skipped (barely indexed);
+                   when the route is "fastest wins" it first measures speed
+3  One by one      free sources and the publisher site in parallel -> then each campus route
+                   campus routes: WebVPN direct download -> WebVPN browser -> CARSI -> EZProxy
 ```
 
-- **出版商官网**：Elsevier、Wiley、Springer、ACS、RSC、T&F、SAGE、IOP、IEEE 等约 30 家有专门的处理，其余用通用的官网浏览器。学校 IP 有权限时，官网这一步就能下到，不用登录。
-- **学校通道**：支持 100 多所高校的 WebVPN、CARSI 联邦认证、EZProxy。一次只开一个窗口等你登录；每一步最多 4 分钟（你正在登录时自动顺延），卡住就进入下一条。
-- **不做无用功**：用学校身份登录出版商网站后仍没有全文的，判定为学校没订，不再走学校通道；Sci-Hub 说没收录的，一小时内不再问。
-- **文件**：按 `作者年份_标题前几个词_DOI.pdf` 命名，文件名和论文一一对应；下载前会核对 PDF 是不是这篇论文。只能拿到预印本时，会先等出版商和学校通道的正式版，实在没有才存预印本，文件名加 `_preprint`，下载记录里也写明。
-- **记录**：日志里每一段都有耗时（`[timing]`），慢在哪一步一看便知。
+- **Publisher sites**: about 30 publishers get dedicated handling (Elsevier, Wiley, Springer, ACS, RSC, T&F, SAGE, IOP, IEEE …), the rest go through a generic browser. If the campus IP already has access, this step alone gets the PDF.
+- **Campus routes**: WebVPN at 100+ universities, CARSI federation login, EZProxy. Only one window opens at a time and waits for you; each step gets at most 4 minutes (extended while you are actually logging in) and then hands over to the next.
+- **No wasted work**: if a publisher site still shows nothing after logging in through the institution, it is recorded as "not subscribed" and the campus routes are skipped; when Sci-Hub says it does not have a paper, it is not asked again for an hour.
+- **Files**: named `author-year_first-title-words_DOI.pdf`, one file per paper; before accepting a PDF it checks that the paper is the right one. When only a preprint is available it first waits for the published version from the publisher and campus routes, and only then keeps the preprint, with `_preprint` in the file name and a note in the download record.
+- **Logs**: every stage records its duration (`[timing]`), so a slow step is easy to find.
 
-实测（2026-10-18，一份 2024–2026 年的新文献清单，14 篇，不在校园网，经 WebVPN/CARSI）：11 篇成功；Elsevier、T&F、ACS 的官网一般 20–70 秒一篇，开放获取 10–25 秒。失败的 3 篇里，一篇是学校没订的会议论文集章节，一篇是 SSRN 预印本。
+Measured on 2026-10-18 with a list of 14 new papers from 2024–2026, off campus, through WebVPN/CARSI: 11 succeeded. Publisher sites for Elsevier, T&F and ACS generally take 20–70 seconds per paper, open access 10–25 seconds. Of the three failures, one was a conference chapter the institution does not subscribe to and one was an SSRN preprint.
 
-各出版商和机构通道的配置、代理设置和故障排查见 [docs/DOWNLOAD.md](docs/DOWNLOAD.md)。Sci-Hub、LibGen 默认关闭，是否使用由你决定；使用机构通道时请遵守学校和出版商的使用条款。
+Publisher and institutional configuration, proxy setup and troubleshooting are in [docs/DOWNLOAD.md](docs/DOWNLOAD.md). Sci-Hub and LibGen are off by default; whether to use them is your decision. When using institutional routes, respect your university's and the publishers' terms.
 
-## 安装与启动
+## Install and run
 
-桌面 app 可以从源码运行，也可以自己打安装包。从源码运行需要：Python 3.11+、Git、Node.js、Rust（Windows 上用 MSVC 工具链）。
+You can run the app from source, or build your own installer. Running from source needs Python 3.11+, Git, Node.js and Rust (the MSVC toolchain on Windows).
 
-1. **装 Python 后台。** 最省事的办法是对 Claude Code、Codex 或 ZCode 里的 Agent 说：
+1. **Install the Python side.** The easiest way is to tell an agent in Claude Code, Codex or ZCode:
 
    ```text
-   帮我安装或更新这个插件：https://github.com/dysprosium231/litloop-paper-agent
+   Install or update this plugin for me: https://github.com/dysprosium231/litloop-paper-agent
    ```
 
-   Agent 会拉取代码、建独立的虚拟环境、安装依赖并注册 MCP。手动安装的步骤见 [docs/AGENT.md](docs/AGENT.md#安装与配置详情)。
+   The agent pulls the code, creates a dedicated virtual environment, installs dependencies and registers the MCP server. Manual steps are in [docs/AGENT.md](docs/AGENT.md#安装与配置详情).
 
-2. **启动 app。** 在仓库的 `app` 目录：
+2. **Start the app.** In the repository's `app` directory:
 
    ```bash
    npm install
    npm run tauri dev
    ```
 
-   第一次编译 Rust 需要几分钟，之后约半分钟出窗口。环境变量 `LITLOOP_PYTHON` 可指向装了 LitLoop 的 Python。开发说明和重启脚本见 [app/README.md](app/README.md)。
+   The first Rust build takes a few minutes, later ones about half a minute before a window appears. The `LITLOOP_PYTHON` environment variable can point at a Python that has LitLoop installed. Development notes and restart scripts are in [app/README.md](app/README.md).
 
-3. **走一遍首次引导。** 至少填 OpenAlex Key 和联系邮箱；要下订阅论文就在「学校认证」里选学校。
+3. **Walk through the first-run guide.** At minimum fill in an OpenAlex key and a contact email; to download subscription papers, pick your university under "Campus login".
 
-### 自己打一个安装包
+### Building an installer
 
 ```bash
 python scripts/build_release.py --bundle
 ```
 
-先装配嵌入式 Python 运行时（`build/runtime`：官方 embeddable 发行版 + 核心依赖 + `uv.exe`），再调用 `npm run tauri build`。产物在 `app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`，约 110 MiB，自带 Python 和依赖，目标机器不用装任何东西。
+It first stages an embedded Python runtime in `build/runtime` (the official embeddable distribution, the core dependencies and `uv.exe`), then calls `npm run tauri build`. The result is `app/src-tauri/target/release/bundle/nsis/LitLoop_<version>_x64-setup.exe`, about 110 MiB, with Python and the dependencies inside — the target machine needs nothing installed.
 
-- 安装需要管理员权限（`installMode: both`）。
-- 安装包**没有签名**：Windows 会先弹 SmartScreen「已阻止不认识的应用」，点「更多信息 → 仍要运行」；有的公司电脑策略不允许，需要放行。
-- 版面分析（约 65 MB，只影响 PDF 转 Markdown 的排版）不在安装包里，设置 → 可选组件里点「安装」按需下载；下载慢可在同一处填国内镜像。
+- Installing needs administrator rights (`installMode: both`).
+- The installer is **unsigned**: Windows shows the SmartScreen "unrecognised app" prompt, where you click "More info → Run anyway"; some company machines block this by policy.
+- Layout analysis (about 65 MB, only affects how PDFs are converted to Markdown) is not included; install it on demand under Settings → Optional components, with a mirror if the download is slow.
 
-### 依赖与 Key
+### Dependencies and keys
 
-| 组件 | 必需吗 | 用来做什么 | 没有时 | 怎么获取 |
+| Component | Needed? | What it does | Without it | How to get it |
 |---|---|---|---|---|
-| Python 3.11+、Git | 必需 | 运行和更新 LitLoop | 无法运行 | Windows：`winget install Python.Python.3.12 Git.Git` |
-| OpenAlex API Key | **强烈推荐** | 快速检索和深度检索的主要数据源 | 每天约 1000 积分，一次深度检索就可能用完 | [openalex.org](https://openalex.org) 免费申请；填进设置或环境变量 `OPENALEX_API_KEY` |
-| Elsevier API Key | **强烈推荐** | 从 Scopus 补摘要；有全文权限时下载 ScienceDirect 全文 | Elsevier 文章常缺摘要，深度检索只能按标题排序 | [dev.elsevier.com](https://dev.elsevier.com) 免费申请；环境变量 `ELSEVIER_API_KEY` |
-| Springer Nature Meta API Key | 推荐 | 补 Springer、Nature、BMC 文章的摘要 | 只能靠 Scopus 和 Crossref，缺得多一些 | [dev.springernature.com](https://dev.springernature.com)；环境变量 `SPRINGER_META_API_KEY` |
-| 联系邮箱 | 推荐 | 发给 Crossref、OpenAlex、Unpaywall，便于联络和提额 | Crossref 按公共池限速 | 填进设置 |
-| scansci-find（发现引擎） | 推荐 | 快速检索和深度检索的关键词路线 | 自动退回内置检索，较慢 | 安装时加 `--with-find` |
-| Zotero 7+、zotero-mcp | 可选 | 把文献和 PDF 写进本机 Zotero | 只能下载到文件夹 | 在 app 的 Zotero 页授权本地写入 |
-| 本机 Chrome | 可选 | 打开出版商页面、学校登录 | 依赖浏览器的通道不可用，开放获取不受影响 | 装普通 Chrome 即可，LitLoop 会自动建隔离副本 |
-| 学校账号 | 可选 | 经 WebVPN / CARSI / EZProxy 下载订阅论文 | 只能下开放获取和公开的版本 | 见 [docs/DOWNLOAD.md](docs/DOWNLOAD.md) |
-| Semantic Scholar API Key | 可选 | 加进检索来源，补摘要更快 | 不影响核心功能 | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api)；环境变量 `SEMANTIC_SCHOLAR_API_KEY` |
-| litloop-journal-rank | 可选（未公开） | 期刊分区、预警名单、本地撤稿库 | 没有分区信息，撤稿标记改用 OpenAlex 的数据 | 暂未公开 |
+| Python 3.11+, Git | Required | Running and updating LitLoop | Does not run | Windows: `winget install Python.Python.3.12 Git.Git` |
+| OpenAlex API key | **Strongly recommended** | The main data source for quick and deep search | About 1000 credits a day, which one deep search can use up | Free at [openalex.org](https://openalex.org); put it in settings or `OPENALEX_API_KEY` |
+| Elsevier API key | **Strongly recommended** | Abstracts from Scopus; ScienceDirect full text where you have access | Elsevier papers often lack abstracts and deep search can only rank by title | Free at [dev.elsevier.com](https://dev.elsevier.com); `ELSEVIER_API_KEY` |
+| Springer Nature Meta API key | Recommended | Abstracts for Springer, Nature and BMC papers | Only Scopus and Crossref, so more misses | [dev.springernature.com](https://dev.springernature.com); `SPRINGER_META_API_KEY` |
+| Contact email | Recommended | Sent to Crossref, OpenAlex and Unpaywall for contact and higher limits | Crossref rate-limits you in the public pool | Set it in the app |
+| scansci-find (discovery engine) | Recommended | The keyword route for quick and deep search | Falls back to the built-in search, slower | Install with `--with-find` |
+| Zotero 7+, zotero-mcp | Optional | Writes papers and PDFs into your local Zotero | Downloads only, no library updates | Authorise local writing on the Zotero screen |
+| Local Chrome | Optional | Publisher pages and campus logins | Browser-dependent routes are unavailable; open access still works | Any normal Chrome; LitLoop makes its own isolated copy |
+| Campus account | Optional | Subscription papers through WebVPN / CARSI / EZProxy | Only open-access and public versions | See [docs/DOWNLOAD.md](docs/DOWNLOAD.md) |
+| Semantic Scholar API key | Optional | One more search source, faster abstract lookups | Core features are unaffected | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api); `SEMANTIC_SCHOLAR_API_KEY` |
+| litloop-journal-rank | Optional (not public) | Journal quartiles, warning lists, local retraction data | No quartile information; retraction flags come from OpenAlex | Not released yet |
 
-全部配置项见 [docs/CONFIG.md](docs/CONFIG.md)。
+Every configuration key is in [docs/CONFIG.md](docs/CONFIG.md).
 
-## 搭配 Agent 使用
+## Using it with an agent
 
-LitLoop 同时是一个 MCP 服务器（21 个工具）和命令行工具。装进 Claude Code、Codex、ZCode 后，可以不打开 app，直接用一句话走完流程：
+LitLoop is also an MCP server (21 tools) and a command-line tool. Installed into Claude Code, Codex or ZCode, the whole flow can be one sentence, without opening the app:
 
 ```text
-找一下近五年城市热岛和绿地降温的论文，只要中科院 2 区以上，排除撤稿
-这 30 篇按和我课题的相关度筛一遍，说明理由，我来挑
-以这 3 篇为种子，把 SiC/Al 无压浸渗的文献尽量查全，分批给我筛
-把我选中的这些下载下来，推送到 Zotero 的「热岛」分类
-这个清单有 3000 篇，先分出哪些能直接下、哪些要走学校权限，再分批下载
-这篇下载失败了，帮我诊断一下
+Find papers from the last five years on urban heat islands and green-space cooling, CAS zone 2 or better, no retractions
+Screen these 30 by relevance to my topic, explain each choice, I will pick
+Use these 3 as seeds and cover SiC/Al pressureless infiltration as fully as you can, hand it to me in batches
+Download the ones I picked and push them into my Zotero "heat island" collection
+This list has 3000 papers; split it into ones I can fetch directly and ones that need campus access, then download in batches
+This download failed, help me diagnose it
 ```
 
-app 和 Agent 用的是同一份数据：Agent 存下的评分在 app 里看得到，你在 app 里改的评分和选择 Agent 也看得到（格式见 [docs/APP_DATA.md](docs/APP_DATA.md)）。
+The app and the agent share one store: scores the agent saved show up in the app, and changes you make in the app are visible to the agent (format in [docs/APP_DATA.md](docs/APP_DATA.md)).
 
-命令行：
+Command line:
 
 ```bash
-litloop search "urban heat island" --year-from 2021 --sort cited   # 检索
-litloop search "carbon cycle" --out q.txt                         # 检索结果存成下载队列
-litloop get 10.1038/nature12373                                   # 下载单篇
-litloop batch q.txt --lanes                                       # 批量下载（支持 xlsx/csv/bib/队列文件）
-litloop check                                                     # 检查依赖和环境
+litloop search "urban heat island" --year-from 2021 --sort cited   # search
+litloop search "carbon cycle" --out q.txt                         # write hits to a download queue
+litloop get 10.1038/nature12373                                   # download one paper
+litloop batch q.txt --lanes                                       # batch download (xlsx/csv/bib/queue files)
+litloop check                                                     # check dependencies and environment
 ```
 
-MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、检索的过滤参数见 [docs/AGENT.md](docs/AGENT.md)。
+The full MCP tool list, manual MCP configuration (Claude Desktop, Cursor, Cline …) and search filters are in [docs/AGENT.md](docs/AGENT.md).
 
-## 更多文档
+## More documentation
 
-| 文档 | 内容 |
+| Document | Contents |
 |---|---|
-| [docs/AGENT.md](docs/AGENT.md) | 安装细节、MCP 工具全表、检索过滤参数、深度检索参数 |
-| [docs/DOWNLOAD.md](docs/DOWNLOAD.md) | 下载分层、Elsevier API、WebVPN、CARSI、EZProxy、代理设置、故障排查 |
-| [docs/CONFIG.md](docs/CONFIG.md) | 全部配置项和默认值 |
-| [docs/API_LIMITS.md](docs/API_LIMITS.md) | 各外部接口的官方限额（附来源和核对日期）和 LitLoop 的节奏控制 |
-| [docs/APP_DATA.md](docs/APP_DATA.md) | app 与 Agent 共用的筛选、下载、进度文件格式 |
-| [app/README.md](app/README.md) | 桌面 app 的开发方式 |
-| [AGENTS.md](AGENTS.md) · [docs/LAYOUT.md](docs/LAYOUT.md) | 参与开发的约定 · 代码布局（各子包管什么） |
-| [CHARTER.md](CHARTER.md) · [TODO.md](TODO.md) · [docs/DECISIONS.md](docs/DECISIONS.md) | 设计与验收标准 · 进度与待办 · 决定与实验记录 |
+| [docs/AGENT.md](docs/AGENT.md) | Install details, the full MCP tool list, search filters, deep-search parameters |
+| [docs/DOWNLOAD.md](docs/DOWNLOAD.md) | Download layers, Elsevier API, WebVPN, CARSI, EZProxy, proxies, troubleshooting |
+| [docs/CONFIG.md](docs/CONFIG.md) | Every configuration key and its default |
+| [docs/API_LIMITS.md](docs/API_LIMITS.md) | Official limits of each external API (with sources and check dates) and LitLoop's pacing |
+| [docs/APP_DATA.md](docs/APP_DATA.md) | File formats the app and the agent share |
+| [app/README.md](app/README.md) | Developing the desktop app |
+| [AGENTS.md](AGENTS.md) · [docs/LAYOUT.md](docs/LAYOUT.md) | Contribution conventions · code layout (what each subpackage owns) |
+| [CHARTER.md](CHARTER.md) · [TODO.md](TODO.md) · [docs/DECISIONS.md](docs/DECISIONS.md) | Design and acceptance criteria · progress and to-dos · decisions and experiment logs |
 
-## 项目状态
+## Project status
 
-2026 年 10 月：开发中，维护者自己在用，也欢迎试用和反馈。每次改动都在 Linux、Windows、macOS × Python 3.11–3.13 上跑全部测试。
+October 2026: in development, used by the maintainer, feedback welcome. Every change runs the full test suite on Linux, Windows and macOS across Python 3.11–3.13.
 
-### 已经可用
+### Working today
 
-在真实课题（先驱体陶瓷 SiBCN 的隔热与吸波）上完整跑过“检索 → 筛选 → 下载 → Zotero”：
+Run end to end on a real topic (precursor-derived SiBCN ceramics for insulation and microwave absorption) — search → screening → download → Zotero:
 
-| 环节 | 状态 |
+| Step | State |
 |---|---|
-| 检索 | 查 OpenAlex（没有 Key 时用 Crossref，设了 Key 可加 Semantic Scholar）；按术语表同时搜缩写、全称、英美拼写和元素符号；过滤离题结果和垃圾记录；预印本并入正式版；补全并清洗摘要；标出撤稿和关注声明；可按被引数或年份排序 |
-| 筛选 | AI 逐篇给相关度和理由，你挑选，记录存在本地，可直接生成下载队列 |
-| 深度检索 | 多组检索词 + 共同引用建池，分批筛选，按评分持续重新排序，高相关文章自动滚雪球 |
-| 下载 | 开放获取、出版商官网、学校通道依次尝试；WebVPN、CARSI、EZProxy；文件名带 DOI，不会把一篇论文的 PDF 当成另一篇；只拿到预印本时文件名加 `_preprint` |
-| Zotero | 本地写入，几秒一篇；检查附件是不是空的 |
-| 桌面 app | 筛选、下载、Zotero、设置与额度、内置 Agent、追踪已能用；安装包能自己打（约 110 MiB，自带 Python 运行时）；还差自动更新和签名 |
+| Search | OpenAlex (Crossref when there is no key, Semantic Scholar when a key is set); searches glossary variants — abbreviations, full names, British/American spellings, element symbols — at once; filters off-topic and junk records; folds preprints into the published version; completes and cleans abstracts; flags retractions and expressions of concern; sorts by citations or date |
+| Screening | The AI scores each paper and explains why, you choose, records stay local and become a download queue |
+| Deep search | Multiple query variants plus co-citation build the pool, batch screening, re-ranking from your scores, high-relevance papers snowball |
+| Download | Open access, publisher sites, campus routes in turn; WebVPN, CARSI, EZProxy; DOI in the file name, one paper per file; preprints are marked `_preprint` |
+| Zotero | Local writing, a few seconds per paper; checks for empty attachments |
+| Desktop app | Screening, downloads, Zotero, settings and quota, built-in agent and watched searches all work; you can build the installer (about 110 MiB, Python runtime included); auto-update and code signing are still missing |
 
-### 已知限制
+### Known limits
 
-- 一次快速检索约 6–10 秒，每组检索词只给前 10–20 条；要查全请用深度检索。
-- 深度检索每出一批约 1 分钟（扩展候选池加补摘要）。
-- 分支多、彼此少引用的课题（如稀土药物载体）深度检索还查不全。
-- 期刊分区和本地撤稿库依赖配套插件 litloop-journal-rank，它还没公开。
-- 还不支持中文文献（知网、万方）。
+- A quick search takes about 6–10 seconds and returns only the first 10–20 hits per query variant; use deep search to cover a topic.
+- Deep search takes about a minute per batch (pool expansion plus abstracts).
+- Topics with many branches and little cross-citation (rare-earth drug carriers, for instance) are still not covered fully.
+- Journal quartiles and the local retraction database need the companion plugin litloop-journal-rank, which is not public yet.
+- Chinese-language databases (CNKI, Wanfang) are not supported yet.
 
-### 待开发
+### Still to build
 
-按计划顺序排列，详细进度见 [TODO.md](TODO.md)。
+In planned order; progress is tracked in [TODO.md](TODO.md).
 
-1. **桌面 app**：安装包能打出来了，还差自动更新和签名。内置 Agent（app 直接调 Anthropic / OpenAI 兼容接口）已能接手 app 里发起的检索，还差按任务分模型、用测试集比较它和外部 Agent 的评分质量。
-2. **系统综述支持**：检索流程统计（命中、去重、纳入、排除及理由）和 Markdown 导出已经做了；还差中断后接着跑。
-3. **定期追踪**：保存检索式、app 打开时自动检查并通知已经做了；还差在 app 里点开一次检查，看新文章列表。
-4. **分析归纳**：PDF 转 Markdown 已经有了；下一步从全文抽取要点、做对比表、起草综述。
-5. **中文文献**：接入知网、万方。
-6. **期刊分区插件公开**：分区数据有版权，公开前要改成由用户自己提供数据。
+1. **Desktop app**: the installer can be built; auto-update and signing remain. The built-in agent (the app calling Anthropic / OpenAI-compatible APIs itself) can already run searches started in the app; per-task model choice and a test-set comparison against an external agent are still open.
+2. **Systematic-review support**: flow counts (identified, deduplicated, included, excluded, with reasons) and Markdown export are done; resuming an interrupted review is not.
+3. **Watched searches**: saving a query, checking when the app opens and notifying are done; opening a check in the app to see the new-papers list is not.
+4. **Analysis and synthesis**: PDF to Markdown exists; extracting findings from full text, building comparison tables and drafting a review are next.
+5. **Chinese literature**: CNKI and Wanfang.
+6. **Publishing the quartile plugin**: the data is licensed, so it must be opened up to user-supplied data first.
 
-## 致谢
+## Credits
 
-LitLoop 基于 **[scansci-pdf](https://github.com/Rimagination/scansci-pdf)**（作者 [Rimagination](https://github.com/Rimagination)，Apache-2.0）开发。原项目参考过以下开源项目：[FlareSolverr](https://github.com/FlareSolverr/FlareSolverr)、[ref-downloader](https://github.com/ltczding-gif/ref-downloader)、[paper-fetch-skill](https://github.com/Dictation354/paper-fetch-skill)、[paper-fetcher](https://github.com/fermionoid/paper-fetcher)、[cloakbrowser](https://github.com/CloakHQ/CloakBrowser)。
+LitLoop is built on **[scansci-pdf](https://github.com/Rimagination/scansci-pdf)** by [Rimagination](https://github.com/Rimagination) (Apache-2.0). The original project drew on [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr), [ref-downloader](https://github.com/ltczding-gif/ref-downloader), [paper-fetch-skill](https://github.com/Dictation354/paper-fetch-skill), [paper-fetcher](https://github.com/fermionoid/paper-fetcher) and [cloakbrowser](https://github.com/CloakHQ/CloakBrowser).
 
-原项目贡献者 [annsyun](https://github.com/annsyun) 实现了 SAGE 中国站的机构授权下载通道（[Rimagination/scansci-pdf#58](https://github.com/Rimagination/scansci-pdf/pull/58)）。
+The original project's contributor [annsyun](https://github.com/annsyun) implemented the institutional download route for SAGE China ([Rimagination/scansci-pdf#58](https://github.com/Rimagination/scansci-pdf/pull/58)).
 
-检索用到了 [OpenAlex](https://openalex.org)、[Semantic Scholar](https://www.semanticscholar.org)、[Crossref](https://www.crossref.org) 的公开数据。撤稿数据来自 [Retraction Watch](https://retractionwatch.com)，由 Crossref 公开发布。
+Search uses public data from [OpenAlex](https://openalex.org), [Semantic Scholar](https://www.semanticscholar.org) and [Crossref](https://www.crossref.org). Retraction data comes from [Retraction Watch](https://retractionwatch.com), published by Crossref.
 
-## 许可证
+## License
 
-[Apache License 2.0](LICENSE)。原项目的版权声明保留在 LICENSE 和 [NOTICE](NOTICE) 中。原项目通过 PyPI 分发的预编译扩展（`_core/*.pyd`、`*.so`）不在本仓库内，LitLoop 使用纯 Python 实现。
+[Apache License 2.0](LICENSE). The original project's copyright notices are kept in LICENSE and [NOTICE](NOTICE). The prebuilt extensions the original project shipped through PyPI (`_core/*.pyd`, `*.so`) are not in this repository; LitLoop uses pure Python.
