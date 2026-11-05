@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import os
 import shutil
 import subprocess
 import sys
@@ -90,11 +91,29 @@ def unpack_python(zip_path: Path) -> None:
 
 
 def install_dependencies(site: Path) -> None:
+    """Install into the staged runtime, not into the host interpreter.
+
+    The host may be a different Python (CI builds with 3.13), so plain `pip
+    --target` would fetch the wrong wheels (numpy cp313 *.pyd inside a 3.14
+    runtime, which fails at import). uv is fetched first and asked for the
+    embedded interpreter explicitly; without uv, pip is told the target ABI.
+    """
     deps = core_dependencies()
     step(f"installing {len(deps)} core dependencies into {site}")
     site.mkdir(parents=True, exist_ok=True)
+    embedded = RUNTIME / "python.exe"
+    uv = RUNTIME / "uv.exe"
+    if uv.exists():
+        cmd = [str(uv), "pip", "install", "--python", str(embedded),
+               "--target", str(site), *deps]
+        env = {**os.environ, "UV_LINK_MODE": "copy", "UV_CACHE_DIR": str(CACHE / "uv")}
+        subprocess.run(cmd, check=True, env=env)
+        return
+    major, minor = PYTHON_VERSION.split(".")[:2]
     cmd = [venv_python(), "-m", "pip", "install", "--no-warn-script-location",
-           "--disable-pip-version-check", "--target", str(site), *deps]
+           "--disable-pip-version-check", "--only-binary", ":all:",
+           "--platform", "win_amd64", "--implementation", "cp",
+           "--python-version", f"{major}.{minor}", "--target", str(site), *deps]
     subprocess.run(cmd, check=True)
 
 
@@ -201,12 +220,12 @@ def main() -> None:
     site = RUNTIME / "Lib" / "site-packages"
 
     unpack_python(fetch_python_zip())
+    if not args.no_uv:
+        install_uv()          # before the dependencies: they are installed with it
     install_dependencies(site)
     install_litloop(site)
     if not args.with_layout:
         drop_layout(site)
-    if not args.no_uv:
-        install_uv()
     write_path_file()
     verify()
     step(f"runtime is {size_of(RUNTIME) / 1e6:.0f} MB at {RUNTIME}")
