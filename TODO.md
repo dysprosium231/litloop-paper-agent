@@ -127,7 +127,7 @@
 
 ### 不做
 - 不重写下载引擎；不把排序换成大模型打分；没有测试集不调排序参数（2026-10-18 评审）。
-- 不拆分 `server.py`、`_publisher_strategies_core.py` 两个大文件（继承自原项目，风险大、收益不直接）。2026-10-25 的模块整理只把后者原样挪到 `publishers/strategies/_core.py`，不拆。
+- 不拆分 `server.py`、`_publisher_strategies_core.py` 两个大文件（继承自原项目，风险大、收益不直接）。2026-10-25 的模块整理只把后者原样挪到 `publishers/strategies/_core.py`，不拆。**例外（2026-11-05）**：把其中与浏览器无关的 ScienceDirect 文章 API 一段抽成了 `strategies/_elsevier_api.py`，`_core.py` 回导名字、调用处不变（2873 → 2340 行）；其余部分仍不拆。
 - 不给 `publisher-batch` 补导入登录状态，整条路去掉（2026-10-19）。
 - 不接回 FlareSolverr（要另跑服务；人机验证交给用户，2026-10-19）。
 
