@@ -143,6 +143,8 @@ litloop check                                                     # 检查依赖
 
 记录存在 `~/.litloop/screening/`，每次一个 JSON 文件和一个方便阅读的 Markdown 文件。快速检索直接给结果，深入检索才会先和你确认筛选标准。
 
+装了桌面 app 时，Agent 可以把 `litloop://session/<会话 id>` 一起给你：点开直接跳到那次筛选，app 没开就打开它，已经开着就把链接送进当前窗口。
+
 **深度检索**（`litloop_deep_search`）
 
 要把一个课题查全时用。Agent 给出问题、4–8 组英文检索词、核心词和几篇种子文章；你在 Zotero 里已经有这个课题的分类时，也可以直接把整个分类当种子（`seed_collection`）：
