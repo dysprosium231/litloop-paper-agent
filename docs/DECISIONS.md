@@ -3,6 +3,11 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-05：OpenAIRE 与 DOAJ 的取链规则有了测试
+
+- `tests/test_oa_discovery.py` 8 个：OpenAIRE 只认 `bestaccessright == OPEN` 的记录、取 children 里的 `instance.url`、没有就退回 `webresource.url`、下载时 `require_pdf_like_url=False`、503 直接放弃、全无链接返回 None；DOAJ 只认 `type == fulltext` 的链接、第一条下不到就试第二条、无结果返回 None。
+- 顺手确认：两个来源都新建 `requests.Session()` 并设 `trust_env = False`（不走系统代理），UA 用统一的 `USER_AGENT`。
+
 ## 2026-11-05：Europe PMC 与 PMC 的候选链接有了测试
 
 - 这两个来源一直没有测试（`grep` 扫出的空洞清单里 `sources/europepmc.py` 81 行），改起来心里没底。
