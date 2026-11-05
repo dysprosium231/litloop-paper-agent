@@ -110,7 +110,7 @@
 - [~] 深度链接（2026-11-05）：`litloop://session/<会话 id>` 打开 app 并跳到该会话的筛选页。插件 `tauri-plugin-deep-link` 注册了 `litloop` 协议（安装时写注册表），前端用 `onOpenUrl` 解析。已经开着 app 时点链接会由 `tauri-plugin-single-instance` 转发给现有窗口（事件 `litloop-url`）。技能文档（`skills-src/shared/screening.md`，已重建）现在会提示 Agent 把 `litloop://session/<session>` 和表格一起给用户。**还差**：实测（装一次安装包、点链接）。
 
 ### 测试
-- [~] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；2026-11-05 又补 `bib_import`、`bibtex_crossref`、`http_utils`、`europepmc`、`oa_discovery`、`models`、`pdf_extractor`、`profile_health`、`remote_assist`、`camofox_api`、`cloakbrowser_compat`、`cli/commands` 的辅助函数、`extractors` 的 HTML 路由（7 家出版商 + 兜底 + 大小写不敏感，11 个）。顺手修了四个真 bug（citekey 撞键、`to_text` 多空行、PDF 段落分隔被拼掉、远程协助页面 500）。还剩 `desktop/` 的一些分支。
+- [~] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；2026-11-05 又补 `bib_import`、`bibtex_crossref`、`http_utils`、`europepmc`、`oa_discovery`、`models`、`pdf_extractor`、`profile_health`、`remote_assist`、`camofox_api`、`cloakbrowser_compat`、`cli/commands` 的辅助函数、`extractors` 的 HTML 路由（7 家出版商 + 兜底 + 大小写不敏感，11 个）与通用适配器 `publisher_adapters/generic.py`（标题/摘要/正文/图注/参考文献/作者的回退顺序，14 个）。顺手修了四个真 bug（citekey 撞键、`to_text` 多空行、PDF 段落分隔被拼掉、远程协助页面 500）。还剩 `desktop/` 的一些分支。
 
 ### 分析归纳
 - [ ] 先定验收标准再动手（草案在「待用户决定」），做到「表格级」可用（材料体系 / 方法 / 关键数字 / 出处页码），不写综述正文。
