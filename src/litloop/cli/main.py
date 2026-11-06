@@ -68,6 +68,17 @@ def check_deps() -> None:
     print_status()
 
 
+@app.command("diagnose")
+def diagnose(
+    out: str = typer.Option("", "--out", "-o", help="Where to write the zip (default: ~/.litloop/exports/)"),
+) -> None:
+    """Write a diagnostic bundle: version, system, settings (keys masked), recent log."""
+    from ..diagnostics import write_bundle
+    path = write_bundle(Path(out) if out else None)
+    print(f"  {path}")
+    print("  设置里的密钥已经打码；包里没有 PDF、没有 Zotero 数据。")
+
+
 @app.command("web")
 def web_server(
     # It downloads with the user's school session and has no login: never on

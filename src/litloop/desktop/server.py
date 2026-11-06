@@ -516,6 +516,16 @@ def create_app(token: str) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(404, "没有这个组件") from exc
 
+    @app.post("/api/diagnostics")
+    def diagnostics_export() -> dict[str, Any]:
+        """Write the diagnostic bundle and return where it landed."""
+        from ..diagnostics import write_bundle
+        try:
+            path = write_bundle()
+        except OSError as exc:
+            raise HTTPException(500, f"无法写诊断包：{exc}") from exc
+        return {"path": str(path), "size": path.stat().st_size if path.exists() else 0}
+
     # Downloads: jobs started from the app (download_jobs), one at a time.
     @app.get("/api/downloads")
     def downloads() -> dict[str, Any]:

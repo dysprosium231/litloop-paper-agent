@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, PageBody, PageHeader } from "@/components/page"
 import { Switch } from "@/components/ui/switch"
-import { settingsApi, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
+import { downloadsApi, settingsApi, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 // The native chooser exists only inside the app window, not in a browser preview.
@@ -379,11 +379,38 @@ export function SettingsPage({ groups, current, onPick, onSaved, onGuide }: {
   // The weekly version check (updates.py); nothing is installed from here.
   const [updates, setUpdates] = React.useState<Awaited<ReturnType<typeof settingsApi.updates>>>([])
   React.useEffect(() => { settingsApi.updates().then(setUpdates).catch(() => {}) }, [])
+  const [diag, setDiag] = React.useState<{ path: string; size: number } | null>(null)
+  const [diagBusy, setDiagBusy] = React.useState(false)
+  const [diagError, setDiagError] = React.useState<string | null>(null)
+  const exportDiagnostics = () => {
+    setDiagError(null)
+    setDiagBusy(true)
+    settingsApi.diagnostics().then(setDiag).catch((e) => setDiagError(errorMessage(e))).finally(() => setDiagBusy(false))
+  }
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title="设置">
+        {diag && (
+          <Button variant="outline" size="sm" onClick={() => downloadsApi.open(diag.path).catch(() => {})} title={diag.path}>
+            打开文件夹
+          </Button>
+        )}
+        <Button variant="outline" size="sm" onClick={exportDiagnostics} disabled={diagBusy}>
+          {diagBusy ? "正在导出…" : "导出诊断包"}
+        </Button>
         <Button variant="outline" size="sm" onClick={onGuide}>重新运行引导</Button>
       </PageHeader>
+      {(diag || diagError) && (
+        <div className="space-y-0.5 border-b bg-primary/5 px-8 py-2.5 text-sm">
+          {diag && (
+            <p>
+              <span className="font-medium">诊断包已保存</span>
+              <span className="text-muted-foreground">：{diag.path}（{(diag.size / 1024).toFixed(0)} KB，设置里的密钥已打码）</span>
+            </p>
+          )}
+          {diagError && <p className="text-destructive">{diagError}</p>}
+        </div>
+      )}
       {updates.length > 0 && (
         <div className="space-y-0.5 border-b bg-primary/5 px-8 py-2.5 text-sm">
           {updates.map((u) => (

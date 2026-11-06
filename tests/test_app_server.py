@@ -201,3 +201,12 @@ def test_a_watch_is_saved_from_a_session_and_checked(client, session, monkeypatc
     assert [p["doi"] for p in checked["new"]] == ["10.1/z"]
     assert client.delete(f"/api/watches/{got['id']}").json() == {"removed": True}
     assert client.post("/api/watches/nope/check").status_code == 404
+
+def test_diagnostics_export_writes_a_zip(client, tmp_path, monkeypatch):
+    from litloop import diagnostics
+
+    target = tmp_path / "bundle.zip"
+    monkeypatch.setattr(diagnostics, "write_bundle", lambda *a, **k: target)
+    target.write_bytes(b"PK")
+    got = client.post("/api/diagnostics").json()
+    assert got == {"path": str(target), "size": 2}

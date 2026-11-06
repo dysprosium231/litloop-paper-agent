@@ -299,6 +299,7 @@ export const settingsApi = {
   test: (group: string) => call<{ results: TestResult[]; seconds: number }>(`/api/settings/test/${group}`, {}),
   installComponent: (key: string) => call<{ ok: boolean; log: string }>(`/api/components/${key}/install`, {}),
   updates: () => call<{ name: string; installed: string; latest: string; how: string }[]>("/api/updates"),
+  diagnostics: () => call<{ path: string; size: number }>("/api/diagnostics", {}),
   quota: () => call<Record<string, ProviderUsage>>("/api/quota"),
   openalex: (fresh = false) => call<{ credits_used?: number; credits_remaining?: number; credits_limit?: number; resets_at?: string; has_key?: boolean; error?: string } | null>(`/api/quota/openalex${fresh ? "?fresh=true" : ""}`),
 }

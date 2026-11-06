@@ -3,6 +3,17 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-06：诊断包：一份 zip 说清版本、设置和最近的日志
+
+- 背景：用户说「下不下来」时，我们只能隔着聊天问版本、问设置、让他去翻终端输出；日志只走 stderr，关掉窗口就没了。
+- 做法：新增 `src/litloop/diagnostics.py`，`collect()` 收版本、Python、系统、数据目录里各类文件的数量、**脱敏后的设置**、可选组件与 uv 的状态、最近 300 行日志；`write_bundle()` 打成 `~/.litloop/exports/litloop-diagnostics-<时间>.zip`，内含 `diagnostics.json`、`log.txt`、`README.txt`（说明包里有什么、没有什么）。
+- 脱敏规则：键名匹配 `api_key|token|secret|password|cookie|session_id` 且值非空 → `***`；空值原样保留（能看出「没填」和「填了」的区别，这正是排查时最常问的）。
+- 日志：`src/litloop/log.py` 加一个 `_RingHandler`（`collections.deque(maxlen=400)`）挂在同一个 logger 上，`recent(limit)` 取末尾若干行。日志仍然只写 stderr，不落盘——诊断包是用户主动导出才带上这些行。
+- 三个入口：设置页右上角「导出诊断包」（导出后显示路径与大小、可「打开文件夹」）、`litloop diagnose [-o 目录]`、`POST /api/diagnostics`。
+- 为什么不含 PDF 与 Zotero 数据：诊断包会被人转手（贴进 issue、发给别人），论文本身与文献库属于用户隐私；数量统计足够看出「一篇都没下下来」。
+- 测试：`tests/test_diagnostics.py` 5 个（脱敏、`collect` 的字段、日志进包、zip 内容且不含明文 Key、可指定文件名）、`tests/test_app_server.py` 加 1 个（接口返回路径与大小）。
+- 待实测：在装了安装包的机器上点一次，确认 `~/.litloop/exports` 可写、中文路径不乱码。
+
 ## 2026-11-06：MSI 安装包也能打出来
 
 - 背景：2026-11-05 用户要求「也提供标准的 msi，让用户选安装位置」。
