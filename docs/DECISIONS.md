@@ -3,6 +3,28 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-06：MSI 换掉默认位图，只出中文一份
+
+- 用户反馈：「那个红色图标光盘好丑」，同时问「没有为当前用户 / 为所有人安装的选项吗」。
+- 那张红色光盘是 **WiX 自带的 dialog 位图**（`WixUIDialogBmp` / `WixUIBannerBmp`），随 WiX 模板带进来，跟我们自己的资源无关。做法：新增 `scripts/make_installer_images.py`（Pillow，用 `icon.png` 与品牌蓝），生成 `app/src-tauri/icons/wix-banner.bmp`（493×58，白底、图标 + LitLoop + 学术文献 Agent + 底部蓝条）与 `wix-dialog.bmp`（493×312，深蓝渐变、图标 + 名称 + 一句话 + 仓库地址），在 `bundle.windows.wix.bannerPath` / `dialogImagePath` 指过去；生成的 `main.wxs` 里能看到 `<WixVariable Id="WixUIBannerBmp" …/>` 与 `<WixVariable Id="WixUIDialogBmp" …/>`。
+- 为什么写脚本而不是手工放图：MSI 只认固定尺寸的 24 位 BMP，改文案（比如以后换版本号、换仓库地址）要重画，脚本一行命令就能重来。
+- 同时把 `bundle.windows.wix.language` 从 `["zh-CN", "en-US"]` 收成 `["zh-CN"]`：两个语言会打出**两个独立产品**（不同的 PackageCode + ProductLanguage），用户先后装两次就会在「应用和功能」里出现两份 LitLoop——这次真机上就发生了（事件日志 21:40:53 zh-CN、21:41:44 en-US）。发版说明里写的是「一个包」，所以只留中文；要给英文用户，走 NSIS 包（它的语言跟随系统，不会变成两份）。
+- 「为当前用户 / 为所有人」：MSI 一律 `ALLUSERS=1` 按机器装（写 Program Files + HKLM + 要管理员），Tauri 的 WiX 模板不提供 per-user 分支；这个选择只有 NSIS 包有（`installMode: "both"`）。分工写进发版说明：普通用户用 `.exe`，批量部署用 `.msi`。
+
+## 2026-11-06：卸载失败的真正原因不是权限
+
+- 现象：用户在「应用和功能」里卸载，报 `写入文件 D:\Program Files\LitLoop\15362e21.rbf 时出错。请确认你是否可以访问这个目录。`，安装目录 5299 个文件一个没删；改用管理员终端再卸载，一次成功，`D:\Program Files\LitLoop` 只剩空目录。
+- 排查：UAC 策略是 `ConsentPromptBehaviorAdmin=0`（提权不弹窗）、`FilterAdministratorToken=1`，当前用户在 Administrators 组但令牌是 deny-only，所以「没弹 UAC」是这台机器的策略，不能当成提权失败的证据。MSI 本身声明正常：`InstallScope="perMachine"`、`WordCount=2`、有 `MajorUpgrade`。
+- 真正原因：卸载时 **LitLoop 还在运行**（我 21:56 为测首次引导起的实例，占着 `litloop-app.exe` 与 `python\python.exe`）。Windows Installer 删不掉被占用的文件，就把它们改名挪走并写回滚文件 `.rbf`，写不进安装目录就报错。
+- 要修的：卸载/升级前先关闭运行中的实例。NSIS 包自带这个动作，WiX 模板默认没有；用户开着 app 升级一定会复现，所以排在 MSI 下一轮（改 `bundle.windows.wix.template` 加关闭实例的自定义动作）。
+- 顺带记一条打包的坑：`build/runtime` 是快照，**改了 Python 代码必须重跑 `python scripts/build_release.py`**，只跑 `npm run tauri build` 打出来的包还是旧代码。
+
+## 2026-11-06：OpenAlex 的匿名额度按出口 IP 共享
+
+- 用户在空数据目录下点「检测」，检索接口那一步红着：`无法连接 OpenAlex：出版商拒绝访问，可能需要学校认证`。
+- 实测：直连 `https://api.openalex.org/works` 返回 200（响应里明确写「No API key, so this request shares one free daily budget ($0.10) with everyone on your network's IP」）；经本机代理出口返回 429 `Rate limit exceeded`。也就是说**匿名额度是同出口 IP 共享的**，别人用完了，没填 Key 的请求就会被拒。
+- 原本文案错在把出版商站点的「拒绝访问 → 可能需要学校认证」套到了 OpenAlex 上。改法：新增 `_openalex_failure(raw, has_key)`——限流/拒绝访问时，没填 Key 说「这个网络出口的匿名额度已经用完。填一个免费 Key 就能用，或换个网络再试」，填了 Key 说「这个出口被限流，稍后再试」；并且没填 Key 时这一项降级成黄色提示（`ok=None`，可选），不再是红色错误。首次引导的说明也补了「共享匿名额度」这句。测试两条钉住文案（不含「学校认证」）。
+
 ## 2026-11-06：安装时删掉程序不读的文件
 
 - 现象：用户点 MSI 安装，界面停在「正在安装 LitLoop」、进度条一直 0%，一分半钟后才走完。查下来不是卡死：Windows Installer 对安装目录**逐个文件**写盘，装完是 5299 个文件、279 MB，从 `21:33:53` 到 `21:35:29` 共 96 秒、约每秒 55 个文件；WiX 的进度条只在收到进度消息时前进，加上杀毒软件实时扫描每个文件，前面那段时间就一直显示 0%。

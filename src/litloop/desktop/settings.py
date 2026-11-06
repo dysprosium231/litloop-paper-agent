@@ -149,7 +149,8 @@ _FIELDS = {f["key"]: f for g in GROUPS for f in g["fields"]}
 # with why it matters. Every step can be checked on the spot or skipped.
 STEPS = [
     {"group": "sources", "intro": "检索和补摘要靠这些接口。什么都不填也能先试一次快速检索（退回 Crossref）；"
-                                  "要长期用，OpenAlex Key 免费，在 help.openalex.org 申请，没有时每天的检索额度很少。"
+                                  "要长期用，OpenAlex Key 免费，在 help.openalex.org 申请——不填时用的是同一个网络出口共享的匿名额度，"
+                                  "别人用完了就会被限流。"
                                   "Elsevier Key 用于 ScienceDirect 全文和 Scopus 摘要，对深度检索影响很大。"
                                   "联系邮箱只发给 Crossref、OpenAlex、Unpaywall，它们要求填写。"},
     {"group": "screening", "intro": "筛选时可把摘要翻译成中文。填 DeepSeek 或 DeepL 的 Key 后由 app 翻译，不占用对话额度；也可以以后再设置。"},
@@ -279,14 +280,27 @@ def _cannot_reach(name: str, raw: Any) -> str:
     return f"无法连接 {name}" if why == "出现意外错误" else f"无法连接 {name}：{why}"
 
 
+def _openalex_failure(raw: Any, has_key: bool) -> str:
+    """OpenAlex's anonymous budget is shared per IP, so a refusal rarely means "no network"."""
+    from . import error_text
+    why = error_text.reason(str(raw)) if raw else "没有响应"
+    if "限流" in why or "拒绝访问" in why:
+        if not has_key:
+            return "无法连接 OpenAlex：这个网络出口的匿名额度已经用完。填一个免费 Key 就能用，或换个网络再试"
+        return "无法连接 OpenAlex：这个出口被限流，稍后再试"
+    return f"无法连接 OpenAlex：{why}"
+
+
 def test_sources() -> list[dict[str, Any]]:
     from .. import quota
     cfg = _config.load_config()
     out = []
 
     live = quota.openalex_live()
+    key = str(cfg.get("openalex_api_key") or "").strip()
     if not live or live.get("error"):
-        out.append(_result("OpenAlex", False, _cannot_reach("OpenAlex", (live or {}).get("error"))))
+        out.append(_result("OpenAlex", False if key else None,
+                           _openalex_failure((live or {}).get("error"), bool(key))))
     else:
         left, limit = live.get("credits_remaining"), live.get("credits_limit")
         if live.get("has_key"):

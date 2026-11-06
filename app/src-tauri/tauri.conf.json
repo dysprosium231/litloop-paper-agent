@@ -35,9 +35,10 @@
       },
       "wix": {
         "language": [
-          "zh-CN",
-          "en-US"
-        ]
+          "zh-CN"
+        ],
+        "bannerPath": "icons/wix-banner.bmp",
+        "dialogImagePath": "icons/wix-dialog.bmp"
       }
     },
     "icon": [
