@@ -137,6 +137,8 @@
 
 桌面 app 可以直接下载安装包，也可以从源码运行，或自己打一个。**最新安装包：[Releases](https://github.com/dysprosium231/litloop-paper-agent/releases/latest)**（`LitLoop_1.18.2_x64-setup.exe`，约 102 MB，自带 Python 运行时；未签名，首次运行需要过 SmartScreen「更多信息 → 仍要运行」）。
 
+Windows 安装包的代码签名由 [SignPath.io](https://signpath.io/) 提供、证书由 [SignPath Foundation](https://signpath.org/) 签发。隐私说明见 [PRIVACY.md](PRIVACY.md)：程序在本机运行，没有遥测，数据只在你主动操作时才发往对应的文献数据库或出版商。
+
 从源码运行需要：Python 3.11+、Git、Node.js、Rust（Windows 上用 MSVC 工具链）。
 
 1. **装 Python 后台。** 最省事的办法是对 Claude Code、Codex 或 ZCode 里的 Agent 说：

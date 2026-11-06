@@ -15,12 +15,12 @@
 | Certum Open Source Code Signing | 证书免费，USB 令牌/读卡器几十欧 | 开源项目证明、身份验证、收实体令牌 | 不能，要插着令牌的机器本地签 |
 | Azure Trusted Signing | 约 $10/月 | Azure 订阅 + 身份/组织验证（规则常变，以官网为准） | 能，`trusted-signing-cli` 或官方 Action |
 
-对我们的情况（公开仓库、MIT 许可证、有 Release、CI 已经在打两个包），**先试 SignPath** 最划算：不用买硬件，签名直接在 `release.yml` 里。
+对我们的情况（公开仓库、Apache-2.0 许可证、有 Release、CI 已经在打两个包），**先试 SignPath** 最划算：不用买硬件，签名直接在 `release.yml` 里。
 
 ## SignPath 的申请材料
 
 1. 仓库地址：`https://github.com/dysprosium231/litloop-paper-agent`
-2. 许可证：MIT（仓库里的 `LICENSE`）
+2. 许可证：Apache-2.0（仓库里的 `LICENSE`）
 3. 说明项目做什么：学术文献 Agent，MCP 服务器 + 桌面 app，公开发布 Windows 安装包
 4. 签名对象：`LitLoop_*_x64-setup.exe`、`LitLoop_*_x64_*.msi`（以及里面的 `litloop-app.exe`）
 5. 通过后拿到三样东西：`organization-id`、`project-slug`、`policy-slug`，再加一个 API token
