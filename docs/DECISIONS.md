@@ -3,6 +3,15 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-06：MSI 安装包也能打出来
+
+- 背景：2026-11-05 用户要求「也提供标准的 msi，让用户选安装位置」。
+- 做法：`app/src-tauri/tauri.conf.json` 的 `bundle.targets` 改成 `["nsis", "msi"]`，`bundle.windows.wix.language` 设 `["zh-CN", "en-US"]`；`.github/workflows/release.yml` 的校验和步骤同时收集 `bundle/nsis/*.exe` 与 `bundle/msi/*.msi` 写进 `bundle/SHA256SUMS.txt`，`upload-artifact` 与 `softprops/action-gh-release` 的 `files` 都带上 msi，发版说明改成「两个包选一个」。
+- 产物：本机打出 `app/src-tauri/target/release/bundle/msi/LitLoop_1.18.2_x64_zh-CN.msi`，**134,520,105 字节 = 128.3 MiB**（NSIS 是 101.8 MiB，MSI 的 CAB 压缩率低一些）；用 Windows Installer COM 接口读属性得到 `ProductName LitLoop`、`ProductVersion 1.18.2`、`ProductLanguage 2052`、`ALLUSERS=1`；对话框表里有 `InstallDirDlg`、`BrowseDlg`、`LicenseAgreementDlg`，说明安装时可以选安装位置（正是用户要的）。
+- 有两点要注意：①文件名带语言后缀（`_x64_zh-CN.msi`），所以发版说明里写 `*_x64_*.msi` 而不是写死 `en-US`；②`ALLUSERS=1` 是**按机器安装、需要管理员权限**，与 NSIS 的 `installMode: "both"` 不同，说明里要写清。
+- 为什么本机构建看起来像「卡死」：第一次用 `build_release.py --bundle` 时把输出经 `Select-Object -Last 25` / `*>` 交给 PowerShell 管道，cargo 的 stderr 写满管道缓冲后阻塞，`rustc` CPU 停在 50 秒上不动两小时——`Compiling litloop-app` 是最后一行日志，`bundle/msi` 其实在 12:17 就已经产出。结论：Windows 上跑长构建要交给 `cmd /c ... > log 2>&1` 或直接写日志文件，不要经 PowerShell 管道转发。
+- 待实测：真机装一次 MSI（确认安装位置页、卸载时是否问保留 `~/.litloop`）、干净 Windows 验收；CI 里的 MSI 还没跑过（下一次打 tag 会一次出两个包）。
+
 ## 2026-11-06：内置 Agent 拿到自己的规则
 
 - 背景：2026-11-05 盘点发现，`_run_builtin()` 把给外部 Agent 的提示词直接当用户消息（第一句是「用 litloop 技能…」），调 `run_task()` 时又没传 `system`，内置模型手上只有 5 个工具的简短描述——没有四档口径、没有批次流程；步数还固定 8，三批深度检索就见底。

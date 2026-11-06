@@ -26,7 +26,7 @@
 | app：初次引导与设置 | ✅ | 后端 B 的模型配置随后端 B 做 |
 | app：术语表 | 🔶 | 待实测 7 |
 | app：下载队列与 Zotero | 🔶 | 待实测 1–5 |
-| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | NSIS 安装包已随 v1.18.2 发布；还差 MSI 安装包（2026-11-05 用户定）、自动更新、诊断包、签名（暂不做）、干净机验收 |
+| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | NSIS 与 MSI 两个包都能打出来（v1.18.2 只发了 NSIS）；还差自动更新、诊断包、签名（暂不做）、干净机验收 |
 | 完整流程（真实课题从检索到 Zotero 不用手动补救） | 🔶 | 待办池「阶段 2 剩余」：深度检索 → 批量下载 → 推送 Zotero 连起来走一遍 |
 
 ## 正在做
@@ -103,7 +103,7 @@
   - [x] 先摸底：核心依赖 **336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 跑起 `litloop.desktop.server`，合计约 **358 MB**（DECISIONS「发布摸底（2）」）；NSIS 安装包实测 **113.38 MiB**（DECISIONS「第一个 Windows 安装包」）。还剩：用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净 Windows 验收；
   - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时，Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出安装包；去掉版面分析后是 **99.59 MiB**（DECISIONS「第一个 Windows 安装包」「版面分析不进安装包」）。
   - [x] 按需组件：版面分析（`pymupdf-layout` + `onnxruntime` + `networkx`，约 65 MB）用 uv 装到 `~/.litloop/packages` 并加进 `sys.path`（2026-11-04，`src/litloop/optional.py`、设置页「可选组件」的「安装」按钮、`POST /api/components/{key}/install`、镜像配置 `package_index_url`；uv.exe 由 `scripts/build_release.py` 放进安装包；见 DECISIONS「版面分析改成按需安装」）。还没实测：在装了安装包的机器上点一次安装、看进度与失败提示；失败提示目前是 uv 输出末尾 15 行，没有百分比进度。
-  - [ ] **MSI 安装包**（2026-11-05 用户定）：`bundle.targets` 加 `msi`，安装时可选安装位置、按机器安装；同一份 `build/runtime` 复用，Release 里两个安装包一起给，`SHA256SUMS.txt` 覆盖两者；发版流程里两个包各装一遍、卸载一遍。
+  - [~] **MSI 安装包**（2026-11-05 用户定）：`bundle.targets` 已加 `msi`，`bundle.windows.wix.language` 为 `["zh-CN", "en-US"]`；已在本机打出 `LitLoop_1.18.2_x64_zh-CN.msi`（134,520,105 字节 = 128.3 MiB，`ProductVersion 1.18.2`、`ALLUSERS=1` 按机器安装，带 `InstallDirDlg`/`BrowseDlg` 可选安装位置）。发版流程已改成两个包一起给、`SHA256SUMS.txt` 覆盖两者（DECISIONS「MSI 安装包也能打出来」）。**还差**：真机装一次看安装位置页、卸载是否问保留 `~/.litloop`；MSI 是 `ALLUSERS=1`，需要管理员权限，发版说明要写明。
   - [ ] **诊断包**：设置里「导出诊断包」（版本、系统信息、最近一次任务日志、脱敏后的设置；不含 PDF 与凭据），见 CHARTER「发布」。
   - NSIS `installMode: "both"`，图标、名称、开始菜单；系统通知显示 LitLoop 自己的名称和图标（用户 2026-10-23 要求；开发模式下借用的是 PowerShell 的）；
   - 按需下载都要有进度和失败提示；

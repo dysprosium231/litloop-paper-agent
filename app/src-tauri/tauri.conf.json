@@ -26,11 +26,18 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis"
+      "nsis",
+      "msi"
     ],
     "windows": {
       "nsis": {
         "installMode": "both"
+      },
+      "wix": {
+        "language": [
+          "zh-CN",
+          "en-US"
+        ]
       }
     },
     "icon": [

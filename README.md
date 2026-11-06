@@ -165,7 +165,12 @@ Running from source needs Python 3.11+, Git, Node.js and Rust (the MSVC toolchai
 python scripts/build_release.py --bundle
 ```
 
-It first stages an embedded Python runtime in `build/runtime` (the official embeddable distribution, the core dependencies and `uv.exe`), then calls `npm run tauri build`. The result is `app/src-tauri/target/release/bundle/nsis/LitLoop_<version>_x64-setup.exe`, about 102 MiB (101.8 MiB for 1.18.2), with Python and the dependencies inside — the target machine needs nothing installed.
+It first stages an embedded Python runtime in `build/runtime` (the official embeddable distribution, the core dependencies and `uv.exe`), then calls `npm run tauri build`. You get two packages, either one installs the app:
+
+- `app/src-tauri/target/release/bundle/nsis/LitLoop_<version>_x64-setup.exe`, about 102 MiB (101.8 MiB for 1.18.2);
+- `app/src-tauri/target/release/bundle/msi/LitLoop_<version>_x64_<language>.msi`, about 128 MiB (128.3 MiB for 1.18.2), which lets the user pick the install folder; it installs per machine, so it needs administrator rights.
+
+Both ship Python and the dependencies inside — the target machine needs nothing installed.
 
 - Installing needs administrator rights (`installMode: both`).
 - The installer is **unsigned**: Windows shows the SmartScreen "unrecognised app" prompt, where you click "More info → Run anyway"; some company machines block this by policy.

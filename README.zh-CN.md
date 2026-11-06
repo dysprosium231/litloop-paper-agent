@@ -164,7 +164,12 @@
 python scripts/build_release.py --bundle
 ```
 
-先装配嵌入式 Python 运行时（`build/runtime`：官方 embeddable 发行版 + 核心依赖 + `uv.exe`），再调用 `npm run tauri build`。产物在 `app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`，约 102 MiB（1.18.2 实测 101.8 MiB），自带 Python 和依赖，目标机器不用装任何东西。
+先装配嵌入式 Python 运行时（`build/runtime`：官方 embeddable 发行版 + 核心依赖 + `uv.exe`），再调用 `npm run tauri build`。产物两个，任选一个安装：
+
+- `app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`，约 102 MiB（1.18.2 实测 101.8 MiB）；
+- `app/src-tauri/target/release/bundle/msi/LitLoop_<版本>_x64_<语言>.msi`，约 128 MiB（1.18.2 实测 128.3 MiB），安装时可以选安装位置，按机器安装、需要管理员权限。
+
+两个包都自带 Python 和依赖，目标机器不用装任何东西。
 
 - 安装需要管理员权限（`installMode: both`）。
 - 安装包**没有签名**：Windows 会先弹 SmartScreen「已阻止不认识的应用」，点「更多信息 → 仍要运行」；有的公司电脑策略不允许，需要放行。
