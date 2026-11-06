@@ -146,7 +146,38 @@ def drop_layout(site: Path) -> None:
     step(f"dropped the layout model ({freed / 1e6:.0f} MB); plain text order is used instead")
 
 
+def prune(site: Path) -> None:
+    """Drop files the app never reads, because the installer pays per file.
+
+    Windows Installer writes every file separately and the antivirus inspects
+    each one: 5300 files took about 90 seconds to install on the author's
+    machine, with the progress bar sitting at zero the whole time. Stubs,
+    headers, bundled test suites and byte-code caches are never imported.
+    """
+    step("dropping files the app never reads")
+    removed = freed = 0
+    for path in list(site.rglob("*")):
+        if not path.is_file():
+            continue
+        name = path.name
+        parts = {part.lower() for part in path.parts}
+        if "__pycache__" in parts or "tests" in parts or "test" in parts:
+            pass
+        elif name.endswith((".pyc", ".pyi", ".h")):
+            pass
+        else:
+            continue
+        freed += path.stat().st_size
+        path.unlink()
+        removed += 1
+    for path in site.rglob("__pycache__"):
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+    step(f"dropped {removed} files ({freed / 1e6:.0f} MB); what remains is imported at runtime")
+
+
 UV_URL = "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip"
+
 
 
 def fetch_uv() -> Path:
@@ -226,6 +257,7 @@ def main() -> None:
     install_litloop(site)
     if not args.with_layout:
         drop_layout(site)
+    prune(site)
     write_path_file()
     verify()
     step(f"runtime is {size_of(RUNTIME) / 1e6:.0f} MB at {RUNTIME}")
