@@ -3,6 +3,15 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-06：内置 Agent 拿到自己的规则
+
+- 背景：2026-11-05 盘点发现，`_run_builtin()` 把给外部 Agent 的提示词直接当用户消息（第一句是「用 litloop 技能…」），调 `run_task()` 时又没传 `system`，内置模型手上只有 5 个工具的简短描述——没有四档口径、没有批次流程；步数还固定 8，三批深度检索就见底。
+- 做法：新增 `src/litloop/agents/system.py`（`SYSTEM` 文本 + `system_prompt()`），内容从 `skills-src/shared/screening.md` 摘过来：四档怎么判、拿不准往高评、只有标题时注明「仅凭标题」、快速查找五步、深度检索六步、不许下载与写 Zotero、不许编造。`_run_builtin()` 传 `system=system_prompt()`，步数改成 `min(4 + 2 × 批数, 24)`（批数没填按 5），快速查找仍 8。
+- 一起改的两处：①`build_prompt(form, skill=True)` 加参数，内置后端传 `False`，第一句变成「做深度检索：…」；②`screening_save` 可以不传 `session` 新建会话（这时必须给 `question`），并把 `title`/`year`/`journal` 一并存下——之前快速查找在内置后端里根本没有会话可写，等于快速检索的评分保存不了。
+- 为什么用系统提示词、不把技能文档整段塞进用户消息：技能文档里还有 `litloop_search` 这类 MCP 工具名与呈现/用户选择流程，和内置后端的 5 个工具对不上；只抄判断口径与批次流程，其余靠工具描述。
+- 测试：`tests/test_agent_tools.py` 补「不传 session 新建会话、必须给 question」「没有评分要报错」「title/year 一起存」；`tests/test_agent_builtin.py` 补「系统提示词与批数对应的步数预算」「内置提示词不再提技能」。
+- 还没做：真实 Key 实测（DeepSeek 与本地 Ollama 各一次）、按任务分模型、用测试集比较两个后端的评分质量。
+
 ## 2026-11-05：内置 Agent 现在的样子（盘点）
 
 - 已有的：`agents/client.py`（Anthropic 原生 + OpenAI 兼容两套协议、统一返回、本机地址不走代理、`test_model()` 用一次 `ping` 工具调用验连通）、`agents/runner.py`（问模型 → 跑工具 → 再问，工具出错转成文字不中断）、`agents/tools.py`（`search`、`deep_search_start`、`deep_search_next`、`deep_search_status`、`screening_save` 五个）、`desktop/agent_runner.py` 里的内置分支（进度文案、抓 session、每秒最多写一次盘、取消）、设置页「内置 Agent」一组与 `agent_backend` 开关；22 个测试。

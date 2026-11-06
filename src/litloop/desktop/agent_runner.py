@@ -70,13 +70,17 @@ def _lines(text: str) -> list[str]:
     return [s.strip() for s in re.split(r"[\n;；]+", text or "") if s.strip()]
 
 
-def build_prompt(form: dict[str, Any]) -> str:
-    """The message the user would have typed, from the app's form."""
+def build_prompt(form: dict[str, Any], skill: bool = True) -> str:
+    """The message the user would have typed, from the app's form.
+
+    ``skill=False`` is for the built-in agent: it is told what to do by the system
+    prompt in ``litloop.agents.system`` instead of by a skill it cannot read.
+    """
     question = str(form.get("question") or "").strip()
     if not question:
         raise ValueError("填写检索问题")
     deep = form.get("mode") == "deep"
-    parts = [f"用 litloop 技能{'做深度检索' if deep else '快速查找文献'}：{question}"]
+    parts = [f"{'用 litloop 技能' if skill else ''}{'做深度检索' if deep else '快速查找文献'}：{question}"]
     criteria = _lines(str(form.get("criteria") or ""))
     if criteria:
         parts.append("纳入标准（按这些判断，不要改）：\n" + "\n".join(f"- {c}" for c in criteria))
@@ -160,7 +164,8 @@ def running() -> str | None:
 
 
 def start(form: dict[str, Any]) -> dict[str, Any]:
-    prompt = build_prompt(form)
+    builtin = _backend() == "builtin"
+    prompt = build_prompt(form, skill=not builtin)
     if running():
         raise RuntimeError("已有检索在进行，完成或取消后再开始新的检索")
     run = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -170,7 +175,7 @@ def start(form: dict[str, Any]) -> dict[str, Any]:
             "form": form, "prompt": prompt, "doing": "正在启动 Agent", "events": [],
             "session": None, "agent_session": None, "result": None, "error": None}
     _write(run, data)
-    if _backend() == "builtin":
+    if builtin:
         if not str(_config.load_config().get("builtin_agent_model") or "").strip():
             data.update(state="failed", doing=None,
                         error="无法开始检索：还没有填内置 Agent 的模型名。在「设置 → 内置 Agent」里填写")
@@ -389,8 +394,16 @@ def _run_builtin(run: str, data: dict[str, Any], prompt: str) -> None:
 
     try:
         from ..agents import FUNCTIONS, TOOLS, run_task
+        from ..agents.system import system_prompt
 
-        out = run_task(prompt, TOOLS, functions=FUNCTIONS, on_event=on_event)
+        form = data.get("form") or {}
+        deep = form.get("mode") == "deep"
+        batches = int(form.get("batches") or 0) or 5
+        # One batch costs a rate + a next call; building the pool and the final
+        # answer need a few more (2026-11-06: the old flat 8 stopped deep runs).
+        steps = min(4 + 2 * batches, 24) if deep else 8
+        out = run_task(prompt, TOOLS, functions=FUNCTIONS, system=system_prompt(),
+                       max_steps=steps, on_event=on_event)
         data["result"] = str(out.get("text") or "").strip() or None
         data["state"] = "cancelled" if stop.is_set() else "done"
     except _Cancelled:

@@ -52,17 +52,33 @@ def deep_search_status(session: str) -> dict[str, Any]:
     return deep.status(session)
 
 
-def screening_save(session: str, ratings: list[dict[str, Any]]) -> dict[str, Any]:
-    """Record ratings ([{"doi", "relevance", "reason"}], relevance one of 高/中/低/不相关)."""
+def screening_save(session: str = "", ratings: list[dict[str, Any]] | None = None,
+                   question: str = "", criteria: list[str] | None = None) -> dict[str, Any]:
+    """Record ratings ([{"doi", "relevance", "reason"}], relevance one of 高/中/低/不相关).
+
+    Without ``session`` a new screening session is created, named by ``question``.
+    """
     items = []
-    for item in ratings:
+    for item in ratings or []:
         doi = str(item.get("doi") or "").strip()
         relevance = str(item.get("relevance") or "").strip()
         if not doi or relevance not in ("高", "中", "低", "不相关"):
             raise ValueError(f"评分不对：{item!r}（要 doi 和 高/中/低/不相关）")
-        items.append({"doi": doi, "relevance": relevance, "reason": str(item.get("reason") or "")})
-    data = screening.load(session)
-    return screening.save(data.get("question", ""), items, session=session)
+        row = {"doi": doi, "relevance": relevance, "reason": str(item.get("reason") or "")}
+        for key in ("title", "year", "journal", "journal_rank", "cited_by_count",
+                    "abstract_missing", "retracted", "concern"):
+            if item.get(key) not in (None, "", []):
+                row[key] = item[key]
+        items.append(row)
+    if not items:
+        raise ValueError("没有评分要保存")
+    if session:
+        question = question or str(screening.load(session).get("question") or "")
+    elif not question.strip():
+        raise ValueError("保存评分要带 session，或者给 question 当这次筛选的标题")
+    saved = screening.save(question, items, criteria=criteria, session=session or None)
+    return {"session": saved["session"], "added": saved["added"], "total": saved["total"],
+            "by_relevance": saved["by_relevance"]}
 
 
 TOOLS: list[dict[str, Any]] = [
@@ -90,13 +106,17 @@ TOOLS: list[dict[str, Any]] = [
     {"name": "deep_search_status", "description": "看这个会话读到第几篇、找到多少目标、是否建议停止。",
      "parameters": {"type": "object", "properties": {"session": {"type": "string"}},
                     "required": ["session"]}},
-    {"name": "screening_save", "description": "保存一批评分：每篇给 doi、相关度（高/中/低/不相关）和一句理由。",
+    {"name": "screening_save", "description": "保存一批评分：每篇给 doi、相关度（高/中/低/不相关）和一句理由。不传 session 会新建会话，这时要传 question。",
      "parameters": {"type": "object", "properties": {
-         "session": {"type": "string"},
+         "session": {"type": "string", "description": "已有的筛选会话；新建时不传"},
+         "question": {"type": "string", "description": "新建会话时的标题，通常就是检索问题"},
+         "criteria": {"type": "array", "items": {"type": "string"}, "description": "纳入标准"},
          "ratings": {"type": "array", "items": {"type": "object", "properties": {
              "doi": {"type": "string"}, "relevance": {"type": "string"},
-             "reason": {"type": "string"}}, "required": ["doi", "relevance"]}}},
-         "required": ["session", "ratings"]}},
+             "reason": {"type": "string"}, "title": {"type": "string"},
+             "year": {"type": "integer"}, "journal": {"type": "string"}},
+             "required": ["doi", "relevance"]}}},
+         "required": ["ratings"]}},
 ]
 
 FUNCTIONS: dict[str, Callable[..., Any]] = {

@@ -11,6 +11,13 @@ from litloop import config
 from litloop.desktop import agent_runner
 
 
+def _idle(timeout: float = 5.0) -> None:
+    """The state flips before the worker clears itself, so wait for both."""
+    deadline = time.monotonic() + timeout
+    while agent_runner.running() is not None and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+
 def _wait(run: str, timeout: float = 5.0) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -51,6 +58,31 @@ def test_the_session_and_the_answer_come_back(builtin, monkeypatch):
     assert d["state"] == "done" and d["session"] == "20261104-1-x"
     assert d["result"] == "找到 12 篇。"
     assert [e["text"] for e in d["events"]][0] == "深度检索：正在构建候选池"
+
+
+def test_the_model_gets_the_rules_and_a_step_budget_that_fits_the_batches(builtin, monkeypatch):
+    seen = {}
+
+    def fake_run(goal, tools, *, functions, on_event, **kwargs):
+        seen.update(kwargs)
+        seen["goal"] = goal
+        return {"text": "完成", "steps": 1, "tool_calls": []}
+
+    monkeypatch.setattr("litloop.agents.run_task", fake_run)
+    _wait(agent_runner.start({"question": "x", "mode": "deep", "batches": 3})["run"])
+    _idle()
+    assert "相关度" in seen["system"] and "高 / 中 / 低 / 不相关" in seen["system"]
+    assert seen["max_steps"] == 10  # 4 + 2 per batch
+    seen.clear()
+    _wait(agent_runner.start({"question": "y"})["run"])
+    _idle()
+    assert seen["max_steps"] == 8  # a quick search does not need more
+
+
+def test_the_builtin_prompt_does_not_point_at_a_skill_it_cannot_read():
+    assert agent_runner.build_prompt({"question": "x"}).startswith("用 litloop 技能")
+    without = agent_runner.build_prompt({"question": "x", "mode": "deep"}, skill=False)
+    assert "技能" not in without and without.startswith("做深度检索")
 
 
 def test_a_failing_model_fails_the_run_with_its_message(builtin, monkeypatch):

@@ -36,16 +36,37 @@ def test_screening_save_checks_relevance_words(monkeypatch):
 
     def fake_save(question, items, **kwargs):
         saved.update(question=question, items=items, **kwargs)
-        return {"id": "s1"}
+        return {"session": "s1", "added": 1, "total": 1, "by_relevance": {"高": 1}}
 
     monkeypatch.setattr(tools.screening, "save", fake_save)
     monkeypatch.setattr(tools.screening, "load", lambda session: {"question": "SiC/Al"})
-    out = tools.screening_save("s1", [{"doi": "10.1/a", "relevance": "高", "reason": "对"}])
-    assert out == {"id": "s1"}
+    out = tools.screening_save("s1", [{"doi": "10.1/a", "relevance": "高", "reason": "对"},
+                                     {"doi": "10.1/b", "relevance": "低", "title": "B", "year": 2020}])
+    assert out == {"session": "s1", "added": 1, "total": 1, "by_relevance": {"高": 1}}
     assert saved["question"] == "SiC/Al" and saved["session"] == "s1"
-    assert saved["items"] == [{"doi": "10.1/a", "relevance": "高", "reason": "对"}]
+    assert saved["items"][0] == {"doi": "10.1/a", "relevance": "高", "reason": "对"}
+    assert saved["items"][1]["title"] == "B" and saved["items"][1]["year"] == 2020
     with pytest.raises(ValueError, match="评分不对"):
         tools.screening_save("s1", [{"doi": "10.1/a", "relevance": "interesting"}])
+
+
+def test_a_quick_save_needs_a_question_but_can_create_the_session(monkeypatch):
+    saved = {}
+
+    def fake_save(question, items, **kwargs):
+        saved.update(question=question, **kwargs)
+        return {"session": "20261106-1-x", "added": 2, "total": 2, "by_relevance": {"高": 1, "低": 1}}
+
+    monkeypatch.setattr(tools.screening, "save", fake_save)
+    rows = [{"doi": "10.1/a", "relevance": "高", "title": "A"},
+            {"doi": "10.1/b", "relevance": "低", "title": "B"}]
+    with pytest.raises(ValueError, match="question"):
+        tools.screening_save("", rows)
+    out = tools.screening_save("", rows, question="SiC/Al 无压浸渗")
+    assert out["session"] == "20261106-1-x"
+    assert saved["question"] == "SiC/Al 无压浸渗" and saved["session"] is None  # a new session
+    with pytest.raises(ValueError, match="没有评分"):
+        tools.screening_save("s1", [], question="x")
 
 
 def test_deep_search_tools_go_to_the_engine(monkeypatch):
