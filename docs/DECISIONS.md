@@ -1,5 +1,11 @@
 # 决定与实验记录
 
+## 2026-11-07：文本一律 LF，写进 .gitattributes
+
+- 现象：476 个受管文件里有 189 个在工作区是 CRLF、库里的 blob 是 LF；`core.autocrlf` 为空，也没有 `.gitattributes`。git 信任索引里的 stat 缓存，所以 `git status` 平时是干净的；一改动其中某个文件，缓存失效、git 才去比较，报出整文件重写（`+2945/−2909` 那种），每次都得手工把 `\r\n` 换回 `\n` 再提交。
+- 做法：新增 `.gitattributes`——`* text=auto eol=lf`，`*.bat`/`*.cmd` 保持 `eol=crlf`，常见二进制扩展名标 `binary`；跑 `git add --renormalize .`；再把工作区的 199 个文本文件统一转成 LF。两份 README 当初是把 CRLF 提交进库里的，renormalize 顺手修好（`git diff --ignore-all-space` 只剩 `.gitattributes` 一处）。
+- 结果：476 个文件现在全是 LF，`git status` 干净；以后哪个工具写了 CRLF，git 按文本归一，不会再冒出整文件 diff。
+
 ## 2026-11-07：内置 Agent 刚跑完就开新的会报「已有检索在进行」
 
 - CI 在 `60fe7ee`（只改文档）上红了一次：`tests/test_agent_builtin.py::test_cancel_stops_a_builtin_run` 抛 `已有检索在进行，完成或取消后再开始新的检索`。原因是上一个用例的线程把「完成」状态写进运行记录之后、还没把自己从 `_BUILTIN` 里摘掉，这一小段时间窗口里 `running()` 仍然认为有检索在跑；轮询到「完成」的人立刻点下一次就会撞上。真实使用里也会发生（深度检索刚结束就再发起）。
