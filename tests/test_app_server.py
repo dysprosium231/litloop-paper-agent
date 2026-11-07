@@ -29,6 +29,14 @@ def test_every_request_needs_the_token(client):
     assert client.get("/api/health").json()["schema"] == store.SCHEMA
 
 
+def test_the_data_dir_is_told_to_the_app(client):
+    """Settings shows where papers and sessions live, so an install does not look empty."""
+    from litloop.config import DATA_DIR
+    body = client.get("/api/data-dir").json()
+    assert body["path"] == str(DATA_DIR)
+    assert isinstance(body["exists"], bool)
+
+
 def test_sessions_and_one_session(client, session):
     assert [s["session"] for s in client.get("/api/sessions").json()] == [session]
     got = client.get(f"/api/sessions/{session}").json()

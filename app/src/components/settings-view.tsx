@@ -382,6 +382,9 @@ export function SettingsPage({ groups, current, onPick, onSaved, onGuide }: {
   const [diag, setDiag] = React.useState<{ path: string; size: number } | null>(null)
   const [diagBusy, setDiagBusy] = React.useState(false)
   const [diagError, setDiagError] = React.useState<string | null>(null)
+  // Where the papers and sessions live; the installer never touches this folder.
+  const [dataDir, setDataDir] = React.useState<string | null>(null)
+  React.useEffect(() => { settingsApi.dataDir().then((r) => setDataDir(r.path)).catch(() => {}) }, [])
   const exportDiagnostics = () => {
     setDiagError(null)
     setDiagBusy(true)
@@ -400,6 +403,16 @@ export function SettingsPage({ groups, current, onPick, onSaved, onGuide }: {
         </Button>
         <Button variant="outline" size="sm" onClick={onGuide}>重新运行引导</Button>
       </PageHeader>
+      {dataDir && (
+        <div className="flex flex-wrap items-center gap-x-2 border-b bg-muted/40 px-8 py-2 text-sm text-muted-foreground">
+          <span>数据目录</span>
+          <span className="font-mono text-xs text-foreground" title={dataDir}>{dataDir}</span>
+          <span>（论文、检索记录与设置都在这里，卸载不会删除）</span>
+          <Button variant="link" size="sm" className="h-auto px-0" onClick={() => downloadsApi.open(dataDir).catch(() => {})}>
+            打开
+          </Button>
+        </div>
+      )}
       {(diag || diagError) && (
         <div className="space-y-0.5 border-b bg-primary/5 px-8 py-2.5 text-sm">
           {diag && (

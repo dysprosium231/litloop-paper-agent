@@ -516,6 +516,12 @@ def create_app(token: str) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(404, "没有这个组件") from exc
 
+    @app.get("/api/data-dir")
+    def data_dir() -> dict[str, Any]:
+        """Where the papers, sessions and settings live (not inside the install folder)."""
+        from ..config import DATA_DIR
+        return {"path": str(DATA_DIR), "exists": DATA_DIR.exists()}
+
     @app.post("/api/diagnostics")
     def diagnostics_export() -> dict[str, Any]:
         """Write the diagnostic bundle and return where it landed."""

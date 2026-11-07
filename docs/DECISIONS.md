@@ -3,6 +3,14 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-07：设置页写明数据目录在哪
+
+- 背景：用户装完新 MSI 打开 app，看到的是上次的检索会话，问「为什么还是有残留数据」。程序装在 `D:\Program Files\LitLoop`，数据一直在 `C:\Users\Echo\.litloop`（约 2.8 GB：papers、cache、chrome-real、browser、screening、eval），安装包与卸载都不碰它——这个设计是对的（升级不丢数据），但界面上没有任何地方说清，用户只能猜。
+- 做法：`src/litloop/desktop/server.py` 加 `GET /api/data-dir`（返回 `config.DATA_DIR` 的路径与是否存在）；`app/src/lib/api.ts` 加 `settingsApi.dataDir()`；`app/src/components/settings-view.tsx` 的 `SettingsPage` 顶部加一行「数据目录 <路径>（论文、检索记录与设置都在这里，卸载不会删除）」+「打开」按钮。
+- 为什么用独立接口而不是塞进 `/api/settings`：设置项是「可以改的配置」，数据目录是只读事实，混进去会让「保存设置」的语义变模糊（`update()` 会把键写进 `config.json`）。
+- 测试：`tests/test_app_server.py::test_the_data_dir_is_told_to_the_app`（返回路径等于 `config.DATA_DIR`、带 `exists` 布尔）；`npm run build` 与 `npm run lint:copy`（No issues found）通过。
+- 还没做：卸载时问「是否保留你的数据」——MSI 目前不删 `~/.litloop`，也不问，属于同一类「让用户知道数据在哪」的问题，排在待办。
+
 ## 2026-11-07：卸载/升级前先关掉运行中的 LitLoop
 
 - 背景：2026-11-06 用户装完 MSI 后点卸载，报 `写入文件 D:\Program Files\LitLoop\15362e21.rbf 时出错`（见下一条「卸载失败的真正原因不是权限」）。NSIS 安装包自己会先结束进程，Tauri 的 WiX 模板不会，所以只要 app 开着，卸载或升级就会撞上同一个错。
