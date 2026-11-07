@@ -138,7 +138,7 @@ Publisher and institutional configuration, proxy setup and troubleshooting are i
 
 You can install the desktop app from a download, run it from source, or build your own installer. **Latest installer: [Releases](https://github.com/dysprosium231/litloop-paper-agent/releases/latest)** (`LitLoop_1.18.2_x64-setup.exe`, about 102 MB, ships its own Python runtime; it is not signed, so the first run has to get past SmartScreen via "More info → Run anyway").
 
-Code signing for the Windows installers uses the free open-source signing of the [SignPath Foundation](https://signpath.org/) (**application pending**: releases are not signed yet; once accepted, [SignPath.io](https://signpath.io/) signs the release builds in CI). See [PRIVACY.md](PRIVACY.md): the program runs on your machine, has no telemetry, and only contacts a literature database or a publisher when you ask it to.
+The installers are not signed: the [SignPath Foundation](https://signpath.org/) open-source programme declined the application on 2026-11-07, because it asks for a level of public visibility (stars, forks, outside references and discussion) that this repository does not have yet. Reapplying later is an option, and a paid certificate is the alternative for now (see [docs/SIGNING.md](docs/SIGNING.md)). See [PRIVACY.md](PRIVACY.md): the program runs on your machine, has no telemetry, and only contacts a literature database or a publisher when you ask it to.
 
 Running from source needs Python 3.11+, Git, Node.js and Rust (the MSVC toolchain on Windows).
 

@@ -1,5 +1,12 @@
 # 决定与实验记录
 
+## 2026-11-07：SignPath Foundation 的免费签名申请被拒
+
+- 2026-11-05 提交了 [SignPath Foundation](https://signpath.org/) 的 OSS 申请（材料见 `docs/SIGNING.md`），11-07 收到回信：不通过。回信的理由是这个计划面向「已经有一定公开关注度」的项目，评审看 stars、fork、贡献者、外部文章、独立引用或讨论（Reddit、Stack Overflow、YouTube）、机构背书这类外部信号；仓库 2026-10-11 才建、当时 1 个 star，不够。信里说等社区规模起来可以重新申请，也可以先用付费订阅（`https://docs.signpath.io/change-subscription`）。
+- 处理：`README.md`、`README.zh-CN.md`、`.github/workflows/release.yml` 的发版模板、`v1.18.2` 的线上发版说明统一改成「安装包目前没有签名，SignPath 的申请被拒」；`docs/SIGNING.md` 加「2026-11-07：申请被拒了」一节，记下理由与四条备选（先不签、Certum 免费证书要 USB 令牌只能本地签、Azure Trusted Signing 约 $10/月、SignPath 付费订阅）。
+- 判断：现在最务实的是**先不签**，把「未签名、要过 SmartScreen」写清楚；等 star/fork 与外部引用多起来再申请 Foundation。Certum 那条路每次发版本机手动签，和现在的发布流程冲突。
+- 尚未决定：要不要买 Certum 令牌（一次性几十欧）或走 Azure 付费签名——等用户定。
+
 ## 2026-11-07：精确命中的短语进了标题就加分，这一路默认打开
 
 - 上一条把 AND 检索这一路关着，原因是它把稀土池子从 7/9 拉到 8/9，但精确命中的文献仍被压到第 97–3726 名。这一条补上加分，再在三个材料测试集上重放。

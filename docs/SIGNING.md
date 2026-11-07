@@ -17,6 +17,19 @@
 
 对我们的情况（公开仓库、Apache-2.0 许可证、有 Release、CI 已经在打两个包），**先试 SignPath** 最划算：不用买硬件，签名直接在 `release.yml` 里。
 
+## 2026-11-07：SignPath 的申请被拒了
+
+提交申请后收到回信（Phillip，SignPath Foundation）：Foundation 计划面向「已经有了一定公开关注度」的项目，评审看的是 stars、fork、贡献者、外部文章、独立引用或讨论（Reddit、Stack Overflow、YouTube）、机构背书这类**外部信号**。这个仓库 2026-10-11 才建、当时 1 个 star，不够格，所以没发证书；信里说等社区规模起来欢迎重新申请，也提到可以先用付费订阅。
+
+接下来的选择，按性价比排：
+
+1. **先不签名**（现在的状态）：README 与发版说明写清「未签名、要过 SmartScreen」，等 stars/外部引用多起来再申请 Foundation。花 0，代价是安装体验差。
+2. **Certum Open Source Code Signing**：证书本身免费，但必须买 USB 令牌（几十欧 + 邮寄），签名只能在插着令牌的机器上做，CI 里签不了——每次发版本机手动签完再上传。
+3. **Azure Trusted Signing**：约 $10/月，能在 CI 里签；身份/组织验证的规则常变，个人开发者能否通过要先问支持。
+4. **SignPath 付费订阅**：能在 CI 里签，但价格高一个量级，适合以后有机构支持再说。
+
+不管走哪条，`release.yml` 与发版说明里的措辞都要保持一致（现在是如实的「未签名」）。
+
 ## SignPath 的申请材料
 
 1. 仓库地址：`https://github.com/dysprosium231/litloop-paper-agent`

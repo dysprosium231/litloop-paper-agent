@@ -137,7 +137,7 @@
 
 桌面 app 可以直接下载安装包，也可以从源码运行，或自己打一个。**最新安装包：[Releases](https://github.com/dysprosium231/litloop-paper-agent/releases/latest)**（`LitLoop_1.18.2_x64-setup.exe`，约 102 MB，自带 Python 运行时；未签名，首次运行需要过 SmartScreen「更多信息 → 仍要运行」）。
 
-Windows 安装包的代码签名使用 [SignPath Foundation](https://signpath.org/) 为开源项目提供的免费签名（**申请中**：当前发布的版本尚未签名，通过后由 [SignPath.io](https://signpath.io/) 在发布流程里签名）。隐私说明见 [PRIVACY.md](PRIVACY.md)：程序在本机运行，没有遥测，数据只在你主动操作时才发往对应的文献数据库或出版商。
+安装包目前没有签名：向 [SignPath Foundation](https://signpath.org/) 申请的开源免费签名在 2026-11-07 被拒，理由是这个计划要求项目已有足够的公开关注度（stars、fork、外部引用与讨论），仓库还太新；等社区规模起来可以重新申请，在那之前考虑改用付费证书（见 [docs/SIGNING.md](docs/SIGNING.md)）。隐私说明见 [PRIVACY.md](PRIVACY.md)：程序在本机运行，没有遥测，数据只在你主动操作时才发往对应的文献数据库或出版商。
 
 从源码运行需要：Python 3.11+、Git、Node.js、Rust（Windows 上用 MSVC 工具链）。
 
