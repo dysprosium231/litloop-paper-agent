@@ -1,0 +1,26 @@
+# Text files are stored and checked out with LF; only Windows batch
+# scripts keep CRLF. Binaries are listed so git never tries to diff them.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.ico binary
+*.icns binary
+*.bmp binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.exe binary
+*.msi binary
+*.dll binary
+*.pyd binary
+*.so binary
