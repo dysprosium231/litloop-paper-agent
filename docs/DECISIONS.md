@@ -1,5 +1,12 @@
 # 决定与实验记录
 
+## 2026-11-07：内置 Agent 刚跑完就开新的会报「已有检索在进行」
+
+- CI 在 `60fe7ee`（只改文档）上红了一次：`tests/test_agent_builtin.py::test_cancel_stops_a_builtin_run` 抛 `已有检索在进行，完成或取消后再开始新的检索`。原因是上一个用例的线程把「完成」状态写进运行记录之后、还没把自己从 `_BUILTIN` 里摘掉，这一小段时间窗口里 `running()` 仍然认为有检索在跑；轮询到「完成」的人立刻点下一次就会撞上。真实使用里也会发生（深度检索刚结束就再发起）。
+- 做法：`src/litloop/desktop/agent_runner.py` 加模块级 `_DONE: set[str]`，`_run_builtin` 的 `finally` 里**先**把 run 记进 `_DONE` 再写最终状态，写完再摘 `_BUILTIN`；`running()` 只把「线程还活着且不在 `_DONE` 里」的内置检索算作进行中。这样「记录里已经是完成态」与「`running()` 返回 None」是同时成立的，不会读到半截。
+- 试过另一种顺序（先摘 `_BUILTIN` 再写文件），会把记录写成 `interrupted`（`get()` 看到「running 但不在表里」就当成 app 被关掉），所以反过来做。
+- 测试：`tests/test_agent_builtin.py` 加 `test_a_new_run_can_start_the_moment_the_last_one_finishes`（第一轮 `done` 之后**不 sleep** 直接开第二轮，必须能开起来）；该文件 7 个连跑三遍都过。
+
 ## 2026-11-07：SignPath Foundation 的免费签名申请被拒
 
 - 2026-11-05 提交了 [SignPath Foundation](https://signpath.org/) 的 OSS 申请（材料见 `docs/SIGNING.md`），11-07 收到回信：不通过。回信的理由是这个计划面向「已经有一定公开关注度」的项目，评审看 stars、fork、贡献者、外部文章、独立引用或讨论（Reddit、Stack Overflow、YouTube）、机构背书这类外部信号；仓库 2026-10-11 才建、当时 1 个 star，不够。信里说等社区规模起来可以重新申请，也可以先用付费订阅（`https://docs.signpath.io/change-subscription`）。

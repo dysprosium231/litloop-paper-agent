@@ -37,6 +37,7 @@ _TOOL_TEXT = {
 }
 _SESSION_RE = re.compile(r'"session"\s*:\s*"([^"]+)"')
 _LOCK = threading.Lock()
+_DONE: set[str] = set()  # builtin runs whose final state is written
 _PROCS: dict[str, subprocess.Popen] = {}
 _CANCELLED: set[str] = set()
 _SESSION_TOOLS = frozenset({"litloop_screening", "litloop_deep_search"})
@@ -160,7 +161,7 @@ def running() -> str | None:
         for r, p in _PROCS.items():
             if p.poll() is None:
                 return r
-        return next((r for r, t in _BUILTIN.items() if t.is_alive()), None)
+        return next((r for r, t in _BUILTIN.items() if t.is_alive() and r not in _DONE), None)
 
 
 def start(form: dict[str, Any]) -> dict[str, Any]:
@@ -413,11 +414,17 @@ def _run_builtin(run: str, data: dict[str, Any], prompt: str) -> None:
     finally:
         data["doing"] = None
         data["finished"] = datetime.now().isoformat(timespec="seconds")
+        # Mark it finished before the last write: whoever reads the finished
+        # state may start the next run at once, while this thread is still
+        # alive for a moment and must not count as running.
+        with _LOCK:
+            _DONE.add(run)
         _write(run, data)
         with _LOCK:
             _BUILTIN.pop(run, None)
             _STOP.pop(run, None)
             _CANCELLED.discard(run)
+            _DONE.discard(run)
 
 
 def cancel(run: str) -> bool:

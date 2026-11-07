@@ -118,3 +118,12 @@ def test_cancel_stops_a_builtin_run(builtin, monkeypatch):
     while agent_runner.running() is not None and time.monotonic() < deadline:
         time.sleep(0.02)
     assert agent_runner.running() is None
+
+
+def test_a_new_run_can_start_the_moment_the_last_one_finishes(builtin, monkeypatch):
+    monkeypatch.setattr("litloop.agents.run_task", lambda *a, **k: {"text": "好了", "steps": 1, "tool_calls": []})
+    first = agent_runner.start({"question": "x"})["run"]
+    assert _wait(first)["state"] == "done"
+    # No sleep: the finished run must be out of the running table already.
+    second = agent_runner.start({"question": "y"})["run"]
+    assert _wait(second)["state"] == "done"
