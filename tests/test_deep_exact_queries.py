@@ -45,3 +45,36 @@ def test_a_failing_exact_query_does_not_stop_the_others(monkeypatch):
     assert deep._exact_candidates(["cerium nanoparticle drug"], None, None) == {
         "cerium nanoparticle drug": []
     }
+
+
+def test_a_phrase_mostly_in_the_title_is_covered():
+    rec = {"title": "Cerium dioxide nanoparticles for drug delivery"}
+    assert deep._title_cover(rec, ["cerium dioxide nanoparticle"]) == 1.0
+
+
+def test_a_phrase_the_title_does_not_carry_is_not_covered():
+    assert deep._title_cover({"title": "Bioactive glass scaffolds"}, ["cerium nanoparticle drug"]) == 0.0
+
+
+def test_the_best_phrase_decides_the_bonus():
+    rec = {"title": "Erbium ytterbium hydroxide hollow spheres"}
+    cover = deep._title_cover(rec, ["cerium nanoparticle drug", "erbium ytterbium hydroxide"])
+    assert cover == 1.0
+
+
+def test_a_covered_phrase_from_the_exact_pass_raises_the_score():
+    rec = {"title": "Cerium dioxide nanoparticles", "via": ["exact: cerium dioxide nanoparticle"]}
+    state = {"pool": {"10.1/x": rec}, "seeds": [], "orig_seeds": [], "seed_refs": [],
+             "queries": ["cerium oxide nanoparticles"], "core_terms": CORE}
+    deep._score(state)
+    assert rec["phrase"] == 1.0
+    assert rec["score"] >= deep.EXACT_WEIGHT
+
+
+def test_a_phrase_only_two_of_three_words_in_the_title_is_not_enough():
+    rec = {"title": "Cerium dioxide films", "via": ["exact: cerium dioxide nanoparticle"]}
+    state = {"pool": {"10.1/x": rec}, "seeds": [], "orig_seeds": [], "seed_refs": [],
+             "queries": [], "core_terms": CORE}
+    deep._score(state)
+    assert rec["phrase"] < deep.EXACT_MIN_COVER
+    assert rec["score"] == 0

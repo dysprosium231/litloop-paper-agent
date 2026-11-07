@@ -41,6 +41,7 @@ def main() -> int:
     ap.add_argument("--max", type=int, default=150, help="papers to read before stopping (default 150)")
     ap.add_argument("--batch", type=int, default=30, help="batch size (default 30, as in the recorded runs)")
     ap.add_argument("--stop-on-unjudged", action="store_true", help="stop and list papers with no judgment")
+    ap.add_argument("--exact", action="store_true", help="turn on deep_exact_queries for this run")
     ap.add_argument("--past-stop", action="store_true",
                     help="keep reading after a suggested stop, up to --max (data for scripts/stop_calibration.py)")
     args = ap.parse_args()
@@ -52,6 +53,9 @@ def main() -> int:
     targets = {canonical_doi(t["doi"] if isinstance(t, dict) else t) for t in acc["targets"]}
 
     t0, credits0 = time.time(), quota.spent("openalex")
+    if args.exact:
+        base = deep_search.load_config
+        deep_search.load_config = lambda: {**base(), "deep_exact_queries": True}
     out = deep_search.start(params["question"], params["queries"], seeds, params["core_terms"],
                             must_find=sorted(targets), year_from=params.get("year_from"),
                             year_to=params.get("year_to"), batch_size=args.batch, cap=max(args.max, 200))

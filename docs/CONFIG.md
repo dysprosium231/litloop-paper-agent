@@ -20,7 +20,7 @@
 | `scihub_http_workers` | `12` | Sci-Hub 纯 HTTP 镜像请求共享的线程数，自定值 |
 | `scihub_slow_pdf_seconds` | `90` | 备份镜像竞速窗口（45 秒）结束后，对已经在写 `.part` 的车道再多等这么久（秒，自定值）；`0` 表示不等 |
 | `scihub_slow_pdf_idle_seconds` | `30` | 上面那段额外等待里，连续这么多秒没有新字节就放弃（秒，自定值） |
-| `deep_exact_queries` | `false` | 实验项：深度检索时额外跑一轮两三个词的 AND 检索（`title_and_abstract.search`），召回更高但排名会被噪音拉低，见 [DECISIONS](DECISIONS.md) 2026-11-07 |
+| `deep_exact_queries` | `true` | 深度检索时额外跑一轮两三个词的 AND 检索（`title_and_abstract.search`）；标题里带着这个短语的文献额外加分。三个材料测试集上读到 30–90 篇时找到的更多，代价是多花 5–25% 积分，见 [DECISIONS](DECISIONS.md) 2026-11-07 |
 | `watch_check_days` | 7 | app 打开时，超过这么多天没检查的追踪会自动检查一次（每次检查花 50 次检索的额度） |
 | `package_index_url` | 空 | 安装可选组件（版面分析）时用的软件源；留空用 PyPI，可填国内镜像（自定值） |
 | `search_fill_abstracts` | `true` | 检索结果自动补全摘要 |

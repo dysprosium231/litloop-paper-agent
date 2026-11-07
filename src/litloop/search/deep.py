@@ -66,6 +66,8 @@ _FIELDS = ("id,doi,title,publication_year,cited_by_count,referenced_works,"
 NON_PAPER = {"dataset", "paratext", "erratum", "reference-entry", "book-review", "editorial",
              "peer-review", "grant", "standard", "retraction", "supplementary-materials", "libguides"}
 QUERY_WEIGHT = 2
+EXACT_WEIGHT = 5.0  # a phrase from the exact pass sitting in the title (see the sweep in DECISIONS)
+EXACT_MIN_COVER = 0.75  # ... and most of its words are there: all of a 2-4 word phrase
 ABSTRACT_CHARS = 1200   # per paper in a batch; a batch of 20 stays under ~30 KB for the agent
 PREFILL = 150          # fetch missing abstracts for this many top candidates before ranking
 MIN_LABELS = (3, 5)    # positives (高 + seeds), negatives (中/低/不相关) before the model takes over
@@ -360,6 +362,25 @@ def _exact_candidates(terms: list[str], year_from: int | None, year_to: int | No
         return dict(zip(terms, ex.map(one, terms)))
 
 
+def _exact_terms_of(rec: dict[str, Any]) -> list[str]:
+    """The and-style phrases that found this record (``_exact_terms`` wrote them into ``via``)."""
+    return [v[len("exact: "):] for v in (rec.get("via") or []) if v.startswith("exact: ")]
+
+
+def _title_cover(rec: dict[str, Any], terms: list[str]) -> float:
+    """Best share of a phrase's words that the title itself carries (0 when it has none)."""
+    from ..terms.text import plain, singular
+    if not terms:
+        return 0.0
+    title = {singular(w) for w in plain(rec.get("title") or "").split()}
+    best = 0.0
+    for term in terms:
+        words = [singular(w) for w in plain(term).split() if w]
+        if words:
+            best = max(best, sum(1 for w in words if w in title) / len(words))
+    return best
+
+
 def _key(rec: dict[str, Any]) -> str:
     return rec.get("doi") or ("oa:" + rec["openalex"] if rec.get("openalex") else "")
 
@@ -420,7 +441,10 @@ def _score(state: dict[str, Any]) -> None:
         r["coupling"] = len(shared)
         r["anchored"] = round(sum(1.0 if ref in orig_refs else min(1.0, seed_df[ref] / 3) for ref in shared), 2)
         r["query_hits"] = hits[k]
-        r["score"] = r["anchored"] + QUERY_WEIGHT * r["query_hits"]
+        cover = _title_cover(r, _exact_terms_of(r))
+        r["phrase"] = round(cover, 2)
+        r["score"] = (r["anchored"] + QUERY_WEIGHT * r["query_hits"]
+                      + (EXACT_WEIGHT if cover >= EXACT_MIN_COVER - 1e-9 else 0.0))
         r["rank"] = r["score"]
 
 

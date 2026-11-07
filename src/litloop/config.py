@@ -226,7 +226,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # crawling. Set in 设置 → 可选组件.
     "package_index_url": "",
     "watch_check_days": 7,
-    "deep_exact_queries": False,  # experimental: and-style short phrases (see docs/DECISIONS.md)
+    "deep_exact_queries": True,  # and-style short phrases, plus a bonus when the phrase is in the title
     # Desktop app: push a download job to Zotero when it finishes (off: the
     # user pushes from the job page), into <root>/<the job's title>.
     "zotero_auto_push": False,

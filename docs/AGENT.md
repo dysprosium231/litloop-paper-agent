@@ -158,6 +158,6 @@ litloop check                                                     # 检查依赖
 
 验收结果：SiC/Al 测试集筛 150 篇找到 19 篇目标中的 17 篇（第一版筛 90 篇只找到 12 篇）；PDC 气凝胶测试集筛 120 篇找到 26 篇中的 24 篇，150 篇时建议停止。离陶瓷较远的「稀土药物载体」测试集筛 150 篇只找到 9 篇中的 2 篇：这个课题分支多（配位聚合物、磷酸钙、生物玻璃、空心氧化物……），分支之间很少互相引用，排序容易被其中一支占满，还在改进。
 
-改检索参数前，可以用 `scripts/eval_deep_search.py <测试集>` 按存下的评分自动重放一次深度检索，看“读到第 N 篇找到几篇”，一次约几百 OpenAlex 积分。只想比较“怎么出批”而不花积分时，用 `scripts/replay_batching.py ~/.litloop/screening/<会话>.pool.json --judgments tests/acceptance/<测试集>.judgments.json`，它在存下的候选池上重跑同一套排序。
+改检索参数前，可以用 `scripts/eval_deep_search.py <测试集>` 按存下的评分自动重放一次深度检索，看“读到第 N 篇找到几篇”，一次约几百到两千 OpenAlex 积分；加 `--exact` 可以把 `deep_exact_queries` 打开的版本也跑一遍（默认已开）。只想比较“怎么出批”而不花积分时，用 `scripts/replay_batching.py ~/.litloop/screening/<会话>.pool.json --judgments tests/acceptance/<测试集>.judgments.json`，它在存下的候选池上重跑同一套排序。
 
 > 期刊分区和本地撤稿库由配套插件 litloop-journal-rank 提供，它目前还没有公开。没装这个插件时，检索的其他功能照常可用。
