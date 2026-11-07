@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 
@@ -118,6 +119,26 @@ def test_cancel_stops_a_builtin_run(builtin, monkeypatch):
     while agent_runner.running() is not None and time.monotonic() < deadline:
         time.sleep(0.02)
     assert agent_runner.running() is None
+
+
+def test_a_run_that_finishes_while_being_read_is_not_called_interrupted(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(agent_runner, "runs_dir", lambda: tmp_path)
+    (tmp_path / "20261107-201500.json").write_text(
+        json.dumps({"state": "running"}), encoding="utf-8"
+    )
+    seen: list[int] = []
+
+    def read_json(p):
+        seen.append(1)
+        if len(seen) == 1:
+            return {"state": "running"}  # the run had not written its end yet
+        return {"state": "failed", "error": "x"}
+
+    monkeypatch.setattr(agent_runner.store, "read_json", read_json)
+    assert agent_runner.get("20261107-201500")["state"] == "failed"
+    assert len(seen) == 2
 
 
 def test_a_new_run_can_start_the_moment_the_last_one_finishes(builtin, monkeypatch):

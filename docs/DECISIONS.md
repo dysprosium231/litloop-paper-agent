@@ -6,6 +6,7 @@
 - 做法：`src/litloop/desktop/agent_runner.py` 加模块级 `_DONE: set[str]`，`_run_builtin` 的 `finally` 里**先**把 run 记进 `_DONE` 再写最终状态，写完再摘 `_BUILTIN`；`running()` 只把「线程还活着且不在 `_DONE` 里」的内置检索算作进行中。这样「记录里已经是完成态」与「`running()` 返回 None」是同时成立的，不会读到半截。
 - 试过另一种顺序（先摘 `_BUILTIN` 再写文件），会把记录写成 `interrupted`（`get()` 看到「running 但不在表里」就当成 app 被关掉），所以反过来做。
 - 测试：`tests/test_agent_builtin.py` 加 `test_a_new_run_can_start_the_moment_the_last_one_finishes`（第一轮 `done` 之后**不 sleep** 直接开第二轮，必须能开起来）；该文件 7 个连跑三遍都过。
+- 紧接着 CI 又在同一个文件上红了一次（`test_a_failing_model_fails_the_run_with_its_message` 拿到 `interrupted`）：`get()` 先读文件、再查「还在不在表里」，如果读发生在写最终状态之前、查发生在摘掉之后，就会把一次正常的失败读成「app 被关掉」。改成 `get()` 发现记录还是 `running` 且 `_alive(run)` 为假时**再读一次**，仍是 `running` 才判 `interrupted`；`_alive()` 在锁里同时看 `_PROCS`/`_BUILTIN`/`_DONE`。测试加 `test_a_run_that_finishes_while_being_read_is_not_called_interrupted`（假读接口第一次返回 `running`、第二次返回 `failed`，必须读到 `failed` 且读两次）。
 
 ## 2026-11-07：SignPath Foundation 的免费签名申请被拒
 

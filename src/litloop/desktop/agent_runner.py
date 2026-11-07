@@ -141,9 +141,19 @@ def get(run: str) -> dict[str, Any] | None:
     if not p.exists():
         return None
     d = store.read_json(p)
-    if d.get("state") == "running" and run not in _PROCS and run not in _BUILTIN:
-        d["state"] = "interrupted"  # the app was closed while it ran
+    if d.get("state") == "running" and not _alive(run):
+        # The reader may have caught the file just before the run wrote its
+        # final state; if the run is gone now, look once more before calling it
+        # interrupted.
+        d = store.read_json(p)
+        if d.get("state") == "running":
+            d["state"] = "interrupted"  # the app was closed while it ran
     return d
+
+
+def _alive(run: str) -> bool:
+    with _LOCK:
+        return run in _PROCS or run in _BUILTIN or run in _DONE
 
 
 def list_runs(limit: int = 20) -> list[dict[str, Any]]:
