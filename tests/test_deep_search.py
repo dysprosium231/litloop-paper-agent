@@ -49,6 +49,7 @@ def net(tmp_path, monkeypatch):
     monkeypatch.setattr(deep_search, "_cites_refs_on_topic", cites_refs)
     monkeypatch.setattr(deep_search, "_citing", citing)
     monkeypatch.setattr(deep_search, "_keyword_candidates", keyword)
+    monkeypatch.setattr(deep_search, "_exact_candidates", lambda terms, yf, yt: {})
     import litloop.search.abstracts as ab
     import litloop.search.quick as s
     monkeypatch.setattr(ab, "fill_abstracts", lambda items, cfg=None, **kw: None)

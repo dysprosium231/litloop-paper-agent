@@ -306,6 +306,60 @@ def _keyword_candidates(queries: list[str], year_from: int | None, year_to: int 
         return dict(zip(queries, ex.map(one, queries)))
 
 
+_FILLER = frozenset("""
+a an and as at by for from in into of on or the their to via with using used study studies
+effect effects new based nano vitro vivo application applications
+""".split())
+
+_FUNCTIONS = ("drug", "delivery", "release", "loading", "imaging", "therapy", "antioxidant",
+              "cytotoxicity", "bioactivity", "carrier")
+
+
+def _exact_terms(queries: list[str], core_terms: list[str]) -> list[str]:
+    """Two- and three-word phrases to AND together instead of ranking by overlap.
+
+    OpenAlex's ``search`` ranks by how many words match, so a long query buries
+    papers that use one different word: a query saying "cerium oxide" missed a
+    paper titled "cerium dioxide nanoparticles" among the first hundred. ANDing
+    two or three words shrinks the result set to a few hundred and puts it back
+    in view (2026-11-07: the two rare-earth targets the keyword route never
+    found sat at ranks 34 and 3 this way).
+    """
+    known = {a.lower() for term in core_terms for w in term.replace(",", " ").split()
+             for a in w.split("|") if a}
+    out: list[str] = []
+    for q in queries:
+        words = [w for w in re.split(r"[^0-9a-z\u4e00-\u9fff-]+", q.lower()) if w and w not in _FILLER]
+        if not words:
+            continue
+        out.append(" ".join(words[:3]))
+        element = next((w for w in words if w in known), "")
+        function = next((w for w in words if w in _FUNCTIONS), "")
+        if element and function and element != function:
+            out.append(f"{element} nanoparticle {function}")
+    seen: list[str] = []
+    for t in out:
+        if t and t not in seen:
+            seen.append(t)
+    return seen[:16]
+
+
+def _exact_candidates(terms: list[str], year_from: int | None, year_to: int | None) -> dict[str, list[dict]]:
+    """Up to 60 most cited works whose title or abstract has every word of ``term``."""
+    years = _year_filter(year_from, year_to)
+
+    def one(term: str) -> list[dict[str, Any]]:
+        flt = ",".join([f"title_and_abstract.search:{term}"] + years)
+        try:
+            return _pages(flt, 60, split_over=False) or []
+        except Exception as exc:
+            logger.warning("deep search: exact query %r failed (%s)", term, exc)
+            return []
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        return dict(zip(terms, ex.map(one, terms)))
+
+
 def _key(rec: dict[str, Any]) -> str:
     return rec.get("doi") or ("oa:" + rec["openalex"] if rec.get("openalex") else "")
 
@@ -626,12 +680,20 @@ def _start(session: str, t0: float, question: str, queries: list[str], seeds: li
            batch_size: int, cap: int) -> dict[str, Any]:
     query_variants, glossary_alts, glossary_used = _glossary_expansions(queries, core_terms)
     all_queries = queries + [v for q in queries for v in query_variants.get(q, [])]
-    _phase("keywords", len(all_queries))
     years = _year_filter(year_from, year_to)
     pool: dict[str, dict] = {}
     seed_recs = _by_filter("doi", [canonical_doi(s) for s in seeds])
     for rec in seed_recs:
         _add(pool, rec, "seed")
+    # Off by default: measured 2026-11-07 on the rare-earth set, it puts 8 of the 9 targets
+    # into the pool but the ranking buries them again (the read window found 1 instead of 2).
+    # See docs/DECISIONS.md; keep it for experiments until the scorer can tell the hits apart.
+    exact_terms = _exact_terms(queries, core_terms) if load_config().get("deep_exact_queries") else []
+    _phase("keywords", len(all_queries) + len(exact_terms))
+    if exact_terms:
+        for term, rows in _exact_candidates(exact_terms, year_from, year_to).items():
+            for rec in rows:
+                _add(pool, rec, f"exact: {term}")
     for q, rows in _keyword_candidates(all_queries, year_from, year_to).items():
         for r in rows:
             _add(pool, {"openalex": None, "doi": canonical_doi(r.get("doi")) or None,

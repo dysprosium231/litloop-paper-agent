@@ -1,5 +1,18 @@
 # 决定与实验记录
 
+## 2026-11-07：精确（AND）检索这一路先关着
+
+- 起因：稀土测试集 9 篇只找到 2 篇，其中 `10.2147/ijn.s434873`（ceria 抗氧化）和 `10.1016/j.inoche.2026.117182`（Er/Yb 氢氧化物空心球）连候选池都进不去。
+- 实测（OpenAlex，2026-11-07）：
+  - 这两篇用标题原文能查到（`search=` 排名 11/50 与 1/4），但用会话里的长检索词（5–6 个词）在**前 100 条里一次都没出现**；换成按日期排序也不出现。
+  - 原因：OpenAlex 的 `search=` 按词重合度排序，长查询召回一大片高被引文章，专有名词差一个词就掉出前 100（该文写 `dioxide`，会话检索词写 `oxide`）。
+  - 换成 AND 语义（`filter=title_and_abstract.search:<2–3 个词>`）结果集缩到几十到几千，目标重新出现：`cerium dioxide nanoparticle` 排名 22、`cerium nanoparticle drug` 排名 34、`erbium ytterbium hydroxide` 排名 3、`hollow lanthanide hydroxide` 排名 1。
+- 做法：`src/litloop/search/deep.py` 新增 `_exact_terms(queries, core_terms)`（每条检索词取前三个实词，再补一条「元素 + nanoparticle + 功能词」）与 `_exact_candidates(terms, ...)`（`_pages` 取每种 60 条），在 `_start` 里作为「精确这一路」入池，`via` 记 `exact: <词>`。`tests/test_deep_exact_queries.py` 5 个。
+- 结果：稀土集上开启后候选池从 7/9 升到 **8/9**（只差 `10.2147/ijn.s434873`），但排名把它们埋在 97–3726 名，读完 120 篇只找到 **1** 篇（关闭时是 2 篇）；花 668 积分、331 秒。
+- 决定：代码留着，用 `deep_exact_queries`（默认 `false`）控制。理由：召回确实变好，但 `_score` 给不了 AND 命中应有的优势——同一批 60 条最常被引文章都拿同样的 `exact:` 标记，无法区分。等排序能识别「标题里整短语命中」再打开。
+- 下一步（写进 TODO）：给标题/摘要里**完整短语命中**的记录单独的加分项，然后在三个材料测试集上重放对比。
+- 教训：修「查不全」先分清是召回问题还是排序问题；这次是召回提高了、排序没跟上，只看池子大小会得出相反结论。
+
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
