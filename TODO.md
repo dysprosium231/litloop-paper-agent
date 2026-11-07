@@ -26,12 +26,12 @@
 | app：初次引导与设置 | ✅ | 后端 B 的模型配置随后端 B 做 |
 | app：术语表 | 🔶 | 待实测 7 |
 | app：下载队列与 Zotero | 🔶 | 待实测 1–5 |
-| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | MSI 也能打（中文单语言、自定义向导位图，2026-11-06）；还差卸载前关闭运行中的实例、自动更新、诊断包实测、签名（暂不做）、干净机验收 |
+| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | MSI 也能打（中文单语言、自定义向导位图、卸载/升级前先关掉运行中的实例，2026-11-07）；还差自动更新、诊断包实测、签名（暂不做）、干净机验收 |
 | 完整流程（真实课题从检索到 Zotero 不用手动补救） | 🔶 | 待办池「阶段 2 剩余」：深度检索 → 批量下载 → 推送 Zotero 连起来走一遍 |
 
 ## 正在做
 
-（无。2026-11-06 收工：当天做完内置 Agent 的系统提示词与步数预算、MSI 安装包（含裁剪运行时、单语言、自定义位图）、诊断包、深度链接与单实例转发、`docs/SIGNING.md` 与 `PRIVACY.md`；真机上装了两次 MSI、踩到「卸载时程序还开着会报 `.rbf`」和「OpenAlex 匿名额度按出口 IP 共享」两件事，都已记进 DECISIONS。**下次开工第一件：加 `python scripts/build_release.py` 重打 MSI 复装**（今天最后一版打出来之前我改了 OpenAlex 文案，运行时没重新装配），顺手做「卸载前关闭实例」，再按待实测 13、14 验。）
+（正在做：2026-11-07 补做昨天剩的两件——①重装配运行时（带上 OpenAlex 限流的新文案）并把版本升到 **1.18.3**；②卸载/升级前先关掉运行中的实例（自定义 WiX 模板 `app/src-tauri/wix/main.wxs` 加 `CloseRunningApp`），重打 MSI 待真机验（待实测 13）。接着按待实测 14 看无 Key 时的首次引导提示。之后候选：待实测 8–12、深度检索第三路候选（离线评估）。用户还没定：分析归纳验收标准、要不要重议「不拆大文件」。）
 
 ## 待用户决定
 
@@ -69,7 +69,7 @@
 10. [ ] **Sci-Hub 慢速镜像**：遇到「找到 PDF 但传得慢」的镜像时看是否多等并成功、单篇最坏多久（见 DECISIONS「Sci-Hub 慢速镜像多等一会儿」）。
 11. [ ] **arXiv 任务行**：在 app 里粘贴一条 arXiv 编号，看下载任务的进度、来源、结果是否都正常显示（见 DECISIONS「arXiv 编号与 DOI 对不上时也能更新任务」）。
 12. [ ] **深度检索完成通知**：app 开着、人在别的页面时，让 Agent 跑完一轮，看是否弹「深度检索有新的一批」、同一轮只弹一次（见 DECISIONS「深度检索一轮跑完发通知」）。
-13. [ ] **MSI 复装与卸载**（2026-11-06 真机测了一半）：重打带裁剪运行时的包，装一次看向导的新位图（蓝色，不再是红光盘）与耗时（上次 96 秒 / 4329→ 文件）；**开着 app 卸载**看是否仍报 `.rbf`（要等 WiX 模板加上「先关闭实例」）；卸载时有没有问保留 `~/.litloop`；`ALLUSERS=1` 需要管理员这点是否在页面上说清。
+13. [ ] **MSI 复装与卸载**（2026-11-07 已重打包，等真机验）：装 `LitLoop_1.18.3_x64_zh-CN.msi`，看①向导位图是蓝色的（不再是红光盘）、②安装位置能改到 D 盘、③耗时（上次 5299 个文件 96 秒，裁剪后 4329 个文件）；然后**开着 app** 再卸一次，确认不再报 `写入文件 …\*.rbf 时出错`（模板里加了 `taskkill`）；升级路径：从 1.18.2 直接装 1.18.3，看旧版本是否被正确替换（ARP 里只剩一份）。卸载时问是否保留 `~/.litloop` 还没做。
 14. [ ] **OpenAlex 无 Key 的首次引导**（2026-11-06）：空数据目录下点「检测」，现在应显示黄色「这个网络出口的匿名额度已经用完…填一个免费 Key 就能用」（原来是红色「可能需要学校认证」）；填 Key 后应变绿并显示今日剩余积分。
 
 ## 待办池
@@ -105,7 +105,7 @@
   - [x] 先摸底：核心依赖 **336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 跑起 `litloop.desktop.server`，合计约 **358 MB**（DECISIONS「发布摸底（2）」）；NSIS 安装包实测 **113.38 MiB**（DECISIONS「第一个 Windows 安装包」）。还剩：用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净 Windows 验收；
   - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时，Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出安装包；去掉版面分析后是 **99.59 MiB**（DECISIONS「第一个 Windows 安装包」「版面分析不进安装包」）。
   - [x] 按需组件：版面分析（`pymupdf-layout` + `onnxruntime` + `networkx`，约 65 MB）用 uv 装到 `~/.litloop/packages` 并加进 `sys.path`（2026-11-04，`src/litloop/optional.py`、设置页「可选组件」的「安装」按钮、`POST /api/components/{key}/install`、镜像配置 `package_index_url`；uv.exe 由 `scripts/build_release.py` 放进安装包；见 DECISIONS「版面分析改成按需安装」）。还没实测：在装了安装包的机器上点一次安装、看进度与失败提示；失败提示目前是 uv 输出末尾 15 行，没有百分比进度。
-  - [~] **MSI 安装包**（2026-11-05 用户定）：`bundle.targets` 含 `msi`；语言只留 `zh-CN`（两种语言会打出两个独立产品，真机上先后装出过两份）；`bannerPath`/`dialogImagePath` 换成品牌图（`scripts/make_installer_images.py`）；发版流程两个包一起给、`SHA256SUMS.txt` 覆盖两者（DECISIONS「MSI 安装包也能打出来」「MSI 换掉默认位图，只出中文一份」）。产物 `LitLoop_1.18.2_x64_zh-CN.msi`，裁剪运行时后 **132,011,222 字节（125.9 MiB）**。2026-11-06 真机装过两次（`D:\Program Files\LitLoop`、4329 个文件、96 秒）。**还差**：改过 Python 代码后必须先跑 `python scripts/build_release.py` 再打（`build/runtime` 是快照，直接 `tauri build` 会带旧代码）；卸载/升级前先关掉运行中的实例（WiX 模板要加自定义动作，否则用户开着 app 升级会报 `写入文件 …\*.rbf 时出错`，见 DECISIONS「卸载失败的真正原因不是权限」）；卸载时问是否保留 `~/.litloop`。
+  - [~] **MSI 安装包**（2026-11-05 用户定）：`bundle.targets` 含 `msi`；语言只留 `zh-CN`（两种语言会打出两个独立产品，真机上先后装出过两份）；`bannerPath`/`dialogImagePath` 换成品牌图（`scripts/make_installer_images.py`）；**自定义模板** `app/src-tauri/wix/main.wxs`（复制自 tauri-bundler v2.12.3，加了 `CloseRunningApp`：`taskkill /F /T /IM litloop-app.exe`，`After="InstallValidate"`，见 DECISIONS「卸载/升级前先关掉运行中的 LitLoop」）；发版流程两个包一起给、`SHA256SUMS.txt` 覆盖两者。`scripts/build_release.py` 新增 `--bundles nsis|msi` 只打一种。产物 `LitLoop_1.18.3_x64_zh-CN.msi`。2026-11-06 真机装过两次（`D:\Program Files\LitLoop`、5299→4329 个文件、96 秒）。**还差**：改过 Python 代码后必须先跑 `python scripts/build_release.py` 再打（`build/runtime` 是快照，直接 `tauri build` 会带旧代码）；卸载时问是否保留 `~/.litloop`；**模板与 Tauri 版本绑定**，升级 tauri-cli 后要跟上游 `crates/tauri-bundler/src/bundle/windows/msi/main.wxs` 对一遍。
   - [~] **诊断包**：设置页右上角「导出诊断包」、命令行 `litloop diagnose [-o 目录]`、`POST /api/diagnostics`，产物是 `~/.litloop/exports/litloop-diagnostics-<时间>.zip`（`diagnostics.json` + `log.txt` + `README.txt`；版本、系统、数据目录计数、脱敏后的设置、可选组件与 uv 状态、最近 300 行日志，不含 PDF、Zotero 与密钥）。见 DECISIONS「诊断包：一份 zip 说清版本、设置和最近的日志」。**还差**：真机上点一次看提示，以及确认安装包里的 Python 也能写进 `~/.litloop/exports`。
   - NSIS `installMode: "both"`，图标、名称、开始菜单；系统通知显示 LitLoop 自己的名称和图标（用户 2026-10-23 要求；开发模式下借用的是 PowerShell 的）；
   - 按需下载都要有进度和失败提示；

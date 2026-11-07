@@ -1,6 +1,6 @@
 {
   "name": "litloop",
-  "version": "1.18.2",
+  "version": "1.18.3",
   "description": "LitLoop (Academic Paper Agent) turns academic paper search, download, Zotero filing and citation export into a reusable agent workflow. Derived from Rimagination/scansci-pdf.",
   "author": {
     "name": "dysprosium231",

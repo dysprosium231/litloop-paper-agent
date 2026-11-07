@@ -8,13 +8,13 @@
     "url": "https://github.com/dysprosium231/litloop-paper-agent",
     "source": "github"
   },
-  "version": "1.18.2",
+  "version": "1.18.3",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "litloop",
-      "version": "1.18.2",
+      "version": "1.18.3",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

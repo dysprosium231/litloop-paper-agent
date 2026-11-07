@@ -1,6 +1,6 @@
 [project]
 name = "litloop"
-version = "1.18.2"
+version = "1.18.3"
 description = "LitLoop academic paper agent: search, screening, download (open access, publisher and institutional routes) and Zotero filing, as an MCP server and CLI"
 readme = "README.md"
 license = {text = "Apache-2.0"}

@@ -225,19 +225,23 @@ def size_of(path: Path) -> int:
     return sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
 
 
-def bundle() -> None:
+def bundle(bundles: str = "") -> None:
     npm = "npm.cmd" if os.name == "nt" else "npm"
     step("building the installer (npm run tauri build)")
     # The runtime only exists after staging, so the resources that pull it into
     # the bundle live in a separate overlay the plain `cargo check` never sees.
-    subprocess.run([npm, "run", "tauri", "build", "--", "--config", "src-tauri/tauri.release.json"],
-                   cwd=ROOT / "app", check=True)
+    cmd = [npm, "run", "tauri", "build", "--", "--config", "src-tauri/tauri.release.json"]
+    if bundles:
+        cmd += ["--bundles", bundles]
+    subprocess.run(cmd, cwd=ROOT / "app", check=True)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--clean", action="store_true", help="delete build/runtime and stage it again")
     ap.add_argument("--bundle", action="store_true", help="run npm run tauri build afterwards")
+    ap.add_argument("--bundles", default="",
+                    help="with --bundle: which bundles to build (nsis, msi); empty = as configured")
     ap.add_argument("--with-layout", action="store_true",
                     help="keep pymupdf-layout and onnxruntime (about 67 MB) in the runtime")
     ap.add_argument("--no-uv", action="store_true",
@@ -263,7 +267,7 @@ def main() -> None:
     step(f"runtime is {size_of(RUNTIME) / 1e6:.0f} MB at {RUNTIME}")
 
     if args.bundle:
-        bundle()
+        bundle(args.bundles)
 
 
 if __name__ == "__main__":

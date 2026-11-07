@@ -3,6 +3,14 @@
 > 已完成的工作、实验结论和用户做的决定，按主题和日期归档；从 [TODO.md](../TODO.md) 移来（2026-10-18 起）。
 > 进度和待办仍记在 TODO.md；设计与验收标准见 [CHARTER.md](../CHARTER.md)。
 
+## 2026-11-07：卸载/升级前先关掉运行中的 LitLoop
+
+- 背景：2026-11-06 用户装完 MSI 后点卸载，报 `写入文件 D:\Program Files\LitLoop\15362e21.rbf 时出错`（见下一条「卸载失败的真正原因不是权限」）。NSIS 安装包自己会先结束进程，Tauri 的 WiX 模板不会，所以只要 app 开着，卸载或升级就会撞上同一个错。
+- 做法：把 tauri-bundler v2.12.3 的 WiX 模板复制一份到 `app/src-tauri/wix/main.wxs`，只加两处——一个 `CloseRunningApp` 自定义动作（`taskkill /F /T /IM litloop-app.exe`，`Execute="deferred"` + `Impersonate="no"` 跟着安装序列一起提权，`Return="ignore"` 因为没在跑时 taskkill 会返回 128），以及 `InstallExecuteSequence` 里的 `<CustomAction Id="CloseRunningApp" After="InstallValidate" />`；`tauri.conf.json` 的 `bundle.windows.wix.template` 指过去。
+- 为什么放在 `After="InstallValidate"`：安装与卸载都经过这一格，且都在 `InstallInitialize`（以及 MajorUpgrade 卸载旧版本）之前，能赶在任何文件被删除或替换前动手；写在一个 `CustomAction` 里对两种情况都生效，不用分别挂到 `InstallExecuteSequence` 和 `InstallUISequence`。
+- 代价：模板是**跟 Tauri 版本绑定的副本**，升级 tauri-cli 后要和上游 `crates/tauri-bundler/src/bundle/windows/msi/main.wxs` 对一遍（上游改动没进来时会静默用旧模板）。TODO 里记了这条。
+- 顺带：`scripts/build_release.py` 加 `--bundles nsis|msi`，只打一种包时不用等另一种；版本升到 **1.18.3**，装过的 1.18.2 能按 MajorUpgrade 正常升级。
+
 ## 2026-11-06：MSI 换掉默认位图，只出中文一份
 
 - 用户反馈：「那个红色图标光盘好丑」，同时问「没有为当前用户 / 为所有人安装的选项吗」。
