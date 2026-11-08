@@ -71,7 +71,7 @@ jobs:
             app/src-tauri/target/release/bundle/msi/*.msi
             app/src-tauri/target/release/bundle/SHA256SUMS.txt
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           files: |
