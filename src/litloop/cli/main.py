@@ -26,6 +26,24 @@ def _default_output_dir(output: str) -> str:
     from ..config import load_config
     return str(Path(load_config().get("output_dir") or ".").expanduser())
 
+def _version_callback(value: bool) -> None:
+    if value:
+        from .. import __version__
+
+        typer.echo(f"litloop {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _options(
+    version: bool = typer.Option(
+        False, "--version", callback=_version_callback, is_eager=True,
+        help="Show the version and exit.",
+    ),
+) -> None:
+    """Search, screen, download and file papers."""
+
+
 @app.command("run")
 def run_server(
     mode: ServerMode = typer.Option(ServerMode.STDIO, help="Transport mode"),
@@ -813,8 +831,12 @@ def search_cmd(
             author_match = results[0].pop("_author_match")
     else:
         sort_key = sort if sort else None
-        results = search_papers(query, limit=limit, year_from=year_from, year_to=year_to, sort=sort_key)
+        stats: dict = {}
+        results = search_papers(query, limit=limit, year_from=year_from, year_to=year_to,
+                                sort=sort_key, stats=stats)
         author_match = None
+        if not results:
+            _explain_empty_search(stats.get("errors") or [])
 
     if out:
         from ..download.pipeline import QueueEntry, predict_channel, write_queue
@@ -846,6 +868,20 @@ def search_cmd(
             print(f"    {authors}  ({r.get('year', '?')})  cited={cited}  doi:{r.get('doi', '?')}")
             if i < len(results):
                 print()
+
+
+def _explain_empty_search(errors: list[str]) -> None:
+    """Say why nothing came back instead of printing an empty list."""
+    if not errors:
+        typer.echo("没有搜到结果：换个关键词，或者放宽年份再试。", err=True)
+        return
+    typer.echo("没有搜到结果：" + "；".join(errors), err=True)
+    if any("429" in e.lower() or "限流" in e or "rate" in e.lower() for e in errors):
+        typer.echo(
+            "OpenAlex 对不带 Key 的检索限流很紧：可以在 https://openalex.org/settings/api "
+            "申请一个免费 Key，再填到 app 的「设置 → 检索接口」或 config 里。",
+            err=True,
+        )
 
 
 @app.command("plan")

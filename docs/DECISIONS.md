@@ -1,5 +1,15 @@
 # 决定与实验记录
 
+## 2026-11-08：干净机器上试出来的三个问题
+
+- 场景：在一台干净的 Ubuntu 24.04 云电脑上 `git clone` + `pip install .`，按新用户的路子走一遍。
+- 问题 1：`pip install` 打印 setuptools 的弃用报错框——`pyproject.toml` 里 `license = {text = "Apache-2.0"}` 是旧表格写法。改成 PEP 639 的 `license = "Apache-2.0"` + `license-files = ["LICENSE"]`。
+- 问题 2：`litloop --version` 报 `No such option`。typer 入口加 `@app.callback()` 的 `--version`（打到 stderr 不必要，走 stdout，`litloop 1.18.3`）。
+- 问题 3（真 bug）：**没有 Key 时快速检索静默返回空**。`_search_openalex` 在没有 `sort` 时走 OpenAlex 的 `search=` 参数，而匿名 `search=` 现在经常 429（`Anonymous search is temporarily rate-limited...`）；同一时刻 `filter=title_and_abstract.search:...` 返回 200。三个来源都失败时 `search_papers` 只是返回 `[]`，CLI 打印 `{"results": []}`，用户完全不知道发生了什么。
+  - 做法一：关键词检索一律改用 `filter=title_and_abstract.search:<query>`（`search=` 还匹配全文，本来就该用 filter）。
+  - 做法二：`_search_openalex` / `_search_semantic_scholar` / `_search_crossref` 加 `errors` 参数，非 200 与异常都记一句原因；`search_papers`、`_collect`、`search_papers_v2` 一路透传，`stats["errors"]` 带上。CLI 空结果时打印「没有搜到结果：<原因>」，命中 429 再提示去申请免费 Key。
+  - 测试：`tests/test_search_errors.py` 5 个（429 被记住、请求里是 filter 不是 search、`stats["errors"]`、两种 CLI 提示）。
+
 ## 2026-11-07：文本一律 LF，写进 .gitattributes
 
 - 现象：476 个受管文件里有 189 个在工作区是 CRLF、库里的 blob 是 LF；`core.autocrlf` 为空，也没有 `.gitattributes`。git 信任索引里的 stat 缓存，所以 `git status` 平时是干净的；一改动其中某个文件，缓存失效、git 才去比较，报出整文件重写（`+2945/−2909` 那种），每次都得手工把 `\r\n` 换回 `\n` 再提交。

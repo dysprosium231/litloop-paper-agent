@@ -53,6 +53,24 @@ def _plain_session() -> requests.Session:
     return s
 
 
+def _note(errors: list[str] | None, message: str) -> None:
+    """Remember why a source returned nothing, so the caller can say it."""
+    logger.warning("search: %s", message)
+    if errors is not None and message not in errors:
+        errors.append(message)
+
+
+def _body_reason(resp: Any) -> str:
+    """The short reason an API gave, e.g. "Rate limit exceeded"."""
+    try:
+        data = resp.json()
+    except Exception:
+        return str(resp.reason or "")[:80]
+    if isinstance(data, dict):
+        return str(data.get("error") or data.get("message") or "")[:120]
+    return ""
+
+
 def _reconstruct_abstract(inverted_index: dict | None) -> str:
     if not isinstance(inverted_index, dict):
         return ""
@@ -71,6 +89,7 @@ def _search_openalex(
     query: str, limit: int = 10,
     year_from: int | None = None, year_to: int | None = None,
     sort: str | None = None,
+    errors: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     try:
         session = _plain_session()
@@ -80,12 +99,11 @@ def _search_openalex(
         if key:
             params["api_key"] = key
         filters = []
-        if sort and query:
-            # `search=` also matches full text, so sorted by citations it
-            # returned famous off-topic papers; restrict to title + abstract.
+        if query:
+            # Title + abstract only: `search=` also matches full text and, with
+            # no API key, answers 429 ("Anonymous search is temporarily
+            # rate-limited") often enough that a fresh install searches nothing.
             filters.append("title_and_abstract.search:" + query.replace(",", " "))
-        elif query:
-            params["search"] = query
         if year_from or year_to:
             y_from = year_from or 1900
             y_to = year_to or 2026
@@ -101,9 +119,11 @@ def _search_openalex(
             timeout=_SEARCH_TIMEOUT,
         )
         if resp.status_code != 200:
+            _note(errors, f"OpenAlex {resp.status_code}: {_body_reason(resp)}")
             return []
         data = resp.json()
-    except Exception:
+    except Exception as exc:
+        _note(errors, f"OpenAlex 连不上：{type(exc).__name__}")
         return []
     return _parse_openalex_works(data.get("results", []))
 
@@ -277,7 +297,11 @@ def search_papers_v2(
     filtering = bool(max_cas_zone or max_cas_sub_zone or max_jcr_quartile
                      or exclude_warning or exclude_retracted)
     pool = limit * 3 if filtering else limit
-    results = _collect(query, pool, limit, year_from, year_to, sort, author, author_id, expansions)
+    errors: list[str] = []
+    results = _collect(query, pool, limit, year_from, year_to, sort, author, author_id,
+                       expansions, errors)
+    if stats is not None and errors:
+        stats["errors"] = errors
     return _finalize(results, limit, max_cas_zone=max_cas_zone, max_cas_sub_zone=max_cas_sub_zone,
                      max_jcr_quartile=max_jcr_quartile,
                      exclude_warning=exclude_warning, exclude_retracted=exclude_retracted, stats=stats)
@@ -295,11 +319,12 @@ def _glossary_variants(query: str) -> tuple[list[str], list[dict[str, Any]]]:
 
 
 def _collect(query, pool, limit, year_from, year_to, sort, author, author_id,
-             expansions: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+             expansions: list[dict[str, Any]] | None = None,
+             errors: list[str] | None = None) -> list[dict[str, Any]]:
     if author_id or author:
         return search_papers(
             query, limit=pool, year_from=year_from, year_to=year_to, sort=sort,
-            author=author, author_id=author_id,
+            author=author, author_id=author_id, errors=errors,
         )
     if not query:
         return []
@@ -307,11 +332,14 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id,
     if expansions is not None:
         expansions += used
     if not variants:
-        return _tidy(_collect_one(query, pool, year_from, year_to, sort), query, sort)
+        return _tidy(_collect_one(query, pool, year_from, year_to, sort, errors), query, sort)
     # Each wording is searched on its own; results are taken from each in turn,
     # so papers that only write the other wording also reach the first page.
     with ThreadPoolExecutor(max_workers=len(variants) + 1) as ex:
-        runs = list(ex.map(lambda q: _collect_one(q, pool, year_from, year_to, sort), [query, *variants]))
+        runs = list(ex.map(
+            lambda q: _collect_one(q, pool, year_from, year_to, sort, errors),
+            [query, *variants],
+        ))
     logger.info("search: glossary wordings %s returned %s results", variants, [len(r) for r in runs])
     return _tidy(_take_in_turns(runs), query, sort, variants)
 
@@ -331,12 +359,14 @@ def _take_in_turns(runs: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
     return out
 
 
-def _collect_one(query, pool, year_from, year_to, sort) -> list[dict[str, Any]]:
+def _collect_one(query, pool, year_from, year_to, sort,
+                 errors: list[str] | None = None) -> list[dict[str, Any]]:
     """One wording of a keyword search, not yet tidied: the discovery engine, or the built-in search."""
     try:
         from .scansci_find import find_cli_available, search as discovery_search, to_legacy_results
         if not find_cli_available():
-            return search_papers(query, limit=pool, year_from=year_from, year_to=year_to, sort=sort)
+            return search_papers(query, limit=pool, year_from=year_from, year_to=year_to,
+                                 sort=sort, errors=errors)
         with tempfile.TemporaryDirectory(prefix="scansci_find_") as tmp:
             payload = discovery_search(
                 query, tmp, depth="quick", limit=max(pool * 2, 30),
@@ -746,6 +776,7 @@ def search_papers(
     *,
     author: str | None = None,
     author_id: str | None = None,
+    errors: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Search papers from OpenAlex + Semantic Scholar + Crossref in parallel.
 
@@ -788,15 +819,15 @@ def search_papers(
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         futures = {
-            pool.submit(_search_openalex, query, per_source, year_from, year_to, sort): "openalex",
-            pool.submit(_search_semantic_scholar, query, per_source, year_from, year_to): "semantic_scholar",
-            pool.submit(_search_crossref, query, per_source, year_from, year_to): "crossref",
+            pool.submit(_search_openalex, query, per_source, year_from, year_to, sort, errors): "openalex",
+            pool.submit(_search_semantic_scholar, query, per_source, year_from, year_to, errors): "semantic_scholar",
+            pool.submit(_search_crossref, query, per_source, year_from, year_to, errors): "crossref",
         }
         for future in as_completed(futures, timeout=30):
             try:
                 all_results.extend(future.result())
-            except Exception:
-                pass
+            except Exception as exc:
+                _note(errors, f"{futures[future]} 出错：{type(exc).__name__}")
 
     # Deduplicate by DOI (prefer entry with more info)
     seen: dict[str, dict[str, Any]] = {}
@@ -831,6 +862,7 @@ def search_papers(
 def _search_semantic_scholar(
     query: str, limit: int = 10,
     year_from: int | None = None, year_to: int | None = None,
+    errors: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     import time
     try:
@@ -859,11 +891,14 @@ def _search_semantic_scholar(
             if resp.status_code == 429:
                 time.sleep(2 * (attempt + 1))
                 continue
+            _note(errors, f"Semantic Scholar {resp.status_code}")
             return []
         else:
+            _note(errors, "Semantic Scholar 限流（429）")
             return []
         data = resp.json()
-    except Exception:
+    except Exception as exc:
+        _note(errors, f"Semantic Scholar 连不上：{type(exc).__name__}")
         return []
 
     results = []
@@ -891,6 +926,7 @@ def _search_semantic_scholar(
 def _search_crossref(
     query: str, limit: int = 10,
     year_from: int | None = None, year_to: int | None = None,
+    errors: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     try:
         session = _plain_session()
@@ -913,9 +949,11 @@ def _search_crossref(
             timeout=_SEARCH_TIMEOUT,
         )
         if resp.status_code != 200:
+            _note(errors, f"Crossref {resp.status_code}")
             return []
         data = resp.json()
-    except Exception:
+    except Exception as exc:
+        _note(errors, f"Crossref 连不上：{type(exc).__name__}")
         return []
 
     results = []
