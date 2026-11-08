@@ -63,7 +63,7 @@ jobs:
           } | Out-File -Encoding utf8 $out
           Get-Content $out
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: litloop-windows
           path: |
