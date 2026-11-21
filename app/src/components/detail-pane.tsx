@@ -18,6 +18,7 @@ export type Paper = (BatchPaper | Item) & { item: Item | null }
  */
 export function DetailPane({
   paper,
+  emptyHint,
   onRate,
   onSelect,
   onExclude,
@@ -25,6 +26,7 @@ export function DetailPane({
   onTranslate,
 }: {
   paper: Paper | null
+  emptyHint?: string
   onRate: (rel: Relevance) => void
   onSelect: () => void
   onExclude: (reason?: string) => void
@@ -49,7 +51,7 @@ export function DetailPane({
     run()
   }, [canTranslate, translation, item, key, run])
   if (!paper) {
-    return <div className="flex flex-1 items-center justify-center bg-canvas text-sm text-muted-foreground">选择文献以查看详情</div>
+    return <div className="flex flex-1 items-center justify-center bg-canvas text-sm text-muted-foreground">{emptyHint ?? "选择文献以查看详情"}</div>
   }
   const rel = item ? rating(item) : null
   const busy = translating?.key === key && !translating.error
@@ -149,7 +151,7 @@ export function DetailPane({
                 </Button>
               </div>
             </div>
-          <p className="text-xs text-muted-foreground">快捷键：↑↓ 切换 · 1–4 评分 · 空格 加入下载</p>
+          <p className="text-xs text-muted-foreground">快捷键：↑↓ 切换 · 1–4 评分 · 空格 加入下载 · Ctrl+Z 撤销</p>
         </Card>
       </div>
     </div>

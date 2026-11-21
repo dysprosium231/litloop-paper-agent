@@ -156,6 +156,20 @@ class Decision(BaseModel):
     reason: str | None = None  # why, when rejecting; optional
 
 
+class BatchOp(BaseModel):
+    doi: str | None = None
+    title: str | None = None
+    relevance: str | None = None
+    decision: str | None = None
+    reject_reason: str | None = None
+    clear_user_relevance: bool = False
+    delete_if_unrated: bool = False
+
+
+class BatchUpdate(BaseModel):
+    ops: list[BatchOp]
+
+
 _OPENALEX: dict[str, Any] = {"at": 0.0, "data": None}  # see /api/quota/openalex
 _WRITE_MODE: dict[str, Any] = {}  # zotero-mcp's write mode, cached until the user authorizes
 
@@ -428,6 +442,98 @@ def create_app(token: str) -> FastAPI:
             else:  # a pick, an un-pick, or "no reason": the old one must not linger
                 item.pop("reject_reason", None)
         return {"item": item}
+
+    @app.post("/api/sessions/{session}/batch")
+    def batch_update(session: str, body: BatchUpdate) -> dict[str, Any]:
+        path = _record_path(session)
+        if not body.ops:
+            raise HTTPException(400, "无法批量保存：未选择文献")
+        for op in body.ops:
+            if "relevance" in op.model_fields_set and op.relevance is not None and op.relevance not in screening.RELEVANCE:
+                raise HTTPException(400, f"无法评分：评分只能是{'、'.join(screening.RELEVANCE)}")
+            if "decision" in op.model_fields_set and op.decision not in (None, "selected", "rejected"):
+                raise HTTPException(400, "无法保存：只能加入下载或排除")
+
+        record = store.read_json(path)
+        existing_keys = {screening._key(it) for it in record["items"]}
+        created_keys: set[str] = set()
+        to_create: list[dict[str, Any]] = []
+        pending_create_keys: set[str] = set()
+        for op in body.ops:
+            if op.delete_if_unrated or op.clear_user_relevance:
+                continue
+            if "relevance" not in op.model_fields_set or op.relevance is None:
+                continue
+            key = screening._key({"doi": op.doi, "title": op.title})
+            if key in existing_keys or key in pending_create_keys:
+                continue
+            from ..search import deep as deep_search
+            try:
+                paper = deep_search.batch_paper(session, op.doi, op.title)
+            except FileNotFoundError:
+                paper = None
+            if paper:
+                pending_create_keys.add(key)
+                to_create.append({**paper, "relevance": op.relevance, "reason": ""})
+        if to_create:
+            screening.save("", to_create, session=session, mode="deep")
+            created_keys.update(pending_create_keys)
+
+        with store.update(path, indent=2) as data:
+            by_key = {screening._key(it): it for it in data["items"]}
+            updated = 0
+            skipped = 0
+            previous: list[dict[str, Any]] = []
+            for op in body.ops:
+                key = screening._key({"doi": op.doi, "title": op.title})
+                item = by_key.get(key)
+                if item is None:
+                    skipped += 1
+                    continue
+                existed = key not in created_keys
+                prev = {
+                    "doi": item.get("doi"),
+                    "title": item.get("title"),
+                    "existed": existed,
+                    "relevance": item.get("relevance") if existed else None,
+                    "user_relevance": item.get("user_relevance") if existed else None,
+                    "decision": item.get("decision") if existed else None,
+                    "reject_reason": item.get("reject_reason") if existed else None,
+                }
+                created_keys.discard(key)
+                if op.delete_if_unrated:
+                    if not item.get("reason"):
+                        data["items"].remove(item)
+                        by_key.pop(key, None)
+                    else:
+                        item.pop("user_relevance", None)
+                else:
+                    if op.clear_user_relevance or "relevance" in op.model_fields_set:
+                        target_rel = None if op.clear_user_relevance else op.relevance
+                        if not item.get("reason"):
+                            if target_rel is None:
+                                data["items"].remove(item)
+                                by_key.pop(key, None)
+                                updated += 1
+                                previous.append(prev)
+                                continue
+                            item["relevance"] = item["user_relevance"] = target_rel
+                        elif target_rel is None or target_rel == item["relevance"]:
+                            item.pop("user_relevance", None)
+                        else:
+                            item["user_relevance"] = target_rel
+                    if "decision" in op.model_fields_set:
+                        item["decision"] = op.decision
+                        raw_reason = op.reject_reason if "reject_reason" in op.model_fields_set else None
+                        reason = " ".join((raw_reason or "").split())[:60]
+                        if op.decision == "rejected" and reason:
+                            item["reject_reason"] = reason
+                        else:
+                            item.pop("reject_reason", None)
+                updated += 1
+                previous.append(prev)
+            edited = sum(1 for it in data["items"] if it.get("user_relevance"))
+        return {"updated": updated, "skipped": skipped, "edited": edited, "previous": previous}
 
     @app.get("/api/glossary")
     def glossary_list() -> dict[str, Any]:

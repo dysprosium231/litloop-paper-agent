@@ -1,5 +1,19 @@
 # 决定与实验记录
 
+## 2026-11-21：筛选页批量操作、列表内过滤与撤销
+
+- 背景：`TODO.md`「工程债 → 筛选页批量与撤销」指出筛选页 30 篇只能逐篇操作，缺少多选、按 Agent 评定一键批量处理、撤销，以及列表内按年份/期刊过滤和搜索。
+- 实现与设计边界：
+  1. **不改文件格式版本（`store.SCHEMA` 仍为 1）**：沿用 `<session>.json` 现有字段（`relevance`、`user_relevance`、`decision`、`reject_reason`），与 Agent / MCP 及 `screening.prisma()` 完全兼容。
+  2. **后端单次原子批量接口**：在 [src/litloop/desktop/server.py](src/litloop/desktop/server.py) 新增 `POST /api/sessions/{session}/batch`，一次 `store.update()` 文件锁内完成批量改评分、恢复 Agent 评分（`clear_user_relevance`）、批量改决定与排除理由，并返回逐条修改前快照 `previous`。对未在 `record["items"]` 中的当前批待评文献：改评分时一次性调用 `screening.save()` 建条并标 `existed=False`，仅改决定时平滑计入 `skipped` 不中断整批；使用 `delete_if_unrated` 撤销新建条时若期间 Agent 已补评（`reason` 非空）则降级为仅清 `user_relevance`，绝不误删 Agent 评分。
+  3. **前端列表内过滤、多选与一键批量**：新增 [app/src/lib/screening-filters.ts](app/src/lib/screening-filters.ts)，升级 [app/src/components/paper-list.tsx](app/src/components/paper-list.tsx)、[app/src/components/detail-pane.tsx](app/src/components/detail-pane.tsx) 与 [app/src/App.tsx](app/src/App.tsx)。搜索同时匹配标题、期刊、年份、DOI、Agent 理由与排除理由；支持相关度、决定状态、年份范围、期刊四维过滤并与 `↑↓` 键盘导航联动；支持复选框多选、`Shift` 连选与 `Esc` 清空；「批量」菜单按 Agent 评定一键加入下载/排除，默认只作用于当前过滤列表中未决定的文献且不覆盖 `reject_reason`（`prisma()` 自动沿用 Agent 理由）。
+  4. **会话内多步撤销**：在 `App.tsx` 维护最多 20 步的内存撤销栈，同时覆盖批量操作与单篇评分/加入下载/排除，提供操作反馈条「撤销」、顶栏「撤销」按钮及 `Ctrl+Z` 快捷键。
+- 验证：
+  - 后端相关测试（`tests/test_app_server.py`、`tests/test_app_types.py`、`tests/test_app_continue.py`）：`35 passed`。
+  - 前端构建与文案检查（`app/` 下 `npm run build` 与 `npm run lint:copy`）：通过，`0 issues`。
+  - 全量测试（`python -m pytest -q`）：`1235 passed, 3 skipped`（188.37s）。
+  - 一致性检查（`scripts/check_release_consistency.py`）：通过（`OK: version 1.18.3, 21 MCP tools, skills clean`）。
+
 ## 2026-11-21：真实世界回归（本地 HTTP 录制回放与后台冒烟脚本）
 
 - 背景：`TODO.md`「工程债 → 真实世界回归」要求不依赖外网，在本地回放真实 HTML / 状态码 / PDF 响应以回归下载竞速、迟到落盘、慢镜像、预印本拦截与错篇剔除，并补齐打包 exe / 后台 `/api/health` 冒烟脚本。

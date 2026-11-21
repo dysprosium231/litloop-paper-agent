@@ -264,3 +264,128 @@ def test_resume_endpoint_checks_session_and_forwards_to_agent_runner(client, ses
 
     monkeypatch.setattr(agent_runner, "resume", busy)
     assert client.post(f"/api/sessions/{session}/resume", json={}).status_code == 409
+
+
+def test_batch_decisions_and_prisma_reasons(client, session):
+    r = client.post(f"/api/sessions/{session}/batch", json={
+        "ops": [
+            {"doi": "10.1/b", "decision": "selected"},
+            {"doi": "10.1/a", "decision": "rejected"},
+        ],
+    }).json()
+    assert r["updated"] == 2 and r["skipped"] == 0
+    items = {it["doi"]: it for it in screening.load(session)["items"]}
+    assert items["10.1/b"]["decision"] == "selected"
+    assert items["10.1/a"]["decision"] == "rejected"
+    assert "reject_reason" not in items["10.1/a"]
+    # No user reject_reason falls back to the agent's reason in prisma().
+    assert screening.prisma(session)["reasons"] == [{"reason": "r", "count": 1}]
+
+    # Overwriting with an explicit reject_reason, then clearing decisions.
+    client.post(f"/api/sessions/{session}/batch", json={
+        "ops": [{"doi": "10.1/a", "decision": "rejected", "reject_reason": "主题不相关"}],
+    })
+    assert screening.prisma(session)["reasons"] == [{"reason": "主题不相关", "count": 1}]
+
+    client.post(f"/api/sessions/{session}/batch", json={
+        "ops": [
+            {"doi": "10.1/a", "decision": None},
+            {"doi": "10.1/b", "decision": None},
+        ],
+    })
+    items = {it["doi"]: it for it in screening.load(session)["items"]}
+    assert items["10.1/a"]["decision"] is None and "reject_reason" not in items["10.1/a"]
+    assert items["10.1/b"]["decision"] is None
+
+
+def test_batch_ratings_clear_and_undo_mixed_state(client, session):
+    client.post(f"/api/sessions/{session}/decision", json={"doi": "10.1/a", "decision": "rejected", "reason": "重复文献"})
+    client.post(f"/api/sessions/{session}/rating", json={"doi": "10.1/a", "relevance": "中"})
+    client.post(f"/api/sessions/{session}/decision", json={"doi": "10.1/b", "decision": "selected"})
+
+    res = client.post(f"/api/sessions/{session}/batch", json={
+        "ops": [
+            {"doi": "10.1/a", "clear_user_relevance": True, "decision": "selected"},
+            {"doi": "10.1/b", "relevance": "中", "decision": "rejected", "reject_reason": "数据不可靠"},
+        ],
+    }).json()
+    assert res["updated"] == 2 and res["edited"] == 1
+    items = {it["doi"]: it for it in screening.load(session)["items"]}
+    assert "user_relevance" not in items["10.1/a"] and items["10.1/a"]["decision"] == "selected"
+    assert items["10.1/b"]["user_relevance"] == "中" and items["10.1/b"]["reject_reason"] == "数据不可靠"
+
+    # Undo using returned snapshots restores every field cleanly.
+    undo_ops = [
+        {
+            "doi": p["doi"],
+            "title": p["title"],
+            **({"relevance": p["user_relevance"]} if p.get("user_relevance") else {"clear_user_relevance": True}),
+            "decision": p["decision"],
+            "reject_reason": p["reject_reason"],
+        }
+        for p in res["previous"]
+    ]
+    undo_res = client.post(f"/api/sessions/{session}/batch", json={"ops": undo_ops}).json()
+    assert undo_res["updated"] == 2 and undo_res["edited"] == 1
+    restored = {it["doi"]: it for it in screening.load(session)["items"]}
+    assert restored["10.1/a"]["user_relevance"] == "中"
+    assert restored["10.1/a"]["decision"] == "rejected" and restored["10.1/a"]["reject_reason"] == "重复文献"
+    assert "user_relevance" not in restored["10.1/b"] and restored["10.1/b"]["decision"] == "selected"
+    assert "reject_reason" not in restored["10.1/b"]
+
+
+def test_batch_handles_unrated_batch_papers_and_safe_undo(client, session):
+    from litloop.search import deep as deep_search
+
+    store.write_json(deep_search._pool_path(session), {
+        "session": session,
+        "question": "q",
+        "pool": {},
+        "seeds": [],
+        "served": [],
+        "rounds": [],
+        "last_batch": [{"n": 1, "doi": "10.1/c", "title": "C", "year": 2024, "journal": "J"}],
+    })
+
+    # Decision-only batch skips unrated batch papers cleanly.
+    r1 = client.post(f"/api/sessions/{session}/batch", json={
+        "ops": [
+            {"doi": "10.1/a", "decision": "selected"},
+            {"doi": "10.1/c", "decision": "selected"},
+        ],
+    }).json()
+    assert r1["updated"] == 1 and r1["skipped"] == 1
+
+    # Rating batch creates the unrated paper with existed=False in previous.
+    r2 = client.post(f"/api/sessions/{session}/batch", json={
+        "ops": [{"doi": "10.1/c", "relevance": "高", "decision": "selected"}],
+    }).json()
+    assert r2["updated"] == 1 and r2["previous"][0]["existed"] is False
+    items = {it["doi"]: it for it in screening.load(session)["items"]}
+    assert items["10.1/c"]["user_relevance"] == "高" and items["10.1/c"]["decision"] == "selected"
+
+    # Undo via delete_if_unrated deletes a user-only item...
+    client.post(f"/api/sessions/{session}/batch", json={
+        "ops": [{"doi": "10.1/c", "delete_if_unrated": True}],
+    })
+    assert all(it.get("doi") != "10.1/c" for it in screening.load(session)["items"])
+
+    # ...but if the agent has since added a reason, delete_if_unrated keeps the item and only clears user_relevance.
+    client.post(f"/api/sessions/{session}/batch", json={
+        "ops": [{"doi": "10.1/c", "relevance": "高"}],
+    })
+    with store.update(screening.screening_dir() / f"{session}.json", indent=2) as data:
+        for it in data["items"]:
+            if it.get("doi") == "10.1/c":
+                it["reason"] = "Agent 补评理由"
+    client.post(f"/api/sessions/{session}/batch", json={
+        "ops": [{"doi": "10.1/c", "delete_if_unrated": True}],
+    })
+    c_item = next(it for it in screening.load(session)["items"] if it["doi"] == "10.1/c")
+    assert c_item["reason"] == "Agent 补评理由" and "user_relevance" not in c_item
+
+
+def test_batch_validation_errors(client, session):
+    assert client.post(f"/api/sessions/{session}/batch", json={"ops": []}).status_code == 400
+    assert client.post(f"/api/sessions/{session}/batch", json={"ops": [{"doi": "10.1/a", "relevance": "bad"}]}).status_code == 400
+    assert client.post(f"/api/sessions/{session}/batch", json={"ops": [{"doi": "10.1/a", "decision": "maybe"}]}).status_code == 400

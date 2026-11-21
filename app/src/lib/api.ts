@@ -173,6 +173,33 @@ async function call<T>(path: string, body?: unknown, method?: string): Promise<T
   return res.json() as Promise<T>
 }
 
+export interface BatchOp {
+  doi?: string | null
+  title?: string | null
+  relevance?: Relevance | null
+  decision?: Item["decision"]
+  reject_reason?: string | null
+  clear_user_relevance?: boolean
+  delete_if_unrated?: boolean
+}
+
+export interface BatchPrevious {
+  doi?: string | null
+  title?: string | null
+  existed: boolean
+  relevance?: Relevance | null
+  user_relevance?: Relevance | null
+  decision?: Item["decision"]
+  reject_reason?: string | null
+}
+
+export interface BatchResult {
+  updated: number
+  skipped: number
+  edited: number
+  previous: BatchPrevious[]
+}
+
 export const api = {
   sessions: () => call<SessionListEntry[]>("/api/sessions"),
   roundNotice: () => call<RoundNotice | null>("/api/screening/notice"),
@@ -184,6 +211,8 @@ export const api = {
   decide: (id: string, paper: { doi?: string; title: string }, decision: Item["decision"], reason?: string) =>
     call<{ item: Item }>(`/api/sessions/${encodeURIComponent(id)}/decision`,
       { doi: paper.doi ?? null, title: paper.title, decision, reason: reason ?? null }),
+  batch: (id: string, ops: BatchOp[]) =>
+    call<BatchResult>(`/api/sessions/${encodeURIComponent(id)}/batch`, { ops }),
   translation: () => call<TranslationInfo>("/api/translation"),
   next: (id: string) => call<{ started: boolean }>(`/api/sessions/${encodeURIComponent(id)}/next`, {}),
   resume: (id: string, batches = 0) => call<SearchRun>(`/api/sessions/${encodeURIComponent(id)}/resume`, { batches }),

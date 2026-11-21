@@ -1,10 +1,10 @@
 import * as React from "react"
-import { BookAIcon, ChevronDownIcon, HistoryIcon, PlusIcon } from "lucide-react"
+import { BookAIcon, ChevronDownIcon, HistoryIcon, PlusIcon, Undo2Icon, XIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
 import { AppSidebar, RAIL_COLLAPSED, RAIL_OPEN, type Section } from "@/components/app-sidebar"
-import { PaperList, type PaperRow } from "@/components/paper-list"
+import { PaperList, type PaperRow, type QuickBatchKind } from "@/components/paper-list"
 import { SettingsPage } from "@/components/settings-view"
 import { DownloadsOverview, JobPane, OVERVIEW, useDownloads } from "@/components/downloads-view"
 import { useZotero, ZoteroPage, type ZoteroView } from "@/components/zotero-view"
@@ -32,7 +32,10 @@ import {
   paperKey,
   rating,
   RELEVANCE,
+  type BatchOp,
+  type Item,
   type Progress,
+  type Relevance,
   type SessionListEntry,
   type SessionRecord,
   type Summary,
@@ -41,6 +44,15 @@ import {
   errorMessage,
   type TranslationInfo,
 } from "@/lib/api"
+import {
+  EMPTY_FILTERS,
+  collectJournals,
+  filterPapers,
+  itemToUndoOp,
+  previousToUndoOps,
+  type ScreeningFilters,
+  yearBounds,
+} from "@/lib/screening-filters"
 
 const short = (q: string) => (q.length > 28 ? q.slice(0, 28) + "…" : q)
 
@@ -262,6 +274,30 @@ export default function App() {
     return () => clearInterval(t)
   }, [sid, reload])
 
+  const [filters, setFilters] = React.useState<ScreeningFilters>(EMPTY_FILTERS)
+  const [checked, setChecked] = React.useState<Set<string>>(() => new Set())
+  const lastCheckedRef = React.useRef<string | null>(null)
+  const [undoStack, setUndoStack] = React.useState<{ label: string; ops: BatchOp[] }[]>([])
+  const [batchBusy, setBatchBusy] = React.useState(false)
+  const [notice, setNotice] = React.useState<{ text: string; canUndo?: boolean } | null>(null)
+  const noticeHoverRef = React.useRef(false)
+
+  React.useEffect(() => {
+    setFilters(EMPTY_FILTERS)
+    setChecked(new Set())
+    lastCheckedRef.current = null
+    setUndoStack([])
+    setNotice(null)
+  }, [sid])
+
+  React.useEffect(() => {
+    if (!notice) return
+    const timer = setInterval(() => {
+      if (!noticeHoverRef.current) setNotice(null)
+    }, 8000)
+    return () => clearInterval(timer)
+  }, [notice])
+
   // One list of papers: this batch (deep search) or everything rated so far.
   const items = React.useMemo(() => new Map((record?.items ?? []).map((it) => [paperKey(it), it])), [record])
   const papers: Paper[] = React.useMemo(() => {
@@ -269,7 +305,10 @@ export default function App() {
     const source = batch ?? record?.items ?? []
     return source.map((p) => ({ ...p, item: items.get(paperKey(p)) ?? null }))
   }, [onlyBatch, summary, record, items])
-  const rows: PaperRow[] = papers.map((p) => ({
+  const journals = React.useMemo(() => collectJournals(papers), [papers])
+  const yearRange = React.useMemo(() => yearBounds(papers), [papers])
+  const shown = React.useMemo(() => filterPapers(papers, filters), [papers, filters])
+  const rows: PaperRow[] = React.useMemo(() => shown.map((p) => ({
     key: paperKey(p),
     title: p.title,
     meta: [p.year, p.journal].filter(Boolean).join(" · "),
@@ -277,13 +316,46 @@ export default function App() {
     rel: p.item ? rating(p.item) : null,
     edited: Boolean(p.item?.user_relevance),
     selected: p.item?.decision === "selected",
-  }))
-  const idx = Math.max(0, papers.findIndex((p) => paperKey(p) === current))
-  const paper = papers[idx] ?? null
+    rejected: p.item?.decision === "rejected",
+    rejectReason: p.item?.reject_reason ?? "",
+    hasItem: Boolean(p.item),
+  })), [shown])
 
   React.useEffect(() => {
-    if (papers.length && !papers.some((p) => paperKey(p) === current)) setCurrent(paperKey(papers[0]))
-  }, [papers, current])
+    const valid = new Set(papers.map((p) => paperKey(p)))
+    setChecked((prev) => {
+      let changed = false
+      const next = new Set<string>()
+      for (const k of prev) {
+        if (valid.has(k)) next.add(k)
+        else changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [papers])
+
+  const quickCounts = React.useMemo(() => {
+    let high = 0
+    let highMed = 0
+    let irrelevant = 0
+    let lowIrrelevant = 0
+    for (const p of shown) {
+      if (!p.item || p.item.decision) continue
+      const r = rating(p.item)
+      if (r === "高") { high += 1; highMed += 1 }
+      else if (r === "中") { highMed += 1 }
+      else if (r === "不相关") { irrelevant += 1; lowIrrelevant += 1 }
+      else if (r === "低") { lowIrrelevant += 1 }
+    }
+    return { high, highMed, irrelevant, lowIrrelevant }
+  }, [shown])
+
+  const idx = Math.max(0, shown.findIndex((p) => paperKey(p) === current))
+  const paper = shown[idx] ?? null
+
+  React.useEffect(() => {
+    if (shown.length && !shown.some((p) => paperKey(p) === current)) setCurrent(paperKey(shown[0]))
+  }, [shown, current])
 
   // Read again on each return to screening: the settings page may have changed it.
   const [translation, setTranslation] = React.useState<TranslationInfo | null>(null)
@@ -296,12 +368,153 @@ export default function App() {
     reload()
   }, [sid, paper, reload])
 
+  const pushUndo = React.useCallback((label: string, ops: BatchOp[]) => {
+    if (!ops.length) return
+    setUndoStack((prev) => [...prev.slice(-19), { label, ops }])
+  }, [])
+
+  const showNotice = React.useCallback((text: string, canUndo = false) => {
+    noticeHoverRef.current = false
+    setNotice({ text, canUndo })
+  }, [])
+
+  const runBatch = React.useCallback(
+    async (ops: BatchOp[], labelForCount: (n: number) => string, clearSelection = false) => {
+      if (!sid || !ops.length || batchBusy) return
+      setBatchBusy(true)
+      try {
+        const res = await api.batch(sid, ops)
+        reload()
+        if (res.updated > 0) {
+          const label = labelForCount(res.updated)
+          pushUndo(label, previousToUndoOps(res.previous))
+          const text = res.skipped > 0 ? `${label}（跳过 ${res.skipped} 篇待评文献）` : label
+          showNotice(text, true)
+        } else if (res.skipped > 0) {
+          showNotice(`已跳过 ${res.skipped} 篇待评文献，请先评分后再操作`, false)
+        }
+        if (clearSelection) {
+          setChecked(new Set())
+          lastCheckedRef.current = null
+        }
+      } catch (e) {
+        setError(errorMessage(e))
+      } finally {
+        setBatchBusy(false)
+      }
+    },
+    [sid, batchBusy, reload, pushUndo, showNotice],
+  )
+
+  const undo = React.useCallback(async () => {
+    if (!sid || batchBusy || undoStack.length === 0) return
+    const entry = undoStack[undoStack.length - 1]
+    setBatchBusy(true)
+    try {
+      await api.batch(sid, entry.ops)
+      setUndoStack((prev) => prev.slice(0, -1))
+      reload()
+      showNotice(`已撤销：${entry.label}`, false)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBatchBusy(false)
+    }
+  }, [sid, batchBusy, undoStack, reload, showNotice])
+
+  const toggleCheck = React.useCallback((key: string, shiftKey: boolean) => {
+    setChecked((prev) => {
+      const next = new Set(prev)
+      if (shiftKey && lastCheckedRef.current) {
+        const keys = shown.map((p) => paperKey(p))
+        const a = keys.indexOf(lastCheckedRef.current)
+        const b = keys.indexOf(key)
+        if (a !== -1 && b !== -1) {
+          const [start, end] = a < b ? [a, b] : [b, a]
+          const shouldSelect = !prev.has(key)
+          for (let i = start; i <= end; i += 1) {
+            if (shouldSelect) next.add(keys[i])
+            else next.delete(keys[i])
+          }
+          return next
+        }
+      }
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+    lastCheckedRef.current = key
+  }, [shown])
+
+  const checkAll = React.useCallback(() => {
+    setChecked((prev) => {
+      const next = new Set(prev)
+      for (const p of shown) next.add(paperKey(p))
+      return next
+    })
+  }, [shown])
+
+  const clearCheck = React.useCallback(() => {
+    setChecked(new Set())
+    lastCheckedRef.current = null
+  }, [])
+
+  const handleQuickAction = React.useCallback((kind: QuickBatchKind) => {
+    const targets = shown.filter((p) => {
+      if (!p.item || p.item.decision) return false
+      const r = rating(p.item)
+      if (kind === "accept_high") return r === "高"
+      if (kind === "accept_high_med") return r === "高" || r === "中"
+      if (kind === "reject_irrelevant") return r === "不相关"
+      return r === "低" || r === "不相关"
+    })
+    if (!targets.length) return
+    const decision = kind === "accept_high" || kind === "accept_high_med" ? "selected" : "rejected"
+    const ops: BatchOp[] = targets.map((p) => ({
+      doi: p.doi ?? null,
+      title: p.title,
+      decision,
+    }))
+    const labelForCount = (n: number) => (decision === "selected" ? `已将 ${n} 篇加入下载` : `已排除 ${n} 篇`)
+    void runBatch(ops, labelForCount, false)
+  }, [shown, runBatch])
+
+  const handleBatchDecision = React.useCallback((decision: Item["decision"], reason?: string) => {
+    const targets = papers.filter((p) => checked.has(paperKey(p)))
+    if (!targets.length) return
+    const ops: BatchOp[] = targets.map((p) => ({
+      doi: p.doi ?? null,
+      title: p.title,
+      decision,
+      ...(decision === "rejected" ? { reject_reason: reason ?? null } : {}),
+    }))
+    const labelForCount = (n: number) =>
+      decision === "selected" ? `已将 ${n} 篇加入下载` : decision === "rejected" ? `已排除 ${n} 篇` : `已清除 ${n} 篇决定`
+    void runBatch(ops, labelForCount, true)
+  }, [papers, checked, runBatch])
+
+  const handleBatchRate = React.useCallback((rel: Relevance | null) => {
+    const targets = papers.filter((p) => checked.has(paperKey(p)))
+    if (!targets.length) return
+    const ops: BatchOp[] = targets.map((p) => ({
+      doi: p.doi ?? null,
+      title: p.title,
+      ...(rel === null ? { clear_user_relevance: true } : { relevance: rel }),
+    }))
+    const labelForCount = (n: number) => (rel === null ? `已恢复 ${n} 篇 Agent 评分` : `已将 ${n} 篇评为「${rel}」`)
+    void runBatch(ops, labelForCount, true)
+  }, [papers, checked, runBatch])
+
   // A paper the agent has not rated yet (a batch the app served) can be rated first by the user.
   const rate = React.useCallback((rel: (typeof RELEVANCE)[number]) => {
     if (!sid || !paper) return
+    const undoOp = itemToUndoOp(paper)
     const same = paper.item && rel === (paper.item.reason ? paper.item.relevance : rating(paper.item))
-    api.rate(sid, paper, same ? null : rel).then(reload).catch((e) => setError(errorMessage(e)))
-  }, [sid, paper, reload])
+    api.rate(sid, paper, same ? null : rel).then(() => {
+      pushUndo("修改评分", [undoOp])
+      reload()
+    }).catch((e) => setError(errorMessage(e)))
+  }, [sid, paper, reload, pushUndo])
   const continueSearch = React.useCallback(() => {
     if (!sid) return
     api.next(sid).then(() => api.progress(sid)).then(setProgress).catch((e) => setError(errorMessage(e)))
@@ -318,23 +531,42 @@ export default function App() {
   }, [sid])
   const toggleSelect = React.useCallback(() => {
     if (!sid || !paper?.item) return
-    api.decide(sid, paper, paper.item.decision === "selected" ? null : "selected").then(reload)
-      .catch((e) => setError(errorMessage(e)))
-  }, [sid, paper, reload])
+    const undoOp = itemToUndoOp(paper)
+    const nextDec = paper.item.decision === "selected" ? null : "selected"
+    api.decide(sid, paper, nextDec).then(() => {
+      pushUndo(nextDec === "selected" ? "加入下载" : "移出下载", [undoOp])
+      reload()
+    }).catch((e) => setError(errorMessage(e)))
+  }, [sid, paper, reload, pushUndo])
   const exclude = React.useCallback((reason?: string) => {
     if (!sid || !paper?.item) return
-    api.decide(sid, paper, paper.item.decision === "rejected" ? null : "rejected", reason).then(reload)
-      .catch((e) => setError(errorMessage(e)))
-  }, [sid, paper, reload])
+    const undoOp = itemToUndoOp(paper)
+    const nextDec = paper.item.decision === "rejected" ? null : "rejected"
+    api.decide(sid, paper, nextDec, reason).then(() => {
+      pushUndo(nextDec === "rejected" ? "排除文献" : "取消排除", [undoOp])
+      reload()
+    }).catch((e) => setError(errorMessage(e)))
+  }, [sid, paper, reload, pushUndo])
 
-  // Keyboard: ↑↓ move, 1-4 rate, space select. Not while typing in a field.
+  // Keyboard: ↑↓ move, 1-4 rate, space select, Ctrl+Z undo, Esc clear checks. Not while typing in a field.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (section !== "screen") return
+      if (section !== "screen" || fullPage) return
       const t = e.target as HTMLElement
-      if (t.closest("input, textarea, [contenteditable=true]")) return
+      if (t.closest("input, textarea, select, [contenteditable=true]")) return
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "z") {
+        e.preventDefault()
+        void undo()
+        return
+      }
+      if (e.key === "Escape" && checked.size > 0) {
+        e.preventDefault()
+        clearCheck()
+        return
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        const next = papers[idx + (e.key === "ArrowDown" ? 1 : -1)]
+        const next = shown[idx + (e.key === "ArrowDown" ? 1 : -1)]
         if (next) { setCurrent(paperKey(next)); e.preventDefault() }
       } else if (["1", "2", "3", "4"].includes(e.key)) {
         rate(RELEVANCE[Number(e.key) - 1])
@@ -345,7 +577,7 @@ export default function App() {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [papers, idx, rate, toggleSelect, section])
+  }, [shown, idx, rate, toggleSelect, section, fullPage, undo, checked.size, clearCheck])
 
   const heading = summary && onlyBatch && summary.current_batch?.length
     ? `第 ${summary.batches.length} 批 · ${summary.current_batch.length} 篇`
@@ -364,8 +596,28 @@ export default function App() {
       <SidebarProvider className="h-svh overflow-hidden" style={{ "--sidebar-width": `${(section === "screen" && !fullPage ? widths.screen : RAIL_COLLAPSED) + railExtra}px` } as React.CSSProperties}>
         <AppSidebar section={section} onSection={setSection} railOpen={railOpen} onRailOpen={setRailOpen}>
           {section === "screen" && !fullPage ? (
-            <PaperList rows={rows} current={paperKey(paper ?? {})} onPick={setCurrent} heading={heading}
-              onlyBatch={onlyBatch} onOnlyBatch={setOnlyBatch} />
+            <PaperList
+              rows={rows}
+              totalCount={papers.length}
+              current={paperKey(paper ?? {})}
+              onPick={setCurrent}
+              heading={heading}
+              onlyBatch={onlyBatch}
+              onOnlyBatch={setOnlyBatch}
+              filters={filters}
+              onFilters={setFilters}
+              journals={journals}
+              yearRange={yearRange}
+              checked={checked}
+              onToggleCheck={toggleCheck}
+              onCheckAll={checkAll}
+              onClearCheck={clearCheck}
+              quickCounts={quickCounts}
+              busy={batchBusy}
+              onQuickAction={handleQuickAction}
+              onBatchDecision={handleBatchDecision}
+              onBatchRate={handleBatchRate}
+            />
           ) : null}
         </AppSidebar>
         <SidebarInset className="relative min-h-0 min-w-0">
@@ -432,19 +684,64 @@ export default function App() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <Button size="sm" variant="ghost" className="ml-auto shrink-0" onClick={() => setNewSearch(true)}>
-              <PlusIcon />新建检索
-            </Button>
-            <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setHistory(true)}>
-              <HistoryIcon />筛选历史
-            </Button>
-            <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setGlossary(true)}>
-              <BookAIcon />术语表
-            </Button>
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              {undoStack.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="shrink-0"
+                  disabled={batchBusy}
+                  onClick={() => void undo()}
+                  title={`撤销：${undoStack[undoStack.length - 1].label}（Ctrl+Z）`}
+                >
+                  <Undo2Icon />撤销
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setNewSearch(true)}>
+                <PlusIcon />新建检索
+              </Button>
+              <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setHistory(true)}>
+                <HistoryIcon />筛选历史
+              </Button>
+              <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setGlossary(true)}>
+                <BookAIcon />术语表
+              </Button>
+            </div>
           </header>
           <ProgressStrip progress={progress} summary={summary} resumable={resumable} onContinue={continueSearch} onResume={resumeSearch} />
-          <DetailPane paper={paper} onRate={rate} onSelect={toggleSelect} onExclude={exclude}
-            translation={translation} onTranslate={translateAbstract} />
+          {notice && (
+            <div
+              onMouseEnter={() => { noticeHoverRef.current = true }}
+              onMouseLeave={() => { noticeHoverRef.current = false }}
+              className="flex shrink-0 items-center justify-between gap-3 border-b bg-accent/40 px-6 py-2 text-sm"
+            >
+              <span className="min-w-0 truncate">{notice.text}</span>
+              <div className="flex shrink-0 items-center gap-2">
+                {notice.canUndo && undoStack.length > 0 && (
+                  <Button size="sm" variant="outline" disabled={batchBusy} onClick={() => void undo()} className="h-7 px-2.5 text-xs">
+                    撤销
+                  </Button>
+                )}
+                <button
+                  type="button"
+                  aria-label="关闭提示"
+                  onClick={() => setNotice(null)}
+                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+          <DetailPane
+            paper={paper}
+            emptyHint={papers.length > 0 && shown.length === 0 ? "当前筛选条件下没有匹配的文献" : undefined}
+            onRate={rate}
+            onSelect={toggleSelect}
+            onExclude={exclude}
+            translation={translation}
+            onTranslate={translateAbstract}
+          />
           </>)}
         </SidebarInset>
       </SidebarProvider>
