@@ -289,3 +289,111 @@ def test_import_legacy_data_lossless_idempotent_and_resilient(tmp_path):
 
     w = db.get_watch("w1")
     assert w is not None and w["seen"] == ["doi:10.1000/abc"]
+
+
+def test_auto_import_legacy_session_json_on_demand(tmp_path):
+    sdir = tmp_path / "screening"
+    sdir.mkdir(parents=True)
+    sid = "20261121-120000-legacy"
+    legacy_path = sdir / f"{sid}.json"
+    legacy_path.write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "id": sid,
+                "created": "2026-11-21 12:00:00",
+                "updated": "2026-11-21 12:05:00",
+                "question": "legacy topic",
+                "mode": "quick",
+                "criteria": ["c1"],
+                "searches": [{"query": "legacy", "time": "2026-11-21 12:00:00", "params": {}, "results": 2, "new": 2}],
+                "items": [
+                    {
+                        "n": 1,
+                        "doi": "10.1/legacy-a",
+                        "title": "Legacy A",
+                        "year": 2024,
+                        "journal": "J. Legacy",
+                        "abstract": "Abs A",
+                        "relevance": "高",
+                        "reason": "good",
+                        "decision": "selected",
+                    },
+                    {
+                        "n": 2,
+                        "doi": "10.1/legacy-b",
+                        "title": "Legacy B",
+                        "relevance": "低",
+                        "reason": "weak",
+                        "decision": None,
+                    },
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    assert db.session_exists(sid) is True
+    assert legacy_path.exists()  # never deleted
+
+    loaded = db.load_screening(sid)
+    assert loaded["id"] == sid
+    assert loaded["question"] == "legacy topic"
+    assert [it["doi"] for it in loaded["items"]] == ["10.1/legacy-a", "10.1/legacy-b"]
+
+    # Idempotent across repeated calls and list/history queries
+    assert db.list_sessions()[0]["session"] == sid
+    assert db.history()[0]["selected"][0]["doi"] == "10.1/legacy-a"
+    assert legacy_path.exists()
+
+
+def test_row_level_updates_and_pending_selected_by_session(tmp_path):
+    s1 = db.save_screening(
+        "Topic 1",
+        [
+            {"doi": "10.1/p1", "title": "P1", "year": 2024, "journal": "J1", "abstract": "Abs 1", "relevance": "高", "reason": "r1"},
+            {"doi": "", "title": "No DOI", "relevance": "中", "reason": "r2"},
+        ],
+    )["session"]
+
+    # Row-level rating, decision, and abstract_zh updates
+    r_rate = db.update_item_rating(s1, "10.1/p1", "P1", "中")
+    assert r_rate is not None and r_rate["item"]["user_relevance"] == "中" and r_rate["edited"] == 1
+
+    r_dec = db.update_item_decision(s1, "10.1/p1", "P1", "selected")
+    assert r_dec is not None and r_dec["item"]["decision"] == "selected"
+
+    r_rej = db.update_item_decision(s1, None, "No DOI", "rejected", "主题不相关")
+    assert r_rej is not None and r_rej["item"]["reject_reason"] == "主题不相关"
+
+    assert db.set_item_abstract_zh(s1, "10.1/p1", "P1", "中文摘要 1") is True
+
+    # Batch update (atomic)
+    batch_res = db.batch_update_items(
+        s1,
+        [
+            {"doi": "10.1/p1", "title": "P1", "relevance": "高", "decision": "selected"},
+            {"doi": None, "title": "No DOI", "decision": "selected"},
+        ],
+    )
+    assert batch_res["updated"] == 2 and batch_res["edited"] == 0
+
+    loaded = db.load_screening(s1)
+    p1 = next(it for it in loaded["items"] if it.get("doi") == "10.1/p1")
+    assert p1["abstract_zh"] == "中文摘要 1"
+    assert "user_relevance" not in p1  # cleared because relevance matched agent rating
+
+    # Pending selected by session excludes items without DOI and sorts newest-first
+    s2 = db.save_screening(
+        "Topic 2",
+        [{"doi": "10.1/p2", "title": "P2", "year": 2025, "journal": "J2", "relevance": "高", "reason": "r"}],
+    )["session"]
+    db.update_item_decision(s2, "10.1/p2", "P2", "selected")
+
+    pending = db.pending_selected_by_session()
+    assert [p["session"] for p in pending] == sorted([s1, s2], reverse=True)
+    by_sid = {p["session"]: p for p in pending}
+    assert [x["doi"] for x in by_sid[s1]["papers"]] == ["10.1/p1"]
+    assert [x["doi"] for x in by_sid[s2]["papers"]] == ["10.1/p2"]
+

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from litloop import store
+from litloop import db, store
 from litloop.search import screening
 
 SRC = str(Path(__file__).resolve().parents[1] / "src")
@@ -76,8 +76,7 @@ def test_session_list_skips_pool_summary_and_progress_files(home):
 
 def test_the_users_rating_from_the_app_overrides_the_agents(home):
     sid = screening.save("q", [{"doi": "10.1/a", "title": "A", "relevance": "低", "reason": "r"}])["session"]
-    with store.update(screening.screening_dir() / f"{sid}.json") as data:  # what the app does
-        data["items"][0]["user_relevance"] = "高"
+    db.update_item_rating(sid, "10.1/a", "A", "高")  # what the app does
     item = screening.load(sid)["items"][0]
     assert screening._rating(item) == "高"
     # the agent rating the paper again must not erase the user's rating

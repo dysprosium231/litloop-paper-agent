@@ -29,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from .. import __version__, store
+from .. import __version__, db, store
 from ..search import screening
 
 # Where the app's pages are served from: the Vite dev server, and Tauri's
@@ -186,34 +186,12 @@ def _fail(status: int, raw: str | None, action: str, fallback: str) -> HTTPExcep
     return HTTPException(status, error_text.message(raw or fallback, action))
 
 
-def _record_path(session: str):
+def _record_path(session: str) -> str:
     if not _SESSION_ID.match(session) or session.startswith("."):
         raise HTTPException(400, "无法打开检索会话：会话编号不正确")
-    p = screening.screening_dir() / f"{session}.json"
-    if not p.exists():
+    if not db.session_exists(session):
         raise HTTPException(404, "无法打开检索会话：此会话已不存在")
-    return p
-
-
-def _ensure_item(session: str, doi: str | None, title: str | None, relevance: str | None) -> None:
-    """A paper of the latest batch the agent has not rated yet: the user's rating creates its item
-    (no reason: the agent's rating, when it comes, fills that in and the user's stays)."""
-    if relevance is None:
-        return
-    record = store.read_json(_record_path(session))
-    try:
-        _find(record["items"], doi, title)
-        return
-    except HTTPException:
-        pass
-    from ..search import deep as deep_search
-    try:
-        paper = deep_search.batch_paper(session, doi, title)
-    except FileNotFoundError:
-        paper = None
-    if not paper:
-        raise HTTPException(404, "此检索会话中没有这篇文献")
-    screening.save("", [{**paper, "relevance": relevance, "reason": ""}], session=session, mode="deep")
+    return session
 
 
 def _find(items: list[dict[str, Any]], doi: str | None, title: str | None) -> dict[str, Any]:
@@ -251,7 +229,8 @@ def create_app(token: str) -> FastAPI:
     @app.get("/api/sessions/{session}")
     def session(session: str) -> dict[str, Any]:
         from ..search import deep as deep_search
-        record = store.read_json(_record_path(session))
+        _record_path(session)
+        record = db.load_screening(session)
         try:
             summary = store.read_json(store.summary_path(session))
             # The file keeps the agent's English notes; the app shows today's, in Chinese.
@@ -278,20 +257,24 @@ def create_app(token: str) -> FastAPI:
     def rate(session: str, body: Rating) -> dict[str, Any]:
         if body.relevance is not None and body.relevance not in screening.RELEVANCE:
             raise HTTPException(400, f"无法评分：评分只能是{'、'.join(screening.RELEVANCE)}")
-        _ensure_item(session, body.doi, body.title, body.relevance)
-        with store.update(_record_path(session), indent=2) as data:
-            item = _find(data["items"], body.doi, body.title)
-            if not item.get("reason"):  # rated by the user only: theirs is the only rating
-                if body.relevance is None:
-                    data["items"].remove(item)
-                    return {"item": None, "edited": sum(1 for it in data["items"] if it.get("user_relevance"))}
-                item["relevance"] = item["user_relevance"] = body.relevance
-            elif body.relevance is None or body.relevance == item["relevance"]:
-                item.pop("user_relevance", None)
-            else:
-                item["user_relevance"] = body.relevance
-            edited = sum(1 for it in data["items"] if it.get("user_relevance"))
-        return {"item": item, "edited": edited}
+        _record_path(session)
+        res = db.update_item_rating(session, body.doi, body.title, body.relevance)
+        if res is None:
+            if body.relevance is None:
+                raise HTTPException(404, "此检索会话中没有这篇文献")
+            from ..search import deep as deep_search
+            try:
+                paper = deep_search.batch_paper(session, body.doi, body.title)
+            except FileNotFoundError:
+                paper = None
+            if not paper:
+                raise HTTPException(404, "此检索会话中没有这篇文献")
+            res = db.update_item_rating(
+                session, body.doi, body.title, body.relevance, create_paper=paper
+            )
+            if res is None:
+                raise HTTPException(404, "此检索会话中没有这篇文献")
+        return res
 
     @app.post("/api/sessions/{session}/next")
     def next_round(session: str) -> dict[str, Any]:
@@ -416,7 +399,8 @@ def create_app(token: str) -> FastAPI:
     def translate_abstract(session: str, body: Translate) -> dict[str, Any]:
         """Translate one paper's abstract with DeepSeek / DeepL and keep it in the record."""
         from . import translate
-        item = _find(store.read_json(_record_path(session))["items"], body.doi, body.title)
+        _record_path(session)
+        item = _find(db.load_screening(session)["items"], body.doi, body.title)
         if item.get("abstract_zh"):
             return {"abstract_zh": item["abstract_zh"]}
         if not item.get("abstract"):
@@ -425,27 +409,23 @@ def create_app(token: str) -> FastAPI:
             text = translate.translate_text(item["abstract"])
         except translate.TranslationError as exc:
             raise HTTPException(502, f"无法翻译：{exc}。") from exc
-        with store.update(_record_path(session), indent=2) as data:  # the network call ran outside the lock
-            _find(data["items"], body.doi, body.title)["abstract_zh"] = text[:screening.ABSTRACT_CHARS]
+        if not db.set_item_abstract_zh(session, body.doi, body.title, text):
+            raise HTTPException(404, "此检索会话中没有这篇文献")
         return {"abstract_zh": text}
 
     @app.post("/api/sessions/{session}/decision")
     def decide(session: str, body: Decision) -> dict[str, Any]:
         if body.decision not in (None, "selected", "rejected"):
             raise HTTPException(400, "无法保存：只能加入下载或排除")
-        with store.update(_record_path(session), indent=2) as data:
-            item = _find(data["items"], body.doi, body.title)
-            item["decision"] = body.decision
-            reason = " ".join((body.reason or "").split())[:60]
-            if body.decision == "rejected" and reason:
-                item["reject_reason"] = reason
-            else:  # a pick, an un-pick, or "no reason": the old one must not linger
-                item.pop("reject_reason", None)
-        return {"item": item}
+        _record_path(session)
+        res = db.update_item_decision(session, body.doi, body.title, body.decision, body.reason)
+        if res is None:
+            raise HTTPException(404, "此检索会话中没有这篇文献")
+        return res
 
     @app.post("/api/sessions/{session}/batch")
     def batch_update(session: str, body: BatchUpdate) -> dict[str, Any]:
-        path = _record_path(session)
+        _record_path(session)
         if not body.ops:
             raise HTTPException(400, "无法批量保存：未选择文献")
         for op in body.ops:
@@ -454,18 +434,16 @@ def create_app(token: str) -> FastAPI:
             if "decision" in op.model_fields_set and op.decision not in (None, "selected", "rejected"):
                 raise HTTPException(400, "无法保存：只能加入下载或排除")
 
-        record = store.read_json(path)
+        record = db.load_screening(session)
         existing_keys = {screening._key(it) for it in record["items"]}
-        created_keys: set[str] = set()
-        to_create: list[dict[str, Any]] = []
-        pending_create_keys: set[str] = set()
+        create_papers: dict[str, dict[str, Any]] = {}
         for op in body.ops:
             if op.delete_if_unrated or op.clear_user_relevance:
                 continue
             if "relevance" not in op.model_fields_set or op.relevance is None:
                 continue
             key = screening._key({"doi": op.doi, "title": op.title})
-            if key in existing_keys or key in pending_create_keys:
+            if key in existing_keys or key in create_papers:
                 continue
             from ..search import deep as deep_search
             try:
@@ -473,67 +451,9 @@ def create_app(token: str) -> FastAPI:
             except FileNotFoundError:
                 paper = None
             if paper:
-                pending_create_keys.add(key)
-                to_create.append({**paper, "relevance": op.relevance, "reason": ""})
-        if to_create:
-            screening.save("", to_create, session=session, mode="deep")
-            created_keys.update(pending_create_keys)
+                create_papers[key] = paper
 
-        with store.update(path, indent=2) as data:
-            by_key = {screening._key(it): it for it in data["items"]}
-            updated = 0
-            skipped = 0
-            previous: list[dict[str, Any]] = []
-            for op in body.ops:
-                key = screening._key({"doi": op.doi, "title": op.title})
-                item = by_key.get(key)
-                if item is None:
-                    skipped += 1
-                    continue
-                existed = key not in created_keys
-                prev = {
-                    "doi": item.get("doi"),
-                    "title": item.get("title"),
-                    "existed": existed,
-                    "relevance": item.get("relevance") if existed else None,
-                    "user_relevance": item.get("user_relevance") if existed else None,
-                    "decision": item.get("decision") if existed else None,
-                    "reject_reason": item.get("reject_reason") if existed else None,
-                }
-                created_keys.discard(key)
-                if op.delete_if_unrated:
-                    if not item.get("reason"):
-                        data["items"].remove(item)
-                        by_key.pop(key, None)
-                    else:
-                        item.pop("user_relevance", None)
-                else:
-                    if op.clear_user_relevance or "relevance" in op.model_fields_set:
-                        target_rel = None if op.clear_user_relevance else op.relevance
-                        if not item.get("reason"):
-                            if target_rel is None:
-                                data["items"].remove(item)
-                                by_key.pop(key, None)
-                                updated += 1
-                                previous.append(prev)
-                                continue
-                            item["relevance"] = item["user_relevance"] = target_rel
-                        elif target_rel is None or target_rel == item["relevance"]:
-                            item.pop("user_relevance", None)
-                        else:
-                            item["user_relevance"] = target_rel
-                    if "decision" in op.model_fields_set:
-                        item["decision"] = op.decision
-                        raw_reason = op.reject_reason if "reject_reason" in op.model_fields_set else None
-                        reason = " ".join((raw_reason or "").split())[:60]
-                        if op.decision == "rejected" and reason:
-                            item["reject_reason"] = reason
-                        else:
-                            item.pop("reject_reason", None)
-                updated += 1
-                previous.append(prev)
-            edited = sum(1 for it in data["items"] if it.get("user_relevance"))
-        return {"updated": updated, "skipped": skipped, "edited": edited, "previous": previous}
+        return db.batch_update_items(session, body.ops, create_papers=create_papers)
 
     @app.get("/api/glossary")
     def glossary_list() -> dict[str, Any]:
@@ -690,22 +610,14 @@ def create_app(token: str) -> FastAPI:
         got = {k for d in download_jobs.downloaded_dois() | download_jobs.queued_dois()
                for k in download_jobs.same_paper(d)}
         out = []
-        for s in screening.list_sessions(200):  # newest first: a paper picked twice shows in the newest
-            if not s["selected"]:
-                continue
-            try:
-                items = store.read_json(_record_path(s["session"]))["items"]
-            except (OSError, ValueError, HTTPException):
-                continue
+        for s in db.pending_selected_by_session():  # newest first: a paper picked twice shows in the newest
             papers = []
-            for it in items:
-                if it.get("decision") != "selected" or not it.get("doi"):
-                    continue
+            for it in s["papers"]:
                 keys = download_jobs.same_paper(it["doi"])
                 if keys & got:
                     continue
                 got |= keys
-                papers.append({k: it.get(k) for k in ("doi", "title", "year", "journal")})
+                papers.append(it)
             if papers:
                 out.append({"session": s["session"], "question": s["question"], "papers": papers})
         return out

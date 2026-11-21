@@ -374,10 +374,12 @@ def test_batch_handles_unrated_batch_papers_and_safe_undo(client, session):
     client.post(f"/api/sessions/{session}/batch", json={
         "ops": [{"doi": "10.1/c", "relevance": "高"}],
     })
-    with store.update(screening.screening_dir() / f"{session}.json", indent=2) as data:
-        for it in data["items"]:
-            if it.get("doi") == "10.1/c":
-                it["reason"] = "Agent 补评理由"
+    screening.save(
+        "",
+        [{"doi": "10.1/c", "title": "C", "relevance": "高", "reason": "Agent 补评理由"}],
+        session=session,
+        mode="deep",
+    )
     client.post(f"/api/sessions/{session}/batch", json={
         "ops": [{"doi": "10.1/c", "delete_if_unrated": True}],
     })

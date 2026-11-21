@@ -83,11 +83,10 @@ def test_download_step_type_covers_steps_for_app():
 
 
 def test_session_record_type_covers_screening_record(tmp_path, monkeypatch):
-    written = {}
-    monkeypatch.setattr(screening, "screening_dir", lambda: tmp_path)
-    monkeypatch.setattr(store, "write_json", lambda path, data, **k: written.update(data))
-    monkeypatch.setattr(store, "write_text", lambda path, text, **k: None)
-    screening.save("q", [{"doi": "10.1000/1", "title": "t", "relevance": "高", "reason": "r"}], criteria="c", query="q")
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    r = screening.save("q", [{"doi": "10.1000/1", "title": "t", "relevance": "高", "reason": "r"}], criteria="c", query="q")
+    written = screening.load(r["session"])
+    assert written["id"] == r["session"] and len(written["items"]) == 1
     missing = set(written) - _ts_fields("SessionRecord")
     assert not missing, f"api.ts SessionRecord lacks {sorted(missing)}"
 

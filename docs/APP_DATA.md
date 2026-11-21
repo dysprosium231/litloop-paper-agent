@@ -1,30 +1,30 @@
 # app 与 Agent 共用的数据文件
 
-桌面 app 和 Agent（通过 MCP）是两个进程，只通过 `~/.litloop/screening/` 下的文件交换数据。读写规则由 [`src/litloop/store.py`](../src/litloop/store.py) 实现，app 附带的后台用同一份代码。
+桌面 app 和 Agent（通过 MCP）是两个进程，通过 `~/.litloop/` 下的 SQLite 数据库（`litloop.db`）和 `~/.litloop/screening/` 下的状态文件交换数据。
 
 ## 规则
 
-- **写**：先拿该文件的锁（同名加 `.lock`，`filelock` 库，Windows / macOS / Linux 跨进程都有效），在锁内“读 → 改 → 写”，用 `store.update(path)`；写入先写临时文件再一次替换，读的一方永远看不到半个文件。
-- **读**：不用拿锁，用 `store.read_json(path)`。
-- **版本**：每个文件带 `schema`（当前为 1）。读到比自己新的版本时抛 `SchemaTooNew`，app 应提示“请更新 LitLoop”，不要硬读。改字段含义或删字段时加版本号；只加字段不用。
-- **app 不读候选池**：`<session>.pool.json` 一次深度检索可达上百 MB，只给 Agent 用。app 需要的都在下面三个小文件里。
-- **刷新**：进度文件每 0.5 秒内最多写一次，app 每 1–2 秒读一次即可；另外两个文件每出一批或每存一次评分才变，可按修改时间判断是否重读。
+- **SQLite 数据库（`litloop.db`）**：筛选会话（`sessions` 表）、每篇文献的评分与用户决策（`decisions` 表）、定期追踪（`watches` 表）及候选池表（`pool_items`）存放在 `<litloop home>/litloop.db`，由 [`src/litloop/db.py`](../src/litloop/db.py) 读写（WAL 模式 + `busy_timeout=30000` + `IMMEDIATE` 写事务，支持多进程并发安全更新，app 对单篇评分/决定的修改直接走按行事务更新）。旧版 `<session>.json` / `watches.json` 在首次读取时自动幂等导入 `litloop.db`（不删除原文件），新会话不再写入 `<session>.json`。
+- **JSON 文件（`store.py`）**：其余共享 JSON 文件（概况、进度、下载任务、Agent 续跑记录、术语表等）由 [`src/litloop/store.py`](../src/litloop/store.py) 读写，写前拿 `.lock` 锁在锁内“读 → 改 → 写”并先写临时文件再原子替换，读时直接调用 `store.read_json(path)`。
+- **版本**：每个 JSON 文件带 `schema`（`store.SCHEMA`，当前为 1），`litloop.db` 通过 `PRAGMA user_version`（`db.DB_SCHEMA`）和 `schema_migrations` 表记录迁移版本。读到比自己新的版本时抛 `SchemaTooNew`，app 应提示“请更新 LitLoop”，不要硬读。改字段含义或删字段时加版本号；只加字段不用。
+- **app 不读候选池**：`<session>.pool.json` 一次深度检索可达上百 MB，只给 Agent 用。app 需要的都在筛选记录（`litloop.db`）和下面两个小文件里。
+- **刷新**：进度文件每 0.5 秒内最多写一次，app 每 1–2 秒读一次即可；概况与筛选记录每出一批或每存一次评分才变，可按修改时间或接口响应判断是否重读。
 
-## 文件
+## 文件与数据表
 
 一个会话（`<session>` 形如 `20261016-213958-含稀土-…`）对应：
 
-| 文件 | 谁写 | 内容 |
+| 存储位置 | 谁写 | 内容 |
 |---|---|---|
-| `<session>.json` | Agent、app | 筛选记录：问题、检索历史、每篇的评分与理由、用户的决定 |
+| `litloop.db`（`sessions`、`decisions` 表） | Agent、app | 筛选记录：问题、检索历史、每篇的评分与理由、用户的决定（旧 `<session>.json` 只读兼容自动导入） |
 | `<session>.md` | Agent、app | 筛选记录的表格版，给人读，app 不用 |
 | `<session>.summary.json` | Agent | 深度检索概况和当前这一批，只有深度检索有 |
 | `<session>.progress.json` | Agent | 正在运行的这一轮在做什么，只有深度检索有 |
 | `<session>.pool.json` | Agent | 候选池，app 不读 |
 
-会话列表：`screening.list_sessions()`，只列筛选记录。
+会话列表：`screening.list_sessions()`（由 `db.list_sessions()` 实现），只列筛选记录。
 
-### 筛选记录 `<session>.json`
+### 筛选记录（`litloop.db` 中的 `sessions` + `decisions` 表，接口返回结构）
 
 ```json
 {
@@ -64,12 +64,11 @@
 - `n`：条目按相关度排序后的编号，每次保存会重排；app 定位条目用 `doi`，没有 DOI 的用标题。
 - 一篇算哪一档：`user_relevance`，没有就用 `relevance`（`screening._rating(item)`）。
 
-app 改评分或决定，在锁内改对应条目再写回：
+app 改评分或决定时，通过 `db.py` 在 SQLite `IMMEDIATE` 事务内做行级更新，不再整份重写记录：
 
 ```python
-with store.update(screening_dir() / f"{session}.json", indent=2) as data:
-    item = next(it for it in data["items"] if it.get("doi") == doi)
-    item["user_relevance"] = "高"
+db.update_item_rating(session, doi, title, "高")
+db.update_item_decision(session, doi, title, "selected")
 ```
 
 ### 深度检索概况 `<session>.summary.json`

@@ -16,10 +16,11 @@ from pathlib import Path
 from typing import Any
 
 from .. import config as _config
+from .. import db
 from .. import store
 
-RELEVANCE = ("高", "中", "低", "不相关")
-ABSTRACT_CHARS = 1200  # as much as a deep-search batch shows
+RELEVANCE = db.RELEVANCE
+ABSTRACT_CHARS = db.ABSTRACT_CHARS
 _RANK = {r: i for i, r in enumerate(RELEVANCE)}
 _EN = {"high": "高", "medium": "中", "low": "低", "irrelevant": "不相关", "none": "不相关"}
 
@@ -48,15 +49,8 @@ def _norm_relevance(value: Any) -> str:
     return v
 
 
-def _path(session: str) -> Path:
-    p = screening_dir() / f"{session}.json"
-    if not p.exists():
-        raise FileNotFoundError(f"no screening session {session!r}")
-    return p
-
-
 def load(session: str) -> dict[str, Any]:
-    return store.read_json(_path(session))
+    return db.load_screening(session)
 
 
 def _rating(item: dict[str, Any]) -> str:
@@ -64,69 +58,28 @@ def _rating(item: dict[str, Any]) -> str:
     return item.get("user_relevance") or item["relevance"]
 
 
-def _write(data: dict[str, Any]) -> dict[str, str]:
-    data["updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-    base = screening_dir() / data["id"]
-    store.write_json(base.with_suffix(".json"), data, indent=2)
-    store.write_text(base.with_suffix(".md"), render_markdown(data))
-    return {"json": str(base.with_suffix(".json")), "markdown": str(base.with_suffix(".md"))}
+def _write_markdown(data: dict[str, Any]) -> dict[str, str]:
+    md_path = screening_dir() / f"{data['id']}.md"
+    store.write_text(md_path, render_markdown(data))
+    return {"markdown": str(md_path)}
 
 
 def save(question: str, items: list[dict[str, Any]], criteria: list[str] | str | None = None,
          query: str = "", mode: str = "quick", session: str | None = None,
          search_params: dict[str, Any] | None = None) -> dict[str, Any]:
     """Create a session, or merge ITEMS into SESSION. Returns id, paths, counts."""
-    sid = session or time.strftime("%Y%m%d-%H%M%S") + "-" + _slug(question or query)
-    with store.lock(screening_dir() / f"{sid}.json"):  # the app may be writing the user's picks
-        return _save(sid, bool(session), question, items, criteria, query, mode, search_params)
-
-
-def _save(sid: str, existing: bool, question: str, items: list[dict[str, Any]], criteria: Any,
-          query: str, mode: str, search_params: dict[str, Any] | None) -> dict[str, Any]:
-    if existing:
-        data = load(sid)
-    else:
-        data = {"schema": store.SCHEMA, "id": sid, "created": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "question": question, "mode": mode, "criteria": [], "searches": [], "items": []}
-    if criteria:
-        data["criteria"] = [criteria] if isinstance(criteria, str) else list(criteria)
-    by_key = {_key(it): it for it in data["items"]}
-    added = 0
-    for raw in items:
-        item = {k: raw.get(k) for k in ("doi", "title", "year", "journal", "journal_rank", "authors",
-                                        "cited_by_count", "abstract", "abstract_missing", "retracted", "concern")
-                if raw.get(k) not in (None, "", [])}
-        if item.get("abstract"):  # for the app's detail pane; trimmed so a record stays small
-            item["abstract"] = str(item["abstract"])[:ABSTRACT_CHARS]
-        if isinstance(item.get("authors"), list):
-            item["authors"] = item["authors"][:3]
-        if raw.get("abstract_zh"):
-            item["abstract_zh"] = str(raw["abstract_zh"]).strip()[:ABSTRACT_CHARS]
-        item["relevance"] = _norm_relevance(raw.get("relevance"))
-        item["reason"] = str(raw.get("reason") or "").strip()
-        old = by_key.get(_key(item))
-        if old:  # re-rated: keep the user's decision
-            old.update({k: v for k, v in item.items()})
-        else:
-            item["decision"] = None
-            data["items"].append(item)
-            by_key[_key(item)] = item
-            added += 1
-    data["items"].sort(key=lambda it: (_RANK[it["relevance"]], -(it.get("cited_by_count") or 0)))
-    for n, it in enumerate(data["items"], 1):
-        it["n"] = n
-    if query:
-        # "new" is what survived de-duplication, so the review's flow can say how
-        # many records each search added and how many were already known.
-        data["searches"].append({"query": query, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                                 "params": search_params or {}, "results": len(items), "new": added})
-    paths = _write(data)
-    # Items are re-sorted by relevance, so the numbers the user picks from are
-    # these, not the order they were sent in: show the user this list.
-    return {"session": data["id"], "added": added, "total": len(data["items"]),
-            "by_relevance": {r: sum(1 for it in data["items"] if it["relevance"] == r) for r in RELEVANCE},
-            "numbering": [_brief(it) for it in data["items"]],
-            **paths}
+    res = db.save_screening(
+        question,
+        items,
+        criteria=criteria,
+        query=query,
+        mode=mode,
+        session=session,
+        search_params=search_params,
+    )
+    record = res.pop("record")
+    paths = _write_markdown(record)
+    return {**res, **paths}
 
 
 def translate_wanted(config: dict[str, Any] | None = None) -> list[str]:
@@ -151,21 +104,8 @@ def untranslated(session: str, config: dict[str, Any] | None = None) -> list[dic
 
 def translate(session: str, items: list[dict[str, Any]]) -> dict[str, Any]:
     """Store the agent's Chinese abstracts: items=[{doi or n, abstract_zh}]. Ratings stay as they are."""
-    with store.lock(_path(session)):  # the app may be writing the user's picks
-        data = load(session)
-        by_doi = {str(it.get("doi") or "").lower(): it for it in data["items"] if it.get("doi")}
-        by_n = {it.get("n"): it for it in data["items"]}
-        saved, missing = 0, []
-        for raw in items or []:
-            target = by_doi.get(str(raw.get("doi") or "").lower()) or by_n.get(raw.get("n"))
-            text = str(raw.get("abstract_zh") or "").strip()
-            if not target or not text:
-                missing.append(raw.get("doi") or raw.get("n"))
-                continue
-            target["abstract_zh"] = text[:ABSTRACT_CHARS]
-            saved += 1
-        _write(data)
-    return {"session": session, "saved": saved, "not_found": missing, "left": untranslated(session)}
+    res = db.translate_screening(session, items)
+    return {**res, "left": untranslated(session)}
 
 
 def _brief(it: dict[str, Any]) -> dict[str, Any]:
@@ -178,34 +118,13 @@ def decide(session: str, selected: list[int | str], rejected: list[int | str] | 
     """Record the user's whole choice by item number or DOI, replacing any
     earlier decision (a corrected pick must not leave the wrong one behind);
     optionally write a download queue."""
-    with store.lock(_path(session)):
-        return _decide(session, selected, rejected, out_file)
-
-
-def _decide(session: str, selected: list[int | str], rejected: list[int | str] | None,
-            out_file: str | None) -> dict[str, Any]:
-    data = load(session)
-    index: dict[str, dict[str, Any]] = {}
-    for it in data["items"]:
-        index[str(it["n"])] = it
-        if it.get("doi"):
-            index[str(it["doi"]).lower()] = it
-    refs = [(ref, "selected") for ref in selected or []] + [(ref, "rejected") for ref in rejected or []]
-    unknown = [ref for ref, _ in refs if str(ref).strip().lower() not in index]
-    if unknown:  # a mistyped number must not wipe the earlier choice
-        return {"session": session, "error": "unknown item numbers/DOIs; nothing recorded",
-                "unknown": unknown, "numbering": [_brief(it) for it in data["items"]]}
-    for it in data["items"]:
-        it["decision"] = None
-    for ref, decision in refs:
-        index[str(ref).strip().lower()]["decision"] = decision
-    paths = _write(data)
-    chosen = [it for it in data["items"] if it.get("decision") == "selected"]
-    result: dict[str, Any] = {"session": session, "selected": len(chosen),
-                              "identifiers": [it["doi"] for it in chosen if it.get("doi")],
-                              "chosen": [_brief(it) for it in chosen],
-                              "rejected": [_brief(it) for it in data["items"] if it.get("decision") == "rejected"],
-                              "unknown": unknown, **paths}
+    res = db.decide_screening(session, selected, rejected)
+    if "error" in res:
+        return res
+    record = res.pop("record")
+    paths = _write_markdown(record)
+    result: dict[str, Any] = {**res, **paths}
+    chosen = [it for it in record["items"] if it.get("decision") == "selected"]
     if out_file and chosen:
         from ..download.pipeline import QueueEntry, predict_channel, write_queue
         qe = [QueueEntry(identifier=it["doi"], channel=predict_channel(it["doi"]), title=it.get("title", ""))
@@ -215,20 +134,7 @@ def _decide(session: str, selected: list[int | str], rejected: list[int | str] |
 
 
 def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
-    out = []
-    # Only the records: a deep search's pool, summary and progress files sit
-    # next to them (the pool can be 100+ MB and has no "id").
-    records = [p for p in screening_dir().glob("*.json") if p.name.count(".") == 1]
-    for p in sorted(records, reverse=True)[:limit]:
-        try:
-            d = store.read_json(p)
-            d["id"]
-        except (OSError, ValueError, KeyError, TypeError):
-            continue
-        out.append({"session": d["id"], "question": d.get("question", ""), "updated": d.get("updated", ""),
-                    "items": len(d.get("items", [])),
-                    "selected": sum(1 for it in d.get("items", []) if it.get("decision") == "selected")})
-    return out
+    return db.list_sessions(limit)
 
 
 def prisma(session: str) -> dict[str, Any]:
@@ -273,23 +179,7 @@ def history(limit: int = 500) -> list[dict[str, Any]]:
 
     "selected" lists the final picks (title, year, journal, DOI), newest session first.
     """
-    out = []
-    records = [p for p in screening_dir().glob("*.json") if p.name.count(".") == 1]
-    for p in sorted(records, reverse=True)[:limit]:
-        try:
-            d = store.read_json(p)
-            sid = d["id"]
-        except (OSError, ValueError, KeyError, TypeError):
-            continue
-        items = d.get("items", [])
-        out.append({
-            "session": sid, "question": d.get("question", ""), "mode": d.get("mode", "quick"),
-            "created": d.get("created", ""), "updated": d.get("updated", ""), "items": len(items),
-            "by_relevance": {r: sum(1 for it in items if _rating(it) == r) for r in RELEVANCE},
-            "selected": [{k: it.get(k) for k in ("doi", "title", "year", "journal", "journal_rank")}
-                         for it in items if it.get("decision") == "selected"],
-        })
-    return out
+    return db.history(limit)
 
 
 _DECISION = {"selected": "✅ 选中", "rejected": "✗ 不要", None: ""}
