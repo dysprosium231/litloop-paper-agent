@@ -30,6 +30,19 @@ SERVER = "litloop"
 SKILLS = ("litloop", "litloop-sort")
 WIN = os.name == "nt"
 
+
+def _which_cli(name: str) -> str:
+    """Find a client CLI. On Windows npm installs `name` as a shell shim that
+    CreateProcess cannot run; the runnable entry point is the `name.cmd` (or
+    `name.exe`) next to it, so prefer those before the bare name."""
+    if WIN:
+        for ext in (".cmd", ".exe"):
+            found = shutil.which(name + ext)
+            if found:
+                return found
+    return shutil.which(name) or ""
+
+
 HOME = Path.home()
 ROOT = Path(__file__).resolve().parents[1]
 REPORT: dict = {"steps": [], "warnings": [], "next": []}
@@ -118,7 +131,7 @@ def venv_python(venv: Path) -> Path:
 
 def registered_venv() -> Path | None:
     """The venv an existing Claude Code registration runs from, if it is ours."""
-    claude = shutil.which("claude")
+    claude = _which_cli("claude")
     if not claude:
         return None
     out = run([claude, "mcp", "get", SERVER], check=False).stdout
@@ -186,7 +199,7 @@ def _same_install(cmd: str, py: Path) -> bool:
 
 
 def register_claude_code(py: Path, force: bool, dry: bool) -> None:
-    claude = shutil.which("claude")
+    claude = _which_cli("claude")
     if not claude:
         return
     cur = run([claude, "mcp", "get", SERVER], check=False)
@@ -239,7 +252,7 @@ def register_claude_desktop(py: Path, force: bool, dry: bool, explicit: bool) ->
 
 
 def register_codex(py: Path, force: bool, dry: bool) -> None:
-    codex = shutil.which("codex")
+    codex = _which_cli("codex")
     if not codex:
         return
     listed = run([codex, "mcp", "list"], check=False).stdout
