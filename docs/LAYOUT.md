@@ -12,7 +12,7 @@
 | `publishers/` | 出版商 | `profiles.py`（publisher_profiles.py）、`access.py`（publisher_access.py）、`pdf_router.py`（publisher_pdf_router.py）、`supplementary.py`、`strategies/`（publisher_strategies/，其中 `_core.py` 原为 _publisher_strategies_core.py；`_elsevier_api.py` 是 2026-11-05 从 `_core.py` 抽出的 ScienceDirect 文章 API 一段，`_core.py` 仍回导它的名字，调用处不用改） |
 | `browser/` | 浏览器 | `backend.py`、`engine.py`、`login.py`、`cookies.py`、`pdf.py`、`runtime.py`（browser_discovery.py）、`chrome_copy.py`、`profile_health.py`、`camofox_api.py`（camofox.py，云端 API 客户端）、`cloakbrowser_compat.py`（合并了顶层和 institutional/ 下的两份） |
 | `institutional/` | 学校认证 | `auth.py`、`schools.py`、`session_heal.py`、`session_store.py`、`remote_assist.py`、`proxy_check.py`、`carsi_login.py`（sources/carsi.py）、`config_adapter.py` |
-| `sources/` | 下载来源 | 各来源；`carsi.py`（原 carsi_source.py）、`elsevier_check.py`、`scihub_domains.py`（domain_db.py） |
+| `sources/` | 下载来源 | 各来源；`carsi.py`（原 carsi_source.py）、`elsevier_check.py`、`scihub_domains.py`（domain_db.py）；`_index.py`、`_batch.py`、`_routes.py`（2026-11-20 从 `__init__.py` 抽出的本地 DOI 索引与重命名、批量下载与进度、来源组装与机构顺序路由三段，`__init__.py` 仍回导全部名字，调用处与测试不变） |
 | `citations/` | 引用格式与文献列表 | `formats.py`（citation.py）、`bibtex_crossref.py`（bibtex.py）、`bib_import.py`（bibparser.py）、`paper_list.py`（paperlist.py）、`session_export.py`（export.py） |
 | `desktop/` | 桌面 app 的后台 | `server.py`（app_server.py）、`settings.py`（app_settings.py）、`agent_runner.py`、`download_jobs.py`、`error_text.py`、`translate.py` |
 | `cli/` | 命令行 | `main.py`、`commands.py`（_cli_core.py）、`doctor.py`（setup.py，环境诊断）、`web.py`、`_utils.py` |

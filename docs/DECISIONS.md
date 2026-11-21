@@ -9,6 +9,17 @@
   3. 运行 `scripts/build_skills.py` 同步更新 `skills/litloop/SKILL.md`、`skills/litloop/reference.md` 与 `zcode-plugin/skills/litloop/SKILL.md`。
 - 验证（`C:/Users/Echo/.mcp-envs/litloop/Scripts/python.exe`）：重点 7 个测试文件 `94 passed`；全量 `python -m pytest -q` 为 `1220 passed, 3 skipped`（146.69s）；`scripts/import_smoke.py` 为 `35/35 modules import`；`app/` 中 `npm run build` 与 `npm run lint:copy`（0 issues）通过；`scripts/check_release_consistency.py` 通过（`OK: version 1.18.3, 21 MCP tools, skills clean`）。
 
+## 2026-11-20：`sources/__init__.py` 抽出 `_index.py`、`_batch.py`、`_routes.py`（2214 → 1339 行）
+
+- 背景：`src/litloop/sources/__init__.py` 原 2214 行，是「不拆」约定下另一处仍在增长的大文件。经用户 2026-11-20 拍板，按「阶段 1+2 外围拆分」策略先拆出三个与单篇竞速耦合度低的模块，保住竞速主干。
+- 做法：在 `src/litloop/sources/` 下新增三个内部子模块，`sources/__init__.py` 降至 **1339** 行并在末尾集中回导全部 **33** 个迁出符号（`__all__ = ["download", "batch_download"]` 不变）：
+  1. `_index.py`（221 行 / 10 符号）：本地 `.doi_index.json` 索引、缓存校验与自动重命名（`_EXPLICIT_STRATEGIES`、`_index_entry` … `_update_doi_index`、`_auto_rename`）。
+  2. `_batch.py`（529 行 / 12 符号）：批量编排、JSONL 断点进度、批量机构阶段、结果落盘、预印本回退与独立 `institutional_download`（`_get_progress_file` … `batch_download`、`_close_batch_browsers`）。
+  3. `_routes.py`（290 行 / 11 符号）：Phase 1/2 来源组装、机构串行路由与看门狗、失败排查建议（`_build_free_sources`、`_INSTITUTIONAL_STEPS` … `_build_failure_guidance`）。
+  各子模块顶层不做 `from . import ...` 循环导入，内部通过 `sys.modules[__package__]` 门面辅助函数（`_pkg()`）在运行时查表读取可 patch 目标与共享状态，完整兼容 68 处既有 `monkeypatch.setattr`（`tests/` 零改动），所有调用处也无需修改。
+- 没动的部分：竞速核心（`_try_source`、`_run_tiers_parallel`、负缓存 `_NEG_CACHE`、浏览器信号量）、进程级并发状态（`_INFLIGHT_LOCK`、`_SETTLED`、`_SKIPPED`、`_CANCEL_GEN`、`_SOURCE_TLS`、`_DL_TLS` 等）、单篇主入口 `download`/`_download_impl` 与末尾浏览器钩子（`_bb.LAUNCH_GUARD`、`_bb.OWNER`）均留在 `sources/__init__.py` 作为单一真相源；阶段 3（`_race.py`）待真机实测 8–10 稳定后再评估。
+- 验证：静态审查、`import_smoke.py`（35/35）与 `sources` 相关全部 53 个测试文件（**503 passed, 1 skipped, 0 failed**，含阶段 1+2 重点 17 文件 **152 passed**）均通过；全量 pytest（`PYTHONPATH=src;build/runtime/Lib/site-packages`）跑出 `1204 passed, 13 skipped, 6 failed`（6 条分别为子进程未带 `runtime\Lib\site-packages` 缺 `Crypto` 的 `test_mcp_lifecycle` 与工作区既有 2026-11-19 未提交改动，零本次拆分相关失败）；`check_release_consistency.py` 中布局、源码卫生、吞异常计数（189 <= 190）、版本号与 21 MCP 工具等与本次拆分相关的子项全部通过（唯一未过项为工作区既有未提交 `skills-src/shared/screening.md` 造成的 `skill docs out of date`）。
+
 ## 2026-11-19：深度检索支持中断后续跑
 
 - 背景：深度检索如果在建候选池的引用扩展（`expand`）阶段因网络错误、OpenAlex 积分耗尽或进程被关闭而中断，原有实现不会把基础候选池和已完成波次的参考文献落盘，进度文件也没有记录进程 PID、`stopped_phase` 和失败原因；重启后既看不出中断位置，也无法从断点接着跑，且 app 原先的「继续检索」按钮只能不经 Agent 硬取下一批。

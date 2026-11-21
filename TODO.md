@@ -31,11 +31,10 @@
 
 ## 正在做
 
-（正在做：2026-11-07 的两件事已做完并推送——①重装配运行时并升到 **1.18.3**，MSI 重新打出（`LitLoop_1.18.3_x64_zh-CN.msi`，125.9 MiB，含蓝色向导图与「设置页显示数据目录」）；②卸载/升级前先关掉运行中的实例（自定义 WiX 模板 `app/src-tauri/wix/main.wxs` 的 `CloseRunningApp`，已用 MSI 表核对排在 `InstallValidate` 之后）。另外把深度检索的「精确（AND）检索 + 标题短语加分」做完并默认打开（提交 `ad8798a`、`e544e7c`）。下一步：等用户按待实测 13（装新 MSI、看蓝位图、改 D 盘、开着 app 卸载不报 `.rbf`、升级只剩一份）与 14（无 Key 首次引导提示）验；之后再挑待实测 8–12、或补「卸载时问是否保留数据」、或拆稀土最后那篇漏检。用户还没定：分析归纳验收标准、要不要重议「不拆大文件」。）
+（正在做：2026-11-07 的两件事已做完并推送——①重装配运行时并升到 **1.18.3**，MSI 重新打出（`LitLoop_1.18.3_x64_zh-CN.msi`，125.9 MiB，含蓝色向导图与「设置页显示数据目录」）；②卸载/升级前先关掉运行中的实例（自定义 WiX 模板 `app/src-tauri/wix/main.wxs` 的 `CloseRunningApp`，已用 MSI 表核对排在 `InstallValidate` 之后）。另外把深度检索的「精确（AND）检索 + 标题短语加分」做完并默认打开（提交 `ad8798a`、`e544e7c`）。此外已完成用户 2026-11-20 拍板的 `sources/__init__.py` 阶段 1+2 外围拆分（2214 → **1339** 行，抽出 `_index.py`、`_batch.py`、`_routes.py` 并由 `__init__.py` 回导，见 `DECISIONS.md`）。下一步：等用户按待实测 13（装新 MSI、看蓝位图、改 D 盘、开着 app 卸载不报 `.rbf`、升级只剩一份）与 14（无 Key 首次引导提示）验；之后再挑待实测 8–12、或补「卸载时问是否保留数据」、或拆稀土最后那篇漏检。用户还没定：分析归纳验收标准。）
 
 ## 待用户决定
 
-- [ ] **要不要重议「不拆大文件」这条约定**（2026-11-05 提出）：`src/litloop/sources/__init__.py` 2112 行，预印本兜底、车道晚到文件、Sci-Hub 慢速镜像三处新逻辑这周都加在里面；抽出一个 `download/race.py` 的风险可控，但会动竞速与兜底的主干。`server.py` 与 `publishers/strategies/_core.py` 维持「不拆」。
 - [ ] 停止规则改成“连续 2 批才停”：SYNERGY 10 个综述上都更好（见 DECISIONS「SYNERGY 离线评测（第二批，共 10 个综述）」）。用户 2026-10-28 要求先在自己的 3 个材料测试集上重放看看；重放要花 OpenAlex 积分（每天 10,000），三个都已跑完。**三个材料集上“连续 2 批”都是多读 0 篇**：SiC/Al 现行规则 180 篇停、已找全 19 篇，多读 30 篇还是 19；PDC 现行规则 150 篇停（25/26），180 篇仍是 25/26；稀土现行规则 120 篇停（2/9），读到 150、180 篇仍是 2/9。建议不改（综述类样本上的收益没有在材料课题上复现），等用户定（见 DECISIONS「停止规则重放」三条）。
 - [ ] **「分析归纳」的验收标准**（CHARTER 里这条一直写「待定」，不先定就做不出可验收的东西）。我拟的最小版本，请用户确认或改：
   1. 输入：一次检索里标为「高」并已下载 PDF 的文献（至少 10 篇，其中混 2 篇故意放进去的无关文献）。
@@ -124,7 +123,7 @@
   - 抽取性质数据考虑用 [ChemDataExtractor2](https://github.com/CambridgeMolecularEngineering/ChemDataExtractor2)（2026-10-25 用户提出；MIT，剑桥维护，能从材料与化学论文的正文和表格里抽化合物、性质数值、光谱）。它要求 Python ≤ 3.12、numpy < 2，依赖 transformers、stanza 等，几个 GB，和 LitLoop 的环境（Python 3.14、numpy 2）冲突：单独建一个环境，LitLoop 用子进程调用它（像 zotero-mcp 那样）。它的缩写识别没有用于术语表：600 篇材料摘要上实测不如 `abbreviations`（见 DECISIONS「术语表」）。
 
 ### 工程债（2026-11-05 盘点，用户认可，先记账不动手）
-- [~] **三个巨型文件**：`src/litloop/publishers/strategies/_core.py`（2873 → **2340** 行，2026-11-05 抽出 `_elsevier_api.py`，见 DECISIONS）、`src/litloop/sources/__init__.py` 2112 行、`src/litloop/server.py` 1731 行。「不拆」是继承来的约定，但新逻辑仍在往里加（预印本兜底、车道晚到文件、Sci-Hub 慢速镜像全在 `sources/__init__.py`）。建议至少把竞速/兜底抽成 `download/race.py`，其余保持。
+- [~] **三个巨型文件**：`src/litloop/publishers/strategies/_core.py`（2873 → **2340** 行，2026-11-05 抽出 `_elsevier_api.py`，见 DECISIONS）、`src/litloop/sources/__init__.py`（2214 → **1339** 行，2026-11-20 抽出 `_index.py`、`_batch.py`、`_routes.py` 并回导全部名字，见 DECISIONS；竞速核心 `_race.py` 阶段 3 待真机实测 8–10 稳定后再定）、`src/litloop/server.py` 1731 行。「不拆」是继承来的约定，其余保持。
 - [ ] **数据层换 SQLite**：现在是 JSON + 文件锁，候选池 1600–3400 篇是几 MB 的整份读整份写，会议话越攒越大越慢；`store.SCHEMA` 只有版本号、没有迁移机制。先做「会话/候选池/决策/追踪」四张表，再补迁移。
 - [ ] **真实世界回归**：测试多但都打桩，下载链路（竞速、迟到落盘、慢镜像、预印本）只有真网络能验。做一组录制的真实响应（HTML + 状态码 + 小 PDF）在本地回放，再加一条「装好的 exe 起得来 + `/api/health` 通」的冒烟脚本。
 - [ ] **筛选页批量与撤销**：30 篇只能逐篇点；缺「按 Agent 理由批量接受/排除」、多选、撤销、列表内按年份/期刊过滤与搜索。
@@ -133,7 +132,7 @@
 
 ### 不做
 - 不重写下载引擎；不把排序换成大模型打分；没有测试集不调排序参数（2026-10-18 评审）。
-- 不拆分 `server.py`、`_publisher_strategies_core.py` 两个大文件（继承自原项目，风险大、收益不直接）。2026-10-25 的模块整理只把后者原样挪到 `publishers/strategies/_core.py`，不拆。**例外（2026-11-05）**：把其中与浏览器无关的 ScienceDirect 文章 API 一段抽成了 `strategies/_elsevier_api.py`，`_core.py` 回导名字、调用处不变（2873 → 2340 行）；其余部分仍不拆。
+- 不拆分 `server.py`、`_publisher_strategies_core.py` 两个大文件（继承自原项目，风险大、收益不直接）。2026-10-25 的模块整理只把后者原样挪到 `publishers/strategies/_core.py`，不拆。**例外（2026-11-05）**：把其中与浏览器无关的 ScienceDirect 文章 API 一段抽成了 `strategies/_elsevier_api.py`，`_core.py` 回导名字、调用处不变（2873 → 2340 行）；**同类例外（2026-11-20）**：把 `sources/__init__.py` 中的阶段 1+2 外围段落抽成 `sources/_index.py`、`_batch.py`、`_routes.py`（2214 → **1339** 行），`sources/__init__.py` 回导全部名字、调用处与测试不变；竞速核心（阶段 3 `_race.py` 待真机实测 8–10 稳定后再定）及上述其余部分仍暂不拆。
 - 不给 `publisher-batch` 补导入登录状态，整条路去掉（2026-10-19）。
 - 不接回 FlareSolverr（要另跑服务；人机验证交给用户，2026-10-19）。
 
