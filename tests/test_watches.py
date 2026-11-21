@@ -6,11 +6,13 @@ import json
 
 import pytest
 
+from litloop import config, db
 from litloop.search import quick, watches
 
 
 @pytest.fixture(autouse=True)
 def tmp_home(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(watches, "path", lambda: tmp_path / "watches.json")
     return tmp_path
 
@@ -40,8 +42,7 @@ def test_a_check_reports_only_papers_it_has_not_seen(monkeypatch):
 def test_the_watch_survives_a_restart(tmp_path, monkeypatch):
     monkeypatch.setattr(quick, "search_papers_v2", lambda *a, **k: [])
     watches.add("q", "some query")
-    data = json.loads((tmp_path / "watches.json").read_text(encoding="utf-8"))
-    assert data["schema"] == watches.store.SCHEMA and data["watches"][0]["query"] == "some query"
+    assert (tmp_path / "litloop.db").exists()
     assert watches.list_watches()[0]["query"] == "some query"
 
 
@@ -72,10 +73,10 @@ def test_check_due_only_runs_watches_older_than_the_configured_days(monkeypatch)
     from datetime import datetime, timedelta
     old = watches.add("旧课题", "old topic", [], [])
     fresh = watches.add("新课题", "new topic", [], [])
-    data = json.loads((watches.path()).read_text(encoding="utf-8"))
-    for w in data["watches"]:
-        w["checked"] = (datetime.now() - timedelta(days=1 if w["id"] == fresh["id"] else 30)).isoformat(timespec="seconds")
-    (watches.path()).write_text(json.dumps(data), encoding="utf-8")
+    old_ts = (datetime.now() - timedelta(days=30)).isoformat(timespec="seconds")
+    fresh_ts = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
+    db.update_watch_check(old["id"], seen_keys=[], checked=old_ts, last_new=0)
+    db.update_watch_check(fresh["id"], seen_keys=[], checked=fresh_ts, last_new=0)
     seen: list[str] = []
 
     def fake_check(wid, config=None):
@@ -86,3 +87,41 @@ def test_check_due_only_runs_watches_older_than_the_configured_days(monkeypatch)
     out = watches.check_due({"watch_check_days": 7})
     assert seen == [old["id"]]
     assert out["new_total"] == 1 and out["checked"][0]["question"] == "旧课题"
+
+
+def test_legacy_watches_json_is_imported_idempotently_and_kept(tmp_path):
+    legacy = tmp_path / "watches.json"
+    legacy.write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "watches": [
+                    {
+                        "id": "legacy01",
+                        "question": "旧追踪",
+                        "query": "legacy aerogel",
+                        "core_terms": ["aerogel"],
+                        "session": "s1",
+                        "created": "2026-10-01 10:00",
+                        "checked": "2026-10-02 10:00",
+                        "last_new": 2,
+                        "seen": ["doi:10.1/a", "doi:10.1/b"],
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    first = watches.list_watches()
+    assert len(first) == 1
+    assert first[0]["id"] == "legacy01"
+    assert first[0]["seen_count"] == 2
+    assert legacy.exists()  # original file is never deleted
+
+    # Calling again is idempotent and preserves existing DB state
+    assert db.import_legacy_watches(data_dir=tmp_path) == 0
+    second = watches.get("legacy01")
+    assert second is not None
+    assert second["seen"] == ["doi:10.1/a", "doi:10.1/b"]

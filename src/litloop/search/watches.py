@@ -8,12 +8,13 @@ from there. Nothing here knows about scheduling; the app decides when to ask.
 
 from __future__ import annotations
 
+import threading
 import time
 import uuid
 from pathlib import Path
 from typing import Any
 
-from .. import store
+from .. import config, db
 from ..identifiers import canonical_doi
 
 MAX_SEEN = 5000    # own value: enough history for years of one topic
@@ -21,20 +22,14 @@ NEW_LIMIT = 50     # own value: how many hits one check pulls before dedupe
 
 
 def path() -> Path:
-    from ..config import DATA_DIR
-    return Path(DATA_DIR) / "watches.json"
+    """Legacy JSON path, kept for backward compatibility and one-time import."""
+    return Path(config.DATA_DIR) / "watches.json"
 
 
-def _data() -> dict[str, Any]:
-    try:
-        data = store.read_json(path())
-    except (OSError, ValueError):
-        data = {}
-    if not isinstance(data, dict):
-        data = {}
-    data.setdefault("schema", store.SCHEMA)
-    data.setdefault("watches", [])
-    return data
+def _ensure_legacy_imported() -> None:
+    legacy = path()
+    if legacy.exists():
+        db.import_legacy_watches(legacy_path=legacy)
 
 
 def key(paper: dict[str, Any]) -> str:
@@ -46,72 +41,57 @@ def key(paper: dict[str, Any]) -> str:
 
 
 def list_watches() -> list[dict[str, Any]]:
-    """Newest first; the seen list stays in the file (it can be thousands long)."""
-    out = [{k: v for k, v in w.items() if k != "seen"} | {"seen_count": len(w.get("seen") or [])}
-           for w in _data()["watches"]]
-    return sorted(out, key=lambda w: str(w.get("checked") or w.get("created") or ""), reverse=True)
+    """Newest first; the seen list stays in the database (it can be thousands long)."""
+    _ensure_legacy_imported()
+    return db.list_watches()
 
 
 def get(wid: str) -> dict[str, Any] | None:
-    return next((w for w in _data()["watches"] if w.get("id") == wid), None)
+    _ensure_legacy_imported()
+    return db.get_watch(wid)
 
 
 def add(question: str, query: str, core_terms: list[str] | None = None,
         seen: list[dict[str, Any]] | None = None, session: str = "") -> dict[str, Any]:
     """Remember a search; papers passed in ``seen`` are not reported as new later."""
+    _ensure_legacy_imported()
     query = " ".join(str(query or "").split())
     if not query:
         raise ValueError("无法保存追踪：检索式是空的")
-    keys = [key(p) for p in seen or []]
-    watch = {"id": uuid.uuid4().hex[:8], "question": " ".join(str(question or "").split()),
-             "query": query, "core_terms": list(core_terms or []), "session": session,
-             "created": time.strftime("%Y-%m-%d %H:%M"), "checked": "", "last_new": 0,
-             "seen": keys[:MAX_SEEN]}
-    p = path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    if not p.exists():
-        store.write_json(p, {"schema": store.SCHEMA, "watches": []}, indent=1)
-    with store.update(p, indent=1) as data:
-        data.setdefault("watches", [])
-        data["watches"].append(watch)
-    return {k: v for k, v in watch.items() if k != "seen"} | {"seen_count": len(keys)}
+    keys = [key(p) for p in seen or []][:MAX_SEEN]
+    return db.add_watch(
+        wid=uuid.uuid4().hex[:8],
+        question=" ".join(str(question or "").split()),
+        query=query,
+        core_terms=list(core_terms or []),
+        seen_keys=keys,
+        session=session,
+    )
 
 
 def remove(wid: str) -> bool:
-    p = path()
-    if not p.exists():
-        return False
-    with store.update(p, indent=1) as data:
-        watches = data.setdefault("watches", [])
-        left = [w for w in watches if w.get("id") != wid]
-        if len(left) == len(watches):
-            return False
-        data["watches"] = left
-    return True
+    _ensure_legacy_imported()
+    return db.remove_watch(wid)
 
 
 def check(wid: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
     """Run the saved search once; return only the papers this watch has not seen."""
     from . import quick
-    watch = get(wid)
+    _ensure_legacy_imported()
+    watch = db.get_watch(wid)
     if not watch:
         raise ValueError("没有这个追踪")
     hits = quick.search_papers_v2(watch["query"], limit=NEW_LIMIT, sort="date") or []
     seen = set(watch.get("seen") or [])
     fresh = [p for p in hits if key(p) not in seen]
     now = time.strftime("%Y-%m-%d %H:%M")
-    p = path()
-    with store.update(p, indent=1) as data:
-        for w in data.setdefault("watches", []):
-            if w.get("id") == wid:
-                keys = list(w.get("seen") or []) + [key(x) for x in hits]
-                w["seen"] = list(dict.fromkeys(keys))[-MAX_SEEN:]
-                w["checked"] = now
-                w["last_new"] = len(fresh)
+    keys = list(watch.get("seen") or []) + [key(x) for x in hits]
+    merged_seen = list(dict.fromkeys(keys))[-MAX_SEEN:]
+    db.update_watch_check(wid, seen_keys=merged_seen, checked=now, last_new=len(fresh))
     return {"id": wid, "checked": now, "found": len(hits), "new": fresh}
 
 
-_DUE_LOCK = __import__("threading").Lock()
+_DUE_LOCK = threading.Lock()
 
 
 def check_due(config: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -121,25 +101,16 @@ def check_due(config: dict[str, Any] | None = None) -> dict[str, Any]:
     the default (7 days) keeps the OpenAlex credits spent on this small. Returns
     the per-watch outcome and how many new papers came back in total.
     """
-    from datetime import datetime, timedelta
-
     from ..config import load_config
     config = config or load_config()
     days = float(config.get("watch_check_days") or 7)
     if not _DUE_LOCK.acquire(blocking=False):
         return {"checked": [], "new_total": 0, "busy": True}
     try:
-        now = datetime.now()
+        _ensure_legacy_imported()
         done: list[dict[str, Any]] = []
         total = 0
-        for w in _data()["watches"]:
-            checked = str(w.get("checked") or "")
-            if checked:
-                try:
-                    if now - datetime.fromisoformat(checked) < timedelta(days=days):
-                        continue
-                except ValueError:
-                    pass
+        for w in db.due_watches(days):
             try:
                 r = check(str(w["id"]), config)
             except Exception as exc:  # one broken search must not stop the rest
