@@ -169,14 +169,15 @@ python scripts/build_release.py --bundle
 
 It first stages an embedded Python runtime in `build/runtime` (the official embeddable distribution, the core dependencies and `uv.exe`), then calls `npm run tauri build`. You get two packages, either one installs the app:
 
-- `app/src-tauri/target/release/bundle/nsis/LitLoop_<version>_x64-setup.exe`, about 102 MiB (101.8 MiB for 1.18.2);
-- `app/src-tauri/target/release/bundle/msi/LitLoop_<version>_x64_<language>.msi`, about 128 MiB (128.3 MiB for 1.18.2), which lets the user pick the install folder; it installs per machine, so it needs administrator rights.
+- **NSIS (`app/src-tauri/target/release/bundle/nsis/LitLoop_<version>_x64-setup.exe`)**, about 102 MiB (101.8 MiB for 1.18.2): double-click to install with support for per-user or per-machine mode (`installMode: both`). When uninstalling, a prompt asks whether to also delete `~/.litloop` (defaulting to **No**, so your screening records, downloaded PDFs and settings are kept).
+- **MSI (`app/src-tauri/target/release/bundle/msi/LitLoop_<version>_x64_<language>.msi`)**, about 128 MiB (128.3 MiB for 1.18.2): Windows Installer package that lets you choose the install folder and installs per machine (requires administrator rights, suitable for bulk deployment). Uninstalling keeps `~/.litloop` by default.
 
 Both ship Python and the dependencies inside — the target machine needs nothing installed.
 
-- Installing needs administrator rights (`installMode: both`).
-- The installer is **unsigned**: Windows shows the SmartScreen "unrecognised app" prompt, where you click "More info → Run anyway"; some company machines block this by policy.
-- Layout analysis (about 65 MB, only affects how PDFs are converted to Markdown) is not included; install it on demand under Settings → Optional components, with a mirror if the download is slow.
+- **Administrator rights**: per-machine installation (installing into `Program Files` or using the MSI) requires administrator rights (`installMode: both`).
+- **SmartScreen prompt**: the installer is **unsigned**, so on first launch Windows shows "Windows protected your PC" / "unrecognised app" — click **More info** → **Run anyway**; if a managed/company PC blocks this by policy, ask your IT administrator or run from source.
+- **Uninstalling and user data**: your data lives in `~/.litloop`; NSIS asks before deleting it (defaulting to keep), and MSI always leaves it intact.
+- **Optional layout analysis** (about 65 MB, only affects how PDFs are converted to Markdown): not included in the installer; install it on demand under Settings → Optional components, with a mirror if the download is slow.
 
 ### Dependencies and keys
 

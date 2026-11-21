@@ -1,5 +1,18 @@
 # 决定与实验记录
 
+## 2026-11-21：体积与冷启动优化、安装包与发布收尾
+
+- 背景：按 [TODO.md](TODO.md) 完成「工程债 → 体积与冷启动」与「app → 安装包与自动更新」收尾，并作为当日工作收口。
+- 第 1 波（提交 `413d657`）：**体积与冷启动优化**
+  1. **Python 顶层懒加载**：[src/litloop/\_\_init\_\_.py](src/litloop/__init__.py) 改为 PEP 562 `__getattr__` / `__dir__` 懒加载 `batch_download` 与 `search_papers`。实测 `python -X importtime -c "import litloop.desktop.server"` 中 `litloop` cumulative 由 `166.96 ms` 降至 `12.89 ms`（-92.3%），`litloop.desktop.server` 由 `325.49 ms` 降至 `212.94 ms`（-34.6%）。
+  2. **Tauri 窗口与后台并行拉起**：[app/src-tauri/src/lib.rs](app/src-tauri/src/lib.rs) 在后台线程启动 `start_backend()` 并用 `Condvar` + `async fn backend` 同步，退出时通过 `stopping` 标志防孤儿进程；[app/src/App.tsx](app/src/App.tsx) 新增 `booting` 启动态，并把非首屏页面拆为 `React.lazy`，配合 [app/vite.config.ts](app/vite.config.ts) `manualChunks` 将首屏 `index` chunk 由 `534.38 kB` 降至 `99.96 kB`（0 个 >500 kB 告警）。
+  3. **运行时裁剪增强**：[scripts/build_release.py](scripts/build_release.py) 的 `prune()` 额外移除 `*.chm`、`*.pdb`、`*.lib`、`*.a`、`*.c`、`*.cpp`、`*.pxd`、`*.pyx` 与 `pythonwin`/`demos`/`examples`；新增 [tests/test_startup_and_prune.py](tests/test_startup_and_prune.py)。第 1 波全量 `1264 passed, 3 skipped`。
+- 第 2 波：**安装包与发布收尾**
+  1. **NSIS 卸载保留用户数据询问**：新增 [app/src-tauri/nsis/hooks.nsh](app/src-tauri/nsis/hooks.nsh) 并接入 [app/src-tauri/tauri.conf.json](app/src-tauri/tauri.conf.json)，非升级卸载时弹窗询问是否删除 `~/.litloop`（默认「否」保留）；MSI 默认保留；已在 [README.md](README.md)、[README.zh-CN.md](README.zh-CN.md) 与 [.github/workflows/release.yml](.github/workflows/release.yml) 写清差异与 SmartScreen 通过步骤。
+  2. **按需组件安装进度与版本更新检查**：[src/litloop/optional.py](src/litloop/optional.py) 改用 `Popen` 流式读取 `uv` 输出并暴露 `install_status()`；[src/litloop/desktop/server.py](src/litloop/desktop/server.py) 新增 `GET /api/components/{key}/status` 与 `GET /api/app-update`；[app/src/components/settings-view.tsx](app/src/components/settings-view.tsx) 接入 600ms 进度轮询及「版本与更新」检查入口；新增 [tests/test_optional.py](tests/test_optional.py)。
+  3. **发版自检与条件签名流**：新增 [scripts/prepare_release.py](scripts/prepare_release.py) 与 [tests/test_prepare_release.py](tests/test_prepare_release.py)，[.github/workflows/release.yml](.github/workflows/release.yml) 支持存在 `TAURI_SIGNING_PRIVATE_KEY` 时自动生成 `.sig` 与 `latest.json`。
+- 第 2 波终验：`scripts/prepare_release.py`（4 处版本一致 `1.18.3`、`check_release_consistency.py` OK、`35/35 modules import`、`smoke_app.py` healthy、`npm run build` 0 warnings、`npm run lint:copy` `No issues found.`）、`cargo check` 通过、全量 `pytest -q` 为 `1267 passed, 3 skipped`（215.79s），全部变更文件纯 LF。
+
 ## 2026-11-21：快速检索结果缓存（默认 7 天）
 
 - 背景：`TODO.md`「检索 → 快速检索提速」提到重复检索会重复耗费网络与 OpenAlex 额度；与用户确认采用默认 **7 天（168 小时）**缓存并补齐安全绕过规则。

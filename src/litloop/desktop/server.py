@@ -22,6 +22,7 @@ import re
 import secrets
 import socket
 import sys
+import time
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -171,7 +172,26 @@ class BatchUpdate(BaseModel):
 
 
 _OPENALEX: dict[str, Any] = {"at": 0.0, "data": None}  # see /api/quota/openalex
+_APP_UPDATE: dict[str, Any] = {"at": 0.0, "data": None}  # see /api/app-update
+_APP_UPDATE_URL = "https://api.github.com/repos/dysprosium231/litloop-paper-agent/releases/latest"
 _WRITE_MODE: dict[str, Any] = {}  # zotero-mcp's write mode, cached until the user authorizes
+
+
+def _parse_version_tuple(version: str) -> tuple[int, ...] | None:
+    """Extract numeric version parts (e.g. 'v1.18.3' -> (1, 18, 3))."""
+    cleaned = version.strip().lstrip("vV")
+    if not cleaned:
+        return None
+    parts: list[int] = []
+    for piece in re.split(r"[.+_-]", cleaned):
+        if piece.isdigit():
+            parts.append(int(piece))
+        else:
+            m = re.match(r"^(\d+)", piece)
+            if m:
+                parts.append(int(m.group(1)))
+            break
+    return tuple(parts) if parts else None
 
 
 def _explain(d: dict[str, Any] | None, action: str = "下载", full: bool = False) -> None:
@@ -556,6 +576,15 @@ def create_app(token: str) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(404, "无法完成检测：此分组没有检测项") from exc
 
+    @app.get("/api/components/{key}/status")
+    def component_status(key: str) -> dict[str, Any]:
+        """Return the current install progress and state for an optional component."""
+        from .. import optional
+        try:
+            return optional.install_status(key)
+        except KeyError as exc:
+            raise HTTPException(404, "没有这个可选组件") from exc
+
     @app.post("/api/components/{key}/install")
     def component_install(key: str) -> dict[str, Any]:
         """Download an optional component (the layout model) into the data dir."""
@@ -567,6 +596,70 @@ def create_app(token: str) -> FastAPI:
             return optional.install(key, index_url=str(load_config().get("package_index_url") or ""))
         except KeyError as exc:
             raise HTTPException(404, "没有这个组件") from exc
+
+    @app.get("/api/app-update")
+    def app_update(fresh: bool = False) -> dict[str, Any]:
+        """Check GitHub Releases for a newer LitLoop version (cached 10 minutes)."""
+        now = time.time()
+        cached = _APP_UPDATE.get("data")
+        if not fresh and cached is not None and now - float(_APP_UPDATE.get("at") or 0.0) <= 600:
+            return cached
+
+        base: dict[str, Any] = {
+            "current": __version__,
+            "latest": "",
+            "available": False,
+            "url": "",
+            "notes": "",
+            "error": "",
+        }
+        import requests
+        try:
+            resp = requests.get(
+                _APP_UPDATE_URL,
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "User-Agent": f"LitLoop/{__version__}",
+                },
+                timeout=5,
+            )
+        except requests.Timeout:
+            return {**base, "error": "无法检查更新：请求超时"}
+        except requests.RequestException:
+            return {**base, "error": "无法检查更新：网络连接失败，请检查网络或代理设置"}
+
+        if resp.status_code != 200:
+            return {**base, "error": f"无法检查更新：GitHub 返回 HTTP {resp.status_code}"}
+
+        try:
+            payload = resp.json()
+        except ValueError:
+            return {**base, "error": "无法检查更新：返回数据格式异常"}
+        if not isinstance(payload, dict):
+            return {**base, "error": "无法检查更新：返回数据格式异常"}
+
+        tag = str(payload.get("tag_name") or "").strip()
+        latest = tag.lstrip("vV")
+        if not latest:
+            return {**base, "error": "无法检查更新：未找到版本号"}
+
+        cur_ver = _parse_version_tuple(__version__)
+        lat_ver = _parse_version_tuple(latest)
+        if cur_ver is not None and lat_ver is not None:
+            available = lat_ver > cur_ver
+        else:
+            available = latest != __version__
+
+        result = {
+            "current": __version__,
+            "latest": latest,
+            "available": available,
+            "url": str(payload.get("html_url") or ""),
+            "notes": str(payload.get("body") or ""),
+            "error": "",
+        }
+        _APP_UPDATE.update(at=time.time(), data=result)
+        return result
 
     @app.get("/api/data-dir")
     def data_dir() -> dict[str, Any]:

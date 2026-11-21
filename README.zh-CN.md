@@ -168,14 +168,15 @@ python scripts/build_release.py --bundle
 
 先装配嵌入式 Python 运行时（`build/runtime`：官方 embeddable 发行版 + 核心依赖 + `uv.exe`），再调用 `npm run tauri build`。产物两个，任选一个安装：
 
-- `app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`，约 102 MiB（1.18.2 实测 101.8 MiB）；
-- `app/src-tauri/target/release/bundle/msi/LitLoop_<版本>_x64_<语言>.msi`，约 128 MiB（1.18.2 实测 128.3 MiB），安装时可以选安装位置，按机器安装、需要管理员权限。
+- **NSIS（`app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`）**，约 102 MiB（1.18.2 实测 101.8 MiB）：双击即装，支持仅当前用户或所有用户安装（`installMode: both`）。卸载时会弹窗询问是否同时删除 `~/.litloop`（默认选「**否**」，即保留检索记录、已下载的 PDF 与配置）。
+- **MSI（`app/src-tauri/target/release/bundle/msi/LitLoop_<版本>_x64_<语言>.msi`）**，约 128 MiB（1.18.2 实测 128.3 MiB）：Windows Installer 格式，安装时可以自选安装路径，按机器安装（需要管理员权限，适合批量部署）。卸载时默认保留 `~/.litloop`。
 
 两个包都自带 Python 和依赖，目标机器不用装任何东西。
 
-- 安装需要管理员权限（`installMode: both`）。
-- 安装包**没有签名**：Windows 会先弹 SmartScreen「已阻止不认识的应用」，点「更多信息 → 仍要运行」；有的公司电脑策略不允许，需要放行。
-- 版面分析（约 65 MB，只影响 PDF 转 Markdown 的排版）不在安装包里，设置 → 可选组件里点「安装」按需下载；下载慢可在同一处填国内镜像。
+- **管理员权限**：按机器安装（装进 `Program Files` 或使用 MSI）需要管理员权限（`installMode: both`）。
+- **SmartScreen 拦截通过步骤**：安装包**没有签名**，首次运行 Windows 会弹 SmartScreen「Windows 已保护你的电脑 / 已阻止不认识的应用」，点「**更多信息**」→「**仍要运行**」即可；若公司或学校电脑策略禁止绕过，请联系管理员放行或改用源码运行。
+- **卸载与用户数据**：个人数据保存在 `~/.litloop`；NSIS 卸载前会弹窗确认（默认保留），MSI 卸载默认保留该目录。
+- **版面分析（可选）**（约 65 MB，只影响 PDF 转 Markdown 的排版）：不在安装包里，设置 → 可选组件里点「安装」按需下载；下载慢可在同一处填国内镜像。
 
 ### 依赖与 Key
 

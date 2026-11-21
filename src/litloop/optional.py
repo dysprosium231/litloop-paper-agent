@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,29 @@ COMPONENTS: dict[str, dict[str, Any]] = {
 }
 
 _INSTALL_LOCK = threading.Lock()
+_STATUS_LOCK = threading.Lock()
+_STATUS: dict[str, dict[str, Any]] = {}
+
+_STAGES = ("准备环境", "正在下载依赖", "正在安装", "正在校验")
+_STAGE_ORDER = {name: idx for idx, name in enumerate(_STAGES)}
+_NETWORK_ERROR_HINTS = (
+    "timed out",
+    "timeout",
+    "connection",
+    "ssl",
+    "certificate",
+    "dns",
+    "name or service not known",
+    "temporary failure in name resolution",
+    "failed to fetch",
+    "network",
+    "proxy",
+    "403",
+    "404",
+    "502",
+    "503",
+    "index",
+)
 
 
 def packages_dir() -> Path:
@@ -74,6 +98,87 @@ def uv_command() -> str | None:
     return None
 
 
+def _set_status(
+    key: str,
+    *,
+    state: str,
+    stage: str = "",
+    elapsed: float = 0.0,
+    line: str = "",
+    ok: bool | None = None,
+    log: str = "",
+    started_at: float | None = None,
+) -> None:
+    """Record the latest install progress for *key* under ``_STATUS_LOCK``."""
+    with _STATUS_LOCK:
+        _STATUS[key] = {
+            "key": key,
+            "state": state,
+            "stage": stage,
+            "elapsed": round(float(elapsed), 1),
+            "line": line[:160],
+            "ok": ok,
+            "log": log,
+            "started_at": started_at,
+        }
+
+
+def install_status(key: str) -> dict[str, Any]:
+    """Return the current install status for an optional component."""
+    if key not in COMPONENTS:
+        raise KeyError(f"no such component: {key}")
+    with _STATUS_LOCK:
+        entry = dict(_STATUS.get(key) or {})
+    if not entry:
+        return {
+            "key": key,
+            "installed": installed(key),
+            "state": "idle",
+            "stage": "",
+            "elapsed": 0.0,
+            "line": "",
+            "ok": None,
+            "log": "",
+        }
+    elapsed = float(entry.get("elapsed") or 0.0)
+    started_at = entry.get("started_at")
+    if entry.get("state") == "running" and isinstance(started_at, (int, float)):
+        elapsed = round(max(0.0, time.monotonic() - started_at), 1)
+    return {
+        "key": key,
+        "installed": installed(key),
+        "state": str(entry.get("state") or "idle"),
+        "stage": str(entry.get("stage") or ""),
+        "elapsed": elapsed,
+        "line": str(entry.get("line") or ""),
+        "ok": entry.get("ok"),
+        "log": str(entry.get("log") or ""),
+    }
+
+
+def _stage_from_line(line: str, current: str) -> str:
+    """Advance the install stage monotonically from a single line of uv output."""
+    low = line.lower()
+    detected = current
+    if any(tok in low for tok in ("installing", "unpacking", "installed", "built ")):
+        detected = "正在安装"
+    elif any(tok in low for tok in ("downloading", "fetching", "resolved ", "prepared ")):
+        detected = "正在下载依赖"
+    if _STAGE_ORDER.get(detected, 0) >= _STAGE_ORDER.get(current, 0):
+        return detected
+    return current
+
+
+def _format_failure_log(returncode: int, tail: str) -> str:
+    """Build a clear Chinese failure reason with trailing uv output."""
+    low = tail.lower()
+    if any(hint in low for hint in _NETWORK_ERROR_HINTS):
+        prefix = f"网络或镜像连接失败（退出码 {returncode}），请在设置中检查网络或更换镜像源后重试"
+    else:
+        prefix = f"安装失败（uv 退出码 {returncode}）"
+    return f"{prefix}\n{tail}" if tail else prefix
+
+
 def install(key: str, *, index_url: str = "", timeout: float = 1800.0) -> dict[str, Any]:
     """Download a component into `packages_dir()`. Blocking; run it in a thread.
 
@@ -86,7 +191,9 @@ def install(key: str, *, index_url: str = "", timeout: float = 1800.0) -> dict[s
         raise KeyError(f"no such component: {key}")
     uv = uv_command()
     if not uv:
-        return {"ok": False, "log": "找不到 uv：安装包应当自带，或在 PATH 里放一个 uv"}
+        msg = "找不到 uv：安装包应当自带，或在 PATH 里放一个 uv"
+        _set_status(key, state="failed", stage="", elapsed=0.0, line=msg, ok=False, log=msg)
+        return {"ok": False, "log": msg}
     target = packages_dir()
     target.mkdir(parents=True, exist_ok=True)
     cmd = [uv, "pip", "install", "--python", sys.executable, "--target", str(target),
@@ -96,20 +203,108 @@ def install(key: str, *, index_url: str = "", timeout: float = 1800.0) -> dict[s
         env["UV_INDEX_URL"] = index_url
     if not _INSTALL_LOCK.acquire(timeout=5):
         return {"ok": False, "log": "另一个组件正在安装，稍后再试"}
+
+    started = time.monotonic()
+    stage = "准备环境"
+    lines: list[str] = []
+    last_line = ""
+    timed_out = False
+    _set_status(key, state="running", stage=stage, elapsed=0.0, line="", ok=None, log="", started_at=started)
+
     try:
-        done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=timeout, env=env)
-    except subprocess.TimeoutExpired:
-        return {"ok": False, "log": f"安装超过了 {int(timeout)} 秒，已放弃"}
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+            env=env,
+        )
     except OSError as exc:
-        return {"ok": False, "log": f"无法运行 uv：{exc}"}
-    finally:
         _INSTALL_LOCK.release()
-    tail = "\n".join((done.stdout or "").strip().splitlines()[-15:] +
-                     (done.stderr or "").strip().splitlines()[-15:]).strip()
-    if done.returncode != 0:
-        return {"ok": False, "log": tail or f"uv 退出码 {done.returncode}"}
+        elapsed = round(time.monotonic() - started, 1)
+        msg = f"无法运行 uv：{exc}"
+        _set_status(key, state="failed", stage=stage, elapsed=elapsed, line=msg, ok=False, log=msg)
+        return {"ok": False, "log": msg}
+
+    def _on_timeout() -> None:
+        nonlocal timed_out
+        timed_out = True
+        try:
+            proc.kill()
+        except OSError:
+            pass
+
+    timer = threading.Timer(timeout, _on_timeout)
+    timer.daemon = True
+    timer.start()
+    try:
+        if proc.stdout is not None:
+            for raw_line in proc.stdout:
+                text_line = raw_line.rstrip("\r\n")
+                stripped = text_line.strip()
+                if stripped:
+                    lines.append(stripped)
+                    last_line = stripped[:160]
+                    stage = _stage_from_line(stripped, stage)
+                elapsed = round(time.monotonic() - started, 1)
+                _set_status(
+                    key,
+                    state="running",
+                    stage=stage,
+                    elapsed=elapsed,
+                    line=last_line,
+                    ok=None,
+                    log="\n".join(lines[-20:]),
+                    started_at=started,
+                )
+        returncode = proc.wait()
+    finally:
+        timer.cancel()
+        if proc.stdout is not None:
+            try:
+                proc.stdout.close()
+            except OSError:
+                pass
+        _INSTALL_LOCK.release()
+
+    tail = "\n".join(lines[-20:]).strip()
+    elapsed = round(time.monotonic() - started, 1)
+
+    if timed_out:
+        msg = f"安装超过了 {int(timeout)} 秒，已放弃"
+        full_log = f"{msg}\n{tail}" if tail else msg
+        _set_status(key, state="failed", stage=stage, elapsed=elapsed, line=msg, ok=False, log=full_log)
+        return {"ok": False, "log": full_log}
+
+    if returncode != 0:
+        msg = _format_failure_log(returncode, tail)
+        _set_status(key, state="failed", stage=stage, elapsed=elapsed, line=last_line or msg, ok=False, log=msg)
+        return {"ok": False, "log": msg}
+
+    stage = "正在校验"
+    _set_status(
+        key,
+        state="running",
+        stage=stage,
+        elapsed=elapsed,
+        line=last_line,
+        ok=None,
+        log=tail,
+        started_at=started,
+    )
     # The new directory may be new to the import system.
     importlib.invalidate_caches()
     ensure_on_path()
-    return {"ok": installed(key), "log": tail or "已安装"}
+    ok = installed(key)
+    elapsed = round(time.monotonic() - started, 1)
+    if ok:
+        log = tail or "已安装"
+        _set_status(key, state="done", stage=stage, elapsed=elapsed, line=last_line or "已安装", ok=True, log=log)
+        return {"ok": True, "log": log}
+
+    msg = f"安装命令已完成，但仍无法导入组件。\n{tail}" if tail else "安装命令已完成，但仍无法导入组件"
+    _set_status(key, state="failed", stage=stage, elapsed=elapsed, line=last_line or msg, ok=False, log=msg)
+    return {"ok": False, "log": msg}

@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, PageBody, PageHeader } from "@/components/page"
 import { Switch } from "@/components/ui/switch"
-import { downloadsApi, settingsApi, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
+import { downloadsApi, settingsApi, type AppUpdateInfo, type ComponentStatus, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 // The native chooser exists only inside the app window, not in a browser preview.
@@ -73,7 +73,7 @@ function SettingsNav({ groups, current, onPick }: { groups: SettingGroup[]; curr
     items: shown.filter((e) => s.ids.includes(e.id) || (i === SECTIONS.length - 1 && !known.has(e.id))),
   })).filter((s) => s.items.length)
   return (
-    <nav className="scrollable flex w-60 shrink-0 flex-col gap-5 overflow-y-auto border-r bg-background px-4 py-5">
+    <nav className="scrollable flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input className="h-9 pl-8" placeholder="搜索设置" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -247,6 +247,7 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
   const [results, setResults] = React.useState<TestResult[] | null>(null)
   const [testing, setTesting] = React.useState(false)
   const [installing, setInstalling] = React.useState<string | null>(null)
+  const [installStatus, setInstallStatus] = React.useState<{ key: string; status: ComponentStatus } | null>(null)
   const [installLog, setInstallLog] = React.useState<{ key: string; text: string } | null>(null)
   const test = async () => {
     setTesting(true)
@@ -258,20 +259,51 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
       setTesting(false)
     }
   }
+  React.useEffect(() => {
+    if (!installing) return
+    let cancelled = false
+    const poll = () => {
+      settingsApi.componentStatus(installing).then((status) => {
+        if (!cancelled) setInstallStatus({ key: installing, status })
+      }).catch(() => {})
+    }
+    poll()
+    const timer = window.setInterval(poll, 600)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [installing])
   // Installing an optional component runs uv in the backend; when it works the
   // check runs again so the row turns green, otherwise its log is shown.
   const install = async (key: string) => {
     setInstalling(key)
+    setInstallStatus(null)
     setInstallLog(null)
     try {
       const out = await settingsApi.installComponent(key)
-      if (out.ok) await test()
-      else setInstallLog({ key, text: out.log || "安装失败" })
+      if (out.ok) {
+        setInstallStatus(null)
+        await test()
+      } else {
+        setInstallLog({ key, text: out.log || "安装失败" })
+      }
     } catch (e) {
       setInstallLog({ key, text: errorMessage(e) })
     } finally {
       setInstalling(null)
     }
+  }
+  const mirrorField = group.fields.find((f) => f.key === "package_index_url")
+  const tunaMirror = "https://pypi.tuna.tsinghua.edu.cn/simple"
+  const retryWithTunaMirror = async (key: string) => {
+    try {
+      onSaved(await settingsApi.save("package_index_url", tunaMirror))
+    } catch (e) {
+      setInstallLog({ key, text: errorMessage(e) })
+      return
+    }
+    await install(key)
   }
   // A group with nothing to set is only its check: run it on opening (so is a
   // group that asks for the check to run by itself, like 可选组件).
@@ -297,8 +329,46 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
                   </Button>
                 )}
               </div>
-              {installLog?.key === r.action?.key && (
-                <pre className="ml-6 max-h-40 overflow-auto rounded-md bg-muted p-2 text-xs whitespace-pre-wrap text-destructive">{installLog?.text}</pre>
+              {installing === r.action?.key && (
+                <div className="ml-6 space-y-1 rounded-md border bg-muted/40 px-3 py-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-foreground">
+                      {installStatus?.key === r.action.key && installStatus.status.stage
+                        ? installStatus.status.stage
+                        : "正在准备安装…"}
+                    </span>
+                    {installStatus?.key === r.action.key && installStatus.status.elapsed != null && (
+                      <span className="tabular-nums text-muted-foreground">
+                        已用时 {Math.max(0, Math.round(installStatus.status.elapsed))} 秒
+                      </span>
+                    )}
+                  </div>
+                  {installStatus?.key === r.action.key && installStatus.status.line && (
+                    <div className="truncate font-mono text-muted-foreground" title={installStatus.status.line}>
+                      {installStatus.status.line}
+                    </div>
+                  )}
+                </div>
+              )}
+              {installLog && r.action && installLog.key === r.action.key && installing !== r.action.key && (
+                <div className="ml-6 space-y-2">
+                  <pre className="max-h-40 overflow-auto rounded-md bg-muted p-2 text-xs whitespace-pre-wrap text-destructive">{installLog.text}</pre>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>
+                      {mirrorField
+                        ? "安装失败，可在下方「组件下载镜像」更换镜像后重试。"
+                        : "安装失败，检查网络后重试。"}
+                    </span>
+                    <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => install(r.action!.key)}>
+                      重试
+                    </Button>
+                    {mirrorField && mirrorField.value !== tunaMirror && (
+                      <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => retryWithTunaMirror(r.action!.key)}>
+                        切换清华镜像并重试
+                      </Button>
+                    )}
+                  </div>
+                </div>
               )}
               {r.guides?.map((g) => (
                 <section key={g.title} className="ml-6 min-w-0 space-y-3 rounded-lg border bg-canvas p-4">
@@ -385,6 +455,27 @@ export function SettingsPage({ groups, current, onPick, onSaved, onGuide }: {
   // Where the papers and sessions live; the installer never touches this folder.
   const [dataDir, setDataDir] = React.useState<string | null>(null)
   React.useEffect(() => { settingsApi.dataDir().then((r) => setDataDir(r.path)).catch(() => {}) }, [])
+  const [appUpdate, setAppUpdate] = React.useState<AppUpdateInfo | null>(null)
+  const [checkingUpdate, setCheckingUpdate] = React.useState(false)
+  const [updateCheckedFresh, setUpdateCheckedFresh] = React.useState(false)
+  const [updateFetchError, setUpdateFetchError] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    settingsApi.checkAppUpdate(false).then(setAppUpdate).catch(() => {})
+  }, [])
+  const checkAppUpdate = async () => {
+    setCheckingUpdate(true)
+    setUpdateFetchError(null)
+    try {
+      const info = await settingsApi.checkAppUpdate(true)
+      setAppUpdate(info)
+      setUpdateCheckedFresh(true)
+    } catch (e) {
+      setUpdateFetchError(errorMessage(e))
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
+  const formatVersion = (v: string) => (v.startsWith("v") || v.startsWith("V") ? v.slice(1) : v)
   const exportDiagnostics = () => {
     setDiagError(null)
     setDiagBusy(true)
@@ -435,7 +526,43 @@ export function SettingsPage({ groups, current, onPick, onSaved, onGuide }: {
         </div>
       )}
       <div className="flex min-h-0 flex-1">
-        <SettingsNav groups={groups} current={current} onPick={onPick} />
+        <div className="flex w-60 shrink-0 flex-col border-r bg-background">
+          <SettingsNav groups={groups} current={current} onPick={onPick} />
+          <div className="space-y-2 border-t px-4 py-3.5">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="font-semibold text-muted-foreground">版本与更新</span>
+              {appUpdate?.current && (
+                <span className="font-mono text-muted-foreground">当前版本 v{formatVersion(appUpdate.current)}</span>
+              )}
+            </div>
+            <Button variant="outline" size="sm" className="w-full" disabled={checkingUpdate} onClick={checkAppUpdate}>
+              {checkingUpdate && <LoaderIcon className="animate-spin" />}
+              {checkingUpdate ? "正在检查…" : "检查更新"}
+            </Button>
+            {updateFetchError ? (
+              <p className="text-xs text-destructive">{updateFetchError}</p>
+            ) : appUpdate?.error ? (
+              <p className="text-xs text-destructive">{appUpdate.error}</p>
+            ) : appUpdate?.available && appUpdate.latest ? (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-primary">发现新版本 v{formatVersion(appUpdate.latest)}</p>
+                {appUpdate.notes && (
+                  <p className="line-clamp-3 text-xs text-muted-foreground">{appUpdate.notes}</p>
+                )}
+                {appUpdate.url && (
+                  <Button variant="outline" size="sm" className="w-full" asChild>
+                    <a href={appUpdate.url} target="_blank" rel="noreferrer">
+                      前往下载新版本
+                      <ExternalLinkIcon className="size-3.5" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            ) : updateCheckedFresh && appUpdate ? (
+              <p className="text-xs text-muted-foreground">已是最新版本</p>
+            ) : null}
+          </div>
+        </div>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {current === QUOTA ? <QuotaPane />
             : group ? <GroupPane key={group.id} group={group} onSaved={onSaved} />

@@ -49,7 +49,35 @@ jobs:
         run: npm ci
 
       - name: Stage the runtime and build the installer
-        run: python scripts/build_release.py --bundle
+        shell: pwsh
+        env:
+          _SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          _SIGNING_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:_SIGNING_KEY)) {
+            $env:TAURI_SIGNING_PRIVATE_KEY = $env:_SIGNING_KEY
+            if (-not [string]::IsNullOrWhiteSpace($env:_SIGNING_PASSWORD)) {
+              $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $env:_SIGNING_PASSWORD
+            }
+          }
+          python scripts/build_release.py --bundle
+
+      - name: Generate updater manifest if signed
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $sig = Get-ChildItem "app/src-tauri/target/release/bundle/nsis/*.exe.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $exe = Get-ChildItem "app/src-tauri/target/release/bundle/nsis/*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($sig -and $exe) {
+            $version = "${{ github.ref_name }}".TrimStart("v")
+            python scripts/prepare_release.py --write-updater-manifest `
+              --version $version `
+              --installer $exe.FullName `
+              --signature $sig.FullName `
+              --out "app/src-tauri/target/release/bundle/latest.json"
+          } else {
+            Write-Host "No .sig file found; skipping latest.json generation."
+          }
 
       - name: Write the checksums
         shell: pwsh
@@ -68,16 +96,20 @@ jobs:
           name: litloop-windows
           path: |
             app/src-tauri/target/release/bundle/nsis/*.exe
+            app/src-tauri/target/release/bundle/nsis/*.sig
             app/src-tauri/target/release/bundle/msi/*.msi
             app/src-tauri/target/release/bundle/SHA256SUMS.txt
+            app/src-tauri/target/release/bundle/latest.json
 
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           files: |
             app/src-tauri/target/release/bundle/nsis/*.exe
+            app/src-tauri/target/release/bundle/nsis/*.sig
             app/src-tauri/target/release/bundle/msi/*.msi
             app/src-tauri/target/release/bundle/SHA256SUMS.txt
+            app/src-tauri/target/release/bundle/latest.json
           draft: false
           generate_release_notes: true
           body: |
@@ -94,7 +126,7 @@ jobs:
             - 权限：装进 Program Files 需要管理员权限。
             - 第一次运行会被 SmartScreen 拦住：点「更多信息」→「仍要运行」
               （安装包没有代码签名，每个新版本都会拦一次）。
-            - 卸载时会问要不要保留 `~/.litloop`（检索记录、下载的 PDF、配置都在这里）。
+            - 卸载：NSIS 安装包（`*_x64-setup.exe`）卸载时会弹窗询问是否同时删除 `~/.litloop`（默认选否，即保留检索记录、下载的 PDF 与配置）；MSI 安装包（`*_x64_*.msi`）卸载时默认保留 `~/.litloop`。
 
             ## 第一次用
 

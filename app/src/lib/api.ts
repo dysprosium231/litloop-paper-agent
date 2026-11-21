@@ -336,6 +336,26 @@ export interface ProviderUsage {
   checked_at: string | null
 }
 
+export interface ComponentStatus {
+  key: string
+  installed: boolean
+  state: "idle" | "running" | "done" | "failed"
+  stage: string | null
+  elapsed: number | null
+  line: string | null
+  ok: boolean | null
+  log: string | null
+}
+
+export interface AppUpdateInfo {
+  current: string
+  latest: string | null
+  available: boolean
+  url: string | null
+  notes: string | null
+  error: string | null
+}
+
 export const settingsApi = {
   list: () => call<SettingGroup[]>("/api/settings"),
   save: (key: string, value: unknown) => call<SettingField>("/api/settings", { key, value }),
@@ -343,6 +363,8 @@ export const settingsApi = {
   finishOnboarding: () => call<{ done: boolean }>("/api/onboarding", { done: true }),
   test: (group: string) => call<{ results: TestResult[]; seconds: number }>(`/api/settings/test/${group}`, {}),
   installComponent: (key: string) => call<{ ok: boolean; log: string }>(`/api/components/${key}/install`, {}),
+  componentStatus: (key: string) => call<ComponentStatus>(`/api/components/${encodeURIComponent(key)}/status`),
+  checkAppUpdate: (fresh = false) => call<AppUpdateInfo>(`/api/app-update${fresh ? "?fresh=true" : ""}`),
   updates: () => call<{ name: string; installed: string; latest: string; how: string }[]>("/api/updates"),
   diagnostics: () => call<{ path: string; size: number }>("/api/diagnostics", {}),
   dataDir: () => call<{ path: string; exists: boolean }>("/api/data-dir"),

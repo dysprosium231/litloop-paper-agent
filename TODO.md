@@ -26,12 +26,12 @@
 | app：初次引导与设置 | ✅ | 后端 B 的模型配置随后端 B 做 |
 | app：术语表 | 🔶 | 待实测 7 |
 | app：下载队列与 Zotero | 🔶 | 待实测 1–5 |
-| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | MSI 也能打（中文单语言、自定义向导位图、卸载/升级前先关掉运行中的实例，2026-11-07）；还差自动更新、诊断包实测、干净机验收；签名：SignPath Foundation 免费计划 2026-11-07 被拒（要求更多公开关注度），暂不签名，README 如实写明 |
+| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | NSIS（含卸载询问是否保留 `~/.litloop` 钩子）与 MSI（默认保留）均可打；按需组件流式进度、`scripts/prepare_release.py` 发版自检、设置页版本更新检查与 CI 条件签名流已就绪（2026-11-21）；待填 Tauri 更新公钥、诊断包/干净机真机验收；签名：SignPath Foundation 免费计划 2026-11-07 被拒，暂不签名，README 如实写明 |
 | 完整流程（真实课题从检索到 Zotero 不用手动补救） | 🔶 | 待办池「阶段 2 剩余」：深度检索 → 批量下载 → 推送 Zotero 连起来走一遍 |
 
 ## 正在做
 
-（正在做：2026-11-07 的两件事已做完并推送——①重装配运行时并升到 **1.18.3**，MSI 重新打出（`LitLoop_1.18.3_x64_zh-CN.msi`，125.9 MiB，含蓝色向导图与「设置页显示数据目录」）；②卸载/升级前先关掉运行中的实例（自定义 WiX 模板 `app/src-tauri/wix/main.wxs` 的 `CloseRunningApp`，已用 MSI 表核对排在 `InstallValidate` 之后）。另外把深度检索的「精确（AND）检索 + 标题短语加分」做完并默认打开（提交 `ad8798a`、`e544e7c`）。此外已完成用户 2026-11-20 拍板的 `sources/__init__.py` 阶段 1+2 外围拆分（2214 → **1339** 行，抽出 `_index.py`、`_batch.py`、`_routes.py` 并由 `__init__.py` 回导，见 `DECISIONS.md`），以及 2026-11-21「真实世界回归」（提交 `4c1168d`）、「筛选页批量与撤销」（提交 `05f24d7`）、「SQLite 数据层三阶段迁移」（提交 `e288ae5`、`b4285f4`、`bb99f8f`）、「错误提示补『下一步』及界面文案规范化」（提交 `ff93500`）与「快速检索 7 天结果缓存」（`search_cache_ttl_hours=168`，`sort="date"` 与定期追踪绕过）。下一步：等用户按待实测 13（装新 MSI、看蓝位图、改 D 盘、开着 app 卸载不报 `.rbf`、升级只剩一份）与 14（无 Key 首次引导提示）验；之后再挑待实测 8–12、或补「卸载时问是否保留数据」、或拆稀土最后那篇漏检。用户还没定：分析归纳验收标准。）
+（正在做：今日（2026-11-21）已完成工程债全面清偿与发布前收尾——①「真实世界回归」（`4c1168d`）；②「筛选页批量与撤销」（`05f24d7`）；③「SQLite 数据层三阶段迁移」（`e288ae5`、`b4285f4`、`bb99f8f`）；④「错误提示补『下一步』及界面文案规范化」（`ff93500`）；⑤「快速检索 7 天结果缓存」（`2caf2bb`）；⑥「体积与冷启动优化」（`413d657`，`litloop` 顶层懒加载、`lib.rs` 窗口与后台并行启动、前端代码分割与运行时裁剪增强）；⑦「安装包与发布收尾」（NSIS 卸载数据提示钩子、按需组件安装进度与 `/api/app-update`、设置页检查更新、`scripts/prepare_release.py` 与 CI 条件签名流）。下一步：等用户按待实测 13–14 真机验收，生成 Tauri 更新签名公钥填入后即可打 tag 发版（`v1.18.3` / `v1.19.0`）；用户还没定：分析归纳验收标准与停止规则结项。）
 
 ## 待用户决定
 
@@ -100,17 +100,13 @@
     - [x] **步数**（2026-11-06）：按批数算，深度检索 `min(4 + 2 × 批数, 24)`、快速查找仍是 8。
     - [ ] 真实 Key 实测一次快速查找、一次深度检索（DeepSeek 与本地 Ollama 各一次）。
     - [ ] 设置里按任务分模型、用测试集存档比较各模型的评分质量、补「先给检索词再由你确认」的确认点。
-- [ ] 安装包与自动更新（评审 12；设计和验收见 CHARTER「可视化 app → 发布」，2026-10-26 用户定了安装范围、签名、分发和浏览器的做法，见 DECISIONS「作为标准 Windows 程序分发」）。模块整理做完后开始，大致步骤：
+- [~] 安装包与自动更新（评审 12；设计和验收见 CHARTER「可视化 app → 发布」，2026-10-26 用户定了安装范围、签名、分发和浏览器的做法，见 DECISIONS「作为标准 Windows 程序分发」）。
   - [x] 先摸底：核心依赖 **336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 跑起 `litloop.desktop.server`，合计约 **358 MB**（DECISIONS「发布摸底（2）」）；NSIS 安装包实测 **113.38 MiB**（DECISIONS「第一个 Windows 安装包」）。还剩：用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净 Windows 验收；
   - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时，Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出安装包；去掉版面分析后是 **99.59 MiB**（DECISIONS「第一个 Windows 安装包」「版面分析不进安装包」）。
-  - [x] 按需组件：版面分析（`pymupdf-layout` + `onnxruntime` + `networkx`，约 65 MB）用 uv 装到 `~/.litloop/packages` 并加进 `sys.path`（2026-11-04，`src/litloop/optional.py`、设置页「可选组件」的「安装」按钮、`POST /api/components/{key}/install`、镜像配置 `package_index_url`；uv.exe 由 `scripts/build_release.py` 放进安装包；见 DECISIONS「版面分析改成按需安装」）。还没实测：在装了安装包的机器上点一次安装、看进度与失败提示；失败提示目前是 uv 输出末尾 15 行，没有百分比进度。
-  - [~] **MSI 安装包**（2026-11-05 用户定）：`bundle.targets` 含 `msi`；语言只留 `zh-CN`（两种语言会打出两个独立产品，真机上先后装出过两份）；`bannerPath`/`dialogImagePath` 换成品牌图（`scripts/make_installer_images.py`）；**自定义模板** `app/src-tauri/wix/main.wxs`（复制自 tauri-bundler v2.12.3，加了 `CloseRunningApp`：`taskkill /F /T /IM litloop-app.exe`，`After="InstallValidate"`，见 DECISIONS「卸载/升级前先关掉运行中的 LitLoop」）；发版流程两个包一起给、`SHA256SUMS.txt` 覆盖两者。`scripts/build_release.py` 新增 `--bundles nsis|msi` 只打一种。产物 `LitLoop_1.18.3_x64_zh-CN.msi`。2026-11-06 真机装过两次（`D:\Program Files\LitLoop`、5299→4329 个文件、96 秒）。**还差**：改过 Python 代码后必须先跑 `python scripts/build_release.py` 再打（`build/runtime` 是快照，直接 `tauri build` 会带旧代码）；卸载时问是否保留 `~/.litloop`；**模板与 Tauri 版本绑定**，升级 tauri-cli 后要跟上游 `crates/tauri-bundler/src/bundle/windows/msi/main.wxs` 对一遍。
-  - [~] **诊断包**：设置页右上角「导出诊断包」、命令行 `litloop diagnose [-o 目录]`、`POST /api/diagnostics`，产物是 `~/.litloop/exports/litloop-diagnostics-<时间>.zip`（`diagnostics.json` + `log.txt` + `README.txt`；版本、系统、数据目录计数、脱敏后的设置、可选组件与 uv 状态、最近 300 行日志，不含 PDF、Zotero 与密钥）。见 DECISIONS「诊断包：一份 zip 说清版本、设置和最近的日志」。**还差**：真机上点一次看提示，以及确认安装包里的 Python 也能写进 `~/.litloop/exports`。
-  - NSIS `installMode: "both"`，图标、名称、开始菜单；系统通知显示 LitLoop 自己的名称和图标（用户 2026-10-23 要求；开发模式下借用的是 PowerShell 的）；
-  - 按需下载都要有进度和失败提示；
-  - 更新插件读 GitHub Releases，`passive` 模式；发版流程（打包、生成更新清单、上传）写成脚本；
-  - 卸载时问是否保留 `~/.litloop`；README 写 SmartScreen 提示怎么继续；
-  - 在干净的 Windows 上验收（另找一台电脑或虚拟机）。
+  - [x] 按需组件：版面分析（约 65 MB）用 uv 装到 `~/.litloop/packages` 并加进 `sys.path`（`src/litloop/optional.py`、`GET /api/components/{key}/status`、设置页「可选组件」实时阶段进度轮询与镜像重试，2026-11-21）。待真机安装包实测一次。
+  - [~] **MSI 安装包**（2026-11-05 用户定）：`bundle.targets` 含 `msi`；语言只留 `zh-CN`；`bannerPath`/`dialogImagePath` 换成品牌图；**自定义模板** `app/src-tauri/wix/main.wxs` 加了 `CloseRunningApp`。MSI 卸载默认保留 `~/.litloop`（已在 README 与 Release 说明写明与 NSIS 的差异）。待真机按待实测 13 验收；升级 `tauri-cli` 后需与上游模板核对。
+  - [~] **诊断包**：设置页右上角「导出诊断包」、命令行 `litloop diagnose [-o 目录]`、`POST /api/diagnostics`，待真机实测。
+  - [x] **卸载留数据与发版流**（2026-11-21）：NSIS 通过 `app/src-tauri/nsis/hooks.nsh` 在非升级卸载时弹窗询问是否保留 `~/.litloop`（默认保留）；`README.md` / `README.zh-CN.md` 补齐 NSIS/MSI 差异与 SmartScreen 说明；新增 [scripts/prepare_release.py](scripts/prepare_release.py) 与 `.github/workflows/release.yml` 条件签名生成 `latest.json`；设置页「版本与更新」通过 `GET /api/app-update` 检查 GitHub Releases 新版本。待填 Tauri 更新公钥及干净 Windows 验收。
 - [x] 完成通知：一轮深度检索跑完（agent 或 app 发起）发一次系统通知，见 DECISIONS「深度检索一轮跑完发通知」。
 - [~] 深度链接（2026-11-05）：`litloop://session/<会话 id>` 打开 app 并跳到该会话的筛选页。插件 `tauri-plugin-deep-link` 注册了 `litloop` 协议（安装时写注册表），前端用 `onOpenUrl` 解析。已经开着 app 时点链接会由 `tauri-plugin-single-instance` 转发给现有窗口（事件 `litloop-url`）。技能文档（`skills-src/shared/screening.md`，已重建）现在会提示 Agent 把 `litloop://session/<session>` 和表格一起给用户。**还差**：实测（装一次安装包、点链接）。
 
@@ -128,7 +124,7 @@
 - [x] **真实世界回归**（2026-11-21）：本地 HTTP 录制回放已落地（[tests/fixtures/replay/](tests/fixtures/replay/) + [tests/test_real_world_replay.py](tests/test_real_world_replay.py) 覆盖竞速成功与错篇/1 页预览淘汰、迟到落盘、慢镜像流式等待、预印本拦截、429 降级与真 HTTP 错篇剔除），并新增 [scripts/smoke_app.py](scripts/smoke_app.py) 与 [tests/test_smoke_app.py](tests/test_smoke_app.py) 验证后台启动与 `/api/health`（安装包/打包 exe 可在真机传 `--exe ... --launch-exe` 验收）。
 - [x] **筛选页批量与撤销**（2026-11-21）：新增后端批量原子更新接口 `/api/sessions/{session}/batch`（单次文件锁更新并返回修改前快照），前端补齐列表内搜索与多维过滤（相关度/决定状态/年份范围/期刊）、多选与 `Shift` 连选、按 Agent 评定一键批量加入下载/排除，以及会话内最多 20 步多步撤销（顶栏按钮、操作反馈条与 `Ctrl+Z`）。
 - [x] **错误提示补「下一步」**（2026-11-21）：后端 `error_text.next_step()` 与 `action_for()` 经 `_explain()` 注入 `error_hint` 与结构化 `error_action`，下载任务页与筛选进度条已接入对应设置分组/Zotero 附件检查直达按钮及单篇「重试此篇」；同步按 [docs/UI_COPY.md](docs/UI_COPY.md) 清洗全量前后端提示文案并把 `error_text.py` 纳入 `lint:copy`。
-- [ ] **体积与冷启动**：安装包 101.8 MiB、启动要起 Python 子进程；可做后端懒加载与首屏预热。
+- [x] **体积与冷启动**（2026-11-21）：Python 顶层 [src/litloop/\_\_init\_\_.py](src/litloop/__init__.py) 改为 `__getattr__` 懒加载（`litloop` 导入耗时 -92.3%，`litloop.desktop.server` 降 34.6%）、[app/src-tauri/src/lib.rs](app/src-tauri/src/lib.rs) 并行拉起主窗口与 Python 后台、[app/src/App.tsx](app/src/App.tsx) 与 [app/vite.config.ts](app/vite.config.ts) 拆块懒加载将首屏主包由 534.38 kB 降至 99.96 kB，并增强 [scripts/build_release.py](scripts/build_release.py) 的 `prune()` 裁剪 `.chm`/`.pdb`/`.lib`/`.c`/`.cpp`/`pythonwin`/`demos`/`examples`。
 
 ### 不做
 - 不重写下载引擎；不把排序换成大模型打分；没有测试集不调排序参数（2026-10-18 评审）。
