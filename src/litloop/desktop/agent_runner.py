@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from .. import config as _config
-from .. import store
+from .. import db, store
 
 # What the agent tells the app, by tool: shown under the run as it works.
 _TOOL_TEXT = {
@@ -193,13 +193,10 @@ def build_resume_prompt(session: str, *, batches: int = 0, skill: bool = True) -
     """
     from ..search import deep as deep_search, screening
 
-    if not deep_search._pool_path(session).exists():
+    if not deep_search.has_pool(session):
         raise ValueError("无法继续检索：这不是深度检索会话")
     record = screening.load(session)
-    try:
-        summary = store.read_json(store.summary_path(session))
-    except (FileNotFoundError, OSError, ValueError):
-        summary = None
+    summary = db.load_summary(session)
 
     question = str(record.get("question") or "").strip()
     head = f"{'用 litloop 技能' if skill else ''}继续深度检索会话 {session}" + (f"：{question}" if question else "")

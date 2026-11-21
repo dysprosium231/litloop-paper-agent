@@ -1,5 +1,20 @@
 # 决定与实验记录
 
+## 2026-11-21：数据层迁移 SQLite（三阶段完成）
+
+- 背景：`TODO.md`「工程债 → 数据层换 SQLite」指出筛选会话、1600–3400 篇候选池、决策与追踪使用 JSON + 文件锁整份读写，随会话增大变慢且缺乏结构迁移机制。
+- 实施与设计决定：
+  1. **阶段 1（地基、迁移引擎与 `watches` 切库，提交 `e288ae5`）**：新建 [src/litloop/db.py](src/litloop/db.py)（登记进 [docs/LAYOUT.md](docs/LAYOUT.md)），采用 `<DATA_DIR>/litloop.db` + `WAL` / `busy_timeout=30000` / `foreign_keys=ON` / `synchronous=NORMAL`；以 `PRAGMA user_version`（`DB_SCHEMA = 1`）+ `schema_migrations` + `MIGRATIONS` 实现版本检查（过高抛 `store.SchemaTooNew`）与顺序迁移；建四张表 `sessions`、`pool_items`、`decisions`、`watches`；改造 [src/litloop/search/watches.py](src/litloop/search/watches.py) 与 [tests/test_watches.py](tests/test_watches.py) 并新增 [tests/test_db.py](tests/test_db.py)。阶段 1 全量 `1241 passed, 3 skipped`。
+  2. **阶段 2（`screening` 与桌面后台切到 `sessions` + `decisions`，提交 `b4285f4`）**：改造 [src/litloop/search/screening.py](src/litloop/search/screening.py) 与 [src/litloop/desktop/server.py](src/litloop/desktop/server.py)，评分、决定、批量更新、翻译写回与待下载汇总改走 SQLite 行级事务（仍输出给人读的 `<session>.md`）。阶段 2 全量 `1243 passed, 3 skipped`。
+  3. **阶段 3（`deep.py` 候选池与概况切到 `pool_items` + `sessions`）**：改造 [src/litloop/search/deep.py](src/litloop/search/deep.py)（新增 `has_pool()`）、[src/litloop/desktop/agent_runner.py](src/litloop/desktop/agent_runner.py) 与 [src/litloop/store.py](src/litloop/store.py)（`latest_round_notice`），`save_pool_state` 单事务批量 `INSERT OR REPLACE` 并清理已移除条目，`get_batch_paper` 直接按需读取，不再写入 `.pool.json` 与 `.summary.json`；在 `tests/test_db.py` 补充 3000 篇规模候选池读写/增量更新/重载一致性回归，更新 [docs/APP_DATA.md](docs/APP_DATA.md) 与 [TODO.md](TODO.md)。
+  4. **旧数据策略**：首次打开自动按 `INSERT OR IGNORE` 幂等导入遗留 `<session>.json`、`.summary.json`、`.pool.json` 与 `watches.json`，保留磁盘旧 JSON 不删作备份，新写入不再双写旧 JSON；`config.json`、`glossary.json`、`.progress.json`、`.md`、`downloads/*.json`、`agent_runs/*.json` 暂留 JSON。
+- 阶段 3 终验：
+  - `scripts/import_smoke.py`：`35/35 modules import`
+  - `scripts/smoke_app.py`：`OK: backend healthy`（`version=1.18.3, schema=1`）
+  - `app/` 下 `npm run lint:copy`：`No issues found.`
+  - `scripts/check_release_consistency.py`：`OK: version 1.18.3, 21 MCP tools, skills clean`
+  - 全量 `pytest -q`：`1245 passed, 3 skipped`（236.97s）；变更文件均为纯 LF。
+
 ## 2026-11-21：筛选页批量操作、列表内过滤与撤销
 
 - 背景：`TODO.md`「工程债 → 筛选页批量与撤销」指出筛选页 30 篇只能逐篇操作，缺少多选、按 Agent 评定一键批量处理、撤销，以及列表内按年份/期刊过滤和搜索。

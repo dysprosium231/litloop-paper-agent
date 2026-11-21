@@ -175,7 +175,7 @@ def test_idle_minutes_parsing(monkeypatch):
 
 
 def test_build_resume_prompt_reads_no_pool_and_rejects_quick_sessions(agent, monkeypatch):
-    from litloop import store
+    from litloop import db
     from litloop.search import deep as deep_search, screening
 
     quick_sid = screening.save("quick q", [{"doi": "10.1/a", "title": "A", "relevance": "高", "reason": "r"}])["session"]
@@ -184,10 +184,10 @@ def test_build_resume_prompt_reads_no_pool_and_rejects_quick_sessions(agent, mon
 
     deep_sid = screening.save("SiC/Al", [{"doi": "10.1/a", "title": "A", "relevance": "高", "reason": "r"}],
                               criteria=["研究 SiC/Al"], mode="deep")["session"]
-    pool_file = deep_search._pool_path(deep_sid)
-    pool_file.write_text("{broken json never read by app", encoding="utf-8")
-    store.write_json(store.summary_path(deep_sid), {"session": deep_sid, "pool": 500, "screened": 20, "batches": [{}]})
+    db.save_pool_state({"session": deep_sid, "pool": {}})
+    db.save_summary(deep_sid, {"session": deep_sid, "pool": 500, "screened": 20, "batches": [{}]})
     monkeypatch.setattr(deep_search, "_load", lambda s: (_ for _ in ()).throw(AssertionError("pool must not be read")))
+    monkeypatch.setattr(db, "load_pool_state", lambda s: (_ for _ in ()).throw(AssertionError("pool must not be read")))
 
     ext = agent_runner.build_resume_prompt(deep_sid, batches=2, skill=True)
     assert "litloop_deep_search" in ext and "action='status'" in ext and "最多再筛 2 批" in ext
@@ -198,10 +198,11 @@ def test_build_resume_prompt_reads_no_pool_and_rejects_quick_sessions(agent, mon
 
 
 def test_resume_runs_external_agent_for_existing_session(agent):
-    from litloop.search import deep as deep_search, screening
+    from litloop import db
+    from litloop.search import screening
 
     sid = screening.save("SiC/Al", [{"doi": "10.1/a", "title": "A", "relevance": "高", "reason": "r"}], mode="deep")["session"]
-    deep_search._pool_path(sid).write_text("{}", encoding="utf-8")
+    db.save_pool_state({"session": sid, "pool": {}})
     (agent / "fake_agent.py").write_text(
         "import json, sys\n"
         "prompt = sys.stdin.read()\n"

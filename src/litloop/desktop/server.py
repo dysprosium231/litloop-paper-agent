@@ -223,7 +223,7 @@ def create_app(token: str) -> FastAPI:
         from ..search import deep as deep_search
         out = screening.list_sessions(limit)
         for s in out:
-            s["deep"] = store.summary_path(s["session"]).exists() or deep_search._pool_path(s["session"]).exists()
+            s["deep"] = (db.load_summary(s["session"]) is not None) or deep_search.has_pool(s["session"])
         return out
 
     @app.get("/api/sessions/{session}")
@@ -231,14 +231,12 @@ def create_app(token: str) -> FastAPI:
         from ..search import deep as deep_search
         _record_path(session)
         record = db.load_screening(session)
-        try:
-            summary = store.read_json(store.summary_path(session))
+        summary = db.load_summary(session)
+        if summary is not None:
             # The file keeps the agent's English notes; the app shows today's, in Chinese.
             from .. import quota
             summary["api_warnings"] = quota.warnings("zh")
-        except FileNotFoundError:
-            summary = None
-        return {"record": record, "summary": summary, "resumable": deep_search._pool_path(session).exists()}
+        return {"record": record, "summary": summary, "resumable": deep_search.has_pool(session)}
 
     @app.get("/api/sessions/{session}/progress")
     def progress(session: str) -> dict[str, Any] | None:
@@ -284,7 +282,7 @@ def create_app(token: str) -> FastAPI:
 
         from ..search import deep as deep_search
         _record_path(session)
-        if not deep_search._pool_path(session).exists():
+        if not deep_search.has_pool(session):
             raise HTTPException(400, "无法继续检索：这不是深度检索会话。")
         p = store.read_progress(session)
         if p and p.get("state") == "running" and (p.get("pid") or time.time() - float(p.get("updated") or 0) < 300):

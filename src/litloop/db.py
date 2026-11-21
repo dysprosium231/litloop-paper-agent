@@ -5,6 +5,8 @@ versioned migrations via ``PRAGMA user_version`` + ``schema_migrations``,
 idempotent legacy JSON import, and watch table operations.
 Phase 2 adds screening session & decision operations with automatic on-demand
 import of legacy ``<session>.json`` files.
+Phase 3 adds deep-search candidate pool & summary operations with automatic
+on-demand import of legacy ``<session>.pool.json`` / ``<session>.summary.json`` files.
 """
 
 from __future__ import annotations
@@ -1611,4 +1613,310 @@ def pending_selected_by_session(*, db_file: Path | str | None = None) -> list[di
             {"doi": r["doi"], "title": r["title"], "year": r["year"], "journal": r["journal"]}
         )
     return [grouped[sid] for sid in order]
+
+
+# --------------------------------------------------------------------------- deep search pool & summary
+
+_BATCH_FIELDS = (
+    "doi",
+    "title",
+    "year",
+    "journal",
+    "journal_rank",
+    "retracted",
+    "concern",
+    "authors",
+    "cited_by_count",
+    "abstract",
+    "abstract_missing",
+)
+
+
+def _safe_session_file(session: str, sdir: Path, suffix: str) -> Path | None:
+    if not session or session.startswith(".") or "/" in session or "\\" in session:
+        return None
+    if not _SAFE_SESSION_RE.match(session):
+        return None
+    p = sdir / f"{session}{suffix}"
+    return p if p.is_file() else None
+
+
+def _ensure_pool_in_conn(
+    conn: sqlite3.Connection,
+    session: str,
+    *,
+    sdir: Path,
+    in_write_tx: bool,
+) -> bool:
+    row = conn.execute(
+        "SELECT pool_state_json FROM sessions WHERE id = ?", (session,)
+    ).fetchone()
+    if row is not None and row["pool_state_json"] is not None:
+        return True
+    has_items = conn.execute(
+        "SELECT 1 FROM pool_items WHERE session_id = ? LIMIT 1", (session,)
+    ).fetchone()
+    if has_items is not None:
+        return True
+
+    legacy = _safe_session_file(session, sdir, ".pool.json")
+    if legacy is None:
+        return False
+    pdata = _read_json_safe(legacy)
+    if not isinstance(pdata, dict):
+        return False
+
+    counts = {"sessions": 0, "pool_items": 0}
+    if not in_write_tx:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            _import_pool_file(conn, session, pdata, counts)
+            if conn.in_transaction:
+                conn.execute("COMMIT")
+        except BaseException:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+            raise
+    else:
+        _import_pool_file(conn, session, pdata, counts)
+    return True
+
+
+def _ensure_summary_in_conn(
+    conn: sqlite3.Connection,
+    session: str,
+    *,
+    sdir: Path,
+    in_write_tx: bool,
+) -> str | None:
+    row = conn.execute(
+        "SELECT summary_json FROM sessions WHERE id = ?", (session,)
+    ).fetchone()
+    if row is not None and row["summary_json"] is not None:
+        return str(row["summary_json"])
+
+    legacy = _safe_session_file(session, sdir, ".summary.json")
+    if legacy is None:
+        return None
+    summary = _read_json_safe(legacy)
+    if not isinstance(summary, dict):
+        return None
+
+    counts = {"sessions": 0}
+    if not in_write_tx:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            _import_summary_file(conn, session, summary, counts)
+            if conn.in_transaction:
+                conn.execute("COMMIT")
+        except BaseException:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+            raise
+    else:
+        _import_summary_file(conn, session, summary, counts)
+    return json.dumps(summary, ensure_ascii=False)
+
+
+def _pool_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    raw_data = row["data_json"]
+    if raw_data:
+        try:
+            rec = json.loads(raw_data)
+            if isinstance(rec, dict) and rec:
+                return rec
+        except (ValueError, TypeError):
+            pass
+    rec: dict[str, Any] = {}
+    if row["doi"] is not None:
+        rec["doi"] = row["doi"]
+    if row["openalex"] is not None:
+        rec["openalex"] = row["openalex"]
+    rec["title"] = row["title"]
+    if row["year"] is not None:
+        rec["year"] = int(row["year"])
+    if row["journal"]:
+        rec["journal"] = row["journal"]
+    rec["cited_by_count"] = int(row["cited_by_count"] or 0)
+    if row["abstract"]:
+        rec["abstract"] = row["abstract"]
+    if row["score"] is not None:
+        rec["score"] = float(row["score"])
+    return rec
+
+
+def has_pool(session: str, *, db_file: Path | str | None = None) -> bool:
+    """Return True if a deep-search candidate pool exists in SQLite or legacy JSON."""
+    sdir = _screening_dir(db_file)
+    with connect(db_file) as conn:
+        return _ensure_pool_in_conn(conn, session, sdir=sdir, in_write_tx=False)
+
+
+def load_pool_state(session: str, *, db_file: Path | str | None = None) -> dict[str, Any]:
+    """Load deep-search pool metadata and candidate items from SQLite (auto-importing legacy JSON)."""
+    sdir = _screening_dir(db_file)
+    with connect(db_file) as conn:
+        if not _ensure_pool_in_conn(conn, session, sdir=sdir, in_write_tx=False):
+            raise FileNotFoundError(f"no deep search for session {session!r}")
+        srow = conn.execute(
+            "SELECT pool_state_json, question FROM sessions WHERE id = ?", (session,)
+        ).fetchone()
+        meta: dict[str, Any] = {}
+        if srow is not None and srow["pool_state_json"]:
+            parsed = json.loads(srow["pool_state_json"])
+            if isinstance(parsed, dict):
+                meta = parsed
+        meta.setdefault("session", session)
+        if "question" not in meta and srow is not None and srow["question"]:
+            meta["question"] = srow["question"]
+
+        rows = conn.execute(
+            """
+            SELECT paper_key, doi, openalex, title, year, journal,
+                   cited_by_count, abstract, score, data_json
+            FROM pool_items
+            WHERE session_id = ?
+            ORDER BY rowid ASC
+            """,
+            (session,),
+        ).fetchall()
+        pool = {str(r["paper_key"]): _pool_row_to_dict(r) for r in rows}
+    return {**meta, "pool": pool}
+
+
+def save_pool_state(state: dict[str, Any], *, db_file: Path | str | None = None) -> None:
+    """Persist deep-search pool metadata and candidate items in a single transaction."""
+    sid = str(state["session"])
+    now = _now_iso()
+    pool_meta = {k: v for k, v in state.items() if k != "pool"}
+    pool = state.get("pool") or {}
+    pool_meta_json = json.dumps(pool_meta, ensure_ascii=False)
+
+    with transaction(db_file) as conn:
+        conn.execute(
+            """
+            INSERT INTO sessions (id, question, mode, updated, pool_state_json)
+            VALUES (?, ?, 'deep', ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                pool_state_json = excluded.pool_state_json,
+                updated = CASE WHEN sessions.updated = '' THEN excluded.updated ELSE sessions.updated END
+            """,
+            (sid, str(state.get("question") or ""), now, pool_meta_json),
+        )
+
+        existing_keys = {
+            r[0]
+            for r in conn.execute(
+                "SELECT paper_key FROM pool_items WHERE session_id = ?", (sid,)
+            ).fetchall()
+        }
+        new_keys = {str(k) for k, v in pool.items() if isinstance(v, dict)}
+        stale_keys = existing_keys - new_keys
+        if stale_keys:
+            conn.executemany(
+                "DELETE FROM pool_items WHERE session_id = ? AND paper_key = ?",
+                [(sid, k) for k in stale_keys],
+            )
+
+        rows = []
+        for pkey, rec in pool.items():
+            if not isinstance(rec, dict):
+                continue
+            rows.append(
+                (
+                    sid,
+                    str(pkey),
+                    str(rec["doi"]) if rec.get("doi") is not None else None,
+                    str(rec["openalex"]) if rec.get("openalex") is not None else None,
+                    str(rec.get("title") or ""),
+                    _opt_int(rec.get("year")),
+                    str(rec.get("journal") or ""),
+                    _opt_int(rec.get("cited_by_count")) or 0,
+                    str(rec.get("abstract") or ""),
+                    _opt_float(rec.get("score")),
+                    json.dumps(rec, ensure_ascii=False),
+                )
+            )
+        if rows:
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO pool_items (
+                    session_id, paper_key, doi, openalex, title, year, journal,
+                    cited_by_count, abstract, score, data_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
+
+
+def load_summary(session: str, *, db_file: Path | str | None = None) -> dict[str, Any] | None:
+    """Load deep-search summary dict from SQLite (auto-importing legacy summary JSON)."""
+    sdir = _screening_dir(db_file)
+    with connect(db_file) as conn:
+        raw = _ensure_summary_in_conn(conn, session, sdir=sdir, in_write_tx=False)
+    if raw is None:
+        return None
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else None
+    except (ValueError, TypeError):
+        return None
+
+
+def save_summary(
+    session: str,
+    summary: dict[str, Any],
+    *,
+    db_file: Path | str | None = None,
+) -> None:
+    """Persist deep-search summary JSON into sessions.summary_json."""
+    now = _now_iso()
+    summary_json = json.dumps(summary, ensure_ascii=False)
+    with transaction(db_file) as conn:
+        conn.execute(
+            """
+            INSERT INTO sessions (id, question, mode, updated, summary_json)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                summary_json = excluded.summary_json
+            """,
+            (
+                session,
+                str(summary.get("question") or ""),
+                str(summary.get("mode") or "deep"),
+                str(summary.get("updated") or now),
+                summary_json,
+            ),
+        )
+
+
+def get_batch_paper(
+    session: str,
+    doi: str | None,
+    title: str | None,
+    *,
+    db_file: Path | str | None = None,
+) -> dict[str, Any] | None:
+    """Return one paper from the session's latest batch without loading pool_items."""
+    sdir = _screening_dir(db_file)
+    with connect(db_file) as conn:
+        if not _ensure_pool_in_conn(conn, session, sdir=sdir, in_write_tx=False):
+            return None
+        row = conn.execute(
+            "SELECT pool_state_json FROM sessions WHERE id = ?", (session,)
+        ).fetchone()
+    if row is None or not row["pool_state_json"]:
+        return None
+    try:
+        meta = json.loads(row["pool_state_json"])
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(meta, dict):
+        return None
+    target_key = paper_key({"doi": doi, "title": title})
+    for b in meta.get("last_batch") or []:
+        if isinstance(b, dict) and paper_key({"doi": b.get("doi"), "title": b.get("title")}) == target_key:
+            return {f: b.get(f) for f in _BATCH_FIELDS}
+    return None
+
 

@@ -31,7 +31,7 @@
 
 ## 正在做
 
-（正在做：2026-11-07 的两件事已做完并推送——①重装配运行时并升到 **1.18.3**，MSI 重新打出（`LitLoop_1.18.3_x64_zh-CN.msi`，125.9 MiB，含蓝色向导图与「设置页显示数据目录」）；②卸载/升级前先关掉运行中的实例（自定义 WiX 模板 `app/src-tauri/wix/main.wxs` 的 `CloseRunningApp`，已用 MSI 表核对排在 `InstallValidate` 之后）。另外把深度检索的「精确（AND）检索 + 标题短语加分」做完并默认打开（提交 `ad8798a`、`e544e7c`）。此外已完成用户 2026-11-20 拍板的 `sources/__init__.py` 阶段 1+2 外围拆分（2214 → **1339** 行，抽出 `_index.py`、`_batch.py`、`_routes.py` 并由 `__init__.py` 回导，见 `DECISIONS.md`），以及 2026-11-21「真实世界回归」（提交 `4c1168d`）和「筛选页批量与撤销」（新增 `/api/sessions/{session}/batch` 原子更新接口、前端列表内搜索与多维过滤、多选/Shift 连选、按 Agent 评定一键批量处理及多步撤销）。下一步：等用户按待实测 13（装新 MSI、看蓝位图、改 D 盘、开着 app 卸载不报 `.rbf`、升级只剩一份）与 14（无 Key 首次引导提示）验；之后再挑待实测 8–12、或补「卸载时问是否保留数据」、或拆稀土最后那篇漏检。用户还没定：分析归纳验收标准。）
+（正在做：2026-11-07 的两件事已做完并推送——①重装配运行时并升到 **1.18.3**，MSI 重新打出（`LitLoop_1.18.3_x64_zh-CN.msi`，125.9 MiB，含蓝色向导图与「设置页显示数据目录」）；②卸载/升级前先关掉运行中的实例（自定义 WiX 模板 `app/src-tauri/wix/main.wxs` 的 `CloseRunningApp`，已用 MSI 表核对排在 `InstallValidate` 之后）。另外把深度检索的「精确（AND）检索 + 标题短语加分」做完并默认打开（提交 `ad8798a`、`e544e7c`）。此外已完成用户 2026-11-20 拍板的 `sources/__init__.py` 阶段 1+2 外围拆分（2214 → **1339** 行，抽出 `_index.py`、`_batch.py`、`_routes.py` 并由 `__init__.py` 回导，见 `DECISIONS.md`），以及 2026-11-21「真实世界回归」（提交 `4c1168d`）和「筛选页批量与撤销」（新增 `/api/sessions/{session}/batch` 原子更新接口、前端列表内搜索与多维过滤、多选/Shift 连选、按 Agent 评定一键批量处理及多步撤销），以及 **SQLite 数据层三阶段迁移完成**（`litloop.db` 接管 `watches`、`sessions`/`decisions` 与 `pool_items`/`summary_json`，支持旧 JSON 自动幂等导入且不再写新 `.json`/`.pool.json`/`.summary.json`）。下一步：等用户按待实测 13（装新 MSI、看蓝位图、改 D 盘、开着 app 卸载不报 `.rbf`、升级只剩一份）与 14（无 Key 首次引导提示）验；之后再挑待实测 8–12、或补「卸载时问是否保留数据」、或拆稀土最后那篇漏检。用户还没定：分析归纳验收标准。）
 
 ## 待用户决定
 
@@ -124,7 +124,7 @@
 
 ### 工程债（2026-11-05 盘点，用户认可，先记账不动手）
 - [~] **三个巨型文件**：`src/litloop/publishers/strategies/_core.py`（2873 → **2340** 行，2026-11-05 抽出 `_elsevier_api.py`，见 DECISIONS）、`src/litloop/sources/__init__.py`（2214 → **1339** 行，2026-11-20 抽出 `_index.py`、`_batch.py`、`_routes.py` 并回导全部名字，见 DECISIONS；竞速核心 `_race.py` 阶段 3 待真机实测 8–10 稳定后再定）、`src/litloop/server.py` 1731 行。「不拆」是继承来的约定，其余保持。
-- [ ] **数据层换 SQLite**：现在是 JSON + 文件锁，候选池 1600–3400 篇是几 MB 的整份读整份写，会议话越攒越大越慢；`store.SCHEMA` 只有版本号、没有迁移机制。先做「会话/候选池/决策/追踪」四张表，再补迁移。
+- [x] **数据层换 SQLite**（2026-11-21）：三阶段迁移全部完成（`src/litloop/db.py`，schema v1 + `PRAGMA user_version` + `schema_migrations`；WAL 模式 + `busy_timeout=30000` + `IMMEDIATE` 写事务；`watches`、`sessions`/`decisions`、深度检索 `pool_items` + `sessions.pool_state_json`/`summary_json` 均已切至 SQLite，旧版 JSON 首次读取时自动幂等导入且不删原文件）。
 - [x] **真实世界回归**（2026-11-21）：本地 HTTP 录制回放已落地（[tests/fixtures/replay/](tests/fixtures/replay/) + [tests/test_real_world_replay.py](tests/test_real_world_replay.py) 覆盖竞速成功与错篇/1 页预览淘汰、迟到落盘、慢镜像流式等待、预印本拦截、429 降级与真 HTTP 错篇剔除），并新增 [scripts/smoke_app.py](scripts/smoke_app.py) 与 [tests/test_smoke_app.py](tests/test_smoke_app.py) 验证后台启动与 `/api/health`（安装包/打包 exe 可在真机传 `--exe ... --launch-exe` 验收）。
 - [x] **筛选页批量与撤销**（2026-11-21）：新增后端批量原子更新接口 `/api/sessions/{session}/batch`（单次文件锁更新并返回修改前快照），前端补齐列表内搜索与多维过滤（相关度/决定状态/年份范围/期刊）、多选与 `Shift` 连选、按 Agent 评定一键批量加入下载/排除，以及会话内最多 20 步多步撤销（顶栏按钮、操作反馈条与 `Ctrl+Z`）。
 - [ ] **错误提示补「下一步」**：文案已统一成「无法…：原因」，但下载失败后没给动作（去设置填学校 / 开代理 / 跳过这篇），只在日志里。

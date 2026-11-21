@@ -5,7 +5,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from litloop import store
+from litloop import db, store
 from litloop.desktop import server as app_server
 from litloop.search import deep as deep_search, screening
 
@@ -17,7 +17,7 @@ PAPER = {"doi": "10.1/new", "title": "New", "year": 2024, "journal": "J", "abstr
 def session(tmp_path, monkeypatch):
     monkeypatch.setattr(screening._config, "DATA_DIR", tmp_path)
     sid = screening.save("q", [{"doi": "10.1/old", "title": "Old", "relevance": "高", "reason": "agent"}], mode="deep")["session"]
-    store.write_json(deep_search._pool_path(sid), {
+    db.save_pool_state({
         "session": sid, "pool": {"10.1/old": {}, "10.1/new": {}}, "served": [["10.1/old"], ["10.1/new"]],
         "last_batch": [{"key": "10.1/new", **PAPER}], "seeds": [], "batch_size": 20, "cap": 200, "rounds": []})
     monkeypatch.setattr(deep_search, "_ranked", lambda state: [])

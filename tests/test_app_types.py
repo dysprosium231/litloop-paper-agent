@@ -26,8 +26,10 @@ def _ts_fields(interface: str) -> set[str]:
 
 
 def test_summary_type_covers_the_deep_search_summary(monkeypatch):
+    from litloop import db
+
     written = {}
-    monkeypatch.setattr(store, "write_json", lambda path, data, **k: written.update(data))
+    monkeypatch.setattr(db, "save_summary", lambda session, data, **k: written.update(data))
     state = {"session": "s", "question": "q", "pool": {}, "seeds": [], "served": [], "rounds": [{"time": "t", "event": "start"}]}
     deep_search._write_summary(state, {}, {"stop_suggested": False, "stop_reason": ""}, [], [], 0, [])
     missing = set(written) - _ts_fields("Summary")

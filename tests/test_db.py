@@ -397,3 +397,118 @@ def test_row_level_updates_and_pending_selected_by_session(tmp_path):
     assert [x["doi"] for x in by_sid[s1]["papers"]] == ["10.1/p1"]
     assert [x["doi"] for x in by_sid[s2]["papers"]] == ["10.1/p2"]
 
+
+def test_large_3000_pool_roundtrip_incremental_update_and_batch_paper(tmp_path):
+    sid = "20261121-150000-large-pool"
+    pool = {
+        f"doi:10.1000/p{i}": {
+            "doi": f"10.1000/p{i}",
+            "openalex": f"W{i}",
+            "title": f"Paper {i}",
+            "year": 2020 + (i % 6),
+            "journal": "J. Test",
+            "cited_by_count": i,
+            "abstract": f"Abstract {i}",
+            "score": round(i * 0.01, 2),
+            "found_via": ["keyword"],
+        }
+        for i in range(3000)
+    }
+    state = {
+        "session": sid,
+        "question": "3000 papers",
+        "queries": ["q1"],
+        "core_terms": ["t1"],
+        "seeds": ["doi:10.1000/p0"],
+        "served": [["doi:10.1000/p0", "doi:10.1000/p1"]],
+        "rounds": [{"event": "start", "pool_added": 3000}],
+        "last_batch": [
+            {
+                "doi": "10.1000/p42",
+                "title": "Paper 42",
+                "year": 2020,
+                "journal": "J. Test",
+                "journal_rank": "Q1",
+                "retracted": False,
+                "concern": False,
+                "authors": ["Alice"],
+                "cited_by_count": 42,
+                "abstract": "Abstract 42",
+                "abstract_missing": False,
+            }
+        ],
+        "pool": pool,
+    }
+
+    db.save_pool_state(state)
+    assert db.has_pool(sid) is True
+
+    loaded = db.load_pool_state(sid)
+    assert len(loaded["pool"]) == 3000
+    assert loaded["question"] == "3000 papers"
+    assert loaded["pool"]["doi:10.1000/p2999"]["openalex"] == "W2999"
+    assert loaded["pool"]["doi:10.1000/p2999"]["found_via"] == ["keyword"]
+
+    # Incremental update: remove p0..p9, update p10, add p3000
+    for i in range(10):
+        pool.pop(f"doi:10.1000/p{i}")
+    pool["doi:10.1000/p10"]["score"] = 99.5
+    pool["doi:10.1000/p3000"] = {
+        "doi": "10.1000/p3000",
+        "openalex": "W3000",
+        "title": "Paper 3000",
+        "score": 88.0,
+    }
+    db.save_pool_state(state)
+
+    reloaded = db.load_pool_state(sid)
+    assert len(reloaded["pool"]) == 2991
+    assert "doi:10.1000/p0" not in reloaded["pool"]
+    assert reloaded["pool"]["doi:10.1000/p10"]["score"] == 99.5
+    assert reloaded["pool"]["doi:10.1000/p3000"]["title"] == "Paper 3000"
+
+    # batch_paper reads from pool_state_json without loading pool_items
+    bp = db.get_batch_paper(sid, "10.1000/p42", "Paper 42")
+    assert bp is not None and bp["journal_rank"] == "Q1" and bp["authors"] == ["Alice"]
+    assert db.get_batch_paper(sid, "10.1000/missing", "Missing") is None
+
+    # summary roundtrip
+    db.save_summary(sid, {"session": sid, "pool": 2991, "screened": 1})
+    assert db.load_summary(sid) == {"session": sid, "pool": 2991, "screened": 1}
+
+
+def test_auto_import_legacy_pool_and_summary_on_demand(tmp_path):
+    sdir = tmp_path / "screening"
+    sdir.mkdir(parents=True)
+    sid = "20261121-150500-legacy-deep"
+    pool_file = sdir / f"{sid}.pool.json"
+    summary_file = sdir / f"{sid}.summary.json"
+
+    pool_file.write_text(
+        json.dumps(
+            {
+                "session": sid,
+                "question": "legacy deep",
+                "seeds": [],
+                "served": [],
+                "rounds": [],
+                "last_batch": [{"doi": "10.1/l1", "title": "Legacy 1", "year": 2024}],
+                "pool": {"doi:10.1/l1": {"doi": "10.1/l1", "title": "Legacy 1", "score": 1.0}},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    summary_file.write_text(
+        json.dumps({"session": sid, "question": "legacy deep", "pool": 1}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    assert db.has_pool(sid) is True
+    loaded = db.load_pool_state(sid)
+    assert loaded["pool"]["doi:10.1/l1"]["title"] == "Legacy 1"
+    assert db.get_batch_paper(sid, "10.1/l1", None)["title"] == "Legacy 1"
+    assert db.load_summary(sid)["pool"] == 1
+    assert pool_file.exists() and summary_file.exists()
+
+

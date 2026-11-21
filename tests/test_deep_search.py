@@ -358,10 +358,11 @@ def test_element_symbols_that_are_common_words_are_flagged():
 
 
 def test_a_round_leaves_a_summary_and_progress_for_the_app(net):
-    from litloop import store
+    from litloop import db, store
     out = deep_search.start("SiC/Al 无压浸渗", ["pressureless infiltration SiC aluminum"], ["10.1/SEED"],
                             ["aluminum"], batch_size=10)
-    summary = store.read_json(store.summary_path(out["session"]))
+    summary = db.load_summary(out["session"])
+    assert summary is not None
     assert summary["pool"] == out["pool"] and summary["batches"][0]["size"] == len(out["batch"])
     progress = store.read_progress(out["session"])
     assert progress["state"] == "idle" and progress["event"] == "start"

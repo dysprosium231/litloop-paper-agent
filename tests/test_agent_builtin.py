@@ -151,12 +151,13 @@ def test_a_new_run_can_start_the_moment_the_last_one_finishes(builtin, monkeypat
 
 
 def test_resume_runs_builtin_agent_and_blocks_concurrent_runs(builtin, tmp_path, monkeypatch):
-    from litloop.search import deep as deep_search, screening
+    from litloop import db
+    from litloop.search import screening
 
     monkeypatch.setattr(screening._config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     sid = screening.save("SiC/Al", [{"doi": "10.1/a", "title": "A", "relevance": "高", "reason": "r"}], mode="deep")["session"]
-    deep_search._pool_path(sid).write_text("{}", encoding="utf-8")
+    db.save_pool_state({"session": sid, "pool": {}})
 
     seen = {}
     started = threading.Event()

@@ -21,7 +21,8 @@ seeds, so later batches follow what the user actually wants (snowballing). A bat
 the screening cap, ends the search with a stated reason.
 
 Ratings live in the screening session (``litloop_screening``); this module
-keeps the pool next to it as ``<session>.pool.json``.
+keeps the pool in SQLite (``pool_items`` + ``sessions.pool_state_json``, with
+automatic import of legacy ``<session>.pool.json``).
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ import json
 import math
 import random
 import re
+import sqlite3
 import threading
 import time
 from collections import Counter
@@ -37,7 +39,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from . import screening
-from .. import store
+from .. import db, store
 from ..desktop import translate
 from ..config import load_config
 from ..identifiers import canonical_doi
@@ -615,15 +617,17 @@ def _pool_path(session: str):
     return screening.screening_dir() / f"{session}.pool.json"
 
 
+def has_pool(session: str) -> bool:
+    """Return True if a deep-search candidate pool exists for the session."""
+    return db.has_pool(session)
+
+
 def _load(session: str) -> dict[str, Any]:
-    p = _pool_path(session)
-    if not p.exists():
-        raise FileNotFoundError(f"no deep search for session {session!r}")
-    return store.read_json(p)
+    return db.load_pool_state(session)
 
 
 def _save(state: dict[str, Any]) -> None:
-    store.write_json(_pool_path(state["session"]), state)  # whole file at once: a crash keeps the old one
+    db.save_pool_state(state)
 
 
 def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
@@ -972,11 +976,7 @@ def _batch_key(b: dict[str, Any]) -> str:
 
 def batch_paper(session: str, doi: str | None, title: str | None) -> dict[str, Any] | None:
     """A paper of the latest batch, as the batch showed it (for a rating the user gives first)."""
-    key = screening._key({"doi": doi, "title": title})
-    for b in _load(session).get("last_batch") or []:
-        if _batch_key(b) == key:
-            return {f: b.get(f) for f in _BATCH_FIELDS}
-    return None
+    return db.get_batch_paper(session, doi, title)
 
 
 # --------------------------------------------------------------------------- helpers
@@ -1144,8 +1144,8 @@ def _write_summary(state: dict[str, Any], rated: dict[str, str], stop: dict[str,
                "glossary": state.get("glossary_used", []),
                "queries": state.get("queries", []), "current_batch": batch}
     try:
-        store.write_json(store.summary_path(state["session"]), summary)
-    except OSError as exc:
+        db.save_summary(state["session"], summary)
+    except (OSError, sqlite3.Error) as exc:
         logger.warning("deep search: could not write the session summary (%s)", exc)
 
 

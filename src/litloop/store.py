@@ -247,7 +247,8 @@ def latest_round_notice() -> dict[str, Any] | None:
     data = _normalize_progress(best[1])
     session = str(data["session"])
     try:
-        summary = read_json(summary_path(session))
+        from . import db
+        summary = db.load_summary(session) or {}
     except (OSError, ValueError):
         summary = {}
     return {

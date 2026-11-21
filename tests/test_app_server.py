@@ -176,11 +176,13 @@ def test_round_notice_is_none_without_a_deep_search(client):
 
 
 def test_round_notice_names_the_newest_round(client, tmp_path):
+    from litloop import db
+
     store.write_json(store.progress_path("s-old"), {
         "session": "s-old", "event": "next", "state": "idle", "started": 100.0, "updated": 200.0})
     store.write_json(store.progress_path("s-new"), {
         "session": "s-new", "event": "next", "state": "running", "started": 300.0, "updated": 400.0})
-    store.write_json(store.summary_path("s-new"), {
+    db.save_summary("s-new", {
         "session": "s-new", "question": "稀土药物载体", "batches": [{}, {}, {}]})
 
     n = client.get("/api/screening/notice").json()
@@ -221,10 +223,11 @@ def test_diagnostics_export_writes_a_zip(client, tmp_path, monkeypatch):
 
 
 def test_session_reports_resumable_and_progress_translates_errors(client, session, monkeypatch):
+    from litloop import db
     from litloop.search import deep as deep_search
 
     assert client.get(f"/api/sessions/{session}").json()["resumable"] is False
-    deep_search._pool_path(session).write_text("{}", encoding="utf-8")
+    db.save_pool_state({"session": session, "pool": {}})
     assert client.get(f"/api/sessions/{session}").json()["resumable"] is True
 
     store.write_json(store.progress_path(session), {
@@ -335,9 +338,9 @@ def test_batch_ratings_clear_and_undo_mixed_state(client, session):
 
 
 def test_batch_handles_unrated_batch_papers_and_safe_undo(client, session):
-    from litloop.search import deep as deep_search
+    from litloop import db
 
-    store.write_json(deep_search._pool_path(session), {
+    db.save_pool_state({
         "session": session,
         "question": "q",
         "pool": {},
