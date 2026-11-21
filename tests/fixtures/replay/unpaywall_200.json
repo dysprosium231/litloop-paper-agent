@@ -1,0 +1,22 @@
+{
+  "doi": "10.1038/s41598-024-67653-y",
+  "is_oa": true,
+  "title": "Improving thermal conductivity of AlSiC composites by post-oxidization of reaction-bonded silicon carbide preforms",
+  "best_oa_location": {
+    "host_type": "repository",
+    "url_for_pdf": "{base}/repo/vor.pdf",
+    "url": "{base}/repo/vor.pdf"
+  },
+  "oa_locations": [
+    {
+      "host_type": "publisher",
+      "url_for_pdf": "{base}/pub/preview.pdf",
+      "url": "{base}/pub/preview.pdf"
+    },
+    {
+      "host_type": "repository",
+      "url_for_pdf": "{base}/repo/vor.pdf",
+      "url": "{base}/repo/vor.pdf"
+    }
+  ]
+}

@@ -430,11 +430,13 @@ def download_pdf(
             deadline = time.monotonic() + float(config.get("download_deadline_seconds", 60))
             with tmp_path.open("wb") as fh:
                 fh.write(first_chunk)
+                fh.flush()
                 for chunk in iterator:
                     if time.monotonic() > deadline:
                         raise TimeoutError("stream deadline exceeded")
                     if chunk:
                         fh.write(chunk)
+                        fh.flush()
             tmp_path.replace(output_path)
         except Exception:
             tmp_path.unlink(missing_ok=True)

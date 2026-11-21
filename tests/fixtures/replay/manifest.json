@@ -1,0 +1,61 @@
+{
+  "description": "Recorded HTTP response fixtures for local offline regression replay",
+  "target_doi": "10.1038/s41598-024-67653-y",
+  "fixtures": {
+    "unpaywall_200.json": {
+      "status": 200,
+      "content_type": "application/json",
+      "scenario": "Unpaywall v2 work record with repository VOR and publisher preview"
+    },
+    "unpaywall_429.json": {
+      "status": 429,
+      "content_type": "application/json",
+      "scenario": "Unpaywall v2 rate-limit response"
+    },
+    "openalex_work_200.json": {
+      "status": 200,
+      "content_type": "application/json",
+      "scenario": "OpenAlex work metadata with OA flag and Work ID for Content API"
+    },
+    "scihub_article_200.html": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "scenario": "Sci-Hub mirror landing page embedding PDF iframe URL"
+    },
+    "scihub_cloudflare_403.html": {
+      "status": 403,
+      "content_type": "text/html; charset=utf-8",
+      "scenario": "Cloudflare Turnstile / challenge 403 block page"
+    },
+    "scihub_absent_200.html": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "scenario": "Sci-Hub mirror article-not-found page"
+    },
+    "publisher_article_200.html": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "scenario": "Publisher article HTML with citation_pdf_url meta tag"
+    },
+    "vor_scientific_reports.pdf": {
+      "status": 200,
+      "content_type": "application/pdf",
+      "scenario": "3-page version-of-record PDF matching target DOI"
+    },
+    "preprint_research_square.pdf": {
+      "status": 200,
+      "content_type": "application/pdf",
+      "scenario": "3-page Research Square preprint PDF of target title"
+    },
+    "preview_1page.pdf": {
+      "status": 200,
+      "content_type": "application/pdf",
+      "scenario": "1-page publisher cover/preview PDF >50KB"
+    },
+    "wrong_paper.pdf": {
+      "status": 200,
+      "content_type": "application/pdf",
+      "scenario": "3-page unrelated paper PDF with different DOI"
+    }
+  }
+}

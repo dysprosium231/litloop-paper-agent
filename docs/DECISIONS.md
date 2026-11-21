@@ -1,5 +1,20 @@
 # 决定与实验记录
 
+## 2026-11-21：真实世界回归（本地 HTTP 录制回放与后台冒烟脚本）
+
+- 背景：`TODO.md`「工程债 → 真实世界回归」要求不依赖外网，在本地回放真实 HTML / 状态码 / PDF 响应以回归下载竞速、迟到落盘、慢镜像、预印本拦截与错篇剔除，并补齐打包 exe / 后台 `/api/health` 冒烟脚本。
+- 实现：
+  1. **录制回放测试集**：在 `tests/fixtures/replay/` 放入 8 份文本响应（`manifest.json`、`unpaywall_200.json`、`unpaywall_429.json`、`openalex_work_200.json`、`scihub_article_200.html`、`scihub_cloudflare_403.html`、`scihub_absent_200.html`、`publisher_article_200.html`）与 4 份真实结构 PDF（`vor_scientific_reports.pdf`、`preprint_research_square.pdf`、`preview_1page.pdf`、`wrong_paper.pdf`）；在 [tests/test_real_world_replay.py](tests/test_real_world_replay.py) 用本地 HTTP 服务回放，覆盖 7 项回归（竞速淘汰 1 页预览与错篇、迟到落盘、慢镜像流式等待与临时文件清理、预印本拦截、Unpaywall 429 降级、真 HTTP 错篇校验淘汰等）。
+  2. **后台与打包 exe 冒烟脚本**：新增 [scripts/smoke_app.py](scripts/smoke_app.py)（支持 `--python`、`--runtime`、`--exe`、`--launch-exe`）与 [tests/test_smoke_app.py](tests/test_smoke_app.py)，验证后台随机空闲端口拉起及 `/api/health` 返回结构（`version`、`schema`）。
+- 发现并修复的两处真实缺陷：
+  1. [src/litloop/download/pdf.py](src/litloop/download/pdf.py)（`download_pdf`）：写入 `.part` 时未显式 `fh.flush()`，在 Windows NTFS 下 Python 8 KiB 缓冲导致慢镜像流式写入期间 `part.stat().st_size` 长时间为 `0`，使 `scihub._await_slow_pdfs` 误判没有进展。已在首块及后续分块写入后补充 `fh.flush()`。
+  2. [src/litloop/sources/scihub.py](src/litloop/sources/scihub.py)：Sci-Hub 镜像临时文件名原先只替换 `.`，在带端口号的镜像地址（如 `http://127.0.0.1:<port>/m1`）下会保留 `:` 导致 Windows 非法文件名；已改用正则 `re.sub(r"[^A-Za-z0-9_-]+", "_", ...)` 清洗，并支持通过配置项 `scihub_backup_race_seconds` 调整备选赛跑等待时长（默认仍为 45 秒）。
+- 验证（`C:/Users/Echo/.mcp-envs/litloop/Scripts/python.exe`）：
+  - 重点回归 5 个测试文件（`test_real_world_replay.py`、`test_smoke_app.py`、`test_scihub_pool.py`、`test_preprint_pdf.py`、`test_late_files.py`）：`39 passed`（35.38s）。
+  - 全量 `python -m pytest -q`：`1231 passed, 3 skipped`（195.28s）。
+  - `scripts/smoke_app.py`：`OK: backend healthy`（`version=1.18.3, schema=1`）；注：`--runtime` 在受限沙箱环境下因 `build/runtime/python.exe` 加载 `_ctypes` DLL 受限未能测试，真机安装包的 `--exe ... --launch-exe` 路径待用户本机或 CI 验收。
+  - `scripts/import_smoke.py`：`35/35 modules import`；`scripts/check_release_consistency.py`：`OK: version 1.18.3, 21 MCP tools, skills clean`。
+
 ## 2026-11-21：补完「深度检索中断后续跑」实机验收与测试修复
 
 - 背景：2026-11-19 条目中记载的全套验证命令当时因环境工具受限未实际执行；后续在本地虚拟环境运行全量测试时，暴露出两处与该功能同期新增的测试桩缺陷，且 `skills-src/shared/screening.md` 改动后尚未同步生成技能文档。

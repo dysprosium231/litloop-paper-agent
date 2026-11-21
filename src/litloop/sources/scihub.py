@@ -1254,7 +1254,8 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
 
     # Try best domain first with short timeout
     best_domain = domains[0]
-    best_output = output_path.parent / f"{output_path.stem}_scihub_{best_domain.split('//')[1].replace('.', '_')}.pdf"
+    best_tag = re.sub(r"[^A-Za-z0-9_-]+", "_", best_domain.split("//")[-1])
+    best_output = output_path.parent / f"{output_path.stem}_scihub_{best_tag}.pdf"
     log.info(f"   Sci-Hub: trying {best_domain} first...")
     try:
         result = _submit(
@@ -1314,13 +1315,15 @@ def _try_scihub_impl(doi: str, output_path: Path, config: dict[str, Any], use_to
 
     futures = {}
     for domain in remaining:
-        src_output = output_path.parent / f"{output_path.stem}_scihub_{domain.split('//')[1].replace('.', '_')}.pdf"
+        dom_tag = re.sub(r"[^A-Za-z0-9_-]+", "_", domain.split("//")[-1])
+        src_output = output_path.parent / f"{output_path.stem}_scihub_{dom_tag}.pdf"
         futures[_submit(pool, _lane_that_cleans_up, try_scihub_domain, doi, domain, src_output,
                         config, use_tor, fail_notes, race_over)] = (domain, src_output)
+    backup_timeout = float(config.get("scihub_backup_race_seconds", 45) or 45)
     try:
         # 10 s ended the race while the backups were still streaming PDFs they
         # had already found (sci.bban.top serves at a few hundred KB/s here).
-        for future in as_completed(futures, timeout=45):
+        for future in as_completed(futures, timeout=backup_timeout):
             domain, src_output = futures[future]
             try:
                 result = future.result(timeout=1)
