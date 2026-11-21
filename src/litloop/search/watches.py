@@ -81,7 +81,7 @@ def check(wid: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
     watch = db.get_watch(wid)
     if not watch:
         raise ValueError("没有这个追踪")
-    hits = quick.search_papers_v2(watch["query"], limit=NEW_LIMIT, sort="date") or []
+    hits = quick.search_papers_v2(watch["query"], limit=NEW_LIMIT, sort="date", use_cache=False) or []
     seen = set(watch.get("seen") or [])
     fresh = [p for p in hits if key(p) not in seen]
     now = time.strftime("%Y-%m-%d %H:%M")

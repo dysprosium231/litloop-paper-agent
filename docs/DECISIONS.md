@@ -1,5 +1,17 @@
 # 决定与实验记录
 
+## 2026-11-21：快速检索结果缓存（默认 7 天）
+
+- 背景：`TODO.md`「检索 → 快速检索提速」提到重复检索会重复耗费网络与 OpenAlex 额度；与用户确认采用默认 **7 天（168 小时）**缓存并补齐安全绕过规则。
+- 做法：
+  1. [src/litloop/config.py](src/litloop/config.py)：新增 `search_cache_ttl_hours`（默认 `168`，允许 `0–8760`，设为 `0` 关闭）。
+  2. [src/litloop/cache.py](src/litloop/cache.py)：新增 `search_cache_key`、`search_cache_path`、`search_cache_get`、`search_cache_set`，缓存文件以 `search_<hash>.json` 落盘在 `cache_dir`，天然受 `cache_clear(None, config)` 统一清理。
+  3. [src/litloop/search/quick.py](src/litloop/search/quick.py) 与 [src/litloop/search/watches.py](src/litloop/search/watches.py)：`search_papers_v2` 新增 `use_cache: bool = True`，命中时还原 `expansions` 与 `stats`（并置 `stats["cached"] = True`）；缓存键包含规范化检索参数、数据源 Key/邮箱状态、`scansci_find.find_cli_available()` 状态及 `glossary.path()` 文件指纹。`sort` 为 `"date"`/`"publication_date"`、`use_cache=False`（`watches.check()` 显式传入）、空结果与存在 `errors` 的结果均不走或不写入缓存。
+  4. [tests/conftest.py](tests/conftest.py) 隔离 `DEFAULT_CONFIG["cache_dir"]`，新增 [tests/test_search_cache.py](tests/test_search_cache.py)（6 项单测）并更新 [TODO.md](TODO.md)。
+- 验证：
+  - 相关测试（`test_search_cache.py`、`test_search_errors.py`、`test_search_cleanup.py`、`test_search_fallback_tidy.py`、`test_watches.py`）：`29 passed`。
+  - 全量 `pytest -q`：`1261 passed, 3 skipped`（231.52s）。
+
 ## 2026-11-21：错误提示补「下一步」与界面提示文案规范化
 
 - 背景：`TODO.md`「工程债 → 错误提示补『下一步』」指出下载或推送失败后界面只显示原因短语，缺少直接可点的下一步动作按钮；同时按 [docs/UI_COPY.md](docs/UI_COPY.md) 对全量前后端提示文案做了一次通读自查。

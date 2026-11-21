@@ -260,6 +260,61 @@ def _search_openalex_by_author(
     return _parse_openalex_works(data.get("results", []))
 
 
+def _search_cache_payload(
+    cfg: dict[str, Any],
+    *,
+    query: str,
+    limit: int,
+    year_from: int | None,
+    year_to: int | None,
+    sort: str | None,
+    author: str | None,
+    author_id: str | None,
+    max_cas_zone: int | None,
+    max_cas_sub_zone: int | None,
+    max_jcr_quartile: int | None,
+    exclude_warning: bool,
+    exclude_retracted: bool,
+) -> dict[str, Any]:
+    from ..terms import glossary
+    from . import scansci_find
+
+    try:
+        gp = glossary.path()
+        st = gp.stat()
+        glossary_sig: tuple[int, int] | None = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        glossary_sig = None
+
+    try:
+        scansci_avail = bool(scansci_find.find_cli_available())
+    except Exception:
+        scansci_avail = False
+
+    email = str(cfg.get("email") or "").strip().lower()
+    return {
+        "query": " ".join(str(query or "").strip().lower().split()),
+        "limit": limit,
+        "year_from": year_from,
+        "year_to": year_to,
+        "sort": sort,
+        "author": " ".join(str(author or "").strip().lower().split()) if author else None,
+        "author_id": str(author_id or "").strip() or None,
+        "max_cas_zone": max_cas_zone,
+        "max_cas_sub_zone": max_cas_sub_zone,
+        "max_jcr_quartile": max_jcr_quartile,
+        "exclude_warning": bool(exclude_warning),
+        "exclude_retracted": bool(exclude_retracted),
+        "has_openalex_key": bool(str(cfg.get("openalex_api_key") or "").strip()),
+        "has_elsevier_key": bool(str(cfg.get("elsevier_api_key") or "").strip()),
+        "has_springer_key": bool(str(cfg.get("springer_meta_api_key") or "").strip()),
+        "has_s2_key": bool(str(cfg.get("semantic_scholar_api_key") or "").strip()),
+        "has_email": bool(email and email != "your-email@example.com"),
+        "scansci_available": scansci_avail,
+        "glossary": glossary_sig,
+    }
+
+
 def search_papers_v2(
     query: str = "",
     limit: int = 10,
@@ -276,6 +331,7 @@ def search_papers_v2(
     exclude_retracted: bool = False,
     stats: dict[str, Any] | None = None,
     expansions: list[dict[str, Any]] | None = None,
+    use_cache: bool = True,
 ) -> list[dict[str, Any]]:
     """Keyword search via ScanSci Find's discovery engine when available.
 
@@ -293,18 +349,66 @@ def search_papers_v2(
     exclude_warning drops warning-listed journals) drop records whose journal
     is unranked as well; ``stats`` receives how many were dropped and why.
     """
+    from .. import cache as _cache
+
     sort = _normalize_sort(sort)
+    cfg = load_config()
+    ttl_hours = float(cfg.get("search_cache_ttl_hours", 168))
+    can_cache = bool(use_cache and sort not in ("date", "publication_date") and ttl_hours > 0)
+    payload: dict[str, Any] | None = None
+    if can_cache:
+        payload = _search_cache_payload(
+            cfg,
+            query=query,
+            limit=limit,
+            year_from=year_from,
+            year_to=year_to,
+            sort=sort,
+            author=author,
+            author_id=author_id,
+            max_cas_zone=max_cas_zone,
+            max_cas_sub_zone=max_cas_sub_zone,
+            max_jcr_quartile=max_jcr_quartile,
+            exclude_warning=exclude_warning,
+            exclude_retracted=exclude_retracted,
+        )
+        cached = _cache.search_cache_get(payload, cfg)
+        if cached and isinstance(cached.get("results"), list):
+            if expansions is not None and isinstance(cached.get("expansions"), list):
+                expansions.extend(cached["expansions"])
+            if stats is not None:
+                if isinstance(cached.get("stats"), dict):
+                    stats.update(cached["stats"])
+                stats["cached"] = True
+            return cached["results"]
+
     filtering = bool(max_cas_zone or max_cas_sub_zone or max_jcr_quartile
                      or exclude_warning or exclude_retracted)
     pool = limit * 3 if filtering else limit
     errors: list[str] = []
+    local_expansions: list[dict[str, Any]] | None = [] if (expansions is not None or can_cache) else None
+    local_stats: dict[str, Any] | None = {} if (stats is not None or can_cache) else None
     results = _collect(query, pool, limit, year_from, year_to, sort, author, author_id,
-                       expansions, errors)
-    if stats is not None and errors:
-        stats["errors"] = errors
-    return _finalize(results, limit, max_cas_zone=max_cas_zone, max_cas_sub_zone=max_cas_sub_zone,
-                     max_jcr_quartile=max_jcr_quartile,
-                     exclude_warning=exclude_warning, exclude_retracted=exclude_retracted, stats=stats)
+                       local_expansions, errors)
+    if local_stats is not None and errors:
+        local_stats["errors"] = errors
+    finalized = _finalize(results, limit, max_cas_zone=max_cas_zone, max_cas_sub_zone=max_cas_sub_zone,
+                          max_jcr_quartile=max_jcr_quartile,
+                          exclude_warning=exclude_warning, exclude_retracted=exclude_retracted, stats=local_stats)
+    if expansions is not None and local_expansions:
+        expansions.extend(local_expansions)
+    if stats is not None and local_stats:
+        stats.update(local_stats)
+    if can_cache and payload is not None and not errors and finalized:
+        try:
+            _cache.search_cache_set(
+                payload,
+                {"results": finalized, "expansions": local_expansions or [], "stats": local_stats or {}},
+                cfg,
+            )
+        except OSError as exc:
+            logger.warning("quick search: failed to write cache (%s)", exc)
+    return finalized
 
 
 def _glossary_variants(query: str) -> tuple[list[str], list[dict[str, Any]]]:

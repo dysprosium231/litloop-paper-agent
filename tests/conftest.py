@@ -32,6 +32,7 @@ def _isolated_config(tmp_path, monkeypatch):
     did, for a made-up DOI). A test that needs settings writes them here."""
     from litloop import config
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "litloop-config.json")
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "cache_dir", str(tmp_path / "cache"))
 
 
 @pytest.fixture(autouse=True)

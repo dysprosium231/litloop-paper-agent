@@ -60,3 +60,45 @@ def cache_clear(identifier: str | None, config: dict[str, Any]) -> int:
         f.unlink()
         count += 1
     return count
+
+
+def search_cache_key(payload: dict[str, Any]) -> str:
+    raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+
+
+def search_cache_path(payload: dict[str, Any], config: dict[str, Any]) -> Path:
+    return Path(config["cache_dir"]) / f"search_{search_cache_key(payload)}.json"
+
+
+def search_cache_get(payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any] | None:
+    ttl_hours = float(config.get("search_cache_ttl_hours", 168))
+    if ttl_hours <= 0:
+        return None
+    path = search_cache_path(payload, config)
+    if not path.exists():
+        return None
+    if time.time() - path.stat().st_mtime > ttl_hours * 3600:
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def search_cache_set(payload: dict[str, Any], data: dict[str, Any], config: dict[str, Any]) -> None:
+    if float(config.get("search_cache_ttl_hours", 168)) <= 0:
+        return
+    cache_dir = Path(config["cache_dir"])
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    target = search_cache_path(payload, config)
+    tmp = target.with_name(f".{target.name}.{hash(target) & 0xFFFF:x}.tmp")
+    try:
+        with tmp.open("w", encoding="utf-8", newline="\n") as fh:
+            json.dump(data, fh, indent=2, ensure_ascii=False)
+        tmp.replace(target)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
