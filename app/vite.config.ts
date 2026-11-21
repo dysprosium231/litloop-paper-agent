@@ -13,6 +13,27 @@ export default defineConfig(() => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (/[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
+            return "vendor-react";
+          }
+          if (/[\\/]lucide-react[\\/]/.test(id)) {
+            return "vendor-lucide";
+          }
+          if (/[\\/](radix-ui|@radix-ui)[\\/]/.test(id)) {
+            return "vendor-radix";
+          }
+          if (/[\\/]@tauri-apps[\\/]/.test(id)) {
+            return "vendor-tauri";
+          }
+        },
+      },
+    },
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

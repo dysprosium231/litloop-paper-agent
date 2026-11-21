@@ -5,15 +5,16 @@ import { Button } from "@/components/ui/button"
 
 import { AppSidebar, RAIL_COLLAPSED, RAIL_OPEN, type Section } from "@/components/app-sidebar"
 import { PaperList, type PaperRow, type QuickBatchKind } from "@/components/paper-list"
-import { SettingsPage } from "@/components/settings-view"
 import { DownloadsOverview, JobPane, OVERVIEW, useDownloads } from "@/components/downloads-view"
 import { useZotero, ZoteroPage, type ZoteroView } from "@/components/zotero-view"
 import { DetailPane, type Paper } from "@/components/detail-pane"
-import { Onboarding } from "@/components/onboarding"
-import { GlossaryPage } from "@/components/glossary-view"
-import { HistoryPage } from "@/components/history-view"
-import { SearchPage } from "@/components/search-view"
 import { ProgressStrip } from "@/components/progress-strip"
+
+const SettingsPage = React.lazy(() => import("@/components/settings-view").then((m) => ({ default: m.SettingsPage })))
+const Onboarding = React.lazy(() => import("@/components/onboarding").then((m) => ({ default: m.Onboarding })))
+const GlossaryPage = React.lazy(() => import("@/components/glossary-view").then((m) => ({ default: m.GlossaryPage })))
+const HistoryPage = React.lazy(() => import("@/components/history-view").then((m) => ({ default: m.HistoryPage })))
+const SearchPage = React.lazy(() => import("@/components/search-view").then((m) => ({ default: m.SearchPage })))
 import { useSystemNotices } from "@/hooks/use-system-notices"
 import { onOpenUrl } from "@tauri-apps/plugin-deep-link"
 import { listen as tauriListen } from "@tauri-apps/api/event"
@@ -175,6 +176,7 @@ export default function App() {
   const [progress, setProgress] = React.useState<Progress | null>(null)
   const [current, setCurrent] = React.useState<string | null>(null)
   const [onlyBatch, setOnlyBatch] = React.useState(true)
+  const [booting, setBooting] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [widths, setWidth] = useStoredWidths()
   const [railOpen, setRailOpen] = useRailOpen()
@@ -257,6 +259,7 @@ export default function App() {
       setSessions(s)
       setSid((cur) => cur ?? s[0]?.session ?? null)
     }).catch((e) => setError(errorMessage(e)))
+      .finally(() => setBooting(false))
   }, [])
 
   const reload = React.useCallback(() => {
@@ -593,11 +596,19 @@ export default function App() {
     ? `第 ${summary.batches.length} 批 · ${summary.current_batch.length} 篇`
     : `已评分 ${record?.items.length ?? 0} 篇`
 
+  const pageFallback = <div className="flex flex-1 items-center justify-center bg-canvas text-sm text-muted-foreground">正在加载…</div>
+
   if (guide) {
-    return <Onboarding steps={guide} onDone={() => {
-      setGuide(null)
-      if (section === "settings") settingsApi.list().then(setGroups).catch(() => {})
-    }} />
+    return (
+      <div className="flex min-h-svh">
+        <React.Suspense fallback={pageFallback}>
+          <Onboarding steps={guide} onDone={() => {
+            setGuide(null)
+            if (section === "settings") settingsApi.list().then(setGroups).catch(() => {})
+          }} />
+        </React.Suspense>
+      </div>
+    )
   }
 
   return (
@@ -636,35 +647,41 @@ export default function App() {
               offset={railExtra} onWidth={(w) => setWidth(section, w)} />
           )}
           {error && <p className="m-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-          {section === "zotero" ? (
-            <ZoteroPage data={zotero.data} error={zotero.error} mode={zotero.mode} onModeChanged={zotero.loadMode}
-              onChanged={zotero.refresh} onOpenJob={openJob} view={zoteroView} onView={setZoteroView} />
-          ) : section === "download" ? (
-            downloadView === OVERVIEW
-              ? <DownloadsOverview jobs={downloads.jobs} pending={downloads.pending} outputDir={downloads.outputDir} external={downloads.external}
-                  busy={Boolean(downloads.running)} running={downloads.running} onStarted={startedJob} onOpen={setDownloadView}
-                  onChanged={downloads.refresh} />
-              : <JobPane key={downloadView} id={downloadView} live={downloads.live} busy={Boolean(downloads.running)}
-                  onChanged={downloads.refresh} onStarted={startedJob}
-                  onBack={() => setDownloadView(OVERVIEW)} onErrorAction={handleErrorAction} />
-          ) : section === "settings" ? (
-            <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup} onGuide={openGuide}
-              onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
-          ) : newSearch ? (
-            <SearchPage onBack={() => { setNewSearch(false); reload() }}
-              onOpen={(s) => {
-                api.sessions().then(setSessions).catch(() => {})
-                if (s === sid) reload()
-                else setSid(s)
-                setNewSearch(false)
-              }} />
-          ) : glossary ? (
-            <GlossaryPage onBack={() => setGlossary(false)} />
-          ) : history ? (
-            <HistoryPage onBack={() => setHistory(false)}
-              onOpen={(s) => { setSid(s); setHistory(false) }}
-              onDownloaded={(job) => { setHistory(false); openJob(job) }} />
-          ) : (<>
+          {booting && !error ? (
+            <div className="flex flex-1 items-center justify-center bg-canvas text-sm text-muted-foreground">
+              正在启动后台…
+            </div>
+          ) : (
+            <React.Suspense fallback={pageFallback}>
+              {section === "zotero" ? (
+                <ZoteroPage data={zotero.data} error={zotero.error} mode={zotero.mode} onModeChanged={zotero.loadMode}
+                  onChanged={zotero.refresh} onOpenJob={openJob} view={zoteroView} onView={setZoteroView} />
+              ) : section === "download" ? (
+                downloadView === OVERVIEW
+                  ? <DownloadsOverview jobs={downloads.jobs} pending={downloads.pending} outputDir={downloads.outputDir} external={downloads.external}
+                      busy={Boolean(downloads.running)} running={downloads.running} onStarted={startedJob} onOpen={setDownloadView}
+                      onChanged={downloads.refresh} />
+                  : <JobPane key={downloadView} id={downloadView} live={downloads.live} busy={Boolean(downloads.running)}
+                      onChanged={downloads.refresh} onStarted={startedJob}
+                      onBack={() => setDownloadView(OVERVIEW)} onErrorAction={handleErrorAction} />
+              ) : section === "settings" ? (
+                <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup} onGuide={openGuide}
+                  onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
+              ) : newSearch ? (
+                <SearchPage onBack={() => { setNewSearch(false); reload() }}
+                  onOpen={(s) => {
+                    api.sessions().then(setSessions).catch(() => {})
+                    if (s === sid) reload()
+                    else setSid(s)
+                    setNewSearch(false)
+                  }} />
+              ) : glossary ? (
+                <GlossaryPage onBack={() => setGlossary(false)} />
+              ) : history ? (
+                <HistoryPage onBack={() => setHistory(false)}
+                  onOpen={(s) => { setSid(s); setHistory(false) }}
+                  onDownloaded={(job) => { setHistory(false); openJob(job) }} />
+              ) : (<>
           <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-background px-4 py-3">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
@@ -753,6 +770,8 @@ export default function App() {
             onTranslate={translateAbstract}
           />
           </>)}
+            </React.Suspense>
+          )}
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>

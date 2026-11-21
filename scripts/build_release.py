@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import os
 import shutil
 import subprocess
 import sys
@@ -146,34 +145,51 @@ def drop_layout(site: Path) -> None:
     step(f"dropped the layout model ({freed / 1e6:.0f} MB); plain text order is used instead")
 
 
+_PRUNE_DIRS = {"__pycache__", "tests", "test", "pythonwin", "demos", "examples"}
+_PRUNE_SUFFIXES = (
+    ".pyc", ".pyi", ".h",
+    ".chm", ".pdb", ".lib", ".a", ".c", ".cpp", ".pxd", ".pyx",
+)
+
+
 def prune(site: Path) -> None:
     """Drop files the app never reads, because the installer pays per file.
 
     Windows Installer writes every file separately and the antivirus inspects
     each one: 5300 files took about 90 seconds to install on the author's
     machine, with the progress bar sitting at zero the whole time. Stubs,
-    headers, bundled test suites and byte-code caches are never imported.
+    headers, debug symbols, docs, C/Cython sources, bundled test/demo suites
+    and byte-code caches are never imported.
     """
     step("dropping files the app never reads")
     removed = freed = 0
     for path in list(site.rglob("*")):
         if not path.is_file():
             continue
-        name = path.name
-        parts = {part.lower() for part in path.parts}
-        if "__pycache__" in parts or "tests" in parts or "test" in parts:
-            pass
-        elif name.endswith((".pyc", ".pyi", ".h")):
-            pass
-        else:
+        dir_parts = {part.lower() for part in path.relative_to(site).parts[:-1]}
+        if dir_parts & _PRUNE_DIRS or path.name.lower().endswith(_PRUNE_SUFFIXES):
+            freed += path.stat().st_size
+            path.unlink()
+            removed += 1
+    for dirpath, _dirnames, _filenames in os.walk(site, topdown=False):
+        p = Path(dirpath)
+        if p == site:
             continue
-        freed += path.stat().st_size
-        path.unlink()
-        removed += 1
-    for path in site.rglob("__pycache__"):
-        if path.is_dir():
-            shutil.rmtree(path, ignore_errors=True)
-    step(f"dropped {removed} files ({freed / 1e6:.0f} MB); what remains is imported at runtime")
+        try:
+            if not any(p.iterdir()):
+                p.rmdir()
+        except OSError:
+            pass
+    remaining_files = 0
+    remaining_bytes = 0
+    for path in site.rglob("*"):
+        if path.is_file():
+            remaining_files += 1
+            remaining_bytes += path.stat().st_size
+    step(
+        f"dropped {removed} files ({freed / 1e6:.0f} MB); "
+        f"{remaining_files} files ({remaining_bytes / 1e6:.1f} MB) remain"
+    )
 
 
 UV_URL = "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip"

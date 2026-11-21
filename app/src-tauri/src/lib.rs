@@ -3,7 +3,8 @@
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 
 use tauri::{Emitter, Manager, RunEvent};
 
@@ -15,13 +16,24 @@ struct BackendInfo {
 
 /// The running backend, or why it could not start (shown in the window).
 struct Backend {
-    info: Result<BackendInfo, String>,
-    child: Mutex<Option<Child>>,
+    ready: Arc<(Mutex<Option<Result<BackendInfo, String>>>, Condvar)>,
+    child: Arc<Mutex<Option<Child>>>,
+    stopping: Arc<AtomicBool>,
 }
 
 #[tauri::command]
-fn backend(state: tauri::State<Backend>) -> Result<BackendInfo, String> {
-    state.info.clone()
+async fn backend(state: tauri::State<'_, Backend>) -> Result<BackendInfo, String> {
+    let ready = Arc::clone(&state.ready);
+    tauri::async_runtime::spawn_blocking(move || {
+        let (lock, cvar) = &*ready;
+        let mut guard = lock.lock().unwrap();
+        while guard.is_none() {
+            guard = cvar.wait(guard).unwrap();
+        }
+        guard.as_ref().unwrap().clone()
+    })
+    .await
+    .map_err(|e| format!("等待 LitLoop 后台就绪失败：{e}"))?
 }
 
 /// The interpreter to start the backend with.
@@ -51,7 +63,13 @@ fn resolve_python() -> String {
 }
 
 /// Start `python -m litloop.desktop.server` and wait for the line that names its port.
-fn start_backend() -> (Result<BackendInfo, String>, Option<Child>) {
+fn start_backend(
+    child_slot: Arc<Mutex<Option<Child>>>,
+    stopping: Arc<AtomicBool>,
+) -> Result<BackendInfo, String> {
+    if stopping.load(Ordering::Acquire) {
+        return Err("LitLoop 正在退出".into());
+    }
     let python = resolve_python();
     let token = uuid::Uuid::new_v4().simple().to_string();
     let mut cmd = Command::new(&python);
@@ -66,34 +84,61 @@ fn start_backend() -> (Result<BackendInfo, String>, Option<Child>) {
     }
     let mut child = match cmd.spawn() {
         Ok(c) => c,
-        Err(e) => return (Err(format!("无法启动 LitLoop 后台（{python}）：{e}")), None),
+        Err(e) => return Err(format!("无法启动 LitLoop 后台（{python}）：{e}")),
     };
-    let mut lines = BufReader::new(child.stdout.take().expect("piped stdout")).lines();
+    let stdout = child.stdout.take().expect("piped stdout");
+    {
+        let mut guard = child_slot.lock().unwrap();
+        if stopping.load(Ordering::Acquire) {
+            let _ = child.kill();
+            return Err("LitLoop 正在退出".into());
+        }
+        *guard = Some(child);
+    }
+    let mut lines = BufReader::new(stdout).lines();
     let first = lines.next();
     // Keep reading (and dropping) whatever else it prints, so its stdout never fills up or breaks.
     std::thread::spawn(move || for _ in lines {});
+    if stopping.load(Ordering::Acquire) {
+        if let Some(mut c) = child_slot.lock().unwrap().take() {
+            let _ = c.kill();
+        }
+        return Err("LitLoop 正在退出".into());
+    }
     let port = first
         .and_then(|l| l.ok())
         .and_then(|l| serde_json::from_str::<serde_json::Value>(&l).ok())
         .and_then(|v| v.get("port").and_then(|p| p.as_u64()))
         .and_then(|p| u16::try_from(p).ok());
     match port {
-        Some(port) => (Ok(BackendInfo { port, token }), Some(child)),
+        Some(port) => Ok(BackendInfo { port, token }),
         None => {
-            let _ = child.kill();
-            (
-                Err(format!(
-                    "LitLoop 后台（{python}）没有报告端口；请确认已安装 LitLoop，或用 LITLOOP_PYTHON 指定 Python"
-                )),
-                None,
-            )
+            if let Some(mut c) = child_slot.lock().unwrap().take() {
+                let _ = c.kill();
+            }
+            Err(format!(
+                "LitLoop 后台（{python}）没有报告端口；请确认已安装 LitLoop，或用 LITLOOP_PYTHON 指定 Python"
+            ))
         }
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let (info, child) = start_backend();
+    let ready = Arc::new((Mutex::new(None), Condvar::new()));
+    let child = Arc::new(Mutex::new(None));
+    let stopping = Arc::new(AtomicBool::new(false));
+
+    let ready_bg = Arc::clone(&ready);
+    let child_bg = Arc::clone(&child);
+    let stopping_bg = Arc::clone(&stopping);
+    std::thread::spawn(move || {
+        let result = start_backend(child_bg, stopping_bg);
+        let (lock, cvar) = &*ready_bg;
+        *lock.lock().unwrap() = Some(result);
+        cvar.notify_all();
+    });
+
     let app = tauri::Builder::default()
         // Registered first: a link clicked while LitLoop is open must reach the
         // running window instead of starting a second copy.
@@ -111,15 +156,18 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
         .manage(Backend {
-            info,
-            child: Mutex::new(child),
+            ready,
+            child,
+            stopping,
         })
         .invoke_handler(tauri::generate_handler![backend])
         .build(tauri::generate_context!())
         .expect("error while building the LitLoop app");
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
-            if let Some(mut child) = handle.state::<Backend>().child.lock().unwrap().take() {
+            let backend = handle.state::<Backend>();
+            backend.stopping.store(true, Ordering::Release);
+            if let Some(mut child) = backend.child.lock().unwrap().take() {
                 let _ = child.kill();
             }
         }

@@ -64,6 +64,26 @@ __all__ = [
     "get_config_safe",
 ]
 
-from .sources import batch_download
-from .search.quick import search_papers
 from .config import load_config, update_config, get_config_safe
+
+_LAZY_IMPORTS = {
+    "batch_download": (".sources", "batch_download"),
+    "search_papers": (".search.quick", "search_papers"),
+}
+
+
+def __getattr__(name: str):
+    target = _LAZY_IMPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr_name = target
+    from importlib import import_module
+
+    module = import_module(module_name, __name__)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))
