@@ -242,7 +242,7 @@ def start_queue(job: str, publisher: str) -> dict[str, Any]:
     dois = [it["doi"] for it in get(job)["items"]
             if it["status"] == "queued" and (it.get("publisher") or OTHER_PUBLISHER) == publisher]
     if not dois:
-        raise ValueError("无法开始：这个队列里没有待下载的文献")
+        raise ValueError("无法开始：此队列里没有待下载的文献")
     if not _RUN_LOCK.acquire(blocking=False):
         raise Busy("another download is still running")
     try:

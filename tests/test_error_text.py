@@ -48,10 +48,43 @@ def test_app_server_adds_error_text_and_keeps_raw():
     from litloop.desktop import server as app_server
     item = {"error": "NOT_ENTITLED"}
     app_server._explain(item)
-    assert item == {"error": "NOT_ENTITLED", "error_text": "学校未订阅此期刊，或当前不在校园网"}
+    assert item == {
+        "error": "NOT_ENTITLED",
+        "error_text": "学校未订阅此期刊，或当前不在校园网",
+        "error_hint": "连接校园网或在「设置 → 学校认证」中登录后重试",
+        "error_action": {"kind": "settings", "group": "school", "label": "去学校认证"},
+    }
     job = {"error": "zotero-mcp bridge timed out"}
     app_server._explain(job, "推送", full=True)
     assert job["error_text"] == "无法推送：Zotero 没有响应。确认 Zotero 已启动后重试。"
+    assert "error_hint" not in job
+    assert job["error_action"] == {"kind": "settings", "group": "zotero", "label": "去 Zotero 设置"}
     clean = {"error": None}
     app_server._explain(clean)
     assert "error_text" not in clean
+
+
+@pytest.mark.parametrize("raw, want_hint, want_action", [
+    ("NOT_ENTITLED", "连接校园网或在「设置 → 学校认证」中登录后重试",
+     {"kind": "settings", "group": "school", "label": "去学校认证"}),
+    ("ReadTimeout(HTTPSConnectionPool(...))", "检查网络后重试",
+     {"kind": "settings", "group": "network", "label": "检查网络设置"}),
+    ("OpenAlex daily budget used up", "等待 UTC 零点重置，或在「设置 → 检索接口」中填写免费 Key",
+     {"kind": "settings", "group": "sources", "label": "去检索接口"}),
+    ("PDF file not found on disk", "检查保存位置是否可写入",
+     {"kind": "settings", "group": "downloads", "label": "去下载设置"}),
+    ("browser not available", "确认已安装 Chrome 后重试",
+     {"kind": "settings", "group": "components", "label": "去可选组件"}),
+    ("zotero-mcp not found", "在「设置 → Zotero」中填写它的 Python 路径",
+     {"kind": "settings", "group": "zotero", "label": "去 Zotero 设置"}),
+    ("Attachment `ABCD1234` exists but holds no file", "在「附件检查」中重新附加",
+     {"kind": "zotero", "view": "check", "label": "前往附件检查"}),
+    ("HTTP 429 Too Many Requests", "稍后重试",
+     {"kind": "retry", "label": "重试此篇"}),
+    ("no result", None, None),
+    ("something nobody expected", None, None),
+])
+def test_next_step_and_action_for(raw, want_hint, want_action):
+    assert error_text.next_step(raw) == want_hint
+    assert error_text.action_for(raw) == want_action
+    assert error_text.next_step(None) is None and error_text.action_for(None) is None

@@ -179,6 +179,13 @@ def _explain(d: dict[str, Any] | None, action: str = "下载", full: bool = Fals
     from . import error_text
     if d and d.get("error"):
         d["error_text"] = error_text.message(d["error"], action) if full else error_text.reason(d["error"])
+        if not full:
+            hint = error_text.next_step(d["error"])
+            if hint:
+                d["error_hint"] = hint
+        act = error_text.action_for(d["error"])
+        if act:
+            d["error_action"] = act
 
 
 def _fail(status: int, raw: str | None, action: str, fallback: str) -> HTTPException:
@@ -526,7 +533,7 @@ def create_app(token: str) -> FastAPI:
         try:
             return app_settings.update(body.key, body.value)
         except KeyError as exc:
-            raise HTTPException(400, "无法保存：此项不能在 app 中修改") from exc
+            raise HTTPException(400, "无法保存：此项暂不支持在 app 中修改") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 

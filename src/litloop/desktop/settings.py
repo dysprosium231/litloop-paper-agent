@@ -149,7 +149,7 @@ _FIELDS = {f["key"]: f for g in GROUPS for f in g["fields"]}
 # with why it matters. Every step can be checked on the spot or skipped.
 STEPS = [
     {"group": "sources", "intro": "检索和补摘要靠这些接口。什么都不填也能先试一次快速检索（退回 Crossref）；"
-                                  "要长期用，OpenAlex Key 免费，在 help.openalex.org 申请——不填时用的是同一个网络出口共享的匿名额度，"
+                                  "要长期用，OpenAlex Key 免费，在 help.openalex.org 申请；不填时用的是同一个网络出口共享的匿名额度，"
                                   "别人用完了就会被限流。"
                                   "Elsevier Key 用于 ScienceDirect 全文和 Scopus 摘要，对深度检索影响很大。"
                                   "联系邮箱只发给 Crossref、OpenAlex、Unpaywall，它们要求填写。"},
@@ -515,7 +515,7 @@ def test_components() -> list[dict[str, Any]]:
     out.append(_result("WebVPN 加密", True, "已安装") if deps.check_dependency("Crypto")
                else _result("WebVPN 加密", False, "未安装 pycryptodome：WebVPN 不可用。运行 pip install pycryptodome"))
     out.append(_result("SOCKS 代理", True, "已安装") if deps.check_dependency("socks")
-               else _result("SOCKS 代理", None, "未安装：不能使用 SOCKS 代理和 Tor。运行 pip install \"requests[socks]\""))
+               else _result("SOCKS 代理", None, "未安装：暂无法使用 SOCKS 代理和 Tor。运行 pip install \"requests[socks]\""))
     out.append(_result("Tor", True, "已安装") if embedded_tor.is_tor_installed(cfg)
                else _result("Tor", None, "未安装：只在经 Tor 访问 Sci-Hub、LibGen 时需要"))
     from .. import optional

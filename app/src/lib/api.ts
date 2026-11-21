@@ -95,6 +95,13 @@ export interface SessionListEntry {
   deep: boolean
 }
 
+export interface ErrorAction {
+  kind: "settings" | "zotero" | "retry"
+  label: string
+  group?: string
+  view?: "queue" | "check" | "history"
+}
+
 export interface Progress {
   schema?: number
   session?: string
@@ -109,6 +116,8 @@ export interface Progress {
   stopped_phase?: string | null
   error?: string | null
   error_text?: string | null
+  error_hint?: string | null
+  error_action?: ErrorAction | null
 }
 
 /** The latest deep-search round from any process (system notifications). */
@@ -363,9 +372,18 @@ export interface DownloadItem {
   error?: string | null
   /** Shown in the app (docs/UI_COPY.md section 7); the raw error goes in the tooltip. */
   error_text?: string | null
+  error_hint?: string | null
+  error_action?: ErrorAction | null
   /** The ways it was tried (quick API misses left out), see docs/APP_DATA.md. */
   attempts?: DownloadStep[] | null
-  zotero?: { status: "pushing" | "added" | "reused" | "no_pdf" | "failed"; key?: string | null; error?: string | null; error_text?: string | null } | null
+  zotero?: {
+    status: "pushing" | "added" | "reused" | "no_pdf" | "failed"
+    key?: string | null
+    error?: string | null
+    error_text?: string | null
+    error_hint?: string | null
+    error_action?: ErrorAction | null
+  } | null
 }
 
 export interface DownloadStep {
@@ -399,8 +417,17 @@ export interface DownloadJob extends Omit<DownloadJobEntry, "total" | "done" | "
   error?: string | null
   /** Shown in the app (docs/UI_COPY.md section 7); the raw error goes in the tooltip. */
   error_text?: string | null
+  error_hint?: string | null
+  error_action?: ErrorAction | null
   items: DownloadItem[]
-  zotero?: { state: "running" | "done" | "failed" | "interrupted"; collection: string; error?: string | null; error_text?: string | null } | null
+  zotero?: {
+    state: "running" | "done" | "failed" | "interrupted"
+    collection: string
+    error?: string | null
+    error_text?: string | null
+    error_hint?: string | null
+    error_action?: ErrorAction | null
+  } | null
   /** Where a push goes unless another collection is chosen. */
   zotero_default: string
   /** A long list's papers left for the user, one queue per publisher, the largest first. */

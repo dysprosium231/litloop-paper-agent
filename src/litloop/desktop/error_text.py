@@ -14,60 +14,69 @@ from __future__ import annotations
 
 import re
 
-# (pattern, reason, next step). Matched in order against the raw text,
+# (pattern, reason, next step, optional action). Matched in order against the raw text,
 # case-insensitively; the first hit wins. Keep the most specific first.
-_RULES: list[tuple[str, str, str]] = [
-    (r"\bcancel", "已取消", ""),
-    (r"DOI is not registered", "这个 DOI 不存在", "检查 DOI 是否抄错"),
-    (r"skipped by user", "已跳过", "可在任务结束后重试未完成项"),
+_ACT_SCHOOL = {"kind": "settings", "group": "school", "label": "去学校认证"}
+_ACT_NETWORK = {"kind": "settings", "group": "network", "label": "检查网络设置"}
+_ACT_SOURCES = {"kind": "settings", "group": "sources", "label": "去检索接口"}
+_ACT_DOWNLOADS = {"kind": "settings", "group": "downloads", "label": "去下载设置"}
+_ACT_COMPONENTS = {"kind": "settings", "group": "components", "label": "去可选组件"}
+_ACT_ZOTERO_CFG = {"kind": "settings", "group": "zotero", "label": "去 Zotero 设置"}
+_ACT_ZOTERO_CHECK = {"kind": "zotero", "view": "check", "label": "前往附件检查"}
+_ACT_RETRY = {"kind": "retry", "label": "重试此篇"}
+
+_RULES: list[tuple[str, str, str, dict[str, str] | None]] = [
+    (r"\bcancel", "已取消", "", None),
+    (r"DOI is not registered", "此 DOI 不存在", "检查 DOI 是否抄错", None),
+    (r"skipped by user", "已跳过", "可在任务结束后重试未完成项", _ACT_RETRY),
     (r"the school does not subscribe", "学校没有订阅：已用学校身份登录出版商网站，仍没有全文",
-     "学校认证最终也到同一出版商，已跳过。可通过图书馆文献传递获取"),
-    (r"NOT_ENTITLED", "学校未订阅此期刊，或当前不在校园网", "连接校园网或在「设置 → 学校认证」中登录后重试"),
+     "学校认证最终也到同一出版商，已跳过。可通过图书馆文献传递获取", None),
+    (r"NOT_ENTITLED", "学校未订阅此期刊，或当前不在校园网", "连接校园网或在「设置 → 学校认证」中登录后重试", _ACT_SCHOOL),
     (r"No valid session|session (expired|invalid)|login required|需要机构登录",
-     "学校认证已过期或未登录", "在「设置 → 学校认证」中重新登录"),
-    (r"Login failed or timed out", "登录超时", "确认已安装 Chrome 后重试"),
-    (r"WebVPN not configured|No WebVPN URL", "未设置 WebVPN", "在「设置 → 学校认证」中填写学校代号"),
-    (r"zotero-mcp is too old", "zotero-mcp 版本过旧", "更新 zotero-mcp 后重试"),
-    (r"zotero-mcp not (found|installed)|cannot start zotero-mcp", "未找到 zotero-mcp", "在「设置 → Zotero」中填写它的 Python 路径"),
-    (r"\bdenied\b|not authori[sz]ed by the user", "Zotero 未允许本地写入", "重新授权，并在 Zotero 弹出的窗口中选择允许"),
+     "学校认证已过期或未登录", "在「设置 → 学校认证」中重新登录", _ACT_SCHOOL),
+    (r"Login failed or timed out", "登录超时", "确认已安装 Chrome 后重试", _ACT_COMPONENTS),
+    (r"WebVPN not configured|No WebVPN URL", "未设置 WebVPN", "在「设置 → 学校认证」中填写学校代号", _ACT_SCHOOL),
+    (r"zotero-mcp is too old", "zotero-mcp 版本过旧", "更新 zotero-mcp 后重试", _ACT_ZOTERO_CFG),
+    (r"zotero-mcp not (found|installed)|cannot start zotero-mcp", "未找到 zotero-mcp", "在「设置 → Zotero」中填写它的 Python 路径", _ACT_ZOTERO_CFG),
+    (r"\bdenied\b|not authori[sz]ed by the user", "Zotero 未允许本地写入", "重新授权，并在 Zotero 弹出的窗口中选择允许", _ACT_ZOTERO_CFG),
     (r"bridge timed out|Zotero is not reachable|Connection refused.*23119|23119.*(refused|timed out)",
-     "Zotero 没有响应", "确认 Zotero 已启动后重试"),
-    (r"no local PDF", "本机没有此文献的 PDF", "先下载此文献"),
+     "Zotero 没有响应", "确认 Zotero 已启动后重试", _ACT_ZOTERO_CFG),
+    (r"no local PDF", "本机没有此文献的 PDF", "先下载此文献", None),
     (r"cannot create the collection|empty collection path|Failed to create collection",
-     "无法创建分类", "检查分类路径后重试"),
-    (r"holds no file|exists but holds no file", "Zotero 里的附件为空", "在「附件检查」中重新附加"),
-    (r"school login not completed", "学校认证的登录没有完成", "重试，并在弹出的窗口中完成登录"),
-    (r"Cloudflare|anti-bot|human check", "网站要求人机验证，没有通过", "重试，并在弹出的窗口中完成验证"),
-    (r"could not open the publisher page|site unreachable|\bERR_[A-Z_]+", "打不开出版商网页", "检查网络或代理后重试"),
-    (r"browser not available", "浏览器无法启动", "确认已安装 Chrome 后重试"),
-    (r"no PDF link", "出版商网页上没有 PDF 链接，可能没有权限", "连接校园网或在「设置 → 学校认证」中登录后重试"),
-    (r"already being downloaded|\bin progress\b", "此文献正在另一个下载任务中下载", "等待那个任务完成"),
-    (r"full_text_extracted_but_no_pdf", "只取得网页全文，没有 PDF", ""),
-    (r"PDF file not found on disk", "下载后找不到 PDF 文件", "检查保存位置是否可写入"),
-    (r"PDF not found after batch download", "所有来源都没有找到 PDF", ""),
-    (r"arXiv PDF not available", "arXiv 上没有这篇的 PDF", ""),
-    (r"no OA url|fast lane failed", "未找到开放获取版本", ""),
-    (r"OpenAlex daily budget used up", "OpenAlex 今日积分已用完", "等待 UTC 零点重置，或在「设置 → 检索接口」中填写免费 Key"),
-    (r"OpenAlex request failed|OpenAlex HTTP \d+", "OpenAlex 暂时没有响应", "检查网络后重试"),
-    (r"\b429\b|rate.?limit|too many requests", "请求过于频繁，已被限流", "稍后重试"),
-    (r"\b40[13]\b|forbidden|unauthori[sz]ed", "出版商拒绝访问，可能需要学校认证", "连接校园网或在「设置 → 学校认证」中登录后重试"),
-    (r"\b404\b|not found", "出版商处找不到此文献", ""),
-    (r"timed? ?out|timeout", "连接超时", "检查网络后重试"),
-    (r"Unpaywall.*email|email.*Unpaywall", "Unpaywall 需要你的真实邮箱", "在「设置 → 检索接口」中填写联系邮箱"),
-    (r"\bpaywall\b", "需要订阅才能下载", "连接校园网或在「设置 → 学校认证」中登录后重试"),
-    (r"download exception|missing result|^invalid$", "下载过程出错", "详情已写入日志，可重试"),
-    (r"^no result$|all sources failed|no source|no PDF found", "所有来源都没有找到 PDF", ""),
-    (r"unrecognized identifier|invalid DOI", "无法识别的 DOI", "检查 DOI 是否完整"),
+     "无法创建分类", "检查分类路径后重试", None),
+    (r"holds no file|exists but holds no file", "Zotero 里的附件为空", "在「附件检查」中重新附加", _ACT_ZOTERO_CHECK),
+    (r"school login not completed", "学校认证的登录没有完成", "重试，并在弹出的窗口中完成登录", _ACT_RETRY),
+    (r"Cloudflare|anti-bot|human check", "网站要求人机验证，没有通过", "重试，并在弹出的窗口中完成验证", _ACT_RETRY),
+    (r"could not open the publisher page|site unreachable|\bERR_[A-Z_]+", "打不开出版商网页", "检查网络或代理后重试", _ACT_NETWORK),
+    (r"browser not available", "浏览器无法启动", "确认已安装 Chrome 后重试", _ACT_COMPONENTS),
+    (r"no PDF link", "出版商网页上没有 PDF 链接，可能没有权限", "连接校园网或在「设置 → 学校认证」中登录后重试", _ACT_SCHOOL),
+    (r"already being downloaded|\bin progress\b", "此文献正在另一个下载任务中下载", "等待那个任务完成", None),
+    (r"full_text_extracted_but_no_pdf", "只取得网页全文，没有 PDF", "", None),
+    (r"PDF file not found on disk", "下载后找不到 PDF 文件", "检查保存位置是否可写入", _ACT_DOWNLOADS),
+    (r"PDF not found after batch download", "所有来源都没有找到 PDF", "", None),
+    (r"arXiv PDF not available", "arXiv 上没有此文献的 PDF", "", None),
+    (r"no OA url|fast lane failed", "未找到开放获取版本", "", None),
+    (r"OpenAlex daily budget used up", "OpenAlex 今日积分已用完", "等待 UTC 零点重置，或在「设置 → 检索接口」中填写免费 Key", _ACT_SOURCES),
+    (r"OpenAlex request failed|OpenAlex HTTP \d+", "OpenAlex 暂时没有响应", "检查网络后重试", _ACT_NETWORK),
+    (r"\b429\b|rate.?limit|too many requests", "请求过于频繁，已被限流", "稍后重试", _ACT_RETRY),
+    (r"\b40[13]\b|forbidden|unauthori[sz]ed", "出版商拒绝访问，可能需要学校认证", "连接校园网或在「设置 → 学校认证」中登录后重试", _ACT_SCHOOL),
+    (r"\b404\b|not found", "出版商处找不到此文献", "", None),
+    (r"timed? ?out|timeout", "连接超时", "检查网络后重试", _ACT_NETWORK),
+    (r"Unpaywall.*email|email.*Unpaywall", "Unpaywall 需要你的真实邮箱", "在「设置 → 检索接口」中填写联系邮箱", _ACT_SOURCES),
+    (r"\bpaywall\b", "需要订阅才能下载", "连接校园网或在「设置 → 学校认证」中登录后重试", _ACT_SCHOOL),
+    (r"download exception|missing result|^invalid$", "下载过程出错", "详情已写入日志，可重试", _ACT_RETRY),
+    (r"^no result$|all sources failed|no source|no PDF found", "所有来源都没有找到 PDF", "", None),
+    (r"unrecognized identifier|invalid DOI", "无法识别的 DOI", "检查 DOI 是否完整", None),
 ]
 
-_COMPILED = [(re.compile(p, re.I), r, n) for p, r, n in _RULES]
+_COMPILED = [(re.compile(p, re.I), r, n, a) for p, r, n, a in _RULES]
 _EXCEPTION = re.compile(r"^[A-Z][A-Za-z]+(Error|Exception)\b")
 
 
-def _match(raw: str) -> tuple[str, str] | None:
-    for rx, reason_text, step in _COMPILED:
+def _match(raw: str) -> tuple[str, str, dict[str, str] | None] | None:
+    for rx, reason_text, step, action in _COMPILED:
         if rx.search(raw):
-            return reason_text, step
+            return reason_text, step, action
     return None
 
 
@@ -145,6 +154,26 @@ def reason(raw: str | None) -> str | None:
     return hit[0] if hit else "出现意外错误"  # docs/UI_COPY.md 7: the raw text goes in the tooltip
 
 
+def next_step(raw: str | None) -> str | None:
+    """Actionable hint text for a known error, without repeating the reason."""
+    if not raw:
+        return None
+    hit = _match(str(raw))
+    if not hit or not hit[1]:
+        return None
+    return hit[1]
+
+
+def action_for(raw: str | None) -> dict[str, str] | None:
+    """Structured UI navigation/retry action for a known error, or None."""
+    if not raw:
+        return None
+    hit = _match(str(raw))
+    if not hit or hit[2] is None:
+        return None
+    return dict(hit[2])
+
+
 def message(raw: str | None, action: str) -> str | None:
     """Full sentence: '无法<action>：<reason>。<next step>。' (or the generic one)."""
     if not raw:
@@ -155,7 +184,9 @@ def message(raw: str | None, action: str) -> str | None:
         if _EXCEPTION.match(raw):
             return f"抱歉，{action}时出现意外错误。详情已写入日志。"
         return f"无法{action}：出现意外错误"
-    reason_text, step = hit
+    reason_text, step, _ = hit
     if reason_text == "已取消":
         return "已取消"
-    return f"无法{action}：{reason_text}。" + (f"{step}。" if step else "")
+    if step:
+        return f"无法{action}：{reason_text}。{step}。"
+    return f"无法{action}：{reason_text}。"

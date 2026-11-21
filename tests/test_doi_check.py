@@ -61,4 +61,4 @@ def test_download_of_an_unregistered_doi_stops_before_the_sources(monkeypatch, t
     monkeypatch.setattr(sources, "_download_impl", lambda *a, **k: pytest.fail("sources were asked"))
     r = sources.download("10.1016/j.typo.2020.1", tmp_path)
     assert not r["success"] and r["error_type"] == "doi_not_found"
-    assert error_text.reason(r.get("error") or r.get("reason")) == "这个 DOI 不存在"
+    assert error_text.reason(r.get("error") or r.get("reason")) == "此 DOI 不存在"

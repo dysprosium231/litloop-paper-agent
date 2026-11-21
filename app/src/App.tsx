@@ -33,6 +33,7 @@ import {
   rating,
   RELEVANCE,
   type BatchOp,
+  type ErrorAction,
   type Item,
   type Progress,
   type Relevance,
@@ -238,6 +239,15 @@ export default function App() {
   const zotero = useZotero(section === "zotero")
   const [zoteroView, setZoteroView] = React.useState<ZoteroView>("queue")
   const openJob = (job: string) => { setSection("download"); setDownloadView(job) }
+  const handleErrorAction = React.useCallback((action: ErrorAction) => {
+    if (action.kind === "settings" && action.group) {
+      setSettingsGroup(action.group)
+      setSection("settings")
+    } else if (action.kind === "zotero" && action.view) {
+      setZoteroView(action.view)
+      setSection("zotero")
+    }
+  }, [])
   React.useEffect(() => {
     if (section === "settings") settingsApi.list().then(setGroups).catch((e) => setError(errorMessage(e)))
   }, [section])
@@ -636,7 +646,7 @@ export default function App() {
                   onChanged={downloads.refresh} />
               : <JobPane key={downloadView} id={downloadView} live={downloads.live} busy={Boolean(downloads.running)}
                   onChanged={downloads.refresh} onStarted={startedJob}
-                  onBack={() => setDownloadView(OVERVIEW)} />
+                  onBack={() => setDownloadView(OVERVIEW)} onErrorAction={handleErrorAction} />
           ) : section === "settings" ? (
             <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup} onGuide={openGuide}
               onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
@@ -708,7 +718,7 @@ export default function App() {
               </Button>
             </div>
           </header>
-          <ProgressStrip progress={progress} summary={summary} resumable={resumable} onContinue={continueSearch} onResume={resumeSearch} />
+          <ProgressStrip progress={progress} summary={summary} resumable={resumable} onContinue={continueSearch} onResume={resumeSearch} onErrorAction={handleErrorAction} />
           {notice && (
             <div
               onMouseEnter={() => { noticeHoverRef.current = true }}

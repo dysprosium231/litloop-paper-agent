@@ -1,5 +1,17 @@
 # 决定与实验记录
 
+## 2026-11-21：错误提示补「下一步」与界面提示文案规范化
+
+- 背景：`TODO.md`「工程债 → 错误提示补『下一步』」指出下载或推送失败后界面只显示原因短语，缺少直接可点的下一步动作按钮；同时按 [docs/UI_COPY.md](docs/UI_COPY.md) 对全量前后端提示文案做了一次通读自查。
+- 改动：
+  1. **后端下一步提示与结构化动作**：在 [src/litloop/desktop/error_text.py](src/litloop/desktop/error_text.py) 新增 `next_step()` 与 `action_for()`，覆盖学校认证、网络设置、检索接口、下载设置、可选组件、Zotero 设置、Zotero 附件检查及单篇重试等映射；在 [src/litloop/desktop/server.py](src/litloop/desktop/server.py) 的 `_explain()` 同步注入 `error_hint`（非 `full` 时）与 `error_action`。
+  2. **前端可点击「下一步」接入**：在 [app/src/lib/api.ts](app/src/lib/api.ts) 新增 `ErrorAction`，在 [app/src/App.tsx](app/src/App.tsx) 提供统一跳转处理，在 [app/src/components/downloads-view.tsx](app/src/components/downloads-view.tsx)（单篇失败行、任务错误、Zotero 推送错误及「重试此篇」）和 [app/src/components/progress-strip.tsx](app/src/components/progress-strip.tsx) 渲染对应跳转/重试按钮。
+  3. **全量提示文案规范化**：对照 [docs/UI_COPY.md](docs/UI_COPY.md) 修正 6 处既有文案（[settings.py](src/litloop/desktop/settings.py) 去掉 `——` 与「不能」、[server.py](src/litloop/desktop/server.py) 去掉「不能」、[downloads-view.tsx](app/src/components/downloads-view.tsx) 将「推送中/排队中」改为「正在推送/等待下载」、[error_text.py](src/litloop/desktop/error_text.py) 与 [download_jobs.py](src/litloop/desktop/download_jobs.py) 统一用「此」替代「这个/这篇」），并将 `error_text.py` 纳入 `app/package.json` 的 `lint:copy`。同步更新 [tests/test_error_text.py](tests/test_error_text.py) 与 [tests/test_doi_check.py](tests/test_doi_check.py)，并在 [TODO.md](TODO.md) 标 `[x]`。
+- 验证：
+  - 相关测试（`tests/test_error_text.py`、`tests/test_app_server.py`、`tests/test_app_types.py`、`tests/test_download_jobs.py`）：`95 passed`；`tests/test_doi_check.py`：`5 passed`。
+  - 前端 `app/` 下 `npm run build` 与 `npm run lint:copy`：通过，`No issues found.`。
+  - 全量 `pytest -q`：`1255 passed, 3 skipped`（249.73s）。
+
 ## 2026-11-21：数据层迁移 SQLite（三阶段完成）
 
 - 背景：`TODO.md`「工程债 → 数据层换 SQLite」指出筛选会话、1600–3400 篇候选池、决策与追踪使用 JSON + 文件锁整份读写，随会话增大变慢且缺乏结构迁移机制。

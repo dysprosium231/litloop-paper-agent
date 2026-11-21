@@ -2,7 +2,7 @@ import * as React from "react"
 import { TriangleAlertIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import type { Progress, Summary } from "@/lib/api"
+import type { ErrorAction, Progress, Summary } from "@/lib/api"
 import { cn, duration } from "@/lib/utils"
 
 const PHASES: [string, string][] = [
@@ -76,12 +76,13 @@ function Pop({ label, aria, className, children }: {
 }
 
 /** What the running round is doing, or a one-line overview when nothing runs. */
-export function ProgressStrip({ progress, summary, resumable, onContinue, onResume }: {
+export function ProgressStrip({ progress, summary, resumable, onContinue, onResume, onErrorAction }: {
   progress: Progress | null
   summary: Summary | null
   resumable?: boolean
   onContinue: () => void
   onResume?: () => void
+  onErrorAction?: (action: ErrorAction) => void
 }) {
   const running = progress?.state === "running"
   if (!running) {
@@ -105,9 +106,17 @@ export function ProgressStrip({ progress, summary, resumable, onContinue, onResu
           </span>
         )}
         {failed && (
-          <span className="max-w-md truncate rounded bg-destructive/10 px-2 py-0.5 text-xs text-destructive"
-            title={progress?.error ?? undefined}>
-            {progress?.error_text || "无法继续检索：上一轮未完成"}
+          <span className="flex items-center gap-2">
+            <span className="max-w-md truncate rounded bg-destructive/10 px-2 py-0.5 text-xs text-destructive"
+              title={progress?.error ?? undefined}>
+              {progress?.error_text || "无法继续检索：上一轮未完成"}
+            </span>
+            {progress?.error_action && progress.error_action.kind !== "retry" && onErrorAction && (
+              <Button size="sm" variant="outline" className="h-6 px-2 text-xs"
+                onClick={() => onErrorAction(progress.error_action!)}>
+                {progress.error_action.label}
+              </Button>
+            )}
           </span>
         )}
         <span className="ml-auto flex shrink-0 items-center gap-2">

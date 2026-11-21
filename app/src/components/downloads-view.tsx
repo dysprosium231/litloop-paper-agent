@@ -11,6 +11,7 @@ import {
   type DownloadJob,
   type DownloadJobEntry,
   type DownloadStep,
+  type ErrorAction,
   type JobState,
   type LiveDownload,
   type PastedList,
@@ -360,11 +361,13 @@ export function DownloadsOverview({ jobs, pending, outputDir, external, busy, ru
 }
 
 const ZOTERO: Record<NonNullable<DownloadItem["zotero"]>["status"], string> = {
-  pushing: "Zotero：推送中", added: "Zotero：已添加", reused: "Zotero：已存在", no_pdf: "Zotero：附件缺失", failed: "Zotero：推送失败",
+  pushing: "Zotero：正在推送", added: "Zotero：已添加", reused: "Zotero：已存在", no_pdf: "Zotero：附件缺失", failed: "Zotero：推送失败",
 }
 
 /** Push the job's downloaded papers to a Zotero collection (an existing one or a new path). */
-function ZoteroPanel({ job, onPushed }: { job: DownloadJob; onPushed: () => void }) {
+function ZoteroPanel({ job, onPushed, onErrorAction }: {
+  job: DownloadJob; onPushed: () => void; onErrorAction?: (action: ErrorAction) => void
+}) {
   const [open, setOpen] = React.useState(false)
   const [target, setTarget] = React.useState(job.zotero_default)
   const [collections, setCollections] = React.useState<ZoteroCollection[] | null>(null)
@@ -392,7 +395,17 @@ function ZoteroPanel({ job, onPushed }: { job: DownloadJob; onPushed: () => void
         </span>
         {waiting > 0 && !open && <Button size="sm" variant="outline" onClick={show}>推送到 Zotero</Button>}
       </div>
-      {(z?.state === "failed" || z?.state === "interrupted") && z.error && <p className="text-sm text-destructive" title={z.error}>{z.error_text ?? z.error}</p>}
+      {(z?.state === "failed" || z?.state === "interrupted") && z.error && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-destructive">
+          <span title={z.error}>{z.error_text ?? z.error}</span>
+          {z.error_action && z.error_action.kind !== "retry" && onErrorAction && (
+            <Button size="sm" variant="outline" className="h-6 px-2 text-xs text-foreground"
+              onClick={() => onErrorAction(z.error_action!)}>
+              {z.error_action.label}
+            </Button>
+          )}
+        </div>
+      )}
       {open && (
         <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); push() }}>
           <Input list="zotero-collections" value={target} onChange={(e) => setTarget(e.target.value)} aria-label="目标分类"
@@ -417,9 +430,9 @@ function StatusIcon({ item, running }: { item: DownloadItem; running: boolean })
 }
 
 /** One job: progress, what needs the user (captcha, sign-in), and every paper's result. */
-export function JobPane({ id, live, busy, onChanged, onStarted, onBack }: {
+export function JobPane({ id, live, busy, onChanged, onStarted, onBack, onErrorAction }: {
   id: string; live: LiveDownload | null; busy: boolean; onChanged: () => void; onStarted: (job: string) => void
-  onBack: () => void
+  onBack: () => void; onErrorAction?: (action: ErrorAction) => void
 }) {
   const [job, setJob] = React.useState<DownloadJob | null>(null)
   const [error, setError] = React.useState<string | null>(null)
@@ -504,10 +517,20 @@ export function JobPane({ id, live, busy, onChanged, onStarted, onBack }: {
             )}
           </div>
         ))}
-        {job.error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" title={job.error}>{job.error_text ?? job.error}</p>}
+        {job.error && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            <span className="min-w-0 flex-1" title={job.error}>{job.error_text ?? job.error}</span>
+            {job.error_action && job.error_action.kind !== "retry" && onErrorAction && (
+              <Button size="sm" variant="outline" className="h-7 shrink-0 px-2.5 text-xs text-foreground"
+                onClick={() => onErrorAction(job.error_action!)}>
+                {job.error_action.label}
+              </Button>
+            )}
+          </div>
+        )}
         {job.state === "interrupted" && <p className="text-sm text-muted-foreground">下载任务未完成时应用已退出，可重试未完成项。</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {done > 0 && <ZoteroPanel job={job} onPushed={onChanged} />}
+        {done > 0 && <ZoteroPanel job={job} onPushed={onChanged} onErrorAction={onErrorAction} />}
       </Card>
       {job.queues && job.queues.length > 0 && (
         <Card className="space-y-3 p-5">
@@ -552,13 +575,41 @@ export function JobPane({ id, live, busy, onChanged, onStarted, onBack }: {
                 </div>
               )}
               {it.status === "done" && it.note && <div className="mt-0.5 text-xs text-muted-foreground">{it.note}</div>}
-              {it.status === "failed" && it.error && <div className="mt-0.5 line-clamp-2 text-xs text-destructive/90" title={it.error}>{it.error_text ?? it.error}</div>}
+              {it.status === "failed" && it.error && (
+                <div className="mt-0.5 space-y-1">
+                  <div className="line-clamp-2 text-xs text-destructive/90" title={it.error}>{it.error_text ?? it.error}</div>
+                  {it.error_hint && <div className="text-xs text-muted-foreground">下一步：{it.error_hint}</div>}
+                  {((it.error_action && it.error_action.kind !== "retry" && onErrorAction) || !running) && (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      {it.error_action && it.error_action.kind !== "retry" && onErrorAction && (
+                        <Button size="sm" variant="outline" className="h-6 px-2 text-xs"
+                          onClick={() => onErrorAction(it.error_action!)}>
+                          {it.error_action.label}
+                        </Button>
+                      )}
+                      {!running && (
+                        <Button size="sm" variant="outline" className="h-6 px-2 text-xs" disabled={busy}
+                          title={busy ? "另一个下载任务完成后才能重试" : "重新下载此文献"}
+                          onClick={() => act(async () => onStarted((await downloadsApi.start([it], `重试 · ${it.title.slice(0, 24)}`, job.session ?? undefined)).job))}>
+                          重试此篇
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               {it.status === "failed" && it.attempts && it.attempts.length > 0 && <Attempts steps={it.attempts} />}
-              {it.status === "queued" && <div className="mt-0.5 text-xs text-muted-foreground">排队中 · {it.publisher || "其他出版商"}</div>}
+              {it.status === "queued" && <div className="mt-0.5 text-xs text-muted-foreground">等待下载 · {it.publisher || "其他出版商"}</div>}
               {it.zotero && (
-                <div className={cn("mt-0.5 text-xs", it.zotero.status === "failed" ? "text-destructive/90" : it.zotero.status === "no_pdf" ? "text-warning-foreground" : "text-muted-foreground")}
+                <div className={cn("mt-0.5 flex flex-wrap items-center gap-2 text-xs", it.zotero.status === "failed" ? "text-destructive/90" : it.zotero.status === "no_pdf" ? "text-warning-foreground" : "text-muted-foreground")}
                   title={it.zotero.error ?? undefined}>
-                  {ZOTERO[it.zotero.status]}{it.zotero.status === "failed" && it.zotero.error ? `：${it.zotero.error_text ?? it.zotero.error}` : ""}
+                  <span>{ZOTERO[it.zotero.status]}{it.zotero.status === "failed" && it.zotero.error ? `：${it.zotero.error_text ?? it.zotero.error}` : ""}</span>
+                  {it.zotero.error_action && it.zotero.error_action.kind !== "retry" && onErrorAction && (
+                    <Button size="sm" variant="outline" className="h-5 px-2 text-[11px] text-foreground"
+                      onClick={() => onErrorAction(it.zotero!.error_action!)}>
+                      {it.zotero.error_action.label}
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
