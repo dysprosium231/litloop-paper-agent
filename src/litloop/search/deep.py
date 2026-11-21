@@ -275,20 +275,25 @@ def _cites_refs_on_topic(ref_ids: list[str], core_terms: list[str], years: list[
     out: list[dict[str, Any]] = []
     asked: set[str] = set()
     _step(0, len(ref_ids))
-    while jobs:  # a query over the cap is split in halves; a few jobs at a time, budget permitting
-        if not _budget_ok(credits0):
-            break
-        wave, jobs = jobs[:WORKERS * 2], jobs[WORKERS * 2:]
-        again = []
-        for (term, chunk), (split, got) in zip(wave, _parallel(one, wave)):
-            if split:
-                half = len(chunk) // 2
-                again += [(term, chunk[:half]), (term, chunk[half:])]
-            else:
-                out += got
-                asked.update(chunk)
-        _step(len(asked))
-        jobs = again + jobs  # finish the halves of important references first
+    try:
+        while jobs:  # a query over the cap is split in halves; a few jobs at a time, budget permitting
+            if not _budget_ok(credits0):
+                break
+            wave, jobs = jobs[:WORKERS * 2], jobs[WORKERS * 2:]
+            again = []
+            for (term, chunk), (split, got) in zip(wave, _parallel(one, wave)):
+                if split:
+                    half = len(chunk) // 2
+                    again += [(term, chunk[:half]), (term, chunk[half:])]
+                else:
+                    out += got
+                    asked.update(chunk)
+            _step(len(asked))
+            jobs = again + jobs  # finish the halves of important references first
+    except BaseException as exc:
+        if out or asked:
+            exc._partial_expand = (out, asked)  # type: ignore[attr-defined]
+        raise
     return out, asked
 
 
@@ -639,17 +644,31 @@ def _expand(state: dict[str, Any], new_seed_keys: list[str]) -> int:
     before = len(pool)
     asked: set[str] = set()
     _phase("expand", len(new_refs))
-    if new_refs:
-        for rec in _by_filter("openalex", new_refs, years):
-            _add(pool, rec, "seed_reference")
-        got, asked = _cites_refs_on_topic(new_refs, state["core_terms"], years, credits0=credits0,
-                                          glossary_alts=state.get("glossary_alts"))
-        for rec in got:
-            _add(pool, rec, "cites_seed_references")
-    seed_ids = [s["openalex"] for s in seeds if s.get("openalex")]
-    if seed_ids and _budget_ok(credits0):
-        for rec in _citing(seed_ids, years):
-            _add(pool, rec, "cites_seed")
+    try:
+        if new_refs:
+            for rec in _by_filter("openalex", new_refs, years):
+                _add(pool, rec, "seed_reference")
+            got, asked = _cites_refs_on_topic(new_refs, state["core_terms"], years, credits0=credits0,
+                                              glossary_alts=state.get("glossary_alts"))
+            for rec in got:
+                _add(pool, rec, "cites_seed_references")
+        seed_ids = [s["openalex"] for s in seeds if s.get("openalex")]
+        if seed_ids and _budget_ok(credits0):
+            for rec in _citing(seed_ids, years):
+                _add(pool, rec, "cites_seed")
+    except BaseException as exc:
+        partial = getattr(exc, "_partial_expand", None)
+        if partial:
+            partial_got, partial_asked = partial
+            for rec in partial_got:
+                _add(pool, rec, "cites_seed_references")
+            asked |= partial_asked
+        state["deferred_refs"] = len(new_refs) - len(asked)
+        state["queried_refs"] = sorted(set(state["queried_refs"]) | asked)
+        state["seed_refs"] = sorted(set(state["seed_refs"]) | {r for s in seeds for r in (s.get("refs") or [])})
+        if state.get("session"):
+            _save(state)
+        raise
     deferred = len(new_refs) - len(asked)
     state["deferred_refs"] = deferred
     if deferred:
@@ -692,8 +711,8 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
     try:
         return _start(session, t0, question, queries, seeds, core_terms, must_find, year_from, year_to,
                       batch_size, cap)
-    except BaseException:
-        _run.progress.finish("failed")
+    except BaseException as exc:
+        _run.progress.finish("failed", error=str(exc) or type(exc).__name__)
         raise
     finally:
         _run.progress = None
@@ -735,6 +754,7 @@ def _start(session: str, t0: float, question: str, queries: list[str], seeds: li
              "must_find": [canonical_doi(d) for d in (must_find or [])], "seeds": [], "seed_refs": [],
              "queried_refs": [], "served": [], "rounds": [], "pool": pool,
              "query_variants": query_variants, "glossary_alts": glossary_alts, "glossary_used": glossary_used}
+    _save(state)
     _expand(state, [_key(r) for r in seed_recs])
     _score(state)
     state["rounds"].append({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "event": "start",
@@ -805,8 +825,8 @@ def next_batch(session: str, force: bool = False) -> dict[str, Any]:
     try:
         with _session_lock(session):
             out = _next_round(session, force)
-    except BaseException:
-        _run.progress.finish("failed")
+    except BaseException as exc:
+        _run.progress.finish("failed", error=str(exc) or type(exc).__name__)
         raise
     finally:
         p, _run.progress = _run.progress, None
@@ -820,7 +840,10 @@ def _next_round(session: str, force: bool = False) -> dict[str, Any]:
     credits0 = quota.spent("openalex")
     state = _load(session)
     rated = _ratings(state)
-    new_seeds = [k for k, rel in rated.items() if rel == "高" and k in state["pool"] and k not in state["seeds"]]
+    orig_missing = [k for k in _orig_seeds(state) if k in state["pool"] and k not in state["seeds"]]
+    new_seeds = list(dict.fromkeys(orig_missing + [
+        k for k, rel in rated.items() if rel == "高" and k in state["pool"] and k not in state["seeds"]
+    ]))
     # Abstracts for the best-ranked papers without one, fetched while the pool is
     # expanded (2026-10-20: the two ran one after the other, 12-25 s + ~50 s a
     # round). Picked from last round's ranking, so papers this expansion adds
@@ -829,14 +852,14 @@ def _next_round(session: str, force: bool = False) -> dict[str, Any]:
     added, found = 0, 0
     with ThreadPoolExecutor(max_workers=1) as ex:
         filling = ex.submit(_prefill_fetch, todo) if todo else None
-        if new_seeds:
+        if new_seeds or state.get("deferred_refs"):
             added = _expand(state, new_seeds)
         t_exp = time.time()
         if filling is not None:
             if not filling.done():
                 _phase("abstracts", len(todo))
             found = filling.result()
-    if added or found:
+    if added or found or not state.get("rounds"):
         _score(state)
     t1 = time.time()
     rnd = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "event": "next", "new_seeds": len(new_seeds),
@@ -905,13 +928,36 @@ def status(session: str) -> dict[str, Any]:
     agent = _agent_rated(state)
     unrated = [{"n": n, **{f: b.get(f) for f in _BATCH_FIELDS}}
                for n, b in enumerate(state.get("last_batch") or [], 1) if _batch_key(b) not in agent]
+    stop = _stop(state, rated)
+    remaining = len([k for k in order if k not in rated])
+    batches = len([b for b in state.get("served") or [] if b])
+    deferred_refs = int(state.get("deferred_refs") or 0)
+    prog = store.read_progress(session)
+    progress_info: dict[str, Any] | None = None
+    if prog:
+        progress_info = {}
+        for k in ("event", "state", "phase", "stopped_phase", "error", "updated"):
+            v = prog.get(k)
+            if k == "phase" and isinstance(v, dict):
+                v = v.get("name")
+            if v is not None:
+                progress_info[k] = v
+    resumable = bool(
+        unrated
+        or (not stop["stop_suggested"] and (remaining > 0 or deferred_refs > 0 or not state.get("served")))
+        or (prog and prog.get("state") in ("failed", "interrupted"))
+    )
     out = {"session": session, "pool": len(state["pool"]), "screened": len(rated),
+           "batches": batches, "remaining": remaining, "deferred_refs": deferred_refs,
+           "unrated_count": len(unrated), "progress": progress_info, "resumable": resumable,
            "by_relevance": {r: sum(1 for v in rated.values() if v == r) for r in screening.RELEVANCE},
-           "seeds": len(state["seeds"]), "coverage": _coverage(state, rated, order), **_stop(state, rated)}
+           "seeds": len(state["seeds"]), "coverage": _coverage(state, rated, order), **stop}
     if unrated:
         out["unrated"] = unrated
         out["next_step"] = ("rate these papers of the latest batch by their n (action='rate'; "
                             "a rating the user already gave in the app stays), then action='next'")
+    elif resumable:
+        out["next_step"] = "resume from where this session stopped: call action='next'"
     return out
 
 

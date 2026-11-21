@@ -63,6 +63,13 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
       refresh()
     }).catch((e) => setError(errorMessage(e)))
   }
+  const resume = (session: string) => {
+    setError(null)
+    searchApi.resume(session).then((r) => {
+      if (r.state === "failed") setError(r.error)
+      refresh()
+    }).catch((e) => setError(errorMessage(e)))
+  }
   const year = (v: string) => (v.trim() ? Number(v) : null)
 
   return (
@@ -155,7 +162,9 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
           <ul className="divide-y">
             {runs?.map((r) => {
               const cur = live && live.run === r.run ? live : r
-              return <RunRow key={r.run} run={cur} onOpen={onOpen} onCancel={() => searchApi.cancel(r.run).then(refresh)} />
+              return <RunRow key={r.run} run={cur} busy={Boolean(running)} onOpen={onOpen}
+                onResume={() => r.session && resume(r.session)}
+                onCancel={() => searchApi.cancel(r.run).then(refresh)} />
             })}
           </ul>
         </Card>
@@ -164,7 +173,9 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
   )
 }
 
-function RunRow({ run: r, onOpen, onCancel }: { run: SearchRun; onOpen: (s: string) => void; onCancel: () => void }) {
+function RunRow({ run: r, busy, onOpen, onResume, onCancel }: {
+  run: SearchRun; busy: boolean; onOpen: (s: string) => void; onResume: () => void; onCancel: () => void
+}) {
   const steps = r.events?.slice(-4) ?? []
   return (
     <li className="space-y-1.5 px-5 py-3">
@@ -174,6 +185,10 @@ function RunRow({ run: r, onOpen, onCancel }: { run: SearchRun; onOpen: (s: stri
         <span className={cn("shrink-0 text-xs", r.state === "failed" ? "text-destructive" : "text-muted-foreground")}>{STATE[r.state]}</span>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{r.started.slice(5, 16).replace("T", " ")}</span>
         {r.state === "running" && <Button size="sm" variant="ghost" onClick={onCancel}>取消检索</Button>}
+        {r.mode === "deep" && r.session && r.state !== "running" && (
+          <Button size="sm" variant="outline" disabled={busy} onClick={onResume}
+            title={busy ? "已有检索在进行，完成后再继续" : "从上次停下的地方继续深度检索"}>继续检索</Button>
+        )}
         {r.session && r.state !== "running" && <Button size="sm" variant="outline" onClick={() => onOpen(r.session!)}>查看结果</Button>}
       </div>
       {r.state === "running" && (

@@ -47,6 +47,8 @@ _RULES: list[tuple[str, str, str]] = [
     (r"PDF not found after batch download", "所有来源都没有找到 PDF", ""),
     (r"arXiv PDF not available", "arXiv 上没有这篇的 PDF", ""),
     (r"no OA url|fast lane failed", "未找到开放获取版本", ""),
+    (r"OpenAlex daily budget used up", "OpenAlex 今日积分已用完", "等待 UTC 零点重置，或在「设置 → 检索接口」中填写免费 Key"),
+    (r"OpenAlex request failed|OpenAlex HTTP \d+", "OpenAlex 暂时没有响应", "检查网络后重试"),
     (r"\b429\b|rate.?limit|too many requests", "请求过于频繁，已被限流", "稍后重试"),
     (r"\b40[13]\b|forbidden|unauthori[sz]ed", "出版商拒绝访问，可能需要学校认证", "连接校园网或在「设置 → 学校认证」中登录后重试"),
     (r"\b404\b|not found", "出版商处找不到此文献", ""),

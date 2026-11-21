@@ -158,6 +158,7 @@ export default function App() {
   const [sid, setSid] = React.useState<string | null>(null)
   const [record, setRecord] = React.useState<SessionRecord | null>(null)
   const [summary, setSummary] = React.useState<Summary | null>(null)
+  const [resumable, setResumable] = React.useState(false)
   const [progress, setProgress] = React.useState<Progress | null>(null)
   const [current, setCurrent] = React.useState<string | null>(null)
   const [onlyBatch, setOnlyBatch] = React.useState(true)
@@ -238,9 +239,10 @@ export default function App() {
 
   const reload = React.useCallback(() => {
     if (!sid) return
-    api.session(sid).then(({ record, summary }) => {
+    api.session(sid).then(({ record, summary, resumable: canResume }) => {
       setRecord(record)
       setSummary(summary)
+      setResumable(Boolean(canResume))
       setError(null)
     }).catch((e) => setError(errorMessage(e)))
   }, [sid])
@@ -303,6 +305,16 @@ export default function App() {
   const continueSearch = React.useCallback(() => {
     if (!sid) return
     api.next(sid).then(() => api.progress(sid)).then(setProgress).catch((e) => setError(errorMessage(e)))
+  }, [sid])
+  const resumeSearch = React.useCallback(() => {
+    if (!sid) return
+    api.resume(sid).then((r) => {
+      if (r.state === "failed") {
+        setError(r.error)
+        return
+      }
+      setNewSearch(true)
+    }).catch((e) => setError(errorMessage(e)))
   }, [sid])
   const toggleSelect = React.useCallback(() => {
     if (!sid || !paper?.item) return
@@ -377,10 +389,11 @@ export default function App() {
             <SettingsPage groups={groups} current={settingsGroup} onPick={setSettingsGroup} onGuide={openGuide}
               onSaved={(f) => setGroups((gs) => gs.map((g) => ({ ...g, fields: g.fields.map((x) => (x.key === f.key ? f : x)) })))} />
           ) : newSearch ? (
-            <SearchPage onBack={() => setNewSearch(false)}
+            <SearchPage onBack={() => { setNewSearch(false); reload() }}
               onOpen={(s) => {
                 api.sessions().then(setSessions).catch(() => {})
-                setSid(s)
+                if (s === sid) reload()
+                else setSid(s)
                 setNewSearch(false)
               }} />
           ) : glossary ? (
@@ -429,7 +442,7 @@ export default function App() {
               <BookAIcon />术语表
             </Button>
           </header>
-          <ProgressStrip progress={progress} summary={summary} onContinue={continueSearch} />
+          <ProgressStrip progress={progress} summary={summary} resumable={resumable} onContinue={continueSearch} onResume={resumeSearch} />
           <DetailPane paper={paper} onRate={rate} onSelect={toggleSelect} onExclude={exclude}
             translation={translation} onTranslate={translateAbstract} />
           </>)}

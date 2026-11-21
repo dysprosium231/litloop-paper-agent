@@ -103,6 +103,7 @@ with store.update(screening_dir() / f"{session}.json", indent=2) as data:
   "session": "…",
   "event": "next",
   "state": "running",
+  "pid": 12345,
   "started": 1792161500.2,
   "updated": 1792161561.7,
   "phase": {"name": "abstracts", "done": 62, "total": 150, "started": 1792161540.0},
@@ -111,9 +112,10 @@ with store.update(screening_dir() / f"{session}.json", indent=2) as data:
 ```
 
 - 时间都是 Unix 秒。
+- `pid`：写这份进度的进程号（2026-11-19 起）。文件里是 `running` 且记录了 `pid`、但该进程已退出时，读出时视作 `interrupted`，并把当时正在跑的 `phase.name` 填到 `stopped_phase`。没有 `pid` 的旧文件保持原 `state`。
 - `phase.name`：`keywords`（开局的关键词检索）→ `expand`（扩展候选池，`done` / `total` 为已查 / 待查的参考文献数）→ `abstracts`（给排名靠前的补摘要，`done` 为已有结论的篇数）→ `rank`（训练排序模型）→ `batch`（给这一批补摘要、期刊分区）。并非每轮都有每个阶段：没有新种子就没有 `expand`，没缺摘要就没有 `abstracts`。
 - `phases`：已经结束的阶段及用时，可用来估计剩余时间。
-- `state` 为 `idle` 时，`seconds` 是这一轮总用时；`phase` 为 `null`。
+- `state` 为 `idle` 时，`seconds` 是这一轮总用时；`phase` 为 `null`。为 `failed` 时另有 `stopped_phase`（停在哪个阶段，如有）和 `error`（原始错误，最多 500 字，桌面后台读取时会附带中文 `error_text`）。
 - 读不到或读到坏文件时当作“没有在运行”。
 
 ### 下载任务 `<litloop home>/downloads/<job>.json`
@@ -176,6 +178,7 @@ app 的「新建检索」把表单拼成一段话（`agent_runner.build_prompt`�
 
 - `state`：`running` → `done` / `failed` / `cancelled`；文件里是 `running`、但后台没有在跑它（app 中途关闭），读出时当作 `interrupted`。同一时间只运行一个。
 - `session`：Agent 保存的筛选会话（从工具返回里取到的最后一个），app 据此打开结果；`agent_session` 是 Agent 自己的对话编号，可用 `claude --resume` 接着聊。
+- `resumed_from`（可选，2026-11-19 起）：从筛选页或历史任务「继续检索」发起的续跑记录，写明续跑的原筛选会话 ID。
 - `events` 只保留最近 200 条，`doing` 是当前一步，结束后为 `null`。
 
 ### 术语表 `<litloop home>/glossary.json`

@@ -80,6 +80,10 @@ class NewSearch(BaseModel):
     seed_collection: str = ""
 
 
+class ResumeSearch(BaseModel):
+    batches: int = 0
+
+
 class NewDownload(BaseModel):
     papers: list[Paper]
     title: str
@@ -224,13 +228,15 @@ def create_app(token: str) -> FastAPI:
 
     @app.get("/api/sessions")
     def sessions(limit: int = 50) -> list[dict[str, Any]]:
+        from ..search import deep as deep_search
         out = screening.list_sessions(limit)
         for s in out:
-            s["deep"] = store.summary_path(s["session"]).exists()
+            s["deep"] = store.summary_path(s["session"]).exists() or deep_search._pool_path(s["session"]).exists()
         return out
 
     @app.get("/api/sessions/{session}")
     def session(session: str) -> dict[str, Any]:
+        from ..search import deep as deep_search
         record = store.read_json(_record_path(session))
         try:
             summary = store.read_json(store.summary_path(session))
@@ -239,12 +245,15 @@ def create_app(token: str) -> FastAPI:
             summary["api_warnings"] = quota.warnings("zh")
         except FileNotFoundError:
             summary = None
-        return {"record": record, "summary": summary}
+        return {"record": record, "summary": summary, "resumable": deep_search._pool_path(session).exists()}
 
     @app.get("/api/sessions/{session}/progress")
     def progress(session: str) -> dict[str, Any] | None:
         _record_path(session)
-        return store.read_progress(session)
+        p = store.read_progress(session)
+        if p and p.get("error"):
+            _explain(p, "检索", full=True)
+        return p
 
     @app.get("/api/sessions/{session}/prisma")
     def prisma_view(session: str) -> dict[str, Any]:
@@ -281,7 +290,7 @@ def create_app(token: str) -> FastAPI:
         if not deep_search._pool_path(session).exists():
             raise HTTPException(400, "无法继续检索：这不是深度检索会话。")
         p = store.read_progress(session)
-        if p and p.get("state") == "running" and time.time() - float(p.get("updated") or 0) < 300:
+        if p and p.get("state") == "running" and (p.get("pid") or time.time() - float(p.get("updated") or 0) < 300):
             raise HTTPException(409, "正在生成下一批，完成后再继续。")
 
         def run() -> None:
@@ -291,6 +300,18 @@ def create_app(token: str) -> FastAPI:
                 pass
         threading.Thread(target=run, name=f"next-{session}", daemon=True).start()
         return {"started": True}
+
+    @app.post("/api/sessions/{session}/resume")
+    def resume_session(session: str, body: ResumeSearch | None = None) -> dict[str, Any]:
+        """Resume a deep-search session through the configured agent."""
+        from . import agent_runner
+        _record_path(session)
+        try:
+            return agent_runner.resume(session, batches=body.batches if body else 0)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     @app.get("/api/updates")
     def updates_available() -> list[dict[str, Any]]:

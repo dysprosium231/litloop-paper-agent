@@ -454,3 +454,114 @@ def test_next_round_fetches_abstracts_while_it_expands(net, monkeypatch):
 def test_word_features_keep_words_that_only_queries_ignore():
     toks = deep_search._tokens({"title": "A review of the effect", "abstract": "via study"})
     assert {"review", "effect", "via", "study"} <= set(toks) and "the" not in toks
+
+
+def test_start_interrupted_during_expand_saves_checkpoint_and_resumes(tmp_path, monkeypatch):
+    from litloop import quota, store
+    import litloop.search.abstracts as ab
+    import litloop.search.quick as s
+
+    monkeypatch.setattr(screening._config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(deep_search, "WORKERS", 1)
+    monkeypatch.setattr(quota, "spent", lambda provider: 0)
+    monkeypatch.setattr(quota, "summary", lambda: {"openalex": {"remaining": 5000, "limit": 10000, "throttled_today": 0, "resets_at": None}})
+    monkeypatch.setattr(ab, "fill_abstracts", lambda items, cfg=None, **kw: None)
+    monkeypatch.setattr(s, "_add_journal_rank", lambda items: None)
+    monkeypatch.setattr(s, "_flag_retractions", lambda items: None)
+
+    refs = [f"R{i:03d}" for i in range(120)]
+    seed = rec("10.1/seed", "Pressureless infiltration of SiC by aluminum", refs=refs)
+    wave1_hit = rec("10.1/w1", "Al/SiC wave 1", refs=["R000"], abstract="pressureless infiltration SiC aluminum")
+    wave2_hit = rec("10.1/w2", "Al/SiC wave 2", refs=["R119"], abstract="pressureless infiltration SiC aluminum")
+
+    def by_filter(field, values, extra=None):
+        return [seed] if field == "doi" and "10.1/seed" in values else []
+
+    def keyword(queries, yf, yt):
+        return {q: [{"doi": "10.1/kw", "title": "SiC aluminum matrix", "abstract": "pressureless infiltration SiC aluminum"}]
+                for q in queries}
+
+    asked_batches: list[list[str]] = []
+    should_fail = [True]
+
+    def fake_pages(flt, max_records, split_over=False):
+        if "cites:" not in flt:
+            return []
+        ids = flt.split("cites:")[1].split(",")[0].split("|")
+        asked_batches.append(ids)
+        if should_fail[0] and "R100" in ids:
+            raise RuntimeError("OpenAlex HTTP 500")
+        out = []
+        if "R000" in ids:
+            out.append(wave1_hit)
+        if "R119" in ids:
+            out.append(wave2_hit)
+        return out
+
+    monkeypatch.setattr(deep_search, "_by_filter", by_filter)
+    monkeypatch.setattr(deep_search, "_keyword_candidates", keyword)
+    monkeypatch.setattr(deep_search, "_exact_candidates", lambda terms, yf, yt: {})
+    monkeypatch.setattr(deep_search, "_citing", lambda ids, years, max_records=400: [])
+    monkeypatch.setattr(deep_search, "_pages", fake_pages)
+
+    with pytest.raises(RuntimeError, match="OpenAlex HTTP 500"):
+        deep_search.start("SiC/Al", ["pressureless infiltration SiC aluminum"], ["10.1/seed"], ["aluminum"], batch_size=10)
+
+    sid = screening.list_sessions()[0]["session"]
+    prog = store.read_progress(sid)
+    assert prog["state"] == "failed" and prog["stopped_phase"] == "expand"
+    assert "OpenAlex HTTP 500" in prog["error"]
+
+    saved_state = deep_search._load(sid)
+    assert "10.1/w1" in saved_state["pool"] and "10.1/kw" in saved_state["pool"]
+    assert len(saved_state["queried_refs"]) == 100
+    assert saved_state["deferred_refs"] == 20
+    assert saved_state["seeds"] == []
+
+    st = deep_search.status(sid)
+    assert st["resumable"] is True and st["deferred_refs"] == 20 and st["batches"] == 0
+    assert st["progress"]["stopped_phase"] == "expand"
+    assert "action='next'" in st["next_step"]
+
+    asked_batches.clear()
+    should_fail[0] = False
+    resumed = deep_search.next_batch(sid)
+    assert [len(b) for b in asked_batches] == [20]  # only the remaining refs, no duplicate work
+    resumed_dois = {b["doi"] for b in resumed["batch"]}
+    assert {"10.1/w1", "10.1/w2", "10.1/kw"} <= resumed_dois
+    after_state = deep_search._load(sid)
+    assert after_state["deferred_refs"] == 0 and after_state["seeds"] == ["10.1/seed"]
+
+
+def test_deferred_refs_continue_even_without_new_high_seeds(tmp_path, monkeypatch):
+    import litloop.search.abstracts as ab
+    import litloop.search.quick as s
+
+    monkeypatch.setattr(screening._config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(ab, "fill_abstracts", lambda items, cfg=None, **kw: None)
+    monkeypatch.setattr(s, "_add_journal_rank", lambda items: None)
+    monkeypatch.setattr(s, "_flag_retractions", lambda items: None)
+
+    seed = rec("10.1/seed", "Seed", refs=["R1", "R2"])
+    extra = rec("10.1/extra", "Extra SiC Al", refs=[], abstract="aluminum")
+    sid = screening.save("q", [{"doi": "10.1/a", "title": "A", "relevance": "中", "reason": "ok"}],
+                         query="q", mode="deep")["session"]
+    state = {"session": sid, "question": "q", "queries": ["SiC"], "core_terms": ["aluminum"],
+             "orig_seeds": ["10.1/seed"], "year_from": None, "year_to": None, "batch_size": 10, "cap": 200,
+             "must_find": [], "seeds": ["10.1/seed"], "seed_refs": ["R1", "R2"],
+             "queried_refs": ["R1"], "deferred_refs": 1, "served": [["10.1/a"]],
+             "rounds": [{"time": "t", "event": "start"}],
+             "pool": {"10.1/seed": seed, "10.1/a": rec("10.1/a", "A")},
+             "query_variants": {}, "glossary_alts": {}, "glossary_used": []}
+    deep_search._save(state)
+
+    calls = []
+    monkeypatch.setattr(deep_search, "_by_filter", lambda *a, **k: [])
+    monkeypatch.setattr(deep_search, "_cites_refs_on_topic",
+                        lambda refs, *a, **k: (calls.append(refs) or [extra], set(refs)))
+    monkeypatch.setattr(deep_search, "_citing", lambda *a, **k: [])
+
+    out = deep_search.next_batch(sid)
+    assert calls == [["R2"]]
+    assert "10.1/extra" in [b["doi"] for b in out["batch"]]
+    assert deep_search._load(sid)["deferred_refs"] == 0

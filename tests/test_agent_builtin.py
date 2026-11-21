@@ -148,3 +148,33 @@ def test_a_new_run_can_start_the_moment_the_last_one_finishes(builtin, monkeypat
     # No sleep: the finished run must be out of the running table already.
     second = agent_runner.start({"question": "y"})["run"]
     assert _wait(second)["state"] == "done"
+
+
+def test_resume_runs_builtin_agent_and_blocks_concurrent_runs(builtin, tmp_path, monkeypatch):
+    from litloop.search import deep as deep_search, screening
+
+    monkeypatch.setattr(screening._config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    sid = screening.save("SiC/Al", [{"doi": "10.1/a", "title": "A", "relevance": "高", "reason": "r"}], mode="deep")["session"]
+    deep_search._pool_path(sid).write_text("{}", encoding="utf-8")
+
+    seen = {}
+    started = threading.Event()
+    release = threading.Event()
+
+    def fake_run(goal, tools, *, functions, on_event, **kwargs):
+        seen.update(goal=goal, system=kwargs.get("system", ""))
+        started.set()
+        release.wait(2.0)
+        return {"text": "续跑完成", "steps": 2, "tool_calls": []}
+
+    monkeypatch.setattr("litloop.agents.run_task", fake_run)
+    run = agent_runner.resume(sid)["run"]
+    assert started.wait(2.0)
+    with pytest.raises(RuntimeError, match="已有检索在进行"):
+        agent_runner.resume(sid)
+    release.set()
+    d = _wait(run)
+    _idle()
+    assert d["state"] == "done" and d["resumed_from"] == sid and d["session"] == sid
+    assert "deep_search_status" in seen["goal"] and "deep_search_rate" in seen["system"]

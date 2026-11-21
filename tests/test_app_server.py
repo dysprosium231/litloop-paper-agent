@@ -218,3 +218,49 @@ def test_diagnostics_export_writes_a_zip(client, tmp_path, monkeypatch):
     target.write_bytes(b"PK")
     got = client.post("/api/diagnostics").json()
     assert got == {"path": str(target), "size": 2}
+
+
+def test_session_reports_resumable_and_progress_translates_errors(client, session, monkeypatch):
+    from litloop.search import deep as deep_search
+
+    assert client.get(f"/api/sessions/{session}").json()["resumable"] is False
+    deep_search._pool_path(session).write_text("{}", encoding="utf-8")
+    assert client.get(f"/api/sessions/{session}").json()["resumable"] is True
+
+    store.write_json(store.progress_path(session), {
+        "session": session, "event": "start", "state": "failed",
+        "stopped_phase": "expand", "error": "OpenAlex daily budget used up (1000 credits)",
+        "started": 1.0, "updated": 2.0, "phase": None, "phases": [],
+    })
+    prog = client.get(f"/api/sessions/{session}/progress").json()
+    assert prog["error_text"].startswith("无法检索：OpenAlex 今日积分已用完")
+
+    store.write_json(store.progress_path(session), {
+        "session": session, "event": "next", "state": "running", "pid": 999999,
+        "started": 1.0, "updated": 9999999999.0, "phase": {"name": "expand", "done": 1, "total": 5, "started": 1.0}, "phases": [],
+    })
+    monkeypatch.setattr(store, "pid_alive", lambda pid: False)
+    assert client.get(f"/api/sessions/{session}/progress").json()["state"] == "interrupted"
+
+    import threading
+    called = threading.Event()
+    monkeypatch.setattr(deep_search, "next_batch", lambda *a, **k: called.set() or {})
+    assert client.post(f"/api/sessions/{session}/next").json() == {"started": True}
+    assert called.wait(2.0)
+
+
+def test_resume_endpoint_checks_session_and_forwards_to_agent_runner(client, session, monkeypatch):
+    from litloop.desktop import agent_runner
+
+    assert client.post("/api/sessions/no-such/resume", json={}).status_code == 404
+    assert client.post(f"/api/sessions/{session}/resume", json={}).status_code == 400  # quick session: no pool
+
+    monkeypatch.setattr(agent_runner, "resume", lambda s, batches=0: {"run": "r1", "session": s, "state": "running", "batches": batches})
+    got = client.post(f"/api/sessions/{session}/resume", json={"batches": 2})
+    assert got.status_code == 200 and got.json()["batches"] == 2
+
+    def busy(*a, **k):
+        raise RuntimeError("已有检索在进行")
+
+    monkeypatch.setattr(agent_runner, "resume", busy)
+    assert client.post(f"/api/sessions/{session}/resume", json={}).status_code == 409

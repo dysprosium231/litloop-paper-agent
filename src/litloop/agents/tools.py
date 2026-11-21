@@ -47,6 +47,11 @@ def deep_search_next(session: str, force: bool = False) -> dict[str, Any]:
     return deep.next_batch(session, force=force)
 
 
+def deep_search_rate(session: str, ratings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Save the agent's ratings for the latest batch by number."""
+    return deep.rate(session, ratings)
+
+
 def deep_search_status(session: str) -> dict[str, Any]:
     """What this session has read and found so far, and whether stopping is suggested."""
     return deep.status(session)
@@ -99,6 +104,14 @@ TOOLS: list[dict[str, Any]] = [
          "must_find": {"type": "array", "items": {"type": "string"}},
          "batch_size": {"type": "integer", "description": "每批几篇，默认 20"}},
          "required": ["question", "queries", "seeds"]}},
+    {"name": "deep_search_rate", "description": "按编号保存当前批次的深度检索评分：ratings=[{n, relevance, reason}]，relevance 为 高/中/低/不相关。",
+     "parameters": {"type": "object", "properties": {
+         "session": {"type": "string"},
+         "ratings": {"type": "array", "items": {"type": "object", "properties": {
+             "n": {"type": "integer"}, "relevance": {"type": "string"},
+             "reason": {"type": "string"}},
+             "required": ["n", "relevance"]}}},
+         "required": ["session", "ratings"]}},
     {"name": "deep_search_next", "description": "提交这一批评分后取下一批。",
      "parameters": {"type": "object", "properties": {
          "session": {"type": "string"}, "force": {"type": "boolean"}},
@@ -122,6 +135,7 @@ TOOLS: list[dict[str, Any]] = [
 FUNCTIONS: dict[str, Callable[..., Any]] = {
     "search": search,
     "deep_search_start": deep_search_start,
+    "deep_search_rate": deep_search_rate,
     "deep_search_next": deep_search_next,
     "deep_search_status": deep_search_status,
     "screening_save": screening_save,

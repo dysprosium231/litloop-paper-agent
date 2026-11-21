@@ -95,3 +95,43 @@ def test_progress_records_each_phase_and_ends_idle(home):
     got = store.read_progress("s1")
     assert got["state"] == "idle" and got["phase"] is None
     assert [ph["name"] for ph in got["phases"]] == ["expand", "rank"]
+
+
+def test_progress_records_pid_and_failed_phase_with_error(home):
+    p = store.Progress("s1", "start")
+    assert p.data["pid"] > 0
+    p.phase("expand", 10)
+    p.finish("failed", error="OpenAlex HTTP 500")
+    got = store.read_progress("s1")
+    assert got["state"] == "failed"
+    assert got["stopped_phase"] == "expand"
+    assert got["error"] == "OpenAlex HTTP 500"
+    assert got["phase"] is None
+
+
+def test_read_progress_turns_dead_writer_into_interrupted_unless_pid_absent(home, monkeypatch):
+    store.write_json(store.progress_path("s-dead"), {
+        "session": "s-dead", "event": "next", "state": "running", "pid": 999999,
+        "started": 10.0, "updated": 20.0,
+        "phase": {"name": "expand", "done": 2, "total": 10, "started": 12.0}, "phases": [],
+    })
+    monkeypatch.setattr(store, "pid_alive", lambda pid: False)
+    got = store.read_progress("s-dead")
+    assert got["state"] == "interrupted" and got["stopped_phase"] == "expand"
+
+    store.write_json(store.progress_path("s-nopid"), {
+        "session": "s-nopid", "event": "next", "state": "running", "started": 10.0, "updated": 20.0,
+    })
+    assert store.read_progress("s-nopid")["state"] == "running"
+
+
+def test_latest_round_notice_reports_interrupted_when_writer_died(home, monkeypatch):
+    store.write_json(store.progress_path("s-dead"), {
+        "session": "s-dead", "event": "start", "state": "running", "pid": 999999,
+        "started": 10.0, "updated": 20.0,
+        "phase": {"name": "expand", "done": 1, "total": 5, "started": 12.0},
+    })
+    monkeypatch.setattr(store, "pid_alive", lambda pid: False)
+    n = store.latest_round_notice()
+    assert n["session"] == "s-dead" and n["state"] == "interrupted"
+    assert "pid" not in n

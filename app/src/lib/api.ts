@@ -96,13 +96,19 @@ export interface SessionListEntry {
 }
 
 export interface Progress {
+  schema?: number
+  session?: string
   event: "start" | "next"
-  state: "running" | "idle" | "failed"
+  state: "running" | "idle" | "failed" | "interrupted"
+  pid?: number
   started: number
   updated: number
   phase: { name: string; done: number; total: number | null; started: number } | null
   phases: { name: string; seconds: number }[]
   seconds?: number
+  stopped_phase?: string | null
+  error?: string | null
+  error_text?: string | null
 }
 
 /** The latest deep-search round from any process (system notifications). */
@@ -111,7 +117,7 @@ export interface RoundNotice {
   question: string
   batches: number
   event: "start" | "next" | null
-  state: "running" | "idle" | "failed" | null
+  state: "running" | "idle" | "failed" | "interrupted" | null
   phase: string | null
   started: number | null
   updated: number | null
@@ -170,7 +176,7 @@ async function call<T>(path: string, body?: unknown, method?: string): Promise<T
 export const api = {
   sessions: () => call<SessionListEntry[]>("/api/sessions"),
   roundNotice: () => call<RoundNotice | null>("/api/screening/notice"),
-  session: (id: string) => call<{ record: SessionRecord; summary: Summary | null }>(`/api/sessions/${encodeURIComponent(id)}`),
+  session: (id: string) => call<{ record: SessionRecord; summary: Summary | null; resumable?: boolean }>(`/api/sessions/${encodeURIComponent(id)}`),
   progress: (id: string) => call<Progress | null>(`/api/sessions/${encodeURIComponent(id)}/progress`),
   rate: (id: string, paper: { doi?: string; title: string }, relevance: Relevance | null) =>
     call<{ item: Item | null; edited: number }>(`/api/sessions/${encodeURIComponent(id)}/rating`,
@@ -180,6 +186,7 @@ export const api = {
       { doi: paper.doi ?? null, title: paper.title, decision, reason: reason ?? null }),
   translation: () => call<TranslationInfo>("/api/translation"),
   next: (id: string) => call<{ started: boolean }>(`/api/sessions/${encodeURIComponent(id)}/next`, {}),
+  resume: (id: string, batches = 0) => call<SearchRun>(`/api/sessions/${encodeURIComponent(id)}/resume`, { batches }),
   translate: (id: string, paper: { doi?: string; title: string }) =>
     call<{ abstract_zh: string }>(`/api/sessions/${encodeURIComponent(id)}/translate`, { doi: paper.doi ?? null, title: paper.title }),
 }
@@ -503,12 +510,14 @@ export interface SearchRun {
   doing: string | null
   events?: { t: string; text: string }[]
   session: string | null
+  resumed_from?: string | null
   result: string | null
   error: string | null
 }
 
 export const searchApi = {
   start: (form: SearchForm) => call<SearchRun>("/api/searches", form),
+  resume: (session: string, batches = 0) => call<SearchRun>(`/api/sessions/${encodeURIComponent(session)}/resume`, { batches }),
   list: () => call<SearchRun[]>("/api/searches"),
   get: (run: string) => call<SearchRun>(`/api/searches/${encodeURIComponent(run)}`),
   cancel: (run: string) => call<{ cancelled: boolean }>(`/api/searches/${encodeURIComponent(run)}/cancel`, {}),

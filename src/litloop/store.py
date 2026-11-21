@@ -35,6 +35,28 @@ class SchemaTooNew(RuntimeError):
     """The file was written by a newer LitLoop; this copy must be updated to read it."""
 
 
+def pid_alive(pid: int) -> bool:
+    """Windows-safe liveness probe. NEVER use os.kill(pid, 0) on Windows —
+    any signal value there calls TerminateProcess and would kill the target."""
+    if pid <= 0:
+        return False
+    try:
+        if os.name != "nt":
+            os.kill(pid, 0)
+            return True
+        import ctypes
+
+        SYNCHRONIZE = 0x00100000
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(SYNCHRONIZE, False, int(pid))
+        if not handle:
+            return False
+        kernel32.CloseHandle(int(handle))
+        return True
+    except Exception:
+        return False
+
+
 def lock(path: Path) -> FileLock:
     return FileLock(str(path) + ".lock", timeout=LOCK_TIMEOUT)
 
@@ -124,7 +146,7 @@ class Progress:
     def __init__(self, session: str, event: str):
         self.path = progress_path(session)
         self.data = {"session": session, "event": event, "state": "running",
-                     "started": time.time(), "phase": None, "phases": []}
+                     "pid": os.getpid(), "started": time.time(), "phase": None, "phases": []}
         self._last = 0.0
 
     def _write(self, force: bool = False) -> None:
@@ -152,19 +174,49 @@ class Progress:
                 self.data["phase"]["total"] = total
             self._write()
 
-    def finish(self, state: str = "idle") -> None:
+    def finish(self, state: str = "idle", error: str | None = None) -> None:
+        last_phase = (self.data.get("phase") or {}).get("name") if isinstance(self.data.get("phase"), dict) else None
         self.phase("done")
         self.data["phase"] = None
         self.data["state"] = state
         self.data["seconds"] = round(time.time() - self.data["started"], 1)
+        if state != "idle" and last_phase:
+            self.data["stopped_phase"] = last_phase
+        else:
+            self.data.pop("stopped_phase", None)
+        if error:
+            self.data["error"] = str(error)[:500]
+        else:
+            self.data.pop("error", None)
         self._write(force=True)
+
+
+def _normalize_progress(data: dict[str, Any]) -> dict[str, Any]:
+    """Turn a ``running`` file whose writer process has died into ``interrupted``."""
+    if data.get("state") == "running":
+        raw_pid = data.get("pid")
+        pid = 0
+        if raw_pid is not None and not isinstance(raw_pid, bool):
+            try:
+                pid = int(raw_pid)
+            except (TypeError, ValueError):
+                pid = 0
+        if pid > 0 and not pid_alive(pid):
+            out = dict(data)
+            out["state"] = "interrupted"
+            phase = data.get("phase")
+            if isinstance(phase, dict) and phase.get("name"):
+                out["stopped_phase"] = phase["name"]
+            return out
+    return data
 
 
 def read_progress(session: str) -> dict[str, Any] | None:
     try:
-        return read_json(progress_path(session))
+        data = read_json(progress_path(session))
     except (OSError, ValueError):
         return None
+    return _normalize_progress(data) if isinstance(data, dict) else None
 
 
 def latest_round_notice() -> dict[str, Any] | None:
@@ -192,7 +244,7 @@ def latest_round_notice() -> dict[str, Any] | None:
             best = (stamp, data)
     if best is None:
         return None
-    data = best[1]
+    data = _normalize_progress(best[1])
     session = str(data["session"])
     try:
         summary = read_json(summary_path(session))

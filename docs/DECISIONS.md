@@ -1,5 +1,25 @@
 # 决定与实验记录
 
+## 2026-11-21：补完「深度检索中断后续跑」实机验收与测试修复
+
+- 背景：2026-11-19 条目中记载的全套验证命令当时因环境工具受限未实际执行；后续在本地虚拟环境运行全量测试时，暴露出两处与该功能同期新增的测试桩缺陷，且 `skills-src/shared/screening.md` 改动后尚未同步生成技能文档。
+- 修复与同步：
+  1. [tests/test_agent_tools.py](tests/test_agent_tools.py) 第 75 行：`seen.setdefault("rate", (s, r))` 会返回非空元组导致 `or {"saved": len(r)}` 短路，改为 `seen.__setitem__("rate", (s, r))`。
+  2. [tests/test_deep_search.py](tests/test_deep_search.py) 第 467 行：`deep.next_batch()` 内部调用 `quota.warnings()`，原 `quota.summary` 测试替身缺少 `limit` 字段引发 `KeyError`，补齐 `limit`、`throttled_today` 与 `resets_at`。
+  3. 运行 `scripts/build_skills.py` 同步更新 `skills/litloop/SKILL.md`、`skills/litloop/reference.md` 与 `zcode-plugin/skills/litloop/SKILL.md`。
+- 验证（`C:/Users/Echo/.mcp-envs/litloop/Scripts/python.exe`）：重点 7 个测试文件 `94 passed`；全量 `python -m pytest -q` 为 `1220 passed, 3 skipped`（146.69s）；`scripts/import_smoke.py` 为 `35/35 modules import`；`app/` 中 `npm run build` 与 `npm run lint:copy`（0 issues）通过；`scripts/check_release_consistency.py` 通过（`OK: version 1.18.3, 21 MCP tools, skills clean`）。
+
+## 2026-11-19：深度检索支持中断后续跑
+
+- 背景：深度检索如果在建候选池的引用扩展（`expand`）阶段因网络错误、OpenAlex 积分耗尽或进程被关闭而中断，原有实现不会把基础候选池和已完成波次的参考文献落盘，进度文件也没有记录进程 PID、`stopped_phase` 和失败原因；重启后既看不出中断位置，也无法从断点接着跑，且 app 原先的「继续检索」按钮只能不经 Agent 硬取下一批。
+- 做法：
+  1. **共享进度状态（`store.py`）**：将 Windows 安全的 `pid_alive` 抽到 `store.py` 供 `download/progress.py` 共用；`store.Progress` 写入 `pid`，`finish(state, error=...)` 记录 `stopped_phase` 和截断后的 `error`；`read_progress()` 与 `latest_round_notice()` 对有 `pid` 且进程已退出的 `running` 文件折算为 `interrupted`（无 `pid` 的旧记录/测试文件保持原样）。
+  2. **引擎断点检查点与续跑（`search/deep.py`）**：`_start()` 在构建基础池后、调用 `_expand()` 前先落盘一次；`_cites_refs_on_topic()` 在波次循环外捕获 `BaseException`，通过异常属性 `_partial_expand` 向上传递已拿到的记录与 `asked`（不改动函数签名，兼容测试替身）；`_expand()` 在异常时先合并已获候选、更新 `queried_refs` 与 `deferred_refs` 并保存 `pool.json`；`_next_round()` 在存在未完成原始种子或 `deferred_refs > 0` 时继续执行 `_expand()`，并在 `rounds` 为空时确保计算初始公式分；`status()` 返回 `batches`、`remaining`、`deferred_refs`、`unrated_count`、`progress`、`resumable` 与续跑引导 `next_step`。
+  3. **内置与外部 Agent 续跑（`agents/`、`desktop/`、`skills-src/`）**：`agents/tools.py` 新增 `deep_search_rate`（按编号保存评分，避免无 DOI 文献丢分）；`agent_runner.py` 新增 `build_resume_prompt()`（只读小文件，绝不读 `pool.json`）与 `resume()`；`desktop/server.py` 新增 `POST /api/sessions/{session}/resume`、为 `GET /api/sessions/{session}` 返回 `resumable`、为进度错误补充中文 `error_text`，并允许对进程已死折算为 `interrupted` 的会话直接发起 `next`。
+  4. **界面与通知（`app/`）**：筛选页顶栏展示上次中断阶段或中文失败原因（原始英文进悬停提示），提供「由 Agent 继续」和「仅取下一批」两个入口；新建检索页历史任务支持「继续检索」；系统通知新增「深度检索已中断」。
+- 边界：app 仍不直接读取 `<session>.pool.json`；当整篇基础池在 `_start` 的首批关键词检索完成前就彻底断网时，尚未建出基础池，需要重新发起检索；对无 `pid` 的旧版进度文件，仍沿用原有的 300 秒超时判定，不误折算。
+- 测试：补齐 `test_store.py`、`test_deep_search.py`、`test_agent_tools.py`、`test_agent_runner.py`、`test_agent_builtin.py`、`test_app_server.py`、`test_app_types.py`；运行 `build_skills.py`、`check_release_consistency.py`、`npm run build && npm run lint:copy` 与 `python -m pytest -q` 全套验证。
+
 ## 2026-11-08：干净机器上试出来的三个问题
 
 - 场景：在一台干净的 Ubuntu 24.04 云电脑上 `git clone` + `pip install .`，按新用户的路子走一遍。

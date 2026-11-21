@@ -60,6 +60,10 @@ export function useSystemNotices() {
       if (!rounds.current.has(id) || seen.current.has(id)) return
       rounds.current.delete(id)
       seen.current.add(id)
+      if (n.state === "interrupted") {
+        notify("深度检索已中断", `${n.question || "深度检索"}：这一轮已中断，可在筛选页继续`)
+        return
+      }
       notify("深度检索有新的一批",
         n.state === "failed" ? `${n.question || "深度检索"}：这一轮失败了`
           : `${n.question || "深度检索"}：第 ${Math.max(1, n.batches)} 批已就绪`)

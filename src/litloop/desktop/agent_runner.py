@@ -47,6 +47,7 @@ _STOP: dict[str, threading.Event] = {}
 _BUILTIN_TOOLS = {
     "search": "正在检索",
     "deep_search_start": "深度检索：正在构建候选池",
+    "deep_search_rate": "深度检索：正在保存本批评分",
     "deep_search_next": "深度检索：正在生成下一批",
     "deep_search_status": "深度检索：正在查看进度",
     "screening_save": "正在保存评分",
@@ -174,17 +175,69 @@ def running() -> str | None:
         return next((r for r, t in _BUILTIN.items() if t.is_alive() and r not in _DONE), None)
 
 
-def start(form: dict[str, Any]) -> dict[str, Any]:
-    builtin = _backend() == "builtin"
-    prompt = build_prompt(form, skill=not builtin)
-    if running():
-        raise RuntimeError("已有检索在进行，完成或取消后再开始新的检索")
-    run = datetime.now().strftime("%Y%m%d-%H%M%S")
-    runs_dir().mkdir(parents=True, exist_ok=True)
-    data = {"run": run, "state": "running", "started": datetime.now().isoformat(timespec="seconds"),
-            "question": str(form.get("question")).strip(), "mode": form.get("mode") or "quick",
-            "form": form, "prompt": prompt, "doing": "正在启动 Agent", "events": [],
-            "session": None, "agent_session": None, "result": None, "error": None}
+def _new_run_id() -> str:
+    base = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run = base
+    idx = 2
+    while _path(run).exists():
+        run = f"{base}-{idx}"
+        idx += 1
+    return run
+
+
+def build_resume_prompt(session: str, *, batches: int = 0, skill: bool = True) -> str:
+    """Build the prompt to resume an interrupted or paused deep-search session.
+
+    Reads only the small screening record and optional summary; never reads the
+    (potentially huge) candidate pool file (docs/APP_DATA.md).
+    """
+    from ..search import deep as deep_search, screening
+
+    if not deep_search._pool_path(session).exists():
+        raise ValueError("无法继续检索：这不是深度检索会话")
+    record = screening.load(session)
+    try:
+        summary = store.read_json(store.summary_path(session))
+    except (FileNotFoundError, OSError, ValueError):
+        summary = None
+
+    question = str(record.get("question") or "").strip()
+    head = f"{'用 litloop 技能' if skill else ''}继续深度检索会话 {session}" + (f"：{question}" if question else "")
+    parts = [head]
+    criteria = [str(c).strip() for c in (record.get("criteria") or []) if str(c).strip()]
+    if criteria:
+        parts.append("纳入标准（按这些判断，不要改）：\n" + "\n".join(f"- {c}" for c in criteria))
+    if isinstance(summary, dict):
+        screened = int(summary.get("screened") or 0)
+        pool_size = int(summary.get("pool") or 0)
+        done_batches = len(summary.get("batches") or [])
+        parts.append(f"已有进度：已生成 {done_batches} 批，已评分 {screened}/{pool_size} 篇。")
+    else:
+        parts.append("上次检索在生成首批结果前中断，候选池基础记录已保存。")
+    limit_note = f"本次最多再筛 {int(batches)} 批，" if batches else ""
+    if skill:
+        parts.append(
+            f"不要重新调用 litloop_deep_search(action='start')。请从这个会话接着做："
+            f"先调用 litloop_deep_search(action='status', session={session!r}) 查看进度与 unrated；"
+            f"如果 unrated 非空，先按编号用 action='rate' 评完并保存，再调用 action='next' 继续生成并筛选下一批，"
+            f"{limit_note}返回 stop_suggested=true 时停止。"
+        )
+    else:
+        parts.append(
+            f"不要重新调用 deep_search_start。请从这个会话接着做："
+            f"先调用 deep_search_status(session={session!r}) 查看进度与 unrated；"
+            f"如果 unrated 非空，先按编号用 deep_search_rate 评完并保存，再调用 deep_search_next(session={session!r}) 继续生成并筛选下一批，"
+            f"{limit_note}返回 stop_suggested=true 时停止。"
+        )
+    parts.append(
+        "这是从 LitLoop 桌面 app 发起的任务，用户不在对话里：不要提问、不要等确认，"
+        "需要用户决定的事写进最后的汇报；不要下载、不要推送 Zotero。"
+        "结束时用两三句中文汇报筛选会话名、总篇数和各相关度数量。"
+    )
+    return "\n\n".join(parts)
+
+
+def _launch(run: str, data: dict[str, Any], prompt: str, builtin: bool) -> dict[str, Any]:
     _write(run, data)
     if builtin:
         if not str(_config.load_config().get("builtin_agent_model") or "").strip():
@@ -203,7 +256,7 @@ def start(form: dict[str, Any]) -> dict[str, Any]:
             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             cwd=str(Path.home()), env={**os.environ, "PYTHONUTF8": "1"},
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    except OSError as e:
+    except OSError:
         data.update(state="failed", doing=None, error=f"无法启动 Agent（{cmd[0]}）。在「设置 → Agent」中检查 Agent 命令")
         _write(run, data)
         return data
@@ -211,6 +264,39 @@ def start(form: dict[str, Any]) -> dict[str, Any]:
         _PROCS[run] = proc
     threading.Thread(target=_follow, args=(run, proc, prompt, data), daemon=True).start()
     return data
+
+
+def start(form: dict[str, Any]) -> dict[str, Any]:
+    builtin = _backend() == "builtin"
+    prompt = build_prompt(form, skill=not builtin)
+    if running():
+        raise RuntimeError("已有检索在进行，完成或取消后再开始新的检索")
+    run = _new_run_id()
+    runs_dir().mkdir(parents=True, exist_ok=True)
+    data = {"run": run, "state": "running", "started": datetime.now().isoformat(timespec="seconds"),
+            "question": str(form.get("question")).strip(), "mode": form.get("mode") or "quick",
+            "form": form, "prompt": prompt, "doing": "正在启动 Agent", "events": [],
+            "session": None, "agent_session": None, "result": None, "error": None}
+    return _launch(run, data, prompt, builtin)
+
+
+def resume(session: str, *, batches: int = 0) -> dict[str, Any]:
+    builtin = _backend() == "builtin"
+    prompt = build_resume_prompt(session, batches=batches, skill=not builtin)
+    if running():
+        raise RuntimeError("已有检索在进行，完成或取消后再开始新的检索")
+    from ..search import screening
+    record = screening.load(session)
+    run = _new_run_id()
+    runs_dir().mkdir(parents=True, exist_ok=True)
+    question = str(record.get("question") or "").strip() or session
+    data = {"run": run, "state": "running", "started": datetime.now().isoformat(timespec="seconds"),
+            "question": question, "mode": "deep",
+            "form": {"question": question, "mode": "deep", "batches": int(batches or 0), "session": session},
+            "prompt": prompt, "doing": "正在继续深度检索", "events": [],
+            "session": session, "resumed_from": session, "agent_session": None,
+            "result": None, "error": None}
+    return _launch(run, data, prompt, builtin)
 
 
 def _event(data: dict[str, Any], text: str) -> None:

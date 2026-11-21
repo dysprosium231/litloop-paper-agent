@@ -172,3 +172,49 @@ def test_idle_minutes_parsing(monkeypatch):
     assert agent_runner._idle_minutes() == 15.0
     monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_idle_minutes", 20)
     assert agent_runner._idle_minutes() == 20.0
+
+
+def test_build_resume_prompt_reads_no_pool_and_rejects_quick_sessions(agent, monkeypatch):
+    from litloop import store
+    from litloop.search import deep as deep_search, screening
+
+    quick_sid = screening.save("quick q", [{"doi": "10.1/a", "title": "A", "relevance": "高", "reason": "r"}])["session"]
+    with pytest.raises(ValueError, match="不是深度检索会话"):
+        agent_runner.build_resume_prompt(quick_sid)
+
+    deep_sid = screening.save("SiC/Al", [{"doi": "10.1/a", "title": "A", "relevance": "高", "reason": "r"}],
+                              criteria=["研究 SiC/Al"], mode="deep")["session"]
+    pool_file = deep_search._pool_path(deep_sid)
+    pool_file.write_text("{broken json never read by app", encoding="utf-8")
+    store.write_json(store.summary_path(deep_sid), {"session": deep_sid, "pool": 500, "screened": 20, "batches": [{}]})
+    monkeypatch.setattr(deep_search, "_load", lambda s: (_ for _ in ()).throw(AssertionError("pool must not be read")))
+
+    ext = agent_runner.build_resume_prompt(deep_sid, batches=2, skill=True)
+    assert "litloop_deep_search" in ext and "action='status'" in ext and "最多再筛 2 批" in ext
+    assert "已评分 20/500" in ext and "- 研究 SiC/Al" in ext
+
+    builtin = agent_runner.build_resume_prompt(deep_sid, skill=False)
+    assert "deep_search_status" in builtin and "deep_search_rate" in builtin and "技能" not in builtin
+
+
+def test_resume_runs_external_agent_for_existing_session(agent):
+    from litloop.search import deep as deep_search, screening
+
+    sid = screening.save("SiC/Al", [{"doi": "10.1/a", "title": "A", "relevance": "高", "reason": "r"}], mode="deep")["session"]
+    deep_search._pool_path(sid).write_text("{}", encoding="utf-8")
+    (agent / "fake_agent.py").write_text(
+        "import json, sys\n"
+        "prompt = sys.stdin.read()\n"
+        "def out(m): print(json.dumps(m, ensure_ascii=False), flush=True)\n"
+        'out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", '
+        '"name": "mcp__litloop__litloop_deep_search", "input": {"action": "status"}}]}})\n'
+        f'out({{"type": "user", "message": {{"content": [{{"type": "tool_result", "tool_use_id": "t1", '
+        f'"content": [{{"type": "text", "text": {json.dumps(json.dumps({"session": sid}))}}}]}}]}}}})\n'
+        'out({"type": "result", "result": "续跑完成", "is_error": False})\n',
+        encoding="utf-8",
+    )
+
+    d = _wait(agent_runner.resume(sid, batches=1)["run"])
+    assert d["state"] == "done" and d["session"] == sid and d["resumed_from"] == sid
+    assert sid in d["prompt"]
+    assert [e["text"] for e in d["events"]] == ["深度检索：正在查看进度"]

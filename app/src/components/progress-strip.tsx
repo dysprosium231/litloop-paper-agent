@@ -12,6 +12,7 @@ const PHASES: [string, string][] = [
   ["rank", "排序"],
   ["batch", "生成批次"],
 ]
+const PHASE_LABEL: Record<string, string> = Object.fromEntries(PHASES)
 
 const secs = duration
 
@@ -75,27 +76,48 @@ function Pop({ label, aria, className, children }: {
 }
 
 /** What the running round is doing, or a one-line overview when nothing runs. */
-export function ProgressStrip({ progress, summary, onContinue }: {
-  progress: Progress | null; summary: Summary | null; onContinue: () => void
+export function ProgressStrip({ progress, summary, resumable, onContinue, onResume }: {
+  progress: Progress | null
+  summary: Summary | null
+  resumable?: boolean
+  onContinue: () => void
+  onResume?: () => void
 }) {
   const running = progress?.state === "running"
   if (!running) {
-    if (!summary) return null
-    const highs = summary.batches.map((b) => (b.rated ? b.高 / b.rated : 0))
+    const failed = progress?.state === "failed"
+    const interrupted = progress?.state === "interrupted"
+    if (!summary && !resumable && !failed && !interrupted) return null
+    const highs = summary ? summary.batches.map((b) => (b.rated ? b.高 / b.rated : 0)) : []
+    const phaseLabel = progress?.stopped_phase ? (PHASE_LABEL[progress.stopped_phase] ?? progress.stopped_phase) : null
+    const canAct = Boolean(summary?.current_batch || resumable)
     return (
-      <div className="flex min-h-13 min-w-0 items-center gap-5 border-b px-6 py-3 text-sm text-muted-foreground">
-        <span className="shrink-0 whitespace-nowrap tabular-nums" title={`候选池 ${summary.pool.toLocaleString()} 篇，已评分 ${summary.screened.toLocaleString()} 篇`}>
-          已评分 <span className="font-medium text-foreground">{summary.screened.toLocaleString()}</span> / {summary.pool.toLocaleString()}
-        </span>
-        {highs.length > 0 && <BatchBars batches={summary.batches} highs={highs} />}
+      <div className="flex min-h-13 min-w-0 flex-wrap items-center gap-x-5 gap-y-2 border-b px-6 py-3 text-sm text-muted-foreground">
+        {summary && (
+          <span className="shrink-0 whitespace-nowrap tabular-nums" title={`候选池 ${summary.pool.toLocaleString()} 篇，已评分 ${summary.screened.toLocaleString()} 篇`}>
+            已评分 <span className="font-medium text-foreground">{summary.screened.toLocaleString()}</span> / {summary.pool.toLocaleString()}
+          </span>
+        )}
+        {highs.length > 0 && <BatchBars batches={summary!.batches} highs={highs} />}
+        {interrupted && (
+          <span className="rounded bg-warning px-2 py-0.5 text-xs text-warning-foreground">
+            {phaseLabel ? `上次检索在「${phaseLabel}」中断` : "上次检索已中断"}
+          </span>
+        )}
+        {failed && (
+          <span className="max-w-md truncate rounded bg-destructive/10 px-2 py-0.5 text-xs text-destructive"
+            title={progress?.error ?? undefined}>
+            {progress?.error_text || "无法继续检索：上一轮未完成"}
+          </span>
+        )}
         <span className="ml-auto flex shrink-0 items-center gap-2">
-          {summary.stop_suggested && (
+          {summary?.stop_suggested && (
             <Pop label="建议停止" className="rounded bg-warning px-2 py-0.5 text-warning-foreground hover:brightness-95">
               <p className="font-medium">建议停止</p>
               <p className="mt-1 text-muted-foreground">{summary.stop_reason}</p>
             </Pop>
           )}
-          {!!summary.api_warnings?.length && (
+          {!!summary?.api_warnings?.length && (
             <Pop label={<><TriangleAlertIcon className="size-4" /><span className="tabular-nums">{summary.api_warnings.length}</span></>}
               aria={`接口提醒 ${summary.api_warnings.length} 条`}
               className="flex items-center gap-1 rounded px-1.5 py-0.5 text-warning-foreground hover:bg-warning">
@@ -105,9 +127,13 @@ export function ProgressStrip({ progress, summary, onContinue }: {
               </ul>
             </Pop>
           )}
-          {summary.current_batch && (
-            <Button size="sm" onClick={onContinue}
-              title="按当前全部评分重新排序并生成下一批，不经过 Agent">继续检索</Button>
+          {canAct && onResume && (
+            <Button size="sm" onClick={onResume}
+              title="让 Agent 接着评分并继续深度检索">由 Agent 继续</Button>
+          )}
+          {canAct && (
+            <Button size="sm" variant={onResume ? "outline" : "default"} onClick={onContinue}
+              title="按当前全部评分重新排序并生成下一批，不经过 Agent">仅取下一批</Button>
           )}
         </span>
       </div>

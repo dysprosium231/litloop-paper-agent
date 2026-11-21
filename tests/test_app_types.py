@@ -91,3 +91,14 @@ def test_session_record_type_covers_screening_record(tmp_path, monkeypatch):
     missing = set(written) - _ts_fields("SessionRecord")
     assert not missing, f"api.ts SessionRecord lacks {sorted(missing)}"
 
+
+def test_progress_type_covers_progress_fields(tmp_path, monkeypatch):
+    monkeypatch.setattr(screening._config, "DATA_DIR", tmp_path)
+    p = store.Progress("s1", "start")
+    p.phase("expand", 10)
+    p.finish("failed", error="boom")
+    got = store.read_progress("s1")
+    assert got is not None
+    missing = set(got.keys()) - _ts_fields("Progress")
+    assert not missing, f"api.ts Progress lacks {sorted(missing)}"
+

@@ -20,6 +20,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ..store import pid_alive as _pid_alive
+
 _LOCK = threading.Lock()
 _STATE: dict[str, Any] = {}
 _STARTED_MONO: float = 0.0
@@ -116,28 +118,6 @@ def _atomic_write(payload: dict[str, Any]) -> None:
         except OSError:
             pass
         raise
-
-
-def _pid_alive(pid: int) -> bool:
-    """Windows-safe liveness probe. NEVER use os.kill(pid, 0) on Windows —
-    any signal value there calls TerminateProcess and would murder the bar."""
-    if pid <= 0:
-        return False
-    try:
-        if os.name != "nt":
-            os.kill(pid, 0)
-            return True
-        import ctypes
-
-        SYNCHRONIZE = 0x00100000
-        kernel32 = ctypes.windll.kernel32
-        handle = kernel32.OpenProcess(SYNCHRONIZE, False, int(pid))
-        if not handle:
-            return False
-        kernel32.CloseHandle(int(handle))
-        return True
-    except Exception:
-        return False
 
 
 def start_task(task: str, total: int, **extra: Any) -> None:

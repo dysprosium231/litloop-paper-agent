@@ -72,12 +72,15 @@ def test_a_quick_save_needs_a_question_but_can_create_the_session(monkeypatch):
 def test_deep_search_tools_go_to_the_engine(monkeypatch):
     seen = {}
     monkeypatch.setattr(tools.deep, "start", lambda q, w, s, c, **k: seen.setdefault("start", (q, w, s, c, k)) or {})
+    monkeypatch.setattr(tools.deep, "rate", lambda s, r: seen.__setitem__("rate", (s, r)) or {"saved": len(r)})
     monkeypatch.setattr(tools.deep, "next_batch", lambda s, force=False: seen.setdefault("next", (s, force)) or {})
     monkeypatch.setattr(tools.deep, "status", lambda s: seen.setdefault("status", s) or {})
     tools.deep_search_start("Q", ["a"], ["10.1/s"], None, batch_size=15)
+    rated = tools.deep_search_rate("s1", [{"n": 1, "relevance": "高", "reason": "符合"}])
     tools.deep_search_next("s1", force=True)
     tools.deep_search_status("s1")
     assert seen["start"] == ("Q", ["a"], ["10.1/s"], [], {"criteria": None, "must_find": None, "batch_size": 15})
+    assert rated == {"saved": 1} and seen["rate"] == ("s1", [{"n": 1, "relevance": "高", "reason": "符合"}])
     assert seen["next"] == ("s1", True) and seen["status"] == "s1"
 
 
