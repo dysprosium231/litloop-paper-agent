@@ -175,10 +175,11 @@ jobs:
           python -m build
           python -m twine check --strict dist/*
 
-      - name: Smoke-test wheel import in isolated dir
+      - name: Smoke-test wheel import in isolated venv
         run: |
-          python -m pip install --no-deps --target /tmp/litloop-wheel-check dist/*.whl
-          PYTHONPATH=/tmp/litloop-wheel-check python -c "import litloop, litloop.db, litloop.agents, litloop.desktop.server; print('wheel OK:', litloop.__version__, 'tools:', len(litloop.agents.TOOLS))"
+          python -m venv /tmp/litloop-wheel-venv
+          /tmp/litloop-wheel-venv/bin/pip install dist/*.whl
+          /tmp/litloop-wheel-venv/bin/python -c "import litloop, litloop.db, litloop.agents, litloop.desktop.server; print('wheel OK:', litloop.__version__, 'tools:', len(litloop.agents.TOOLS))"
 
       - uses: actions/upload-artifact@v4
         with:
