@@ -101,6 +101,19 @@ jobs:
             app/src-tauri/target/release/bundle/SHA256SUMS.txt
             app/src-tauri/target/release/bundle/latest.json
 
+      - name: Extract release notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          python -c "
+          import os, pathlib, re
+          tag = os.environ['GITHUB_REF_NAME']
+          text = pathlib.Path('CHANGELOG.md').read_text(encoding='utf-8') if pathlib.Path('CHANGELOG.md').exists() else ''
+          m = re.search(rf'(?m)^##\s+{re.escape(tag)}\b[^\n]*\n(.*?)(?=^##\s+v|\Z)', text, re.S)
+          body = m.group(1).strip() if m else f'详见 [CHANGELOG.md](https://github.com/dysprosium231/litloop-paper-agent/blob/main/CHANGELOG.md) 与 [README](https://github.com/dysprosium231/litloop-paper-agent#readme)。'
+          pathlib.Path('release_notes.md').write_text(body + '\n', encoding='utf-8')
+          "
+
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
@@ -111,49 +124,8 @@ jobs:
             app/src-tauri/target/release/bundle/SHA256SUMS.txt
             app/src-tauri/target/release/bundle/latest.json
           draft: false
-          generate_release_notes: true
-          body: |
-            LitLoop 把「查文献」拆成四步，每一步都能看见 AI 干了什么、也都能由你改主意：
-            检索 → 筛选 → 下载 → 存进 Zotero。Agent 在后台检索、补摘要、给每篇打分并写一句理由，
-            你在桌面 app 里逐篇确认，选中的进下载队列，PDF 落到本地并推送到 Zotero 分类。
-
-            ## 下载与安装
-
-            - 两个包选一个：`*_x64-setup.exe`（NSIS，双击即装，可选只给当前用户）或
-              `*_x64_*.msi`（MSI，安装时可以选安装位置，适合批量部署）。
-            - 系统：Windows 10 / 11 x64。
-            - 依赖：无。自带 Python 运行时和全部核心依赖，目标机器不用装 Python、Node 或 Rust。
-            - 权限：装进 Program Files 需要管理员权限。
-            - 第一次运行会被 SmartScreen 拦住：点「更多信息」→「仍要运行」
-              （安装包没有代码签名，每个新版本都会拦一次）。
-            - 卸载：NSIS 安装包（`*_x64-setup.exe`）卸载时会弹窗询问是否同时删除 `~/.litloop`（默认选否，即保留检索记录、下载的 PDF 与配置）；MSI 安装包（`*_x64_*.msi`）卸载时默认保留 `~/.litloop`。
-
-            ## 第一次用
-
-            1. 打开 app 会走一遍初次引导（数据源、翻译、下载、网络、学校认证、可选组件、Zotero 七组），
-               每组都能当场「检测」，也能跳过。
-            2. 什么都不填也能先试一次快速检索（退回 Crossref）；要长期用，
-               建议在 OpenAlex 免费申请一个 Key，引导里有链接。
-            3. 要下载学校订阅的期刊，填学校代号并选认证方式；不在校园网时会弹浏览器让你登录一次。
-            4. 版面分析（PDF 转 Markdown 时按版面整理表格和分栏，约 65 MB）不在安装包里，
-               第一次需要时在「设置 → 可选组件」点「安装」，可填国内镜像。
-
-            ## 已知限制
-
-            - 安装包目前没有签名（SignPath Foundation 的开源免费签名在 2026-11-07 被拒，因为项目还缺公开关注度）；自动更新还没做，升级要手动下载新版本。
-            - 系统综述只做到流程统计和导出；不支持中文文献。
-            - 分支多、彼此引用少的课题深度检索查不全（稀土药物载体测试集 9 篇找到 2 篇）。
-            - Sci-Hub、LibGen 等来源默认关闭，是否开启由你决定。
-
-            ## 校验
-
-            附件里的 `SHA256SUMS.txt` 是安装包的 SHA-256。PowerShell：
-
-            ```powershell
-            Get-FileHash .\LitLoop_*_x64-setup.exe -Algorithm SHA256
-            ```
-
-            问题和新课题请提到 Issues；路线图和还没做的部分见 TODO.md。
+          generate_release_notes: false
+          body_path: release_notes.md
 
   pypi-build:
     runs-on: ubuntu-latest
