@@ -17,7 +17,7 @@
 - **底层存储迁移至 SQLite**：追踪主题、筛选会话、桌面端决策与深度检索候选池均迁移至 SQLite，支持自动迁移。
 - **安装与卸载体验**：NSIS 卸载时新增弹窗询问是否保留 `~/.litloop` 用户数据（默认保留）；优化错误提示的下一步操作指引与可选组件安装进度。
 - **空配置可用与空结果说明**：未填 Key 时也可先试跑快速检索；检索无结果时明确给出原因。
-- **Windows 安装与打包兼容修复**：修复 Windows 下 npm `claude` shim 与新版 setuptools PEP 639 许可证分类器问题（感谢 @FSJDIFE 在 #4 的贡献）。
+- **Windows 安装与打包兼容修复**：修复 Windows 下 npm `claude` shim 与新版 setuptools PEP 639 许可证分类器问题（感谢 [FSJDIFE](https://github.com/FSJDIFE) 在 #4 的贡献）。
 
 ### 安装与校验
 
