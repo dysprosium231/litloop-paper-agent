@@ -91,7 +91,7 @@ jobs:
           } | Out-File -Encoding utf8 $out
           Get-Content $out
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: litloop-windows
           path: |
@@ -181,7 +181,7 @@ jobs:
           /tmp/litloop-wheel-venv/bin/pip install dist/*.whl
           /tmp/litloop-wheel-venv/bin/python -c "import litloop, litloop.db, litloop.agents, litloop.desktop.server; print('wheel OK:', litloop.__version__, 'tools:', len(litloop.agents.TOOLS))"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pypi-dist
           path: dist/
