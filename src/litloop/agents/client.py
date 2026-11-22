@@ -29,19 +29,24 @@ ANTHROPIC_VERSION = "2023-06-01"
 _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
-def model_config(config: dict[str, Any] | None = None) -> dict[str, str]:
+def model_config(config: dict[str, Any] | None = None, *, task: str = "default") -> dict[str, str]:
     """The configured model, with the provider's defaults filled in."""
     config = config or {}
     provider = (config.get("builtin_agent_provider") or "openai").strip().lower()
     if provider not in PROVIDERS:
         provider = "openai"
     base_url = (config.get("builtin_agent_base_url") or "").strip() or PROVIDERS[provider]["base_url"]
+    model = (config.get("builtin_agent_model") or "").strip()
+    if task == "plan":
+        model = (config.get("builtin_agent_plan_model") or "").strip() or model
+    elif task == "rate":
+        model = (config.get("builtin_agent_rate_model") or "").strip() or model
     return {
         "provider": provider,
         "protocol": PROVIDERS[provider]["protocol"],
         "base_url": base_url.rstrip("/"),
         "api_key": (config.get("builtin_agent_api_key") or "").strip(),
-        "model": (config.get("builtin_agent_model") or "").strip(),
+        "model": model,
     }
 
 
@@ -120,9 +125,9 @@ def _post(url: str, headers: dict[str, str], body: dict[str, Any], config: dict[
 
 def chat(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None, *,
          config: dict[str, Any] | None = None, system: str = "", max_tokens: int = 2048,
-         timeout: float = 120) -> dict[str, Any]:
+         timeout: float = 120, task: str = "default") -> dict[str, Any]:
     """One round trip. ``tools`` are ``{"name", "description", "parameters"}``."""
-    cfg = model_config(config)
+    cfg = model_config(config, task=task)
     if not cfg["model"]:
         raise ValueError("还没有填模型名")
     if not cfg["api_key"] and cfg["protocol"] == "anthropic":

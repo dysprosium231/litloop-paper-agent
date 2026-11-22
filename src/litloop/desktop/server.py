@@ -79,6 +79,8 @@ class NewSearch(BaseModel):
     exclude_warning: bool = False
     seeds: str = ""
     seed_collection: str = ""
+    planned_queries: list[str] = []
+    planned_core_terms: list[str] = []
 
 
 class ResumeSearch(BaseModel):
@@ -864,6 +866,17 @@ def create_app(token: str) -> FastAPI:
             raise HTTPException(409, "已有下载任务在进行，完成后再开始新的下载") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/searches/plan")
+    def search_plan(body: NewSearch) -> dict[str, Any]:
+        from ..agents.runner import plan_search
+        from ..config import load_config
+        try:
+            return plan_search(body.model_dump(), config=load_config())
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(502, f"无法生成检索方案：{exc}") from exc
 
     @app.post("/api/searches")
     def search_start(body: NewSearch) -> dict[str, Any]:

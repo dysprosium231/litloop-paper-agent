@@ -99,7 +99,7 @@
     - [x] **提示词**（2026-11-06）：新增 `agents/system.py` 的系统提示词（四档相关度怎么判、拿不准往高评、快速/深度检索的步骤、不许下载与写 Zotero），`_run_builtin()` 传给 `run_task(system=…)`；`build_prompt(form, skill=False)` 给内置后端去掉「用 litloop 技能」这句——它读不到技能文档。见 DECISIONS「内置 Agent 拿到自己的规则」。
     - [x] **步数**（2026-11-06）：按批数算，深度检索 `min(4 + 2 × 批数, 24)`、快速查找仍是 8。
     - [ ] 真实 Key 实测一次快速查找、一次深度检索（DeepSeek 与本地 Ollama 各一次）。
-    - [ ] 设置里按任务分模型、用测试集存档比较各模型的评分质量、补「先给检索词再由你确认」的确认点。
+    - [~] **按任务分模型与检索方案确认点**（2026-11-22）：设置页新增 `builtin_agent_plan_model`（检索方案模型）与 `builtin_agent_rate_model`（评分模型），`agents/runner.py` 根据步骤自动切换模型；新增 `POST /api/searches/plan`（0 检索积分预生成可编辑检索词、核心词、纳入标准与预计积分）及新建检索页「预览检索方案」确认卡片。还差：用测试集存档比较各模型的评分质量。
 - [~] 安装包与自动更新（评审 12；设计和验收见 CHARTER「可视化 app → 发布」，2026-10-26 用户定了安装范围、签名、分发和浏览器的做法，见 DECISIONS「作为标准 Windows 程序分发」）。
   - [x] 先摸底：核心依赖 **336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 跑起 `litloop.desktop.server`，合计约 **358 MB**（DECISIONS「发布摸底（2）」）；NSIS 安装包实测 **113.38 MiB**（DECISIONS「第一个 Windows 安装包」）。还剩：用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净 Windows 验收；
   - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时，Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出安装包；去掉版面分析后是 **99.59 MiB**（DECISIONS「第一个 Windows 安装包」「版面分析不进安装包」）。
@@ -152,7 +152,7 @@
 
 ### 2. MCP 生态（当下最大的杠杆）
 
-- [~] 写 `server.json` / `smithery.yaml`：`server.json` 已写（pypi、`uvx litloop run`、stdio）；`smithery.yaml` 等 PyPI 发布后再补，Smithery 要能拉到包才算数。
+- [x] 写 `server.json` / `smithery.yaml`（2026-11-22）：`server.json` 与 `smithery.yaml`（`uvx litloop run`）均已写好；提交素材已整理在 [docs/DIRECTORIES.md](docs/DIRECTORIES.md)。
 - [ ] 提交到 Smithery、Glama、mcp.so、PulseMCP、awesome-mcp-servers。定位一句话：「Search, screen, download, and file papers into Zotero — 21 tools」。需要各站账号，排到 PyPI 之后。
 
 ### 3. 中文社区种草（决定早期用户量）

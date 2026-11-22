@@ -105,6 +105,12 @@ def build_prompt(form: dict[str, Any], skill: bool = True) -> str:
         parts.append("种子文献：" + "、".join(seeds))
     if form.get("seed_collection"):
         parts.append(f"Zotero 分类「{form['seed_collection']}」里的文献也作种子（seed_collection）。")
+    planned_q = [str(x).strip() for x in (form.get("planned_queries") or []) if str(x).strip()]
+    if planned_q:
+        parts.append("已确认检索词（直接按这些检索，不要自行改写）：\n" + "\n".join(f"- {q}" for q in planned_q))
+    planned_c = [str(x).strip() for x in (form.get("planned_core_terms") or []) if str(x).strip()]
+    if planned_c:
+        parts.append("已确认核心词：" + "、".join(planned_c))
     if deep:
         batches = int(form.get("batches") or 0)
         parts.append(
@@ -488,6 +494,7 @@ def _run_builtin(run: str, data: dict[str, Any], prompt: str) -> None:
 
     try:
         from ..agents import FUNCTIONS, TOOLS, run_task
+        from ..agents.runner import default_task_for_step
         from ..agents.system import system_prompt
 
         form = data.get("form") or {}
@@ -497,7 +504,7 @@ def _run_builtin(run: str, data: dict[str, Any], prompt: str) -> None:
         # answer need a few more (2026-11-06: the old flat 8 stopped deep runs).
         steps = min(4 + 2 * batches, 24) if deep else 8
         out = run_task(prompt, TOOLS, functions=FUNCTIONS, system=system_prompt(),
-                       max_steps=steps, on_event=on_event)
+                       max_steps=steps, on_event=on_event, task_for_step=default_task_for_step)
         data["result"] = str(out.get("text") or "").strip() or None
         data["state"] = "cancelled" if stop.is_set() else "done"
     except _Cancelled:

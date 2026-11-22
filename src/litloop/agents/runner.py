@@ -73,10 +73,100 @@ def _messages_for(protocol: str, transcript: list[dict[str, Any]]) -> list[dict[
     return out
 
 
+_FETCH_TOOLS = frozenset({"search", "deep_search_start", "deep_search_next", "deep_search_status"})
+
+
+def default_task_for_step(step: int, produced: list[dict[str, Any]]) -> str:
+    """Use the planning model initially, and switch to the rating model right after batches/hits arrive."""
+    if step <= 1 or not produced:
+        return "plan"
+    if str(produced[-1].get("name") or "") in _FETCH_TOOLS:
+        return "rate"
+    return "plan"
+
+
+def estimate_search_credits(mode: str, query_count: int, batches: int) -> tuple[str, str]:
+    """Rough OpenAlex credit range and a short Chinese explanation (0 credits spent to estimate)."""
+    q = max(1, int(query_count or 1))
+    if mode == "deep":
+        b = max(1, int(batches or 3))
+        low = min(300, 80 + q * 20)
+        high = max(low + 100, min(1500, 120 + q * 30 + b * 90))
+        return f"约 {low}–{high} 积分", f"按 {q} 组检索词、约 {b} 批扩展与补摘要粗略估算（免费 Key 每日 10,000 积分）"
+    low = q * 10
+    high = q * 40
+    return f"约 {low}–{high} 积分", f"按 {q} 组检索词的快速查找粗略估算（免费 Key 每日 10,000 积分）"
+
+
+def _strip_code_fence(text: str) -> str:
+    s = (text or "").strip()
+    if s.startswith("```"):
+        lines = s.splitlines()
+        if len(lines) >= 2 and lines[-1].strip().startswith("```"):
+            return "\n".join(lines[1:-1]).strip()
+    return s
+
+
+def plan_search(form: dict[str, Any], *, config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Generate editable search queries, core terms, criteria, and credit estimate without calling search APIs."""
+    question = str(form.get("question") or "").strip()
+    if not question:
+        raise ValueError("请先填写检索问题")
+    cfg = model_config(config, task="plan")
+    if not cfg["model"]:
+        raise ValueError("无法预览检索方案：还没有填内置 Agent 的模型名。在「设置 → 内置 Agent」中填写")
+    if not cfg["api_key"] and cfg["protocol"] == "anthropic":
+        raise ValueError("无法预览检索方案：还没有填内置 Agent 的 API Key")
+
+    mode = "deep" if form.get("mode") == "deep" else "quick"
+    raw_criteria = str(form.get("criteria") or "").strip()
+    system = (
+        "你是学术文献检索规划助手。只输出一个合法 JSON 对象，不要输出任何额外说明或代码块以外的文字。"
+        'JSON 字段固定为：{"queries": ["..."], "core_terms": ["..."], "criteria": ["..."]}。'
+        "其中 queries 给 2–5 条适合 OpenAlex/Crossref 的英文布尔或短语检索式；"
+        "core_terms 给 2–4 条用于过滤候选池的核心概念词（同义词可用 | 连接）；"
+        "criteria 给 2–5 条简洁明确的中文纳入标准（如果用户已提供纳入标准，保留并微调即可）。"
+    )
+    user_parts = [f"检索问题：{question}", f"检索方式：{'深度检索' if mode == 'deep' else '快速查找'}"]
+    if raw_criteria:
+        user_parts.append(f"用户已填写的纳入标准：\n{raw_criteria}")
+    if form.get("year_from") or form.get("year_to"):
+        user_parts.append(f"年份范围：{form.get('year_from') or '不限'}–{form.get('year_to') or '至今'}")
+
+    reply = chat([{"role": "user", "content": "\n".join(user_parts)}],
+                 tools=None, config=config, system=system, max_tokens=1200, timeout=60, task="plan")
+    raw_text = _strip_code_fence(str(reply.get("text") or ""))
+    try:
+        parsed = json.loads(raw_text)
+    except ValueError:
+        parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+
+    queries = [str(x).strip() for x in (parsed.get("queries") or []) if str(x).strip()][:6]
+    if not queries:
+        queries = [question]
+    core_terms = [str(x).strip() for x in (parsed.get("core_terms") or []) if str(x).strip()][:6]
+    criteria = [str(x).strip() for x in (parsed.get("criteria") or []) if str(x).strip()][:6]
+    if not criteria and raw_criteria:
+        criteria = [s.strip() for s in raw_criteria.splitlines() if s.strip()]
+
+    est, note = estimate_search_credits(mode, len(queries), int(form.get("batches") or 0))
+    return {
+        "queries": queries,
+        "core_terms": core_terms,
+        "criteria": criteria,
+        "estimated_credits": est,
+        "credit_note": note,
+        "model": cfg["model"],
+    }
+
+
 def run_task(goal: str, tools: list[dict[str, Any]], *, functions: dict[str, Tool] | None = None,
              config: dict[str, Any] | None = None, system: str = "", max_steps: int = 8,
              max_tokens: int = 4096, timeout: float = 180,
-             on_event: EventHandler | None = None) -> dict[str, Any]:
+             on_event: EventHandler | None = None,
+             task_for_step: Callable[[int, list[dict[str, Any]]], str] | None = None) -> dict[str, Any]:
     """Run until the model answers without calling a tool (or ``max_steps``)."""
     protocol = model_config(config)["protocol"]
     functions = functions or {}
@@ -88,8 +178,9 @@ def run_task(goal: str, tools: list[dict[str, Any]], *, functions: dict[str, Too
             on_event(kind, data)
 
     for step in range(1, max_steps + 1):
+        step_task = task_for_step(step, produced) if task_for_step else "default"
         reply = chat(_messages_for(protocol, transcript), tools, config=config, system=system,
-                     max_tokens=max_tokens, timeout=timeout)
+                     max_tokens=max_tokens, timeout=timeout, task=step_task)
         text = (reply.get("text") or "").strip()
         calls = reply.get("tool_calls") or []
         if text:

@@ -122,6 +122,12 @@ GROUPS: list[dict[str, Any]] = [
              "help": "本机 Ollama、vLLM 不用填"},
             {"key": "builtin_agent_model", "label": "模型名", "type": "text",
              "placeholder": "例如 deepseek-chat、claude-sonnet-4-5"},
+            {"key": "builtin_agent_plan_model", "label": "检索方案模型", "type": "text",
+             "placeholder": "留空沿用模型名",
+             "help": "拟定检索词与核心词时使用，可填更强的模型"},
+            {"key": "builtin_agent_rate_model", "label": "评分模型", "type": "text",
+             "placeholder": "留空沿用模型名",
+             "help": "逐批读摘要评分时使用，可填更快更省的模型"},
         ],
     },
     {
@@ -538,6 +544,12 @@ def test_builtin_agent() -> list[dict[str, Any]]:
     reply = test_model(cfg)
     detail = str(reply.get("detail") or "")
     ok: bool | None = True if reply.get("ok") else (None if detail.startswith("还没有") else False)
+    if ok:
+        plan_m = str(cfg.get("builtin_agent_plan_model") or "").strip()
+        rate_m = str(cfg.get("builtin_agent_rate_model") or "").strip()
+        if plan_m or rate_m:
+            main_m = str(cfg.get("builtin_agent_model") or "").strip()
+            detail += f"；方案：{plan_m or main_m} · 评分：{rate_m or main_m}"
     return [_result("模型", ok, detail)]
 
 

@@ -179,3 +179,79 @@ def test_resume_runs_builtin_agent_and_blocks_concurrent_runs(builtin, tmp_path,
     _idle()
     assert d["state"] == "done" and d["resumed_from"] == sid and d["session"] == sid
     assert "deep_search_status" in seen["goal"] and "deep_search_rate" in seen["system"]
+
+
+def test_per_task_model_selection_and_step_switching(monkeypatch):
+    from litloop.agents import client, runner
+
+    cfg = {
+        "builtin_agent_provider": "openai",
+        "builtin_agent_model": "gpt-main",
+        "builtin_agent_plan_model": "gpt-strong",
+        "builtin_agent_rate_model": "gpt-fast",
+    }
+    assert client.model_config(cfg)["model"] == "gpt-main"
+    assert client.model_config(cfg, task="plan")["model"] == "gpt-strong"
+    assert client.model_config(cfg, task="rate")["model"] == "gpt-fast"
+    assert client.model_config({"builtin_agent_model": "only-main"}, task="rate")["model"] == "only-main"
+
+    seen_tasks: list[str] = []
+
+    def fake_chat(messages, tools, *, config=None, system="", max_tokens=4096, timeout=180, task="default"):
+        seen_tasks.append(task)
+        if len(seen_tasks) == 1:
+            return {"text": "", "tool_calls": [{"id": "c1", "name": "search", "arguments": {"query": "x"}}]}
+        return {"text": "done", "tool_calls": []}
+
+    monkeypatch.setattr(runner, "chat", fake_chat)
+    out = runner.run_task(
+        "goal",
+        [{"name": "search", "description": "s", "parameters": {"type": "object", "properties": {}}}],
+        functions={"search": lambda **kw: {"items": []}},
+        config=cfg,
+        task_for_step=runner.default_task_for_step,
+    )
+    assert out["text"] == "done"
+    assert seen_tasks == ["plan", "rate"]
+
+
+def test_plan_search_endpoint_and_build_prompt(monkeypatch):
+    from fastapi.testclient import TestClient
+    from litloop.agents import runner
+    from litloop.desktop import server as app_server
+
+    monkeypatch.setattr(
+        config,
+        "load_config",
+        lambda: {"builtin_agent_provider": "openai", "builtin_agent_model": "m-main", "builtin_agent_plan_model": "m-plan"},
+    )
+    monkeypatch.setattr(
+        runner,
+        "chat",
+        lambda *a, **k: {
+            "text": '```json\n{"queries": ["SiC aluminum infiltration", "SiC Al interface"], "core_terms": ["SiC", "aluminum|aluminium"], "criteria": ["研究界面反应"]}\n```',
+            "tool_calls": [],
+        },
+    )
+
+    c = TestClient(app_server.create_app("t0k"))
+    c.headers["X-LitLoop-Token"] = "t0k"
+
+    bad = c.post("/api/searches/plan", json={"question": "   "})
+    assert bad.status_code == 400
+
+    res = c.post("/api/searches/plan", json={"question": "SiC/Al", "mode": "deep", "batches": 3})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["model"] == "m-plan"
+    assert body["queries"] == ["SiC aluminum infiltration", "SiC Al interface"]
+    assert body["core_terms"] == ["SiC", "aluminum|aluminium"]
+    assert "积分" in body["estimated_credits"]
+
+    prompt = agent_runner.build_prompt({
+        "question": "SiC/Al",
+        "mode": "deep",
+        "planned_queries": body["queries"],
+        "planned_core_terms": body["core_terms"],
+    })
+    assert "已确认检索词" in prompt and "SiC aluminum infiltration" in prompt and "已确认核心词" in prompt

@@ -1,5 +1,16 @@
 # 决定与实验记录
 
+## 2026-11-22：内置 Agent 按任务分模型与检索方案确认点
+
+- 背景：补齐 [TODO.md](TODO.md)「app → 后端 B」中按任务分模型与「先给检索词与预计积分，确认后再开始」确认点，并同步完善 MCP 分发材料（[smithery.yaml](smithery.yaml)、[docs/DIRECTORIES.md](docs/DIRECTORIES.md)、`README` 置顶 `pip install litloop` 与 `uvx litloop run`，提交 `9e03e49`）。
+- 改动：
+  1. **按任务分模型**：[src/litloop/config.py](src/litloop/config.py) 与 [src/litloop/desktop/settings.py](src/litloop/desktop/settings.py) 新增 `builtin_agent_plan_model`、`builtin_agent_rate_model`（留空沿用主模型名）；[src/litloop/agents/client.py](src/litloop/agents/client.py) 的 `model_config(task=...)` 与 `chat(task=...)` 按任务选模；[src/litloop/agents/runner.py](src/litloop/agents/runner.py) 的 `run_task(..., task_for_step=...)` 与 `default_task_for_step` 在获取文献前用 `plan` 模型、拿到待评列表后切 `rate` 模型，并在 [src/litloop/desktop/agent_runner.py](src/litloop/desktop/agent_runner.py) 启用。
+  2. **检索方案确认点**：`agents/runner.py` 新增 `estimate_search_credits` 与 `plan_search`（仅调一次 `plan` 模型生成检索词、核心词与纳入标准，0 检索积分消耗）；[src/litloop/desktop/server.py](src/litloop/desktop/server.py) 新增 `POST /api/searches/plan`；`agent_runner.build_prompt()` 支持注入 `planned_queries` / `planned_core_terms`；[app/src/components/search-view.tsx](app/src/components/search-view.tsx) 新增「预览检索方案」与可编辑确认卡片。
+- 验证：
+  - 新增与相关测试（`test_agent_builtin.py`、`test_agent_runner.py`、`test_app_server.py`）：`50 passed`。
+  - 前端 `app/` 下 `npm run build`（`tsc && vite build`）与 `npm run lint:copy`：`No issues found.`。
+  - 全量 `pytest -q`：`1269 passed, 3 skipped`（219.99s）。
+
 ## 2026-11-22：正式发布 `litloop 1.18.3` 至 PyPI
 
 - 结果：已使用用户提供的一次性临时令牌通过 `twine upload` 将 `litloop-1.18.3-py3-none-any.whl` 与 `litloop-1.18.3.tar.gz` 正式发布至 PyPI（`https://pypi.org/project/litloop/1.18.3/`）。

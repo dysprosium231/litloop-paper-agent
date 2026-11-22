@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import {
-  downloadsApi, errorMessage, searchApi, type SearchForm, type SearchRun, type ZoteroCollection,
+  downloadsApi, errorMessage, searchApi, type SearchForm, type SearchPlan, type SearchRun, type ZoteroCollection,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -34,6 +34,10 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
   const [live, setLive] = React.useState<SearchRun | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [collections, setCollections] = React.useState<ZoteroCollection[] | null>(null)
+  const [planning, setPlanning] = React.useState(false)
+  const [plan, setPlan] = React.useState<SearchPlan | null>(null)
+  const [planQueries, setPlanQueries] = React.useState("")
+  const [planCoreTerms, setPlanCoreTerms] = React.useState("")
   const set = <K extends keyof SearchForm>(k: K, v: SearchForm[K]) => setForm((f) => ({ ...f, [k]: v }))
 
   const refresh = React.useCallback(() => searchApi.list().then(setRuns).catch((e) => setError(errorMessage(e))), [])
@@ -56,12 +60,32 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
     if (form.mode === "deep" && collections === null) downloadsApi.collections().then(setCollections).catch(() => setCollections([]))
   }, [form.mode, collections])
 
-  const start = () => {
+  const start = (usePlan = false) => {
     setError(null)
-    searchApi.start(form).then((r) => {
+    const payload: SearchForm = usePlan && plan
+      ? {
+          ...form,
+          planned_queries: planQueries.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
+          planned_core_terms: planCoreTerms.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
+        }
+      : form
+    searchApi.start(payload).then((r) => {
       if (r.state === "failed") setError(r.error)
+      else if (usePlan) setPlan(null)
       refresh()
     }).catch((e) => setError(errorMessage(e)))
+  }
+  const previewPlan = () => {
+    setError(null)
+    setPlanning(true)
+    searchApi.plan(form).then((p) => {
+      setPlan(p)
+      setPlanQueries(p.queries.join("\n"))
+      setPlanCoreTerms(p.core_terms.join("\n"))
+      if (!form.criteria.trim() && p.criteria.length > 0) {
+        set("criteria", p.criteria.join("\n"))
+      }
+    }).catch((e) => setError(errorMessage(e))).finally(() => setPlanning(false))
   }
   const resume = (session: string) => {
     setError(null)
@@ -148,13 +172,40 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
             </div>
           )}
           {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-          <div className="flex items-center gap-3">
-            <Button onClick={start} disabled={!form.question.trim() || Boolean(running)}>开始检索</Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" onClick={previewPlan} disabled={!form.question.trim() || Boolean(running) || planning}>
+              {planning ? <><LoaderIcon className="animate-spin" />正在生成方案…</> : "预览检索方案"}
+            </Button>
+            <Button onClick={() => start(false)} disabled={!form.question.trim() || Boolean(running)}>开始检索</Button>
             <span className="text-xs text-muted-foreground">
-              {running ? "已有检索在进行，完成后再开始新的检索" : "检索要求会发给 Agent，由它检索、评分并保存结果"}
+              {running ? "已有检索在进行，完成后再开始新的检索" : "可先预览检索词和预计积分，再确认开始"}
             </span>
           </div>
         </Card>
+
+        {plan && (
+          <Card className="space-y-4 border-primary/30 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold">检索方案预览</h3>
+                <p className="text-xs text-muted-foreground">
+                  模型：{plan.model} · 预计消耗 {plan.estimated_credits}（{plan.credit_note}）
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setPlan(null)}>收起方案</Button>
+            </div>
+            <Field label="检索词" htmlFor="pq" note="每行一条英文检索式，可直接修改">
+              <textarea id="pq" rows={4} className={textarea} value={planQueries} onChange={(e) => setPlanQueries(e.target.value)} />
+            </Field>
+            <Field label="核心词" htmlFor="pc" note="每行一条核心概念词，同义词可用 | 分隔">
+              <textarea id="pc" rows={2} className={textarea} value={planCoreTerms} onChange={(e) => setPlanCoreTerms(e.target.value)} />
+            </Field>
+            <div className="flex items-center gap-3">
+              <Button onClick={() => start(true)} disabled={Boolean(running) || !planQueries.trim()}>按此方案开始检索</Button>
+              <span className="text-xs text-muted-foreground">检索词与上面的纳入标准会一起发给 Agent</span>
+            </div>
+          </Card>
+        )}
 
         <SectionTitle title="最近的检索" />
         <Card>

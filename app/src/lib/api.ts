@@ -575,6 +575,17 @@ export interface SearchForm {
   exclude_warning: boolean
   seeds: string
   seed_collection: string
+  planned_queries?: string[]
+  planned_core_terms?: string[]
+}
+
+export interface SearchPlan {
+  queries: string[]
+  core_terms: string[]
+  criteria: string[]
+  estimated_credits: string
+  credit_note: string
+  model: string
 }
 
 /** A search the app sent to the agent: agent_runs/<run>.json. */
@@ -594,6 +605,7 @@ export interface SearchRun {
 }
 
 export const searchApi = {
+  plan: (form: SearchForm) => call<SearchPlan>("/api/searches/plan", form),
   start: (form: SearchForm) => call<SearchRun>("/api/searches", form),
   resume: (session: string, batches = 0) => call<SearchRun>(`/api/sessions/${encodeURIComponent(session)}/resume`, { batches }),
   list: () => call<SearchRun[]>("/api/searches"),
