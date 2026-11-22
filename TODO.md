@@ -146,7 +146,7 @@
 - [x] 补仓库元信息：description 与 16 个 topics 已于 2026-11-05 用 `gh repo edit` 设好（「学术文献 Agent：检索 → 筛选 → 下载（校园网 / CARSI / WebVPN）→ Zotero 归档 | 21 MCP tools for Claude, Cursor and Codex」）。社交预览图还没做。
 - [x] 英文 `README.md` + 中文 `README.zh-CN.md`，两份顶部互相链接（2026-11-05）。
 - [x] 打第一个正式 Release（2026-11-05）：tag `v1.18.2` 跑通 `release.yml`，发布 [v1.18.2](https://github.com/dysprosium231/litloop-paper-agent/releases/tag/v1.18.2)，产物 `LitLoop_1.18.2_x64-setup.exe`（106,757,379 字节 = 101.8 MiB）与 `SHA256SUMS.txt`。第一次 tag `v1.18.1` 失败是 CI 用 3.13 的 pip 往 3.14 的嵌入式运行时装依赖（numpy cp313 轮子），改成先用 uv 按嵌入式解释器装后通过（见 DECISIONS）。后续发版只需打 tag。
-- [~] 发上 PyPI（`pip install litloop`）：`pyproject.toml` 补了 keywords 与 11 条 classifiers；`python -m build` 出 sdist 818 KB + wheel 707 KB（170 个文件），`twine check` 都 PASSED，装进临时目录后 `import litloop` 与 `litloop.agents.TOOLS` 正常；`server.json` 已按官方注册表格式写好并纳入一致性检查。**只剩上传**：需要用户的 PyPI API token。
+- [~] 发上 PyPI（`pip install litloop`，2026-11-22 更新）：已按 `1.18.3` 重打 sdist（879.1 KB）+ wheel（734.7 KB，176 个文件），`twine check --strict` 都 PASSED，隔离解压后 `import litloop`、`litloop.db`、`litloop.desktop.server` 与 `litloop.agents.TOOLS` 均正常；`.github/workflows/release.yml` 已接入 PyPI Trusted Publishing（`pypi-build` + `pypi-publish` OIDC 自动发布）。**只剩一步**：在 PyPI 网页配置好 Pending Publisher（或本机用 API token 执行 `twine upload dist/*`）后推 `v1.18.3` tag。
 - [~] 下一次发版带上 MSI（2026-11-06）：`release.yml` 已改成两个包一起发、校验和覆盖两者；本机已打出 `LitLoop_1.18.2_x64_zh-CN.msi`，但 v1.18.2 那次发布只发了 NSIS，MSI 随下一次 tag（建议 1.18.3）一起出。发版说明里要写清「普通用户用 .exe（可选安装范围），批量部署用 .msi（按机器装、需管理员）」。
 - [ ] 90 秒演示 GIF 放 README 顶部（一句话 → 30 篇 → 下载 → Zotero），替换现在 4 张静态截图的位置。
 

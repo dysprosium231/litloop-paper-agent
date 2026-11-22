@@ -1,5 +1,13 @@
 # 决定与实验记录
 
+## 2026-11-22：接入 PyPI Trusted Publishing 与 `1.18.3` 分发包构建自测
+
+- 背景：`TODO.md`「推广 → 发上 PyPI」此前已配好元数据但长期卡在 API token 上传；目前 PyPI 包名 `litloop` 仍可用（HTTP 404）。
+- 改动：
+  1. **CI 自动发布**：在 [.github/workflows/release.yml](.github/workflows/release.yml) 新增 `pypi-build` 与 `pypi-publish` 两个 job，采用 PyPI Trusted Publishing（`environment: pypi` + `id-token: write` + `pypa/gh-action-pypi-publish@release/v1`），推 `v*` tag 时免长期 API token 自动构建、校验并发布到 PyPI。
+  2. **本机 `1.18.3` 构建与自测**：清理旧 `1.18.0` 产物后运行 `python -m build`，产出 `dist/litloop-1.18.3.tar.gz`（879.1 KB）与 `dist/litloop-1.18.3-py3-none-any.whl`（734.7 KB，176 个文件，含 `litloop/db.py`、`data/`、`templates/`、`desktop/server.py`、`agents/tools.py`）；`twine check --strict dist/*` 全部 PASSED；在隔离目录解压 wheel 后独立子进程导入 `litloop`（`1.18.3`）、`litloop.db`（`DB_SCHEMA=1`）、`litloop.desktop.server` 与 `litloop.agents` 全部正常。
+- 下一步：用户在 PyPI 网页添加 Pending Publisher（或在本机终端 `twine upload dist/*`），推 `v1.18.3` tag 即可完成首次上架。
+
 ## 2026-11-21：体积与冷启动优化、安装包与发布收尾
 
 - 背景：按 [TODO.md](TODO.md) 完成「工程债 → 体积与冷启动」与「app → 安装包与自动更新」收尾，并作为当日工作收口。
