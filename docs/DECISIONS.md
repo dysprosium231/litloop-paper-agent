@@ -1,5 +1,10 @@
 # 决定与实验记录
 
+## 2026-11-22：正式发布 `litloop 1.18.3` 至 PyPI
+
+- 结果：已使用用户提供的一次性临时令牌通过 `twine upload` 将 `litloop-1.18.3-py3-none-any.whl` 与 `litloop-1.18.3.tar.gz` 正式发布至 PyPI（`https://pypi.org/project/litloop/1.18.3/`）。
+- 线上验证：请求 `https://pypi.org/pypi/litloop/json` 返回 `HTTP 200`，`info.version == "1.18.3"`，`urls` 包含 `bdist_wheel` 与 `sdist`；`pip install litloop` 与 `uvx litloop run` 已可用。
+
 ## 2026-11-22：接入 PyPI Trusted Publishing 与 `1.18.3` 分发包构建自测
 
 - 背景：`TODO.md`「推广 → 发上 PyPI」此前已配好元数据但长期卡在 API token 上传；目前 PyPI 包名 `litloop` 仍可用（HTTP 404）。
