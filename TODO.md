@@ -22,16 +22,16 @@
 | app：地基 | ✅ | |
 | app：筛选页 | 🔶 | 深度链接 2026-11-05 做了（`litloop://session/<id>`，待实测）；完成通知 2026-11-04 做了（待实测 12） |
 | app：任务层 + 后端 A（外部 Agent） | 🔶 | 待实测 5（真实检索） |
-| app：后端 B（内置 Agent，多家模型） | 🔶 | 客户端、任务循环、五个工具、`agent_backend` 开关、系统提示词与按批数的步数都已做完（2026-11-06）；还差真实 Key 实测与按任务分模型（待办池「app」） |
+| app：后端 B（内置 Agent，多家模型） | 🔶 | 客户端、任务循环、五个工具、`agent_backend` 开关、系统提示词、按批步数、分任务模型（规划/打分）与检索方案预览均已完成（2026-11-22）；还差真实 Key 实测（待实测 15）与测试集模型评分质量对比（待办池「app」） |
 | app：初次引导与设置 | ✅ | 后端 B 的模型配置随后端 B 做 |
 | app：术语表 | 🔶 | 待实测 7 |
 | app：下载队列与 Zotero | 🔶 | 待实测 1–5 |
-| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | NSIS（含卸载询问是否保留 `~/.litloop` 钩子）与 MSI（默认保留）均可打；按需组件流式进度、`scripts/prepare_release.py` 发版自检、设置页版本更新检查与 CI 条件签名流已就绪（2026-11-21）；待填 Tauri 更新公钥、诊断包/干净机真机验收；签名：SignPath Foundation 免费计划 2026-11-07 被拒，暂不签名，README 如实写明 |
+| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | `v1.18.4` 已发布 NSIS（96.0 MiB，含卸载询问是否保留 `~/.litloop`）与 MSI（120.8 MiB）双安装包，PyPI Trusted Publishing 与 `CHANGELOG.md` 自动发版说明已上线，按需组件流式进度、`scripts/prepare_release.py`、设置页检查更新与 CI 条件签名流均就绪（2026-11-22）；待填 Tauri 更新公钥、干净 Windows 真机验收（待实测 13）；签名：SignPath Foundation 免费计划 2026-11-07 被拒，暂不签名，README 如实写明 |
 | 完整流程（真实课题从检索到 Zotero 不用手动补救） | 🔶 | 待办池「阶段 2 剩余」：深度检索 → 批量下载 → 推送 Zotero 连起来走一遍 |
 
 ## 正在做
 
-（正在做：今日（2026-11-21）已完成工程债全面清偿与发布前收尾——①「真实世界回归」（`4c1168d`）；②「筛选页批量与撤销」（`05f24d7`）；③「SQLite 数据层三阶段迁移」（`e288ae5`、`b4285f4`、`bb99f8f`）；④「错误提示补『下一步』及界面文案规范化」（`ff93500`）；⑤「快速检索 7 天结果缓存」（`2caf2bb`）；⑥「体积与冷启动优化」（`413d657`，`litloop` 顶层懒加载、`lib.rs` 窗口与后台并行启动、前端代码分割与运行时裁剪增强）；⑦「安装包与发布收尾」（NSIS 卸载数据提示钩子、按需组件安装进度与 `/api/app-update`、设置页检查更新、`scripts/prepare_release.py` 与 CI 条件签名流）。下一步：等用户按待实测 13–14 真机验收，生成 Tauri 更新签名公钥填入后即可打 tag 发版（`v1.18.3` / `v1.19.0`）；用户还没定：分析归纳验收标准与停止规则结项。）
+（2026-11-22：`v1.18.4` 已正式发布——Windows NSIS + MSI 双安装包、PyPI Trusted Publishing、SQLite 迁移、体积与冷启动优化、内置 Agent 分任务模型与检索方案预览、以及 `CHANGELOG.md` / `README` 同步均已落地。当前等待：① 用户按「待实测 1–15」真机验收；② 提交 MCP 目录（`docs/DIRECTORIES.md` 素材已备好）；③ 用户拍板「待用户决定」中的停止规则结项与「分析归纳」验收标准，随后开启下一阶段。）
 
 ## 待用户决定
 
@@ -68,17 +68,13 @@
 10. [ ] **Sci-Hub 慢速镜像**：遇到「找到 PDF 但传得慢」的镜像时看是否多等并成功、单篇最坏多久（见 DECISIONS「Sci-Hub 慢速镜像多等一会儿」）。
 11. [ ] **arXiv 任务行**：在 app 里粘贴一条 arXiv 编号，看下载任务的进度、来源、结果是否都正常显示（见 DECISIONS「arXiv 编号与 DOI 对不上时也能更新任务」）。
 12. [ ] **深度检索完成通知**：app 开着、人在别的页面时，让 Agent 跑完一轮，看是否弹「深度检索有新的一批」、同一轮只弹一次（见 DECISIONS「深度检索一轮跑完发通知」）。
-13. [ ] **MSI 复装与卸载**（2026-11-07 已重打包并校验过 CA 表，等真机验）：装 `app/src-tauri/target/release/bundle/msi/LitLoop_1.18.3_x64_zh-CN.msi`（132,011,289 字节），看①向导位图是蓝色的（不再是红光盘）、②安装位置能改到 D 盘、③耗时（上次 5299 个文件 96 秒，裁剪后 4330 条文件记录）；然后**开着 app** 再卸一次，确认不再报 `写入文件 …\*.rbf 时出错`（模板里加了 `taskkill`，已在 MSI 的 `CustomAction` 表里确认 `CloseRunningApp` Type=98、排在 `InstallValidate` 之后）；升级路径：从 1.18.2 直接装 1.18.3，看旧版本是否被正确替换（ARP 里只剩一份）。设置页顶部现在会显示「数据目录」+「打开」，也一起看。卸载时问是否保留 `~/.litloop` 还没做。
+13. [ ] **`v1.18.4` 双安装包与发布功能真机验收**（2026-11-22）：从 GitHub Release 下载 `LitLoop_1.18.4_x64-setup.exe`（96.0 MiB）与 `LitLoop_1.18.4_x64_zh-CN.msi`（120.8 MiB），在干净 Windows 或本地各自跑一遍安装/升级/卸载——① NSIS 与 MSI 安装向导、安装位置选择、旧版升级替换（ARP 只剩一份）；② **开着 app** 卸载 MSI 确认不报错，NSIS 卸载确认弹窗询问是否保留 `~/.litloop`（默认否）；③ 点一条 `litloop://session/<id>` 链接确认唤起/切窗；④ 点「导出诊断包」与「设置 → 可选组件」安装版面分析，确认可用。
 14. [ ] **OpenAlex 无 Key 的首次引导**（2026-11-06）：空数据目录下点「检测」，现在应显示黄色「这个网络出口的匿名额度已经用完…填一个免费 Key 就能用」（原来是红色「可能需要学校认证」）；填 Key 后应变绿并显示今日剩余积分。
+15. [ ] **内置 Agent（后端 B）真 Key 实测**（2026-11-22）：填真实 Key（DeepSeek / 本地 Ollama 等）测试：① 设置页「测试」按钮验证工具调用；② 新建检索页「预览检索方案」生成并微调检索词；③ 完整跑一次快速查找与一次深度检索（含规划/打分分任务模型）。
 
 ## 待办池
 
 ### 下载
-- [x] Sci-Hub 落败镜像留副本：已修（DECISIONS「Sci-Hub 落败镜像自己删副本」）。用户文件夹里已有的 2 个旧文件没动，删不删由用户定。
-- [x] 预印本被存成正式版：已修（DECISIONS「预印本另存，正式版优先」），待实测 8。
-- [x] 车道里晚到落盘的文件没算进结果、冷却重试又下一遍：已修（DECISIONS「车道里晚到落盘的文件按成功收下」），待实测 9。
-- [x] Sci-Hub 慢镜像被 45 秒窗口判失败：已修（DECISIONS「Sci-Hub 慢速镜像多等一会儿」），待实测 10。
-- [x] arXiv 编号与下载任务项对不上：已修（DECISIONS「arXiv 编号与 DOI 对不上时也能更新任务」），待实测 11。
 - [ ] 车道不必等整批走完：现在是 fast → 灰色 → 学校通道三段串行，前半批失败的文献要等整批 fast 跑完才进浏览器通道；改成按篇推进能缩短大批量时间，但会动浏览器争用和进度上报，等用户决定。
 
 ### 检索
@@ -86,29 +82,19 @@
 - [~] 类别多、彼此引用少的课题（评审 5）：建池时稀土测试集漏的 7 篇里 3 篇不在候选池；排序在这类综述上也弱（SYNERGY 的 Moran_2021 读 200 篇只找到 8%）。离线对比“每个子方向单写检索词”和“按类别配额出批”，看读到第 60 篇找到几篇目标。SYNERGY（`scripts/eval_synergy.py`）评不了建候选池和材料领域，这两项仍靠 `tests/acceptance/`。**按类别配额出批已排除**（2026-11-03，`scripts/replay_batching.py` 在 PDC 池上对比，现行 rank 全面更好，见 DECISIONS「离线回放分批策略」）；还剩“每个子方向单写检索词”，等稀土测试集跑完再看。**2026-11-07 新证据**：漏掉的 2 篇用标题原文能查到、用会话里的长检索词在前 100 条里查不到；用 AND 语义（`title_and_abstract.search` 2–3 个词）能让它们回到前 50。已实现 `_exact_terms`/`_exact_candidates` 但默认关着（`deep_exact_queries`）：开了以后候选池 7/9→8/9，排名却把它们压到 97–3726 名，读 120 篇只找到 1 篇（关着是 2 篇）。下一步：给「标题/摘要里整短语命中」单独加分，再在三个材料集上重放。**已做（2026-11-07）**：标题命中整短语加 5 分后，PDC 30:13 60:20 90:23（原 10/17/22）、SiC/Al 90:14 120:17（原 13/16）、稀土池回放 90:15 120:18（原 10/14），默认打开（`deep_exact_queries`），代价是多花 5–25% 积分。见 DECISIONS「精确命中的短语进了标题就加分」。
 - [ ] 停止规则校准（评审 8）：每轮已记下规则和估计（`stop_checks`），`scripts/stop_calibration.py` 汇总；SYNERGY 上可离线试（`eval_synergy.py run --knee/--patience`），攒够数据再改。
 - [~] 阶段 3：系统综述支持。已完成：`screening.prisma()` 的流程统计（命中/去重/纳入/排除/低相关未定 + 排除理由）、`GET /api/sessions/{id}/prisma`、历史记录展开时显示「检索流程」、`prisma_markdown()` 导出成 Markdown 表（「导出流程」按钮，2026-11-04）；排除时可选理由（「主题不相关」「不是研究文献」「材料或体系不符」「数据不可靠」「重复文献」或不写，2026-11-05，存在条目的 `reject_reason`，流程统计优先用它）；**中断后续跑**（2026-11-19：进度记录进程号与中止阶段/原因、深度检索扩展波次断点落盘、Agent 续跑接口与 app「由 Agent 继续」「仅取下一批」入口，见 DECISIONS「深度检索支持中断后续跑」）。还差（2026-11-05 盘点评）：**双人筛选与一致性**（两份决策的 Cohen's κ、分歧清单）、**检索式与复现存档**（每次检索的检索词、日期、数据源版本写进会话，导出时带上），这两项先定验收标准再动手。
-- [x] 阶段 4：定期追踪（2026-11-04～05）。`search/watches.py`（`~/.litloop/watches.json`，按 DOI/标题记已见文章）、`GET/POST /api/watches`、`POST /api/watches/{id}/check`（重跑检索式、只回没见过的）、`DELETE /api/watches/{id}`；历史页「追踪」卡片与每个会话展开区的「追踪这个检索式」按钮；`watches.check_due()` 与 `POST /api/watches/check-due`——app 打开时检查超过 `watch_check_days`（默认 7 天）的追踪并通知。2026-11-05 补上最后一块：检查后卡片里直接列出这次的新文献（标题、年份、期刊，前 20 条）并可以「加入下载」。还没实测（要真实检索额度）。**已知半闭环**：新文献只能直接进下载队列，不能并回原会话的筛选列表让人逐篇评分；自动检查只发生在打开 app 时。
+- [ ] 阶段 4 定期追踪半闭环（其余已 ✅）：目前新文献只能直接进下载队列，不能并回原会话的筛选列表逐篇评分；自动检查仅在打开 app 时触发。
 - [ ] 中文文献（知网、万方、维普，以及各校学位论文库）：现在只有 OpenAlex/Crossref 等英文源的覆盖，国内学位论文和中文期刊完全不在候选池，中文课题只能靠英文源的少量覆盖。要先解决「从哪拿、能不能拿」（大多没有开放 API，或要机构订阅），再谈取舍与去重。
 - [~] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。**结果缓存已落地（2026-11-21）**：`quick.search_papers_v2` 新增默认 **7 天（168 小时）**结果缓存（配置项 `search_cache_ttl_hours`，设 `0` 关闭，接入 `litloop_cache_clear`），含完整检索参数/数据源 Key/术语表指纹，`sort="date"`、定期追踪（`use_cache=False`）、空结果与出错均不入缓存。后续如仍需提速再考虑并发或缓存外部检索源。
 
 ### app
-- [ ] 下次发版后删掉 `src/litloop/app_server.py`：模块整理时留下的唯一转发，给已装好、还在启动 `python -m litloop.app_server` 的桌面 app 用（15c08b2）；删时把 `scripts/import_smoke.py` 里的 `litloop.app_server` 和 LAYOUT.md 顶层那句一起去掉。
-- [~] 后端 B：内置 Agent（设计见 CHARTER「可视化 app → 任务与后端」）：app 直接调模型 API，Anthropic 原生接口和 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、本地 Ollama / vLLM）；设置里按服务商、地址、Key、模型名配置，可按任务分模型，测试按钮检查工具调用；用测试集存档比较各模型的评分质量。2026-10-26 补记：原来只写在 CHARTER 的「顺序」里，TODO 漏了这一项。
-  - 已完成（2026-11-04）：模型客户端 `agents/client.py`——两种协议一套返回（文本、工具调用、停止原因、用量），`test_model()` 让模型当场调一个 `ping` 工具来验工具调用；设置页新增「内置 Agent」一组（接口、地址、Key、模型名）与对应测试；配置项 `builtin_agent_*`。见 DECISIONS「内置 Agent 的模型客户端」。**还没实测**：真实 Key 点一次「测试」。
-  - 已完成（2026-11-04）：任务循环 `agents/runner.py`（问模型 → 跑工具 → 再问，工具出错转成文字不中断）、工具清单 `agents/tools.py`（检索、深度检索三步、保存评分）、`agent_backend` 开关——选「内置 Agent」后 app 发起的检索由本进程调模型完成，进度、session、取消都接上了。见 DECISIONS「内置 Agent 接手 app 发起的检索」。**还没实测**：填一个真 Key 在 app 里跑一次快速查找与一次深度检索。
-  - 缺口（2026-11-05 盘点，见 DECISIONS「内置 Agent 现在的样子」）：
-    - [x] **提示词**（2026-11-06）：新增 `agents/system.py` 的系统提示词（四档相关度怎么判、拿不准往高评、快速/深度检索的步骤、不许下载与写 Zotero），`_run_builtin()` 传给 `run_task(system=…)`；`build_prompt(form, skill=False)` 给内置后端去掉「用 litloop 技能」这句——它读不到技能文档。见 DECISIONS「内置 Agent 拿到自己的规则」。
-    - [x] **步数**（2026-11-06）：按批数算，深度检索 `min(4 + 2 × 批数, 24)`、快速查找仍是 8。
-    - [ ] 真实 Key 实测一次快速查找、一次深度检索（DeepSeek 与本地 Ollama 各一次）。
-    - [~] **按任务分模型与检索方案确认点**（2026-11-22）：设置页新增 `builtin_agent_plan_model`（检索方案模型）与 `builtin_agent_rate_model`（评分模型），`agents/runner.py` 根据步骤自动切换模型；新增 `POST /api/searches/plan`（0 检索积分预生成可编辑检索词、核心词、纳入标准与预计积分）及新建检索页「预览检索方案」确认卡片。还差：用测试集存档比较各模型的评分质量。
-- [~] 安装包与自动更新（评审 12；设计和验收见 CHARTER「可视化 app → 发布」，2026-10-26 用户定了安装范围、签名、分发和浏览器的做法，见 DECISIONS「作为标准 Windows 程序分发」）。
-  - [x] 先摸底：核心依赖 **336 MB**、拆掉版面分析 271 MB（DECISIONS「发布摸底（1）」）；官方 embeddable Python 跑起 `litloop.desktop.server`，合计约 **358 MB**（DECISIONS「发布摸底（2）」）；NSIS 安装包实测 **113.38 MiB**（DECISIONS「第一个 Windows 安装包」）。还剩：用 Defender 开着的机器扫一遍（本机 Defender 是关的）、干净 Windows 验收；
-  - [x] 安装包带嵌入式 Python 和核心依赖：`scripts/build_release.py` 装配运行时，Tauri 把它映射成安装目录里的 `python/`，`npm run tauri build` 出安装包；去掉版面分析后是 **99.59 MiB**（DECISIONS「第一个 Windows 安装包」「版面分析不进安装包」）。
-  - [x] 按需组件：版面分析（约 65 MB）用 uv 装到 `~/.litloop/packages` 并加进 `sys.path`（`src/litloop/optional.py`、`GET /api/components/{key}/status`、设置页「可选组件」实时阶段进度轮询与镜像重试，2026-11-21）。待真机安装包实测一次。
-  - [~] **MSI 安装包**（2026-11-05 用户定）：`bundle.targets` 含 `msi`；语言只留 `zh-CN`；`bannerPath`/`dialogImagePath` 换成品牌图；**自定义模板** `app/src-tauri/wix/main.wxs` 加了 `CloseRunningApp`。MSI 卸载默认保留 `~/.litloop`（已在 README 与 Release 说明写明与 NSIS 的差异）。待真机按待实测 13 验收；升级 `tauri-cli` 后需与上游模板核对。
-  - [~] **诊断包**：设置页右上角「导出诊断包」、命令行 `litloop diagnose [-o 目录]`、`POST /api/diagnostics`，待真机实测。
-  - [x] **卸载留数据与发版流**（2026-11-21）：NSIS 通过 `app/src-tauri/nsis/hooks.nsh` 在非升级卸载时弹窗询问是否保留 `~/.litloop`（默认保留）；`README.md` / `README.zh-CN.md` 补齐 NSIS/MSI 差异与 SmartScreen 说明；新增 [scripts/prepare_release.py](scripts/prepare_release.py) 与 `.github/workflows/release.yml` 条件签名生成 `latest.json`；设置页「版本与更新」通过 `GET /api/app-update` 检查 GitHub Releases 新版本。待填 Tauri 更新公钥及干净 Windows 验收。
-- [x] 完成通知：一轮深度检索跑完（agent 或 app 发起）发一次系统通知，见 DECISIONS「深度检索一轮跑完发通知」。
-- [~] 深度链接（2026-11-05）：`litloop://session/<会话 id>` 打开 app 并跳到该会话的筛选页。插件 `tauri-plugin-deep-link` 注册了 `litloop` 协议（安装时写注册表），前端用 `onOpenUrl` 解析。已经开着 app 时点链接会由 `tauri-plugin-single-instance` 转发给现有窗口（事件 `litloop-url`）。技能文档（`skills-src/shared/screening.md`，已重建）现在会提示 Agent 把 `litloop://session/<session>` 和表格一起给用户。**还差**：实测（装一次安装包、点链接）。
+- [ ] 清理 `src/litloop/app_server.py`：`v1.18.4` 已发版，可随时删掉这个转发垫片，并同步去掉 `scripts/import_smoke.py` 里的 `litloop.app_server` 和 `docs/LAYOUT.md` 顶层那句。
+- [~] 后端 B：内置 Agent（`agents/client.py`、`agents/runner.py`、`agents/tools.py`、`agents/system.py`、步数、分任务模型 `builtin_agent_plan_model`/`rate_model` 与 `POST /api/searches/plan` 检索方案预览已做完，见 DECISIONS）。还差：
+  - [ ] 真实 Key 实测（DeepSeek 与本地 Ollama 各一次，见待实测 15）；
+  - [ ] 用测试集存档比较各模型的评分质量。
+- [~] 安装包与自动更新（`v1.18.4` 已发布 NSIS + MSI 双安装包、卸载留数据提示、`optional.py` 流式进度、`litloop diagnose`、设置页检查更新、`scripts/prepare_release.py` 与 CI 条件签名流）。还差：
+  - [ ] 生成并填入 Tauri 自动更新公钥（`tauri.conf.json` + GitHub Secrets）完成端到端自动更新；
+  - [ ] 开着 Windows Defender 的干净机真机验收、诊断包导出与可选组件安装实测（待实测 13）；
+  - [ ] 深度链接 `litloop://session/<id>` 安装包真机实测（待实测 13）。
 
 ### 测试
 - [~] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；2026-11-05 又补 `bib_import`、`bibtex_crossref`、`http_utils`、`europepmc`、`oa_discovery`、`models`、`pdf_extractor`、`profile_health`、`remote_assist`、`camofox_api`、`cloakbrowser_compat`、`cli/commands` 的辅助函数、`extractors` 的 HTML 路由（7 家出版商 + 兜底 + 大小写不敏感，11 个）与通用适配器 `publisher_adapters/generic.py`（标题/摘要/正文/图注/参考文献/作者的回退顺序，14 个）。顺手修了四个真 bug（citekey 撞键、`to_text` 多空行、PDF 段落分隔被拼掉、远程协助页面 500）。还剩 `desktop/` 的一些分支。
@@ -119,12 +105,7 @@
   - 抽取性质数据考虑用 [ChemDataExtractor2](https://github.com/CambridgeMolecularEngineering/ChemDataExtractor2)（2026-10-25 用户提出；MIT，剑桥维护，能从材料与化学论文的正文和表格里抽化合物、性质数值、光谱）。它要求 Python ≤ 3.12、numpy < 2，依赖 transformers、stanza 等，几个 GB，和 LitLoop 的环境（Python 3.14、numpy 2）冲突：单独建一个环境，LitLoop 用子进程调用它（像 zotero-mcp 那样）。它的缩写识别没有用于术语表：600 篇材料摘要上实测不如 `abbreviations`（见 DECISIONS「术语表」）。
 
 ### 工程债（2026-11-05 盘点，用户认可，先记账不动手）
-- [~] **三个巨型文件**：`src/litloop/publishers/strategies/_core.py`（2873 → **2340** 行，2026-11-05 抽出 `_elsevier_api.py`，见 DECISIONS）、`src/litloop/sources/__init__.py`（2214 → **1339** 行，2026-11-20 抽出 `_index.py`、`_batch.py`、`_routes.py` 并回导全部名字，见 DECISIONS；竞速核心 `_race.py` 阶段 3 待真机实测 8–10 稳定后再定）、`src/litloop/server.py` 1731 行。「不拆」是继承来的约定，其余保持。
-- [x] **数据层换 SQLite**（2026-11-21）：三阶段迁移全部完成（`src/litloop/db.py`，schema v1 + `PRAGMA user_version` + `schema_migrations`；WAL 模式 + `busy_timeout=30000` + `IMMEDIATE` 写事务；`watches`、`sessions`/`decisions`、深度检索 `pool_items` + `sessions.pool_state_json`/`summary_json` 均已切至 SQLite，旧版 JSON 首次读取时自动幂等导入且不删原文件）。
-- [x] **真实世界回归**（2026-11-21）：本地 HTTP 录制回放已落地（[tests/fixtures/replay/](tests/fixtures/replay/) + [tests/test_real_world_replay.py](tests/test_real_world_replay.py) 覆盖竞速成功与错篇/1 页预览淘汰、迟到落盘、慢镜像流式等待、预印本拦截、429 降级与真 HTTP 错篇剔除），并新增 [scripts/smoke_app.py](scripts/smoke_app.py) 与 [tests/test_smoke_app.py](tests/test_smoke_app.py) 验证后台启动与 `/api/health`（安装包/打包 exe 可在真机传 `--exe ... --launch-exe` 验收）。
-- [x] **筛选页批量与撤销**（2026-11-21）：新增后端批量原子更新接口 `/api/sessions/{session}/batch`（单次文件锁更新并返回修改前快照），前端补齐列表内搜索与多维过滤（相关度/决定状态/年份范围/期刊）、多选与 `Shift` 连选、按 Agent 评定一键批量加入下载/排除，以及会话内最多 20 步多步撤销（顶栏按钮、操作反馈条与 `Ctrl+Z`）。
-- [x] **错误提示补「下一步」**（2026-11-21）：后端 `error_text.next_step()` 与 `action_for()` 经 `_explain()` 注入 `error_hint` 与结构化 `error_action`，下载任务页与筛选进度条已接入对应设置分组/Zotero 附件检查直达按钮及单篇「重试此篇」；同步按 [docs/UI_COPY.md](docs/UI_COPY.md) 清洗全量前后端提示文案并把 `error_text.py` 纳入 `lint:copy`。
-- [x] **体积与冷启动**（2026-11-21）：Python 顶层 [src/litloop/\_\_init\_\_.py](src/litloop/__init__.py) 改为 `__getattr__` 懒加载（`litloop` 导入耗时 -92.3%，`litloop.desktop.server` 降 34.6%）、[app/src-tauri/src/lib.rs](app/src-tauri/src/lib.rs) 并行拉起主窗口与 Python 后台、[app/src/App.tsx](app/src/App.tsx) 与 [app/vite.config.ts](app/vite.config.ts) 拆块懒加载将首屏主包由 534.38 kB 降至 99.96 kB，并增强 [scripts/build_release.py](scripts/build_release.py) 的 `prune()` 裁剪 `.chm`/`.pdb`/`.lib`/`.c`/`.cpp`/`pythonwin`/`demos`/`examples`。
+- [~] **三个巨型文件**：`src/litloop/publishers/strategies/_core.py`（2873 → **2340** 行，2026-11-05 抽出 `_elsevier_api.py`，见 DECISIONS）、`src/litloop/sources/__init__.py`（2214 → **1339** 行，2026-11-20 抽出 `_index.py`、`_batch.py`、`_routes.py` 并回导全部名字，见 DECISIONS；竞速核心 `_race.py` 阶段 3 待真机实测 8–10 稳定后再定）、`src/litloop/server.py` 1731 行。「不拆」是继承来的约定，其余保持。（SQLite 迁移、HTTP 回放回归、筛选批量与撤销、错误提示下一步、体积与冷启动已全部于 2026-11-21 完成并随 `v1.18.4` 发布，详见 DECISIONS 与 CHANGELOG。）
 
 ### 不做
 - 不重写下载引擎；不把排序换成大模型打分；没有测试集不调排序参数（2026-10-18 评审）。
@@ -137,26 +118,17 @@
 
 ## 推广
 
-对这类工具，曝光度等于被搜到：GitHub 搜索、PyPI、MCP 目录、小红书/知乎/公众号的搜索结果，以及别人写方法部分时的引用。按性价比排，先做 1–3（都不需要用户操作），再发内容。
+对这类工具，曝光度等于被搜到：GitHub 搜索、PyPI、MCP 目录、小红书/知乎/公众号的搜索结果，以及别人写方法部分时的引用。仓库元信息、双语 README、PyPI（`1.18.4`）、`v1.18.4` NSIS+MSI 双安装包、空配置可用、`server.json` / `smithery.yaml` 与 [docs/DIRECTORIES.md](docs/DIRECTORIES.md) 均已就绪（2026-11-22）。
 
-**现在卡在用户这边的两件事**：①Smithery / Glama / mcp.so / PulseMCP 的账号（提交目录用）；②录屏用的真机运行（90 秒 GIF，或由我起草分镜你来录）。PyPI 已于 2026-11-22 发布；其余我能自己往前推。
+**现在卡在用户这边的两件事**：① Smithery / Glama / mcp.so / PulseMCP 账号（提交目录用）；② 录屏用的真机运行（90 秒 GIF，或由我起草分镜你来录）。
 
-### 1. 能被搜到（先做，约半天）
-
-- [x] 补仓库元信息：description 与 16 个 topics 已于 2026-11-05 用 `gh repo edit` 设好（「学术文献 Agent：检索 → 筛选 → 下载（校园网 / CARSI / WebVPN）→ Zotero 归档 | 21 MCP tools for Claude, Cursor and Codex」）。社交预览图还没做。
-- [x] 英文 `README.md` + 中文 `README.zh-CN.md`，两份顶部互相链接（2026-11-05）。
-- [x] 打第一个正式 Release（2026-11-05）：tag `v1.18.2` 跑通 `release.yml`，发布 [v1.18.2](https://github.com/dysprosium231/litloop-paper-agent/releases/tag/v1.18.2)，产物 `LitLoop_1.18.2_x64-setup.exe`（106,757,379 字节 = 101.8 MiB）与 `SHA256SUMS.txt`。第一次 tag `v1.18.1` 失败是 CI 用 3.13 的 pip 往 3.14 的嵌入式运行时装依赖（numpy cp313 轮子），改成先用 uv 按嵌入式解释器装后通过（见 DECISIONS）。后续发版只需打 tag。
-- [x] 发上 PyPI（`pip install litloop` / `uvx litloop run`，2026-11-22）：`litloop 1.18.3` 的 sdist（879.1 KB）与 wheel（734.7 KB，176 个文件）已通过 `twine upload` 正式发布到 [PyPI](https://pypi.org/project/litloop/1.18.3/)，并已在 `https://pypi.org/pypi/litloop/json` 核验返回 `HTTP 200`（含 `bdist_wheel` 与 `sdist`）。后续版本发版可直接用 [.github/workflows/release.yml](.github/workflows/release.yml) 的 PyPI Trusted Publishing。
-- [x] 下一次发版带上 MSI（2026-11-22）：随 `v1.18.4` tag 一并触发 `release.yml` 发布 NSIS + MSI 双安装包及 `SHA256SUMS.txt`；README 与 Release 说明已写清「普通用户用 .exe（可选安装范围），批量部署用 .msi（按机器装、需管理员）」。
-- [ ] 90 秒演示 GIF 放 README 顶部（一句话 → 30 篇 → 下载 → Zotero），替换现在 4 张静态截图的位置。
+### 1. 能被搜到
+- [ ] 90 秒演示 GIF 放 README 顶部（一句话 → 30 篇 → 下载 → Zotero），替换现在 4 张静态截图的位置（另：GitHub 社交预览图待补）。
 
 ### 2. MCP 生态（当下最大的杠杆）
-
-- [x] 写 `server.json` / `smithery.yaml`（2026-11-22）：`server.json` 与 `smithery.yaml`（`uvx litloop run`）均已写好；提交素材已整理在 [docs/DIRECTORIES.md](docs/DIRECTORIES.md)。
-- [ ] 提交到 Smithery、Glama、mcp.so、PulseMCP、awesome-mcp-servers。定位一句话：「Search, screen, download, and file papers into Zotero — 21 tools」。需要各站账号，排到 PyPI 之后。
+- [ ] 提交到 Smithery、Glama、mcp.so、PulseMCP、awesome-mcp-servers（素材见 [docs/DIRECTORIES.md](docs/DIRECTORIES.md)，定位一句话：「Search, screen, download, and file papers into Zotero — 21 tools」）。
 
 ### 3. 中文社区种草（决定早期用户量）
-
 - [ ] 小红书：「一句话查全一个课题」录屏 + 前后对比，标题打痛点（读不完 300 篇摘要）。
 - [ ] B 站：5–8 分钟完整流程（检索 → 筛选 → 下载 → Zotero）。
 - [ ] 知乎：回答「如何高效做文献调研/系统综述」并附工具对比。
@@ -165,11 +137,8 @@
 - 素材原则：讲一个真实课题的结果，不讲功能列表；数字从 `docs/DECISIONS.md` 里挑三个做成图。
 
 ### 4. 先修掉会劝退新用户的硬门槛
-
 - [ ] 安装包没签名，SmartScreen 会拦（README 已写怎么继续，但多数人到这里就走了）：评估买代码签名证书（个人开发者约 ¥1000+/年）。
-- [x] 保证「不填任何 Key 也能跑一次快速检索」，引导里给 OpenAlex Key 申请的直达链接：2026-11-05 实测空数据目录、没有 Key 时 `search_papers()` 5.0 秒返回 5 条；初次引导的「检索接口」现在写明「什么都不填也能先试一次快速检索（退回 Crossref）」，并指向 help.openalex.org。
 - [ ] 宣传里主动写清楚 Sci-Hub、LibGen 默认关闭、只用合法途径，避免被平台判违规限流。
 
 ### 5. 长期：可被引用
-
 - [ ] 工具论文或预印本（ChemRxiv / Zenodo + DOI），别人写方法部分时会引；成本高，但比任何平台都持久。
