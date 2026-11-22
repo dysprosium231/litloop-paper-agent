@@ -11,7 +11,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square" />
   <img alt="Status" src="https://img.shields.io/badge/status-in%20development-F59E0B?style=flat-square" />
 
-  [Screenshots](#screenshots) · [Why](#why-litloop) · [One full run](#one-full-run) · [The four screens](#the-four-screens) · [Deep search](#deep-search-how-it-gets-the-whole-topic) · [Downloading](#downloading-how-it-gets-the-pdf) · [Install](#install-and-run) · [Using it with an agent](#using-it-with-an-agent) · [Status](#project-status)
+  [Screenshots](#screenshots) · [Why](#why-litloop) · [One full run](#one-full-run) · [The four screens](#the-four-screens) · [Deep search](#deep-search-how-it-gets-the-whole-topic) · [Downloading](#downloading-how-it-gets-the-pdf) · [Install](#install-and-run) · [Using it with an agent](#using-it-with-an-agent) · [Status](#project-status) · [Changelog](CHANGELOG.md)
 </div>
 
 > **Still in development.** Search → screening → download → Zotero works end to end and has been checked against real topics and a small test set. The desktop app covers screening, downloads, Zotero, settings, the built-in agent and watched searches, and you can build your own installer. Systematic-review support stops at flow counts and export; analysis and synthesis are not built yet. See [Project status](#project-status).
@@ -59,7 +59,8 @@ Take "rare-earth-doped amorphous nanomaterials as drug carriers" as an example:
 
 ### Screening
 
-- **Batch list**: title, journal, year, the agent's score and one sentence of reasoning; filter to this batch, or search titles and journals.
+- **Batch list**: title, journal, year, the agent's score and one sentence of reasoning; filter to this batch, filter within the list, search titles and journals, run batch actions, and use multi-step undo (`Ctrl+Z`).
+- **Search plan & resume**: quick searches are cached for 7 days (with safe bypass rules); before starting a deep search you can preview and edit the generated search plan, and interrupted deep searches can be resumed later.
 - **Excluding**: when you exclude a paper you can pick a reason (off topic, not a research paper, wrong material or system, unreliable data, duplicate) or skip it; a reason you give shows up in the review flow's exclusion reasons and in the export.
 - **Details**: full abstract, journal quartile (CAS and JCR, needs the companion plugin), citation count, DOI; the abstract can be translated automatically.
 - **Translation**: under Settings → Screening choose the scope (high only, high and medium, everything, or off) and the service. DeepSeek and DeepL use your own key and translate when a paper is opened, without spending chat quota; choosing "agent" translates along with scoring.
@@ -86,9 +87,10 @@ Take "rare-earth-doped amorphous nanomaterials as drug carriers" as an example:
 ### Settings
 
 - Search API keys, screening and translation, API quota, downloads, network, campus login, agent, Zotero — every group has a "Test" button.
-- **Built-in agent**: works without any agent command installed. Fill in an Anthropic or OpenAI-compatible endpoint (DeepSeek, Qwen, Kimi, GLM, OpenRouter, Ollama, vLLM …) with its key and model name; "Test" checks on the spot that the model actually issues tool calls — a model that does not cannot run tasks. Set "Which backend" to "Built-in agent" and searches started in the app run on it.
+- **Built-in agent**: works without any agent command installed. Fill in an Anthropic or OpenAI-compatible endpoint (DeepSeek, Qwen, Kimi, GLM, OpenRouter, Ollama, vLLM …) with its key and model name, plus optional separate models for planning and scoring; "Test" checks on the spot that the model actually issues tool calls — a model that does not cannot run tasks. Set "Which backend" to "Built-in agent" and searches started in the app run on it, with search plan preview/editing before launch.
 - **Optional components**: layout analysis (about 65 MB, only affects how PDFs are converted to Markdown) is not installed by default; click "Install" in the same group when needed, and set a mirror if the download is slow.
 - **API quota**: today's usage and the official limit for each API.
+- **Diagnostic bundle**: one-click export of a redacted diagnostic zip for troubleshooting (also available from the CLI and API).
 - **Network**: detects whether v2rayN, Clash and friends are in TUN mode and shows how to set direct rules; "this computer is on campus" makes downloads go straight out through the campus IP.
 - **First-run guide**: on first launch it walks through search APIs, translation, downloads, network, campus login and Zotero; every step can be tested or skipped, and it can be re-run from settings later.
 - Light and dark themes follow the system; the sidebar collapses to icons.
@@ -137,7 +139,7 @@ Publisher and institutional configuration, proxy setup and troubleshooting are i
 
 ## Install and run
 
-You can install the desktop app from a download, run it from source, or build your own installer. **Latest installer: [Releases](https://github.com/dysprosium231/litloop-paper-agent/releases/latest)** (`LitLoop_1.18.2_x64-setup.exe`, about 102 MB, ships its own Python runtime; it is not signed, so the first run has to get past SmartScreen via "More info → Run anyway").
+You can install the desktop app from a download, run it from source, or build your own installer. **Latest installers: [Releases](https://github.com/dysprosium231/litloop-paper-agent/releases/latest)** (`v1.18.4`: NSIS `LitLoop_1.18.4_x64-setup.exe`, about 96 MiB; or MSI `LitLoop_1.18.4_x64_zh-CN.msi`, about 121 MiB; both ship their own Python runtime and are unsigned, so the first run has to get past SmartScreen via "More info → Run anyway").
 
 The installers are not signed: the [SignPath Foundation](https://signpath.org/) open-source programme declined the application on 2026-11-07, because it asks for a level of public visibility (stars, forks, outside references and discussion) that this repository does not have yet. Reapplying later is an option, and a paid certificate is the alternative for now (see [docs/SIGNING.md](docs/SIGNING.md)). See [PRIVACY.md](PRIVACY.md): the program runs on your machine, has no telemetry, and only contacts a literature database or a publisher when you ask it to.
 
@@ -189,8 +191,8 @@ python scripts/build_release.py --bundle
 
 It first stages an embedded Python runtime in `build/runtime` (the official embeddable distribution, the core dependencies and `uv.exe`), then calls `npm run tauri build`. You get two packages, either one installs the app:
 
-- **NSIS (`app/src-tauri/target/release/bundle/nsis/LitLoop_<version>_x64-setup.exe`)**, about 102 MiB (101.8 MiB for 1.18.2): double-click to install with support for per-user or per-machine mode (`installMode: both`). When uninstalling, a prompt asks whether to also delete `~/.litloop` (defaulting to **No**, so your screening records, downloaded PDFs and settings are kept).
-- **MSI (`app/src-tauri/target/release/bundle/msi/LitLoop_<version>_x64_<language>.msi`)**, about 128 MiB (128.3 MiB for 1.18.2): Windows Installer package that lets you choose the install folder and installs per machine (requires administrator rights, suitable for bulk deployment). Uninstalling keeps `~/.litloop` by default.
+- **NSIS (`app/src-tauri/target/release/bundle/nsis/LitLoop_<version>_x64-setup.exe`)**, about 96 MiB (96.0 MiB for 1.18.4): double-click to install with support for per-user or per-machine mode (`installMode: both`). When uninstalling, a prompt asks whether to also delete `~/.litloop` (defaulting to **No**, so your screening records, downloaded PDFs and settings are kept).
+- **MSI (`app/src-tauri/target/release/bundle/msi/LitLoop_<version>_x64_<language>.msi`)**, about 121 MiB (120.8 MiB for 1.18.4): Windows Installer package that lets you choose the install folder and installs per machine (requires administrator rights, suitable for bulk deployment). Uninstalling keeps `~/.litloop` by default.
 
 Both ship Python and the dependencies inside — the target machine needs nothing installed.
 
@@ -255,13 +257,15 @@ The full MCP tool list, manual MCP configuration (Claude Desktop, Cursor, Cline 
 | [docs/CONFIG.md](docs/CONFIG.md) | Every configuration key and its default |
 | [docs/API_LIMITS.md](docs/API_LIMITS.md) | Official limits of each external API (with sources and check dates) and LitLoop's pacing |
 | [docs/APP_DATA.md](docs/APP_DATA.md) | File formats the app and the agent share |
+| [docs/SIGNING.md](docs/SIGNING.md) | Three ways to sign the installer, application materials, and CI setup |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes per version |
 | [app/README.md](app/README.md) | Developing the desktop app |
 | [AGENTS.md](AGENTS.md) · [docs/LAYOUT.md](docs/LAYOUT.md) | Contribution conventions · code layout (what each subpackage owns) |
 | [CHARTER.md](CHARTER.md) · [TODO.md](TODO.md) · [docs/DECISIONS.md](docs/DECISIONS.md) | Design and acceptance criteria · progress and to-dos · decisions and experiment logs |
 
 ## Project status
 
-October 2026: in development, used by the maintainer, feedback welcome. Every change runs the full test suite on Linux, Windows and macOS across Python 3.11–3.13.
+November 2026: in development, used by the maintainer, feedback welcome. Every change runs the full test suite on Linux, Windows and macOS across Python 3.11–3.13.
 
 ### Working today
 
@@ -269,12 +273,12 @@ Run end to end on a real topic (precursor-derived SiBCN ceramics for insulation 
 
 | Step | State |
 |---|---|
-| Search | OpenAlex (Crossref when there is no key, Semantic Scholar when a key is set); searches glossary variants — abbreviations, full names, British/American spellings, element symbols — at once; filters off-topic and junk records; folds preprints into the published version; completes and cleans abstracts; flags retractions and expressions of concern; sorts by citations or date |
-| Screening | The AI scores each paper and explains why, you choose, records stay local and become a download queue |
-| Deep search | Multiple query variants plus co-citation build the pool, batch screening, re-ranking from your scores, high-relevance papers snowball |
+| Search | OpenAlex (Crossref when there is no key, Semantic Scholar when a key is set); searches glossary variants — abbreviations, full names, British/American spellings, element symbols — at once; filters off-topic and junk records; folds preprints into the published version; completes and cleans abstracts; flags retractions and expressions of concern; sorts by citations or date; caches quick-search hits for 7 days |
+| Screening | The AI scores each paper and explains why, you choose, with batch actions, in-list filters, and multi-step undo; records stay in SQLite and become a download queue |
+| Deep search | Multiple query variants plus co-citation build the pool, batch screening, re-ranking from your scores, high-relevance papers snowball, search plan preview/editing, and resume after interruption |
 | Download | Open access, publisher sites, campus routes in turn; WebVPN, CARSI, EZProxy; DOI in the file name, one paper per file; preprints are marked `_preprint` |
 | Zotero | Local writing, a few seconds per paper; checks for empty attachments |
-| Desktop app | Screening, downloads, Zotero, settings and quota, built-in agent and watched searches all work; you can build the installer and the first release is out (about 102 MiB, Python runtime included); auto-update and code signing are still missing |
+| Desktop app | Screening, downloads, Zotero, settings and quota, built-in agent (with per-task models), watched searches, and diagnostic bundle export all work; published on PyPI (`litloop`) and shipped as Windows NSIS (~96 MiB) and MSI (~121 MiB) installers with embedded Python; auto-update and code signing are still missing |
 
 ### Known limits
 
@@ -288,8 +292,8 @@ Run end to end on a real topic (precursor-derived SiBCN ceramics for insulation 
 
 In planned order; progress is tracked in [TODO.md](TODO.md).
 
-1. **Desktop app**: the installer can be built; auto-update and signing remain. The built-in agent (the app calling Anthropic / OpenAI-compatible APIs itself) can already run searches started in the app; per-task model choice and a test-set comparison against an external agent are still open.
-2. **Systematic-review support**: flow counts (identified, deduplicated, included, excluded, with reasons) and Markdown export are done; resuming an interrupted review is not.
+1. **Desktop app**: NSIS and MSI installers can be built; auto-update and signing remain. The built-in agent (the app calling Anthropic / OpenAI-compatible APIs itself) supports per-task model selection and search plan preview; a test-set quality comparison against an external agent is still open.
+2. **Systematic-review support**: flow counts (identified, deduplicated, included, excluded, with reasons), Markdown export, and resuming an interrupted deep search are done; fuller review reporting and checks remain.
 3. **Watched searches**: saving a query, checking when the app opens, notifying, and listing the new papers with a one-click "add to downloads" are done; feeding those papers straight into a screening session is not.
 4. **Analysis and synthesis**: PDF to Markdown exists; extracting findings from full text, building comparison tables and drafting a review are next.
 5. **Chinese literature**: CNKI and Wanfang.

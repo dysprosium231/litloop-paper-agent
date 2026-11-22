@@ -11,7 +11,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square" />
   <img alt="Status" src="https://img.shields.io/badge/%E7%8A%B6%E6%80%81-%E5%BC%80%E5%8F%91%E4%B8%AD-F59E0B?style=flat-square" />
 
-  [截图](#截图) · [为什么用它](#为什么用它) · [一次完整的流程](#一次完整的流程) · [app 的四个页面](#app-的四个页面) · [深度检索](#深度检索怎么查全) · [下载](#下载怎么拿到全文) · [安装与启动](#安装与启动) · [搭配 Agent 使用](#搭配-agent-使用) · [项目状态](#项目状态)
+  [截图](#截图) · [为什么用它](#为什么用它) · [一次完整的流程](#一次完整的流程) · [app 的四个页面](#app-的四个页面) · [深度检索](#深度检索怎么查全) · [下载](#下载怎么拿到全文) · [安装与启动](#安装与启动) · [搭配 Agent 使用](#搭配-agent-使用) · [项目状态](#项目状态) · [更新日志](CHANGELOG.md)
 </div>
 
 > **项目还在开发中。** 检索、筛选、下载、存进 Zotero 这条流程已经能用，并在真实课题和测试集上验收过；桌面 app 的筛选、下载、Zotero、设置、内置 Agent 和追踪已经能用，也能自己打安装包。系统综述目前只做到流程统计和导出，分析归纳还没做。详见[项目状态](#项目状态)。
@@ -59,7 +59,8 @@
 
 ### 筛选
 
-- **本批列表**：标题、期刊、年份、Agent 的评分和一句理由；可只看本批，或搜索标题和期刊。
+- **本批列表**：标题、期刊、年份、Agent 的评分和一句理由；可只看本批、列表内筛选、搜索标题和期刊，支持批量操作与多步撤销（`Ctrl+Z`）。
+- **检索计划与断点续跑**：快速检索支持 7 天结果缓存（带安全绕过规则）；发起深度检索前可先预览并修改检索计划，深度检索中断后也可继续运行。
 - **排除**：排除一篇时可以顺手选一个理由（主题不相关、不是研究文献、材料或体系不符、数据不可靠、重复文献），也可以不写；写了会出现在「检索流程」的排除理由里，导出时一并带上。
 - **详情**：完整摘要、期刊分区（中科院、JCR，需配套插件）、被引数、DOI；摘要可自动译成中文。
 - **翻译**：在「设置 → 筛选」选范围（评为高、高和中、全部或不自动翻译）和服务。DeepSeek、DeepL 用你自己的 Key，由 app 在打开文献时翻译并保存译文，不耗对话额度；选 Agent 则在评分时顺带翻译。
@@ -86,9 +87,10 @@
 ### 设置
 
 - 检索接口 Key、筛选与翻译、接口额度、下载、网络、学校认证、Agent、Zotero，每组都有「检测」按钮。
-- **内置 Agent**：不装 Agent 命令也能用。填 Anthropic 或 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、Ollama、vLLM 等）的地址、Key 和模型名，点「检测」会当场验证模型会不会发起工具调用——不会发起的模型不能用来跑任务。填好后「用哪个后端」选「内置 Agent」，app 里发起的检索就由它来做。
+- **内置 Agent**：不装 Agent 命令也能用。填 Anthropic 或 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、Ollama、vLLM 等）的地址、Key 和模型名，还支持分别指定规划模型与打分模型；点「检测」会当场验证模型会不会发起工具调用——不会发起的模型不能用来跑任务。填好后「用哪个后端」选「内置 Agent」，app 里发起的检索就由它来做，启动前可预览并修改检索计划。
 - **可选组件**：版面分析（约 65 MB，只影响 PDF 转 Markdown 的排版）默认不装，需要时在同一组点「安装」，下载慢可以填国内镜像。
 - **接口额度**：各接口今天的用量和官方限额。
+- **诊断包导出**：在设置页一键导出脱敏诊断包用于排障（CLI 与 API 同样支持）。
 - **网络**：识别 v2rayN、Clash 等代理软件是否开了 TUN 模式，并给出直连规则的设置步骤；“电脑连在校园网上”打开后直接按学校 IP 下载。
 - **首次引导**：第一次打开时逐步填写检索接口、翻译、下载、网络、学校认证、Zotero，每步可检测、可跳过，之后可在设置页重新运行。
 - 浅色和深色主题跟随系统；左侧导航可收起只留图标。
@@ -136,7 +138,7 @@
 
 ## 安装与启动
 
-桌面 app 可以直接下载安装包，也可以从源码运行，或自己打一个。**最新安装包：[Releases](https://github.com/dysprosium231/litloop-paper-agent/releases/latest)**（`LitLoop_1.18.2_x64-setup.exe`，约 102 MB，自带 Python 运行时；未签名，首次运行需要过 SmartScreen「更多信息 → 仍要运行」）。
+桌面 app 可以直接下载安装包，也可以从源码运行，或自己打一个。**最新安装包：[Releases](https://github.com/dysprosium231/litloop-paper-agent/releases/latest)**（`v1.18.4`：NSIS `LitLoop_1.18.4_x64-setup.exe` 约 96 MiB，或 MSI `LitLoop_1.18.4_x64_zh-CN.msi` 约 121 MiB；均自带 Python 运行时且未签名，首次运行需要过 SmartScreen「更多信息 → 仍要运行」）。
 
 安装包目前没有签名：向 [SignPath Foundation](https://signpath.org/) 申请的开源免费签名在 2026-11-07 被拒，理由是这个计划要求项目已有足够的公开关注度（stars、fork、外部引用与讨论），仓库还太新；等社区规模起来可以重新申请，在那之前考虑改用付费证书（见 [docs/SIGNING.md](docs/SIGNING.md)）。隐私说明见 [PRIVACY.md](PRIVACY.md)：程序在本机运行，没有遥测，数据只在你主动操作时才发往对应的文献数据库或出版商。
 
@@ -188,8 +190,8 @@ python scripts/build_release.py --bundle
 
 先装配嵌入式 Python 运行时（`build/runtime`：官方 embeddable 发行版 + 核心依赖 + `uv.exe`），再调用 `npm run tauri build`。产物两个，任选一个安装：
 
-- **NSIS（`app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`）**，约 102 MiB（1.18.2 实测 101.8 MiB）：双击即装，支持仅当前用户或所有用户安装（`installMode: both`）。卸载时会弹窗询问是否同时删除 `~/.litloop`（默认选「**否**」，即保留检索记录、已下载的 PDF 与配置）。
-- **MSI（`app/src-tauri/target/release/bundle/msi/LitLoop_<版本>_x64_<语言>.msi`）**，约 128 MiB（1.18.2 实测 128.3 MiB）：Windows Installer 格式，安装时可以自选安装路径，按机器安装（需要管理员权限，适合批量部署）。卸载时默认保留 `~/.litloop`。
+- **NSIS（`app/src-tauri/target/release/bundle/nsis/LitLoop_<版本>_x64-setup.exe`）**，约 96 MiB（1.18.4 实测 96.0 MiB）：双击即装，支持仅当前用户或所有用户安装（`installMode: both`）。卸载时会弹窗询问是否同时删除 `~/.litloop`（默认选「**否**」，即保留检索记录、已下载的 PDF 与配置）。
+- **MSI（`app/src-tauri/target/release/bundle/msi/LitLoop_<版本>_x64_<语言>.msi`）**，约 121 MiB（1.18.4 实测 120.8 MiB）：Windows Installer 格式，安装时可以自选安装路径，按机器安装（需要管理员权限，适合批量部署）。卸载时默认保留 `~/.litloop`。
 
 两个包都自带 Python 和依赖，目标机器不用装任何东西。
 
@@ -255,13 +257,14 @@ MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、�
 | [docs/API_LIMITS.md](docs/API_LIMITS.md) | 各外部接口的官方限额（附来源和核对日期）和 LitLoop 的节奏控制 |
 | [docs/APP_DATA.md](docs/APP_DATA.md) | app 与 Agent 共用的筛选、下载、进度文件格式 |
 | [docs/SIGNING.md](docs/SIGNING.md) | 给安装包签名的三条路、申请材料和 CI 接法 |
+| [CHANGELOG.md](CHANGELOG.md) | 各版本的更新日志 |
 | [app/README.md](app/README.md) | 桌面 app 的开发方式 |
 | [AGENTS.md](AGENTS.md) · [docs/LAYOUT.md](docs/LAYOUT.md) | 参与开发的约定 · 代码布局（各子包管什么） |
 | [CHARTER.md](CHARTER.md) · [TODO.md](TODO.md) · [docs/DECISIONS.md](docs/DECISIONS.md) | 设计与验收标准 · 进度与待办 · 决定与实验记录 |
 
 ## 项目状态
 
-2026 年 10 月：开发中，维护者自己在用，也欢迎试用和反馈。每次改动都在 Linux、Windows、macOS × Python 3.11–3.13 上跑全部测试。
+2026 年 11 月：开发中，维护者自己在用，也欢迎试用和反馈。每次改动都在 Linux、Windows、macOS × Python 3.11–3.13 上跑全部测试。
 
 ### 已经可用
 
@@ -269,12 +272,12 @@ MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、�
 
 | 环节 | 状态 |
 |---|---|
-| 检索 | 查 OpenAlex（没有 Key 时用 Crossref，设了 Key 可加 Semantic Scholar）；按术语表同时搜缩写、全称、英美拼写和元素符号；过滤离题结果和垃圾记录；预印本并入正式版；补全并清洗摘要；标出撤稿和关注声明；可按被引数或年份排序 |
-| 筛选 | AI 逐篇给相关度和理由，你挑选，记录存在本地，可直接生成下载队列 |
-| 深度检索 | 多组检索词 + 共同引用建池，分批筛选，按评分持续重新排序，高相关文章自动滚雪球 |
+| 检索 | 查 OpenAlex（没有 Key 时用 Crossref，设了 Key 可加 Semantic Scholar）；按术语表同时搜缩写、全称、英美拼写和元素符号；过滤离题结果和垃圾记录；预印本并入正式版；补全并清洗摘要；标出撤稿和关注声明；可按被引数或年份排序；快速检索支持 7 天结果缓存 |
+| 筛选 | AI 逐篇给相关度和理由，你挑选，支持批量操作、列表内筛选和多步撤销；记录存在本机 SQLite，可直接生成下载队列 |
+| 深度检索 | 多组检索词 + 共同引用建池，分批筛选，按评分持续重新排序，高相关文章自动滚雪球，支持检索计划预览与中断续跑 |
 | 下载 | 开放获取、出版商官网、学校通道依次尝试；WebVPN、CARSI、EZProxy；文件名带 DOI，不会把一篇论文的 PDF 当成另一篇；只拿到预印本时文件名加 `_preprint` |
 | Zotero | 本地写入，几秒一篇；检查附件是不是空的 |
-| 桌面 app | 筛选、下载、Zotero、设置与额度、内置 Agent、追踪已能用；安装包能自己打，也发了第一个 Release（约 102 MiB，自带 Python 运行时）；还差自动更新和签名 |
+| 桌面 app | 筛选、下载、Zotero、设置与额度、内置 Agent（支持分任务选模型）、追踪与诊断包导出已能用；已上架 PyPI（`litloop`），并提供 Windows NSIS（约 96 MiB）和 MSI（约 121 MiB）安装包（自带 Python 运行时）；还差自动更新和签名 |
 
 ### 已知限制
 
@@ -288,8 +291,8 @@ MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、�
 
 按计划顺序排列，详细进度见 [TODO.md](TODO.md)。
 
-1. **桌面 app**：安装包能打出来了，还差自动更新和签名。内置 Agent（app 直接调 Anthropic / OpenAI 兼容接口）已能接手 app 里发起的检索，还差按任务分模型、用测试集比较它和外部 Agent 的评分质量。
-2. **系统综述支持**：检索流程统计（命中、去重、纳入、排除及理由）和 Markdown 导出已经做了；还差中断后接着跑。
+1. **桌面 app**：NSIS 和 MSI 安装包都已能打，还差自动更新和签名。内置 Agent（app 直接调 Anthropic / OpenAI 兼容接口）已支持分任务选模型与检索计划预览，还差用测试集比较它和外部 Agent 的评分质量。
+2. **系统综述支持**：检索流程统计（命中、去重、纳入、排除及理由）、Markdown 导出与深度检索断点续跑已经做了；还差更完整的综述报告与核查项。
 3. **定期追踪**：保存检索式、app 打开时自动检查并通知、检查后列出新文献并一键加入下载都已经做了；还差把这些新文献直接并进某次检索的筛选列表。
 4. **分析归纳**：PDF 转 Markdown 已经有了；下一步从全文抽取要点、做对比表、起草综述。
 5. **中文文献**：接入知网、万方。
