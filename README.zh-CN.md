@@ -5,6 +5,7 @@
   <h1>LitLoop</h1>
   <p><strong>文献检索、筛选、下载、归档的桌面 app</strong> · Agent 在后台检索和评分，你在 app 里做决定</p>
 
+  <a href="https://pypi.org/project/litloop/"><img alt="PyPI" src="https://img.shields.io/pypi/v/litloop?style=flat-square" /></a>
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0F766E?style=flat-square" /></a>
   <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/MCP-21%20tools-111827?style=flat-square" /></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square" />
@@ -141,13 +142,32 @@
 
 从源码运行需要：Python 3.11+、Git、Node.js、Rust（Windows 上用 MSVC 工具链）。
 
-1. **装 Python 后台。** 最省事的办法是对 Claude Code、Codex 或 ZCode 里的 Agent 说：
+1. **装 Python 后台与 MCP 服务。** 已上架 PyPI，可直接安装或用 `uvx` 免安装运行：
+
+   ```bash
+   pip install litloop
+   ```
+
+   在 Claude Desktop、Cursor、Codex 等 MCP 客户端里使用（`uvx` 方式）：
+
+   ```json
+   {
+     "mcpServers": {
+       "litloop": {
+         "command": "uvx",
+         "args": ["litloop", "run"]
+       }
+     }
+   }
+   ```
+
+   或者直接在 Claude Code、Codex、ZCode 里对 Agent 说：
 
    ```text
    帮我安装或更新这个插件：https://github.com/dysprosium231/litloop-paper-agent
    ```
 
-   Agent 会拉取代码、建独立的虚拟环境、安装依赖并注册 MCP。手动安装的步骤见 [docs/AGENT.md](docs/AGENT.md#安装与配置详情)。
+   手动源码安装的步骤见 [docs/AGENT.md](docs/AGENT.md#安装与配置详情)。
 
 2. **启动 app。** 在仓库的 `app` 目录：
 

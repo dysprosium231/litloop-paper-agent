@@ -1,0 +1,35 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required: []
+    properties:
+      openalexApiKey:
+        type: string
+        description: Optional free OpenAlex API key for higher daily quota (https://help.openalex.org/).
+      elsevierApiKey:
+        type: string
+        description: Optional Elsevier API key for Scopus abstracts and ScienceDirect full text.
+      springerMetaApiKey:
+        type: string
+        description: Optional Springer Nature Meta API key.
+      email:
+        type: string
+        description: Contact email for Crossref / OpenAlex / Unpaywall polite pool.
+      semanticScholarApiKey:
+        type: string
+        description: Optional Semantic Scholar API key.
+  commandFunction: |-
+    (config) => {
+      const env = {};
+      if (config.openalexApiKey) env.OPENALEX_API_KEY = config.openalexApiKey;
+      if (config.elsevierApiKey) env.ELSEVIER_API_KEY = config.elsevierApiKey;
+      if (config.springerMetaApiKey) env.SPRINGER_META_API_KEY = config.springerMetaApiKey;
+      if (config.email) env.LITLOOP_EMAIL = config.email;
+      if (config.semanticScholarApiKey) env.SEMANTIC_SCHOLAR_API_KEY = config.semanticScholarApiKey;
+      return {
+        command: "uvx",
+        args: ["litloop", "run"],
+        env,
+      };
+    }

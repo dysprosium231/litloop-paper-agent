@@ -5,6 +5,7 @@
   <h1>LitLoop</h1>
   <p><strong>A desktop app for finding, screening, downloading and filing papers</strong> · an agent searches and scores in the background, you make the calls in the app</p>
 
+  <a href="https://pypi.org/project/litloop/"><img alt="PyPI" src="https://img.shields.io/pypi/v/litloop?style=flat-square" /></a>
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0F766E?style=flat-square" /></a>
   <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/MCP-21%20tools-111827?style=flat-square" /></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square" />
@@ -142,13 +143,32 @@ The installers are not signed: the [SignPath Foundation](https://signpath.org/) 
 
 Running from source needs Python 3.11+, Git, Node.js and Rust (the MSVC toolchain on Windows).
 
-1. **Install the Python side.** The easiest way is to tell an agent in Claude Code, Codex or ZCode:
+1. **Install the Python side & MCP server.** Published on PyPI — install with `pip` or run directly via `uvx`:
+
+   ```bash
+   pip install litloop
+   ```
+
+   MCP client config for Claude Desktop, Cursor or Codex (`uvx`):
+
+   ```json
+   {
+     "mcpServers": {
+       "litloop": {
+         "command": "uvx",
+         "args": ["litloop", "run"]
+       }
+     }
+   }
+   ```
+
+   Or tell an agent in Claude Code, Codex or ZCode:
 
    ```text
    Install or update this plugin for me: https://github.com/dysprosium231/litloop-paper-agent
    ```
 
-   The agent pulls the code, creates a dedicated virtual environment, installs dependencies and registers the MCP server. Manual steps are in [docs/AGENT.md](docs/AGENT.md#安装与配置详情).
+   Manual source install steps are in [docs/AGENT.md](docs/AGENT.md#安装与配置详情).
 
 2. **Start the app.** In the repository's `app` directory:
 
