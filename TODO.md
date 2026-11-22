@@ -147,7 +147,7 @@
 - [x] 英文 `README.md` + 中文 `README.zh-CN.md`，两份顶部互相链接（2026-11-05）。
 - [x] 打第一个正式 Release（2026-11-05）：tag `v1.18.2` 跑通 `release.yml`，发布 [v1.18.2](https://github.com/dysprosium231/litloop-paper-agent/releases/tag/v1.18.2)，产物 `LitLoop_1.18.2_x64-setup.exe`（106,757,379 字节 = 101.8 MiB）与 `SHA256SUMS.txt`。第一次 tag `v1.18.1` 失败是 CI 用 3.13 的 pip 往 3.14 的嵌入式运行时装依赖（numpy cp313 轮子），改成先用 uv 按嵌入式解释器装后通过（见 DECISIONS）。后续发版只需打 tag。
 - [x] 发上 PyPI（`pip install litloop` / `uvx litloop run`，2026-11-22）：`litloop 1.18.3` 的 sdist（879.1 KB）与 wheel（734.7 KB，176 个文件）已通过 `twine upload` 正式发布到 [PyPI](https://pypi.org/project/litloop/1.18.3/)，并已在 `https://pypi.org/pypi/litloop/json` 核验返回 `HTTP 200`（含 `bdist_wheel` 与 `sdist`）。后续版本发版可直接用 [.github/workflows/release.yml](.github/workflows/release.yml) 的 PyPI Trusted Publishing。
-- [~] 下一次发版带上 MSI（2026-11-06）：`release.yml` 已改成两个包一起发、校验和覆盖两者；本机已打出 `LitLoop_1.18.2_x64_zh-CN.msi`，但 v1.18.2 那次发布只发了 NSIS，MSI 随下一次 tag（建议 1.18.3）一起出。发版说明里要写清「普通用户用 .exe（可选安装范围），批量部署用 .msi（按机器装、需管理员）」。
+- [x] 下一次发版带上 MSI（2026-11-22）：随 `v1.18.4` tag 一并触发 `release.yml` 发布 NSIS + MSI 双安装包及 `SHA256SUMS.txt`；README 与 Release 说明已写清「普通用户用 .exe（可选安装范围），批量部署用 .msi（按机器装、需管理员）」。
 - [ ] 90 秒演示 GIF 放 README 顶部（一句话 → 30 篇 → 下载 → Zotero），替换现在 4 张静态截图的位置。
 
 ### 2. MCP 生态（当下最大的杠杆）

@@ -1,5 +1,9 @@
 # 决定与实验记录
 
+## 2026-11-22：升版 `1.18.4` 并触发全量 Release 工作流
+
+- 结果：统一将 `pyproject.toml`、`src/litloop/__init__.py`、`app/src-tauri/tauri.conf.json` 与 `server.json` 升至 `1.18.4`，通过 `scripts/prepare_release.py` 全套检查后推送 `v1.18.4` tag 触发 GitHub Actions 发布（Windows NSIS + MSI 双安装包、校验和与 PyPI 同步）。
+
 ## 2026-11-22：内置 Agent 按任务分模型与检索方案确认点
 
 - 背景：补齐 [TODO.md](TODO.md)「app → 后端 B」中按任务分模型与「先给检索词与预计积分，确认后再开始」确认点，并同步完善 MCP 分发材料（[smithery.yaml](smithery.yaml)、[docs/DIRECTORIES.md](docs/DIRECTORIES.md)、`README` 置顶 `pip install litloop` 与 `uvx litloop run`，提交 `9e03e49`）。
