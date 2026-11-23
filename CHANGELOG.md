@@ -2,6 +2,15 @@
 
 ## v1.18.5 (2026-11-23)
 
+### 新增功能
+
+- **多 Harness 自动探测与主动选择**：桌面端「设置 → Agent」（及首次引导）自动探测本机安装的 **Claude Code**、**WorkBuddy**（内置 `@genie/agent-cli`，以 `ELECTRON_RUN_AS_NODE=1` 免外部 Node.js 驱动）、**DeepSeek Harness**（`dsh --profile headless --json`）、**Codex CLI** 与 **内置 Agent**，支持可视化卡片一键选用，普通用户无需手填长串命令行参数。
+- **MCP 与技能自动注入及一键全局同步**：从桌面端后台启动外部 Harness 时自动注入 `litloop` MCP 配置（`--mcp-config` / `--patch`）；设置页提供「一键配置 MCP 与技能」，可将 `litloop` MCP 服务与 `SKILL.md` 同步写入对应 Harness 的全局配置，方便在外部对话窗口直接使用。
+- **深度检索「继续」的原对话续接与外部对话区分**：
+  - 桌面端发起的检索自动持久化 `agent_session` 与 `harness`，点击「由 Agent 继续（原对话）」时自动携带 `--resume`（Claude/WorkBuddy）、`--session-id`（DeepSeek Harness）或 `exec resume`（Codex）回到同一对话继续下一批，不新开对话、不丢前序上下文；
+  - 外部交互窗口发起的会话诚实区分并提供「复制『继续』指令（回原对话粘贴）」「在 app 后台接手继续」与「仅取下一批」。
+- **提示词与 Agent 对话详情透明可查**：在筛选页进度条与「新建检索 → 最近的检索」列表中新增「对话详情」展开面板，可随时查看执行 Harness、会话 ID、实际发送的完整 `prompt`（含一键复制）及 Agent 最终回复。
+
 ### 改进与修复
 
 - **内置 Agent 启动与连接修复**：修复桌面端启动内置 Agent 时漏传配置导致报「还没有填模型名」的问题；兼容直接填写完整接口路径（如 `.../v1/chat/completions` 或 `.../v1/messages`）；检索方案预览改为生成纯英文短语检索词。
