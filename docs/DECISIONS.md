@@ -1,5 +1,28 @@
 # 决定与实验记录
 
+## 2026-11-23：内置 Agent 真 Key 实测、云端 Windows 虚拟机安装包验收与清理 `app_server.py`
+
+- **内置 Agent 真 Key 全流程实测（待实测 15）**：
+  - 使用 OpenAI 兼容接口（`deepseek-v4-pro` 作规划模型 `builtin_agent_plan_model`，`deepseek-v4.1-flash` 作评分模型 `builtin_agent_rate_model`）在隔离数据目录完成端到端实测：
+    1. `test_model()` 工具调用检测：`deepseek-v4.1-flash`（10.2s，含首次自动切 `curl`）与 `deepseek-v4-pro`（3.8s）均通过。
+    2. `POST /api/searches/plan`（0 检索积分方案预览）：`deepseek-v4-pro` 6.85s 生成 5 组英文短语检索词、4 组核心词、4 条中文纳入标准与积分估算（`约 180–360 积分`）。
+    3. 快速查找（`mode="quick"`）：116.25s 完成（`state=done`），生成会话并评分 24 篇（`高: 10, 中: 8, 低: 5, 不相关: 1`）。
+    4. 深度检索（`mode="deep", batches=1`）：208.14s 完成首批候选池构建、补摘要与 30 篇评分（`state=done`）。
+  - **实测抓到并修复的 3 个真问题**（`6770fef`）：
+    1. [src/litloop/desktop/agent_runner.py](src/litloop/desktop/agent_runner.py) 的 `_run_builtin()` 调用 `run_task()` 时漏传 `config=_config.load_config()`，且 `client.model_config(None)` 原先退回空字典 `{}`，导致从 app 发起内置 Agent 检索必报 `还没有填模型名`；现已双向修复。
+    2. [src/litloop/agents/client.py](src/litloop/agents/client.py) 的 `_endpoint()` 现兼容用户直接粘贴完整路径（如 `.../v1/chat/completions` 或 `.../v1/messages`），不再重复拼接；同时针对 Windows 下用户按「设置 → 网络」引导将 `python.exe` 加入 TUN 代理（`sing-box` / Clash）的 `Direct` 规则后导致 `python.exe` 访问海外/中转大模型 API TLS 握手超时的问题，`_post()` 新增 6s 握手超时检测与系统 `curl` 自动回退（按 host 缓存 `_CURL_HOSTS`，通过 `curl --config -` 从 stdin 传参，命令行不暴露 API Key）。
+    3. [src/litloop/agents/runner.py](src/litloop/agents/runner.py) 的 `plan_search()` 提示词改为明确要求生成空格分隔的纯英文关键词短语（不写 `AND`/`OR` 与括号），与 OpenAlex/Crossref 短语检索参数一致。
+- **OpenAlex 无 Key 首次引导实测（待实测 14）**：
+  - 空配置下 `POST /api/settings/test/sources` 0.6s 返回黄色提示（`ok: null`，`无法连接 OpenAlex：这个网络出口的匿名额度已经用完。填一个免费 Key 就能用，或换个网络再试`）；填入免费 Key 后 2.6s 返回绿色 `ok: true`（`可用，今日剩余 9535 / 10000 积分`）。
+- **云端干净 Windows 虚拟机验收 `v1.18.4` 双安装包（待实测 13，[.github/workflows/vm-verify.yml](.github/workflows/vm-verify.yml)，Run `45129462632`）**：
+  - 在 GitHub Actions `windows-latest` 全新虚拟机上拉取 `v1.18.4` 正式安装包并实测通过：
+    1. `SHA256SUMS.txt` 校验与 **Windows Defender 扫描**（`MpCmdRun.exe -Scan -ScanType 3`）：退出码 `0`（无误报）。
+    2. **GUI 向导截图识别**：实机弹出 MSI 中文向导（`LitLoop 安装程序`，蓝色品牌背景与图标）与 NSIS 安装向导（`LitLoop Setup`）并截屏归档核验（注：MSI 全幅深蓝背景图上右侧默认黑色向导文字对比度偏低，后续可将 `dialog.bmp` 右侧改为浅色底）。
+    3. **MSI 自定义路径安装、`1.18.3 -> 1.18.4` 覆盖升级与“开着 app 卸载”**：装入 `D:\LitLoopCustom` 耗时 **10.1s**（裁剪后较早期 96s 大幅缩短），覆盖升级至 `1.18.4` 耗时 **23.3s**，注册表 ARP 只剩 1 条 `1.18.4`；嵌入式 `D:\LitLoopCustom\python\python.exe` 运行 `smoke_app.py` 返回 `/api/health` 正常，`diagnostics.write_bundle()` 导出脱敏诊断包（2333 字节）成功；在 `litloop-app.exe` 运行中（`PID=1324`）直接执行 `msiexec /x` 卸载，**17.2s** 退出码 `0`，`CloseRunningApp` 自动关闭进程且 `~/.litloop` 数据完整保留。
+    4. **NSIS 安装、`litloop://` 深度链接注册表与卸载留数据**：静默安装耗时 **15.9s**，核对注册表 `HKEY_CLASSES_ROOT\litloop\shell\open\command` 已注册为 `"C:\Program Files\LitLoop\litloop-app.exe" "%1"`；执行 `uninstall.exe /S`（走 `hooks.nsh` 的 `/SD IDNO` 默认分支）退出码 `0`，`~/.litloop` 数据完整保留。
+- **清理 `src/litloop/app_server.py`（`6770fef`）**：
+  - `v1.18.4` 已发版，删除过渡转发模块 `src/litloop/app_server.py`，并同步更新 `scripts/import_smoke.py`（`34/34 modules import`）与 [docs/LAYOUT.md](docs/LAYOUT.md)。
+
 ## 2026-11-22：升版 `1.18.4` 并触发全量 Release 工作流
 
 - 结果：统一将 `pyproject.toml`、`src/litloop/__init__.py`、`app/src-tauri/tauri.conf.json` 与 `server.json` 升至 `1.18.4`，通过 `scripts/prepare_release.py` 全套检查后推送 `v1.18.4` tag 触发 GitHub Actions 发布（Windows NSIS + MSI 双安装包、校验和与 PyPI 同步）。

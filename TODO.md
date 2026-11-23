@@ -22,16 +22,16 @@
 | app：地基 | ✅ | |
 | app：筛选页 | 🔶 | 深度链接 2026-11-05 做了（`litloop://session/<id>`，待实测）；完成通知 2026-11-04 做了（待实测 12） |
 | app：任务层 + 后端 A（外部 Agent） | 🔶 | 待实测 5（真实检索） |
-| app：后端 B（内置 Agent，多家模型） | 🔶 | 客户端、任务循环、五个工具、`agent_backend` 开关、系统提示词、按批步数、分任务模型（规划/打分）与检索方案预览均已完成（2026-11-22）；还差真实 Key 实测（待实测 15）与测试集模型评分质量对比（待办池「app」） |
+| app：后端 B（内置 Agent，多家模型） | 🔶 | 客户端、任务循环、五个工具、`agent_backend` 开关、系统提示词、按批步数、分任务模型（规划/打分）、检索方案预览以及 `deepseek-v4-pro` / `deepseek-v4.1-flash` 真 Key 全流程实测均已完成（2026-11-23）；还差用测试集存档比较各模型的评分质量（待办池「app」） |
 | app：初次引导与设置 | ✅ | 后端 B 的模型配置随后端 B 做 |
 | app：术语表 | 🔶 | 待实测 7 |
 | app：下载队列与 Zotero | 🔶 | 待实测 1–5 |
-| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | `v1.18.4` 已发布 NSIS（96.0 MiB，含卸载询问是否保留 `~/.litloop`）与 MSI（120.8 MiB）双安装包，PyPI Trusted Publishing 与 `CHANGELOG.md` 自动发版说明已上线，按需组件流式进度、`scripts/prepare_release.py`、设置页检查更新与 CI 条件签名流均就绪（2026-11-22）；待填 Tauri 更新公钥、干净 Windows 真机验收（待实测 13）；签名：SignPath Foundation 免费计划 2026-11-07 被拒，暂不签名，README 如实写明 |
+| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | `v1.18.4` NSIS（96.0 MiB）与 MSI（120.8 MiB）已在干净 Windows 虚拟机通过 Defender 扫描、向导截图、D 盘自定义目录安装（10.1s）、`1.18.3 -> 1.18.4` 覆盖升级、嵌入式后台冒烟、诊断包导出、运行中卸载（`CloseRunningApp` 17.2s）、`litloop://` 注册表校验与卸载留数据（2026-11-23，见 DECISIONS）；还差生成并填入 Tauri 自动更新公钥与按需组件版面分析点击安装实测 |
 | 完整流程（真实课题从检索到 Zotero 不用手动补救） | 🔶 | 待办池「阶段 2 剩余」：深度检索 → 批量下载 → 推送 Zotero 连起来走一遍 |
 
 ## 正在做
 
-（2026-11-22：`v1.18.4` 已正式发布——Windows NSIS + MSI 双安装包、PyPI Trusted Publishing、SQLite 迁移、体积与冷启动优化、内置 Agent 分任务模型与检索方案预览、以及 `CHANGELOG.md` / `README` 同步均已落地。当前等待：① 用户按「待实测 1–15」真机验收；② 提交 MCP 目录（`docs/DIRECTORIES.md` 素材已备好）；③ 用户拍板「待用户决定」中的停止规则结项与「分析归纳」验收标准，随后开启下一阶段。）
+（2026-11-23：已完成① 内置 Agent `deepseek-v4-pro` + `deepseek-v4.1-flash` 真 Key 全流程实测与 3 项连接/配置修复；② OpenAlex 无 Key 首次引导提示实测；③ 云端干净 Windows 虚拟机对 `v1.18.4` MSI + NSIS 双安装包的 Defender 扫描、向导 GUI 截图、跨版本升级、运行中卸载、`litloop://` 注册表、嵌入式后台冒烟与诊断包导出全套验收；④ 清理过期转发模块 `src/litloop/app_server.py`。当前等待：① 用户按「待实测 1–12」在日常使用中顺带核对下载与 Zotero 交互；② 提交 MCP 目录（`docs/DIRECTORIES.md` 素材已备好）；③ 用户拍板「待用户决定」中的停止规则结项与「分析归纳」验收标准。）
 
 ## 待用户决定
 
@@ -68,9 +68,9 @@
 10. [ ] **Sci-Hub 慢速镜像**：遇到「找到 PDF 但传得慢」的镜像时看是否多等并成功、单篇最坏多久（见 DECISIONS「Sci-Hub 慢速镜像多等一会儿」）。
 11. [ ] **arXiv 任务行**：在 app 里粘贴一条 arXiv 编号，看下载任务的进度、来源、结果是否都正常显示（见 DECISIONS「arXiv 编号与 DOI 对不上时也能更新任务」）。
 12. [ ] **深度检索完成通知**：app 开着、人在别的页面时，让 Agent 跑完一轮，看是否弹「深度检索有新的一批」、同一轮只弹一次（见 DECISIONS「深度检索一轮跑完发通知」）。
-13. [ ] **`v1.18.4` 双安装包与发布功能真机验收**（2026-11-22）：从 GitHub Release 下载 `LitLoop_1.18.4_x64-setup.exe`（96.0 MiB）与 `LitLoop_1.18.4_x64_zh-CN.msi`（120.8 MiB），在干净 Windows 或本地各自跑一遍安装/升级/卸载——① NSIS 与 MSI 安装向导、安装位置选择、旧版升级替换（ARP 只剩一份）；② **开着 app** 卸载 MSI 确认不报错，NSIS 卸载确认弹窗询问是否保留 `~/.litloop`（默认否）；③ 点一条 `litloop://session/<id>` 链接确认唤起/切窗；④ 点「导出诊断包」与「设置 → 可选组件」安装版面分析，确认可用。
-14. [ ] **OpenAlex 无 Key 的首次引导**（2026-11-06）：空数据目录下点「检测」，现在应显示黄色「这个网络出口的匿名额度已经用完…填一个免费 Key 就能用」（原来是红色「可能需要学校认证」）；填 Key 后应变绿并显示今日剩余积分。
-15. [ ] **内置 Agent（后端 B）真 Key 实测**（2026-11-22）：填真实 Key（DeepSeek / 本地 Ollama 等）测试：① 设置页「测试」按钮验证工具调用；② 新建检索页「预览检索方案」生成并微调检索词；③ 完整跑一次快速查找与一次深度检索（含规划/打分分任务模型）。
+13. [x] **`v1.18.4` 双安装包与发布功能真机验收**（2026-11-23 已在 GitHub Actions `windows-latest` 干净 Windows 虚拟机完成，见 DECISIONS）：Defender 扫描通过；MSI 中文蓝色品牌向导与 NSIS 向导 GUI 截图已归档核验；MSI 装入 `D:\LitLoopCustom` 10.1s、`1.18.3 -> 1.18.4` 覆盖升级 23.3s（ARP 只剩 1 份 `1.18.4`）、嵌入式 Python `smoke_app.py` 与 `diagnostics.write_bundle()` 正常、开着 `litloop-app.exe` 卸载 17.2s 自动关进程且保留 `~/.litloop`；NSIS 15.9s 安装并注册 `HKCR\litloop` 深度链接，静默卸载（`/SD IDNO`）保留 `~/.litloop`。还剩：在界面点一次「可选组件 → 版面分析」安装与点击 `litloop://` 唤起窗口的交互可随日常使用顺带看一眼。
+14. [x] **OpenAlex 无 Key 的首次引导**（2026-11-23 已实测，见 DECISIONS）：空配置下检测 0.6s 显示黄色提示「无法连接 OpenAlex：这个网络出口的匿名额度已经用完。填一个免费 Key 就能用，或换个网络再试」；填 Key 后 2.6s 变绿显示「可用，今日剩余 9535 / 10000 积分」。
+15. [x] **内置 Agent（后端 B）真 Key 实测**（2026-11-23 已用 `deepseek-v4-pro` + `deepseek-v4.1-flash` 实测通过并顺手修复 3 项连接/配置问题，见 DECISIONS）：`test_model` 工具调用（3.8s / 10.2s）、`POST /api/searches/plan` 检索方案生成（6.85s）、快速查找（116.25s，24 篇评分）与深度检索首批（208.14s，30 篇评分）均跑通。
 
 ## 待办池
 
@@ -87,14 +87,10 @@
 - [~] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。**结果缓存已落地（2026-11-21）**：`quick.search_papers_v2` 新增默认 **7 天（168 小时）**结果缓存（配置项 `search_cache_ttl_hours`，设 `0` 关闭，接入 `litloop_cache_clear`），含完整检索参数/数据源 Key/术语表指纹，`sort="date"`、定期追踪（`use_cache=False`）、空结果与出错均不入缓存。后续如仍需提速再考虑并发或缓存外部检索源。
 
 ### app
-- [ ] 清理 `src/litloop/app_server.py`：`v1.18.4` 已发版，可随时删掉这个转发垫片，并同步去掉 `scripts/import_smoke.py` 里的 `litloop.app_server` 和 `docs/LAYOUT.md` 顶层那句。
-- [~] 后端 B：内置 Agent（`agents/client.py`、`agents/runner.py`、`agents/tools.py`、`agents/system.py`、步数、分任务模型 `builtin_agent_plan_model`/`rate_model` 与 `POST /api/searches/plan` 检索方案预览已做完，见 DECISIONS）。还差：
-  - [ ] 真实 Key 实测（DeepSeek 与本地 Ollama 各一次，见待实测 15）；
-  - [ ] 用测试集存档比较各模型的评分质量。
-- [~] 安装包与自动更新（`v1.18.4` 已发布 NSIS + MSI 双安装包、卸载留数据提示、`optional.py` 流式进度、`litloop diagnose`、设置页检查更新、`scripts/prepare_release.py` 与 CI 条件签名流）。还差：
+- [~] 后端 B：内置 Agent（`agents/client.py`、`agents/runner.py`、`agents/tools.py`、`agents/system.py`、步数、分任务模型 `builtin_agent_plan_model`/`rate_model`、`POST /api/searches/plan` 检索方案预览，以及 `deepseek-v4-pro` + `deepseek-v4.1-flash` 真 Key 实测均已完成，见 DECISIONS）。还差：用测试集存档比较各模型的评分质量。
+- [~] 安装包与自动更新（`v1.18.4` 双安装包已在云端干净 Windows 虚拟机完成 Defender 扫描、向导截图、自定义目录安装、跨版本升级、运行期卸载、深度链接注册表与诊断包导出验收，见 DECISIONS）。还差：
   - [ ] 生成并填入 Tauri 自动更新公钥（`tauri.conf.json` + GitHub Secrets）完成端到端自动更新；
-  - [ ] 开着 Windows Defender 的干净机真机验收、诊断包导出与可选组件安装实测（待实测 13）；
-  - [ ] 深度链接 `litloop://session/<id>` 安装包真机实测（待实测 13）。
+  - [ ] MSI 向导背景图 `dialog.bmp` 右侧文字区改为浅色底以提高默认黑色中文文字的对比度（可选视觉优化）。
 
 ### 测试
 - [~] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；2026-11-05 又补 `bib_import`、`bibtex_crossref`、`http_utils`、`europepmc`、`oa_discovery`、`models`、`pdf_extractor`、`profile_health`、`remote_assist`、`camofox_api`、`cloakbrowser_compat`、`cli/commands` 的辅助函数、`extractors` 的 HTML 路由（7 家出版商 + 兜底 + 大小写不敏感，11 个）与通用适配器 `publisher_adapters/generic.py`（标题/摘要/正文/图注/参考文献/作者的回退顺序，14 个）。顺手修了四个真 bug（citekey 撞键、`to_text` 多空行、PDF 段落分隔被拼掉、远程协助页面 500）。还剩 `desktop/` 的一些分支。
