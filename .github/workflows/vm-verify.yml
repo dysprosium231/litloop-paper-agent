@@ -55,17 +55,8 @@ jobs:
         run: |
           Add-Type -AssemblyName System.Windows.Forms
           Add-Type -AssemblyName System.Drawing
-          Add-Type @"
-          using System;
-          using System.Runtime.InteropServices;
-          public class Win32Window {
-              [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
-              [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-              [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-              [StructLayout(LayoutKind.Sequential)]
-              public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-          }
-"@
+          $code = "using System; using System.Runtime.InteropServices; public class Win32Window { [DllImport(`"user32.dll`")] public static extern bool SetProcessDPIAware(); [DllImport(`"user32.dll`")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect); [DllImport(`"user32.dll`")] public static extern bool SetForegroundWindow(IntPtr hWnd); [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; } }"
+          Add-Type -TypeDefinition $code
           [Win32Window]::SetProcessDPIAware() | Out-Null
 
           function Capture-WindowOrScreen([IntPtr]$hwnd, [string]$outPath) {
