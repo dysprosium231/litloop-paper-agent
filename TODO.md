@@ -21,7 +21,7 @@
 | 分析归纳 | ⬜ | 待办池「分析归纳」；开工前和用户确认验收标准 |
 | app：地基 | ✅ | |
 | app：筛选页 | 🔶 | 深度链接 2026-11-05 做了（`litloop://session/<id>`，待实测）；完成通知 2026-11-04 做了（待实测 12） |
-| app：任务层 + 后端 A（外部 Agent） | 🔶 | 待实测 5（真实检索） |
+| app：任务层 + 后端 A（外部 Agent） | 🔶 | 6 种 Harness（Claude Code / WorkBuddy / DeepSeek Harness / Codex CLI / 内置 Agent / 自定义命令）自动探测、运行时 MCP/模型配置注入与一键全局同步、`--resume`/`--session-id`/`exec resume` 原对话续接与外部对话粘贴指令区分、以及桌面端对话详情展示已做（2026-11-23，见 DECISIONS）；还差待实测 5（真实检索） |
 | app：后端 B（内置 Agent，多家模型） | 🔶 | 客户端、任务循环、五个工具、`agent_backend` 开关、系统提示词、按批步数、分任务模型（规划/打分）、检索方案预览以及 `deepseek-v4-pro` / `deepseek-v4.1-flash` 真 Key 全流程实测均已完成（2026-11-23）；还差用测试集存档比较各模型的评分质量（待办池「app」） |
 | app：初次引导与设置 | ✅ | 后端 B 的模型配置随后端 B 做 |
 | app：术语表 | 🔶 | 待实测 7 |
@@ -31,7 +31,7 @@
 
 ## 正在做
 
-（2026-11-23：已完成① 内置 Agent `deepseek-v4-pro` + `deepseek-v4.1-flash` 真 Key 全流程实测与 3 项连接/配置修复；② OpenAlex 无 Key 首次引导提示实测；③ 云端干净 Windows 虚拟机对 `v1.18.4` MSI + NSIS 双安装包的 Defender 扫描、向导 GUI 截图、跨版本升级、运行中卸载、`litloop://` 注册表、嵌入式后台冒烟与诊断包导出全套验收；④ 清理过期转发模块 `src/litloop/app_server.py`。当前等待：① 用户按「待实测 1–12」在日常使用中顺带核对下载与 Zotero 交互；② 提交 MCP 目录（`docs/DIRECTORIES.md` 素材已备好）；③ 用户拍板「待用户决定」中的停止规则结项与「分析归纳」验收标准。）
+（2026-11-23：已完成① 五项 Harness 交互决策落地：6 种 Harness 自动探测、运行时 MCP/技能自动注入与一键全局同步、`--resume`/`--session-id` 原对话续接与外部对话指令区分、桌面端对话详情展示；② 内置 Agent `deepseek-v4-pro` + `deepseek-v4.1-flash` 真 Key 全流程实测与 3 项连接/配置修复；③ OpenAlex 无 Key 首次引导提示实测；④ 云端干净 Windows 虚拟机对 `v1.18.4` MSI + NSIS 双安装包的 Defender 扫描、向导 GUI 截图、跨版本升级、运行中卸载、`litloop://` 注册表、嵌入式后台冒烟与诊断包导出全套验收，以及 `v1.18.5` MSI 向导左蓝右白位图与深度检索去重展开。当前等待：① 用户按「待实测 1–12」在日常使用中顺带核对下载与 Zotero 交互；② 提交 MCP 目录（`docs/DIRECTORIES.md` 素材已备好）；③ 用户拍板「待用户决定」中的停止规则结项与「分析归纳」验收标准。）
 
 ## 待用户决定
 

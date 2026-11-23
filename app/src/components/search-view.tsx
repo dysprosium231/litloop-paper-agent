@@ -227,14 +227,36 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
 function RunRow({ run: r, busy, onOpen, onResume, onCancel }: {
   run: SearchRun; busy: boolean; onOpen: (s: string) => void; onResume: () => void; onCancel: () => void
 }) {
+  const [showDetail, setShowDetail] = React.useState(false)
+  const [copiedPrompt, setCopiedPrompt] = React.useState(false)
   const steps = r.events?.slice(-4) ?? []
+  const hasDetail = Boolean(r.prompt || r.agent_session)
+
+  const copyPrompt = () => {
+    if (!r.prompt) return
+    navigator.clipboard.writeText(r.prompt).then(() => {
+      setCopiedPrompt(true)
+      setTimeout(() => setCopiedPrompt(false), 1500)
+    }).catch(() => {})
+  }
+
   return (
     <li className="space-y-1.5 px-5 py-3">
       <div className="flex items-center gap-3">
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.question}</span>
+        {r.harness_label && (
+          <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
+            {r.harness_label}{r.resumed_chat ? " · 续接" : ""}
+          </span>
+        )}
         <span className="shrink-0 rounded border px-1.5 text-xs text-muted-foreground">{r.mode === "deep" ? "深度检索" : "快速检索"}</span>
         <span className={cn("shrink-0 text-xs", r.state === "failed" ? "text-destructive" : "text-muted-foreground")}>{STATE[r.state]}</span>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{r.started.slice(5, 16).replace("T", " ")}</span>
+        {hasDetail && (
+          <Button size="sm" variant="ghost" onClick={() => setShowDetail((v) => !v)}>
+            {showDetail ? "收起对话详情" : "查看对话详情"}
+          </Button>
+        )}
         {r.state === "running" && <Button size="sm" variant="ghost" onClick={onCancel}>取消检索</Button>}
         {r.mode === "deep" && r.session && r.state !== "running" && (
           <Button size="sm" variant="outline" disabled={busy} onClick={onResume}
@@ -252,8 +274,43 @@ function RunRow({ run: r, busy, onOpen, onResume, onCancel }: {
           {steps.map((e, i) => <li key={i}><span className="tabular-nums">{e.t}</span> {e.text}</li>)}
         </ol>
       )}
-      {r.result && r.state !== "running" && <p className="whitespace-pre-line text-xs text-muted-foreground">{r.result}</p>}
+      {r.result && r.state !== "running" && !showDetail && <p className="whitespace-pre-line text-xs text-muted-foreground">{r.result}</p>}
       {r.error && <p className="text-xs text-destructive">{r.error}</p>}
+      {showDetail && hasDetail && (
+        <div className="mt-2 space-y-2.5 rounded-lg border bg-muted/30 p-3 text-xs">
+          {r.agent_session && (
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-muted-foreground">会话 ID：</span>
+              <code className="font-mono text-foreground">{r.agent_session}</code>
+            </div>
+          )}
+          {r.prompt && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-muted-foreground">发送给 Agent 的提示词</span>
+                <button
+                  type="button"
+                  onClick={copyPrompt}
+                  className="rounded px-1.5 py-0.5 text-xs text-primary hover:bg-primary/10"
+                >
+                  {copiedPrompt ? "已复制" : "复制提示词"}
+                </button>
+              </div>
+              <pre className="max-h-48 overflow-auto rounded-md border bg-background p-2.5 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-foreground">
+                {r.prompt}
+              </pre>
+            </div>
+          )}
+          {r.result && (
+            <div className="space-y-1">
+              <div className="font-medium text-muted-foreground">Agent 最终回复</div>
+              <div className="rounded-md border bg-background p-2.5 leading-relaxed whitespace-pre-line text-foreground">
+                {r.result}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </li>
   )
 }

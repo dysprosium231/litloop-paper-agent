@@ -1,5 +1,27 @@
 # 决定与实验记录
 
+## 2026-11-23：五项 Harness 交互决策落地（自动探测、MCP 注入与一键同步、原对话续接与对话详情透明化）
+
+- 背景：桌面端调起外部 Agent（后端 A）原先只靠手填 `agent_command` / `agent_args`（默认 `claude -p`），每次「由 Agent 继续」都重新启动一个无记忆的新进程，且在外部对话窗口（Claude Code / WorkBuddy / DeepSeek Harness）发起的会话与在 app 内发起的会话混用同一个续跑按钮，用户也看不到发给 Agent 的提示词与最终回复。按与用户对齐的五项交互决策一次性落地：
+  1. **6 种 Harness 自动探测与运行时注入（[src/litloop/desktop/harnesses.py](src/litloop/desktop/harnesses.py)）**：
+     - 新增配置项 `agent_harness`（默认 `"auto"`，可选 `"auto"`、`"claude"`、`"workbuddy"`、`"dsh"`、`"codex"`、`"builtin"`、`"custom"`）。
+     - `detect_harnesses()` 自动探测本机 Claude Code（PATH / `~/.local/bin` / npm）、WorkBuddy（Windows 注册表与安装目录下的 `WorkBuddyAI.exe` + `codebuddy-lite-wb.mjs`，运行时注入 `ELECTRON_RUN_AS_NODE=1`）、DeepSeek Harness（`dsh.cmd --profile headless --json`）、Codex CLI（`codex exec --json`）、内置 Agent 与自定义命令。
+     - `build_invocation()` 在 `agent_runs/` 下自动生成运行时 `litloop-mcp.json`（供 Claude Code / WorkBuddy `--mcp-config` 注入）或 `litloop-dsh.patch.yml`（从 `~/.dsh/profiles/desktop/cordis.patch.yml` 同步 `llm-*` 模型配置并注入 `mcp-litloop`），无需用户先手动改全局配置即可在 app 内直接调用。
+  2. **一键同步全局 MCP 与技能（`sync_harness` 与 `/api/harnesses/{id}/sync`）**：
+     - 在「设置 → Agent」卡片提供「一键配置 / 重新同步配置」，将当前 Python 解释器的 `litloop` MCP 服务与 `skills/litloop/SKILL.md`（及 `reference.md`）幂等写入 `~/.claude.json`、`~/.workbuddy-ai/mcp.json`、`~/.dsh/profiles/{desktop,headless}/cordis.patch.yml` 或 `~/.codex/config.toml` 及对应 `skills/litloop/` 目录。
+  3. **多 Harness JSONL 流解析与原对话续接（[src/litloop/desktop/agent_runner.py](src/litloop/desktop/agent_runner.py)）**：
+     - `_read()` 同时解析 Claude/WorkBuddy `stream-json`（`session_id`）、DeepSeek Harness（`type: "session"` 的 `sessionId`、`status`、`tool_call`/`tool_result`、`final`）与 Codex CLI（`thread.started` 的 `thread_id`、`item.started`/`item.completed`），将外部对话 ID 存入 `agent_runs/<run>.json` 的 `agent_session`。
+     - `resume()` 对 app 发起且带 `agent_session` 的会话自动通过 `--resume <id>`（Claude/WorkBuddy）、`--session-id <id>`（DSH）或 `exec resume <id>`（Codex）续接**同一个原对话**（`resumed_chat=True`），并发送精简的 `continuing_conversation=True` 提示词；支持 `force_new=True` 新开后台对话。
+  4. **区分「app 发起」与「外部对话发起」会话（`session_origin`）**：
+     - `GET /api/sessions/{session}` 返回 `origin`（`source: "app" | "external"`、`harness_label`、`agent_session`、`can_resume_same_chat`、用户手动改评篇数 `changed_ratings` 及外部粘贴指令 `continue_prompt`）。
+     - 筛选页进度条（[app/src/components/progress-strip.tsx](app/src/components/progress-strip.tsx)）对外部发起的会话主按钮改为「复制『继续』指令（回原对话粘贴）」，并提供「在 app 后台接手继续」次要按钮；对 app 发起且可续接的会话显示「由 Agent 继续（原对话）」。
+  5. **设置页 Harness 卡片与对话详情透明化**：
+     - [app/src/components/settings-view.tsx](app/src/components/settings-view.tsx) 在 Agent 分组顶部展示 `HarnessCards`（安装状态、MCP/技能状态、一键配置、选用切换），非 `custom` 模式下折叠底层命令参数。
+     - [app/src/components/search-view.tsx](app/src/components/search-view.tsx) 与 `progress-strip.tsx` 展示执行 Harness 徽章（及 `· 续接` 标记）和可展开的「对话详情」（外部对话 ID、发送的完整 Prompt 与 Agent 最终回复）。
+- 验证：
+  - 新增 [tests/test_harnesses.py](tests/test_harnesses.py)，连同 `test_app_server.py`、`test_agent_runner.py`、`test_app_types.py` 共 `54 passed`；本机实测同时探测到 Claude Code、WorkBuddy 与 DeepSeek Harness。
+  - `scripts/check_release_consistency.py`、`scripts/import_smoke.py`（`34/34`）、`scripts/smoke_app.py`、`npm run build` 与 `npm run lint:copy` 全部通过。
+
 ## 2026-11-23：MSI 向导左蓝右白位图、TUN 代理与翻译回退、深度检索去重展开并发布 `1.18.5`
 
 - **MSI 向导高对比度位图**：更新 [scripts/make_installer_images.py](scripts/make_installer_images.py) 的 `dialog()`，将 `app/src-tauri/icons/wix-dialog.bmp`（`493×312`）由全幅深蓝底改为左侧 `164×312` 蓝色渐变品牌栏 + 右侧 `329×312` 纯白文字区，解决 WiX 默认黑色中文向导文字在深蓝底上对比度偏低的问题。

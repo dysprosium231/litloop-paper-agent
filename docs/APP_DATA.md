@@ -167,15 +167,20 @@ app 的「新建检索」把表单拼成一段话（`agent_runner.build_prompt`�
   "prompt": "用 litloop 技能做深度检索：…",
   "doing": "深度检索：取下一批",
   "events": [{"t": "19:45:12", "text": "深度检索：开始"}],
+  "harness": "claude",
+  "harness_label": "Claude Code",
   "session": "20261017-194530-SiC-…",
   "agent_session": "…",
+  "resumed_chat": false,
   "result": "已保存 …",
   "error": null
 }
 ```
 
 - `state`：`running` → `done` / `failed` / `cancelled`；文件里是 `running`、但后台没有在跑它（app 中途关闭），读出时当作 `interrupted`。同一时间只运行一个。
-- `session`：Agent 保存的筛选会话（从工具返回里取到的最后一个），app 据此打开结果；`agent_session` 是 Agent 自己的对话编号，可用 `claude --resume` 接着聊。
+- `harness`、`harness_label`：本次运行使用的 Agent Harness 标识（`claude`、`workbuddy`、`dsh`、`codex`、`builtin`、`custom`）及显示名称。
+- `session`：Agent 保存的筛选会话（从工具返回里取到的最后一个），app 据此打开结果；`agent_session` 是 Agent 自己的对话编号（如 Claude Code / WorkBuddy 的 `session_id`、DeepSeek Harness 的 `sessionId`、Codex CLI 的 `thread_id`），供下一批继续检索时通过 `--resume` / `--session-id` / `exec resume` 续接同一对话。
+- `resumed_chat`：布尔值，本次续跑是否复用了上一轮的 `agent_session` 原对话上下文。
 - `resumed_from`（可选，2026-11-19 起）：从筛选页或历史任务「继续检索」发起的续跑记录，写明续跑的原筛选会话 ID。
 - `events` 只保留最近 200 条，`doing` 是当前一步，结束后为 `null`。
 

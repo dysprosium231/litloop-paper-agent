@@ -85,6 +85,7 @@ class NewSearch(BaseModel):
 
 class ResumeSearch(BaseModel):
     batches: int = 0
+    force_new: bool = False
 
 
 class NewDownload(BaseModel):
@@ -257,6 +258,7 @@ def create_app(token: str) -> FastAPI:
 
     @app.get("/api/sessions/{session}")
     def session(session: str) -> dict[str, Any]:
+        from . import agent_runner
         from ..search import deep as deep_search
         _record_path(session)
         record = db.load_screening(session)
@@ -265,7 +267,12 @@ def create_app(token: str) -> FastAPI:
             # The file keeps the agent's English notes; the app shows today's, in Chinese.
             from .. import quota
             summary["api_warnings"] = quota.warnings("zh")
-        return {"record": record, "summary": summary, "resumable": deep_search.has_pool(session)}
+        return {
+            "record": record,
+            "summary": summary,
+            "resumable": deep_search.has_pool(session),
+            "origin": agent_runner.session_origin(session),
+        }
 
     @app.get("/api/sessions/{session}/progress")
     def progress(session: str) -> dict[str, Any] | None:
@@ -328,10 +335,17 @@ def create_app(token: str) -> FastAPI:
     @app.post("/api/sessions/{session}/resume")
     def resume_session(session: str, body: ResumeSearch | None = None) -> dict[str, Any]:
         """Resume a deep-search session through the configured agent."""
+        import inspect
+
         from . import agent_runner
         _record_path(session)
         try:
-            return agent_runner.resume(session, batches=body.batches if body else 0)
+            batches = body.batches if body else 0
+            force_new = bool(body.force_new) if body else False
+            params = inspect.signature(agent_runner.resume).parameters
+            if "force_new" in params:
+                return agent_runner.resume(session, batches=batches, force_new=force_new)
+            return agent_runner.resume(session, batches=batches)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         except RuntimeError as exc:
@@ -577,6 +591,27 @@ def create_app(token: str) -> FastAPI:
             return app_settings.run_test(group)
         except KeyError as exc:
             raise HTTPException(404, "无法完成检测：此分组没有检测项") from exc
+
+    @app.get("/api/harnesses")
+    def harnesses_list() -> list[dict[str, Any]]:
+        from . import harnesses
+        return harnesses.detect_harnesses()
+
+    @app.post("/api/harnesses/{harness_id}/sync")
+    def harnesses_sync(harness_id: str) -> dict[str, Any]:
+        from . import harnesses
+        try:
+            return harnesses.sync_harness(harness_id)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/harnesses/{harness_id}/select")
+    def harnesses_select(harness_id: str) -> list[dict[str, Any]]:
+        from . import harnesses
+        try:
+            return harnesses.select_harness(harness_id)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     @app.get("/api/components/{key}/status")
     def component_status(key: str) -> dict[str, Any]:

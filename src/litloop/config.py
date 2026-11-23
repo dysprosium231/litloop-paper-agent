@@ -201,6 +201,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Which backend runs a search started in the app: "command" (backend A,
     # the agent above) or "builtin" (backend B, the model API configured below).
     "agent_backend": "command",
+    "agent_harness": "auto",
     "agent_command": "claude",
     # An agent run that prints nothing for this long is stopped (it hung or
     # waits on a prompt nobody sees). A deep-search batch takes ~1-3 minutes.

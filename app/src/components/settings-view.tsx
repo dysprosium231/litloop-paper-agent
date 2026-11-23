@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, PageBody, PageHeader } from "@/components/page"
 import { Switch } from "@/components/ui/switch"
-import { downloadsApi, settingsApi, type AppUpdateInfo, type ComponentStatus, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
+import { downloadsApi, settingsApi, type AppUpdateInfo, type ComponentStatus, type HarnessInfo, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 // The native chooser exists only inside the app window, not in a browser preview.
@@ -39,7 +39,7 @@ export const QUOTA = "quota"
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   sources: DatabaseIcon, downloads: DownloadIcon, network: GlobeIcon, school: GraduationCapIcon,
-  zotero: BookMarkedIcon, screening: LanguagesIcon, [QUOTA]: GaugeIcon, agent: BotIcon, components: PuzzleIcon,
+  zotero: BookMarkedIcon, screening: LanguagesIcon, [QUOTA]: GaugeIcon, agent: BotIcon, builtin_agent: BotIcon, components: PuzzleIcon,
 }
 
 // Groups of the settings list; ids the backend adds later fall into the last one.
@@ -57,6 +57,8 @@ const ABOUT: Record<string, string> = {
   zotero: "推送到 Zotero 的方式和默认分类。",
   screening: "摘要翻译的范围和翻译服务。",
   [QUOTA]: "各检索接口今日的用量和剩余额度。",
+  agent: "选择在 app 中发起检索时使用的 Agent（支持 Claude Code、WorkBuddy、DeepSeek Harness、Codex CLI 或内置 Agent）。",
+  builtin_agent: "不装外部 Agent 命令，让 app 直接调用模型接口完成检索与评分。",
   components: "浏览器、WebVPN、代理等可选组件是否已安装。",
 }
 
@@ -240,6 +242,120 @@ function Page({ id, title, intro, action, children }: {
   )
 }
 
+function HarnessCards({ harnesses, onReload, onFieldUpdated }: {
+  harnesses: HarnessInfo[] | null
+  onReload: (next?: HarnessInfo[]) => void
+  onFieldUpdated: (f: SettingField) => void
+}) {
+  const [busy, setBusy] = React.useState<string | null>(null)
+  const [feedback, setFeedback] = React.useState<{ id: string; ok: boolean; text: string } | null>(null)
+
+  if (!harnesses) {
+    return (
+      <Card className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
+        <LoaderIcon className="size-4 animate-spin" />正在检测已安装的 Agent…
+      </Card>
+    )
+  }
+
+  const handleSelect = async (id: string) => {
+    setBusy(`select:${id}`)
+    setFeedback(null)
+    try {
+      const next = await settingsApi.selectHarness(id)
+      onReload(next)
+      const gs = await settingsApi.list()
+      const ag = gs.find((g) => g.id === "agent")
+      ag?.fields.forEach(onFieldUpdated)
+    } catch (e) {
+      setFeedback({ id, ok: false, text: errorMessage(e) })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleSync = async (id: string) => {
+    setBusy(`sync:${id}`)
+    setFeedback(null)
+    try {
+      const res = await settingsApi.syncHarness(id)
+      onReload(harnesses.map((h) => (h.id === id ? res.harness : h)))
+      setFeedback({ id, ok: res.ok, text: res.message || "已同步 MCP 与技能配置" })
+    } catch (e) {
+      setFeedback({ id, ok: false, text: errorMessage(e) })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <Card className="divide-y">
+      {harnesses.map((h) => {
+        const synced = h.mcp_configured && h.skill_installed
+        const selecting = busy === `select:${h.id}`
+        const syncing = busy === `sync:${h.id}`
+        return (
+          <div key={h.id} className="space-y-2 px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-48 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium">{h.label}</span>
+                  <span className={cn(
+                    "rounded px-1.5 py-0.5 text-xs",
+                    h.detected
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                      : "bg-muted text-muted-foreground",
+                  )}>
+                    {h.detected ? "已安装" : "未检测到"}
+                  </span>
+                  {h.can_sync && (
+                    <span className={cn(
+                      "rounded px-1.5 py-0.5 text-xs",
+                      synced
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground",
+                    )}>
+                      {synced ? "MCP 与技能已就绪" : "未同步全局配置"}
+                    </span>
+                  )}
+                </div>
+                {h.detail && <div className="text-[13px] leading-relaxed text-muted-foreground">{h.detail}</div>}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {h.can_sync && h.detected && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={Boolean(busy)}
+                    onClick={() => handleSync(h.id)}
+                  >
+                    {syncing && <LoaderIcon className="animate-spin" />}
+                    {synced ? "重新同步配置" : "一键配置 MCP 与技能"}
+                  </Button>
+                )}
+                <Button
+                  variant={h.selected ? "secondary" : "default"}
+                  size="sm"
+                  disabled={h.selected || Boolean(busy)}
+                  onClick={() => handleSelect(h.id)}
+                >
+                  {selecting && <LoaderIcon className="animate-spin" />}
+                  {h.selected ? "当前使用" : "选用"}
+                </Button>
+              </div>
+            </div>
+            {feedback && feedback.id === h.id && (
+              <p className={cn("text-xs", feedback.ok ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")}>
+                {feedback.text}
+              </p>
+            )}
+          </div>
+        )
+      })}
+    </Card>
+  )
+}
+
 // Keyed by group id: switching groups starts a fresh pane, so a check still running
 // for the previous group cannot show its results here.
 /** One settings group: its fields, and its check when it has one. The first-run guide shows these too. */
@@ -249,6 +365,25 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
   const [installing, setInstalling] = React.useState<string | null>(null)
   const [installStatus, setInstallStatus] = React.useState<{ key: string; status: ComponentStatus } | null>(null)
   const [installLog, setInstallLog] = React.useState<{ key: string; text: string } | null>(null)
+  const [harnesses, setHarnesses] = React.useState<HarnessInfo[] | null>(null)
+  const [showCustomCli, setShowCustomCli] = React.useState(false)
+
+  const loadHarnesses = React.useCallback((next?: HarnessInfo[]) => {
+    if (next) {
+      setHarnesses(next)
+      return
+    }
+    settingsApi.harnesses().then(setHarnesses).catch(() => {})
+  }, [])
+
+  React.useEffect(() => {
+    if (group.id === "agent") loadHarnesses()
+  }, [group.id, loadHarnesses])
+
+  const handleFieldSaved = React.useCallback((f: SettingField) => {
+    onSaved(f)
+    if (group.id === "agent") loadHarnesses()
+  }, [group.id, loadHarnesses, onSaved])
   const test = async () => {
     setTesting(true)
     try {
@@ -389,7 +524,38 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
           ))}
         </Card>
       )}
-      {group.fields.length > 0 && <Card>{group.fields.map((f) => <Field key={f.key} field={f} onSaved={onSaved} />)}</Card>}
+      {group.id === "agent" && (
+        <HarnessCards harnesses={harnesses} onReload={loadHarnesses} onFieldUpdated={onSaved} />
+      )}
+      {group.fields.length > 0 && (() => {
+        const harnessVal = String(group.fields.find((f) => f.key === "agent_harness")?.value ?? "")
+        const isCustom = harnessVal === "custom" || harnesses?.find((h) => h.selected)?.id === "custom"
+        const isAdvCli = (f: SettingField) => group.id === "agent" && (f.key === "agent_command" || f.key === "agent_args")
+        const mainFields = group.id === "agent" && !isCustom ? group.fields.filter((f) => !isAdvCli(f)) : group.fields
+        const advFields = group.id === "agent" && !isCustom ? group.fields.filter(isAdvCli) : []
+        return (
+          <Card>
+            {mainFields.map((f) => <Field key={f.key} field={f} onSaved={handleFieldSaved} />)}
+            {advFields.length > 0 && (
+              <div className="border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomCli((v) => !v)}
+                  className="flex w-full items-center justify-between px-5 py-3 text-left text-xs font-medium text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                >
+                  <span>高级：自定义命令与参数</span>
+                  <span>{showCustomCli ? "收起" : "展开"}</span>
+                </button>
+                {showCustomCli && (
+                  <div className="border-t">
+                    {advFields.map((f) => <Field key={f.key} field={f} onSaved={handleFieldSaved} />)}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        )
+      })()}
     </Page>
   )
 }

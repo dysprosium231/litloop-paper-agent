@@ -44,7 +44,8 @@
 | `cache_ttl_hours` | `168` | 下载缓存有效期，设 0 表示不缓存 |
 | `abstract_translation` / `translation_provider` | `高` / `deepseek` | 摘要翻译的范围和服务（见 [桌面 app 能做什么](../README.md#桌面-app-能做什么)） |
 | `update_check_days` | `7` | 每隔几天检查 LitLoop、easyseek、zotero-mcp 有没有新版本，有则在检索、下载结果和 app 设置页提示（不自动安装）；设 0 关闭 |
-| `agent_command` / `agent_args` | `claude` / 空 | app 里「新建检索」调起的 Agent 命令和参数 |
+| `agent_command` / `agent_args` | `claude` / 空 | app 里「新建检索」调起的 Agent 命令和参数（`agent_harness` 选 `custom` 时使用） |
+| `agent_harness` | `auto` | app 调起的外部 Agent（Harness）：`auto`（按已安装顺序自动选择或跟随 `agent_backend`/`agent_command`）、`claude`、`workbuddy`、`dsh`、`codex`、`builtin`、`custom` |
 | `agent_backend` | `command` | app 发起的检索由谁跑：`command`（起上面的 Agent 命令，用你自己的账号）或 `builtin`（内置 Agent，app 直接调模型接口） |
 | `builtin_agent_provider` | `openai` | 内置 Agent 用哪种接口：`openai`（OpenAI 兼容：DeepSeek、通义、Kimi、智谱、OpenRouter、Ollama、vLLM）或 `anthropic` |
 | `builtin_agent_base_url` | 空 | 内置 Agent 的接口地址；留空用该服务商的官方地址（本地 Ollama 例如 `http://127.0.0.1:11434/v1`） |

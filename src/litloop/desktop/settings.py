@@ -95,12 +95,16 @@ GROUPS: list[dict[str, Any]] = [
         ],
     },
     {
-        "id": "agent", "title": "Agent",
+        "id": "agent", "title": "Agent", "test": "agent",
         "fields": [
             {"key": "agent_backend", "label": "用哪个后端", "type": "select",
              "options": [["command", "Agent 命令（在后端 A 里跑，用你自己的账号）"],
                          ["builtin", "内置 Agent（app 直接调模型接口）"]],
              "help": "内置 Agent 的接口和模型在下面一组里设置"},
+            {"key": "agent_harness", "label": "外部 Agent（Harness）", "type": "select",
+             "options": [["auto", "自动选择已安装的 Agent"], ["claude", "Claude Code"], ["workbuddy", "WorkBuddy"],
+                         ["dsh", "DeepSeek Harness"], ["codex", "Codex CLI"], ["custom", "自定义命令"]],
+             "help": "选择本机安装的 Agent；选「自定义命令」时才使用下方的命令与参数"},
             {"key": "agent_command", "label": "Agent 命令", "type": "text", "placeholder": "claude",
              "help": "在 app 里发起检索时，把检索要求发给这个 Agent"},
             {"key": "agent_args", "label": "命令参数", "type": "text",
@@ -531,10 +535,33 @@ def test_components() -> list[dict[str, Any]]:
     else:
         out.append(_result("版面分析", None, "未安装：PDF 转 Markdown 按纯文本顺序，表格和分栏可能不规整",
                            action={"key": "layout", "label": "安装（约 65 MB）"}))
-    cmd = str(cfg.get("agent_command") or "claude").strip()
-    out.append(_result("Agent 命令", True, f"找到 {cmd}") if shutil.which(cmd)
-               else _result("Agent 命令", None, f"找不到 {cmd}：在 app 里发起检索需要它，可在「设置 → Agent」中修改"))
+    from . import harnesses
+    harness_cfg = str(cfg.get("agent_harness") or "auto").strip()
+    if cfg.get("agent_backend") == "builtin" or harness_cfg == "builtin":
+        model = str(cfg.get("builtin_agent_model") or "").strip()
+        out.append(_result("Agent 命令", True, f"内置 Agent（{model}）") if model
+                   else _result("Agent 命令", None, "已选内置 Agent，尚未填写模型名，可在「设置 → 内置 Agent」中填写"))
+    elif harness_cfg in ("workbuddy", "dsh", "codex"):
+        detected_map = {h["id"]: h for h in harnesses.detect_harnesses(cfg)}
+        chosen = detected_map.get(harness_cfg) or {}
+        label = chosen.get("label") or harness_cfg
+        out.append(_result("Agent 命令", True, f"找到 {label}（{chosen.get('binary') or chosen.get('detail')}）") if chosen.get("detected")
+                   else _result("Agent 命令", None, f"找不到 {label}：在 app 里发起检索需要它，可在「设置 → Agent」中修改"))
+    else:
+        cmd = str(cfg.get("agent_command") or "claude").strip()
+        out.append(_result("Agent 命令", True, f"找到 {cmd}") if shutil.which(cmd)
+                   else _result("Agent 命令", None, f"找不到 {cmd}：在 app 里发起检索需要它，可在「设置 → Agent」中修改"))
     return out
+
+
+def test_agent() -> list[dict[str, Any]]:
+    """Detect all installed external harnesses and the built-in agent status."""
+    from . import harnesses
+    return [
+        _result(h["label"], True if h["detected"] else None, h["detail"])
+        for h in harnesses.detect_harnesses()
+        if h["id"] != "custom"
+    ]
 
 
 def test_builtin_agent() -> list[dict[str, Any]]:
@@ -555,7 +582,8 @@ def test_builtin_agent() -> list[dict[str, Any]]:
 
 
 TESTS = {"sources": test_sources, "downloads": test_downloads, "network": test_network, "zotero": test_zotero,
-         "screening": test_screening, "components": test_components, "builtin_agent": test_builtin_agent}
+         "screening": test_screening, "components": test_components, "agent": test_agent,
+         "builtin_agent": test_builtin_agent}
 
 
 def run_test(group: str) -> dict[str, Any]:

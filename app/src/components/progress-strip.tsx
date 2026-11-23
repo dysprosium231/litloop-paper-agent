@@ -2,7 +2,7 @@ import * as React from "react"
 import { TriangleAlertIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import type { ErrorAction, Progress, Summary } from "@/lib/api"
+import type { ErrorAction, Progress, SessionOrigin, Summary } from "@/lib/api"
 import { cn, duration } from "@/lib/utils"
 
 const PHASES: [string, string][] = [
@@ -47,8 +47,8 @@ function BatchBars({ batches, highs }: { batches: Summary["batches"]; highs: num
 }
 
 /** A button that opens a small panel under it; outside click or Esc closes it. */
-function Pop({ label, aria, className, children }: {
-  label: React.ReactNode; aria?: string; className?: string; children: React.ReactNode
+function Pop({ label, aria, className, panelClassName, children }: {
+  label: React.ReactNode; aria?: string; className?: string; panelClassName?: string; children: React.ReactNode
 }) {
   const [open, setOpen] = React.useState(false)
   const root = React.useRef<HTMLSpanElement>(null)
@@ -67,7 +67,7 @@ function Pop({ label, aria, className, children }: {
     <span ref={root} className="relative">
       <button type="button" aria-label={aria} aria-expanded={open} onClick={() => setOpen((o) => !o)} className={className}>{label}</button>
       {open && (
-        <div className="absolute top-full right-0 z-50 mt-2 w-80 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-md">
+        <div className={cn("absolute top-full right-0 z-50 mt-2 w-80 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-md", panelClassName)}>
           {children}
         </div>
       )}
@@ -75,15 +75,82 @@ function Pop({ label, aria, className, children }: {
   )
 }
 
+function ChatDetailPop({ origin }: { origin: SessionOrigin }) {
+  const [copied, setCopied] = React.useState(false)
+  const run = origin.last_run
+  if (!run) return null
+  const sessionId = run.agent_session || origin.agent_session
+  if (!run.prompt && !run.result && !sessionId) return null
+  const agentLabel = run.harness_label || origin.harness_label || "Agent"
+
+  const copyPrompt = () => {
+    if (!run.prompt) return
+    navigator.clipboard.writeText(run.prompt).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }
+
+  return (
+    <Pop
+      label="对话详情"
+      panelClassName="w-96 max-w-[90vw] space-y-2.5"
+      className="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+    >
+      <div className="space-y-1 text-xs">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-muted-foreground">执行 Agent</span>
+          <span className="font-medium text-foreground">
+            {agentLabel}{run.resumed_chat ? " · 原对话续接" : ""}
+          </span>
+        </div>
+        {sessionId && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="shrink-0 text-muted-foreground">会话 ID</span>
+            <code className="truncate font-mono text-[11px] text-foreground" title={sessionId}>{sessionId}</code>
+          </div>
+        )}
+      </div>
+      {run.prompt && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">发送给 Agent 的提示词</span>
+            <button
+              type="button"
+              onClick={copyPrompt}
+              className="rounded px-1.5 py-0.5 text-xs text-primary hover:bg-primary/10"
+            >
+              {copied ? "已复制" : "复制提示词"}
+            </button>
+          </div>
+          <pre className="max-h-40 overflow-auto rounded-md border bg-muted/50 p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-foreground">
+            {run.prompt}
+          </pre>
+        </div>
+      )}
+      {run.result && (
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-muted-foreground">Agent 最终回复</div>
+          <div className="max-h-36 overflow-auto rounded-md border bg-muted/30 p-2 text-xs leading-relaxed whitespace-pre-line text-foreground">
+            {run.result}
+          </div>
+        </div>
+      )}
+    </Pop>
+  )
+}
+
 /** What the running round is doing, or a one-line overview when nothing runs. */
-export function ProgressStrip({ progress, summary, resumable, onContinue, onResume, onErrorAction }: {
+export function ProgressStrip({ progress, summary, resumable, origin, onContinue, onResume, onErrorAction }: {
   progress: Progress | null
   summary: Summary | null
   resumable?: boolean
+  origin?: SessionOrigin | null
   onContinue: () => void
-  onResume?: () => void
+  onResume?: (forceNew?: boolean) => void
   onErrorAction?: (action: ErrorAction) => void
 }) {
+  const [copiedCmd, setCopiedCmd] = React.useState(false)
   const running = progress?.state === "running"
   if (!running) {
     const failed = progress?.state === "failed"
@@ -92,6 +159,14 @@ export function ProgressStrip({ progress, summary, resumable, onContinue, onResu
     const highs = summary ? summary.batches.map((b) => (b.rated ? b.高 / b.rated : 0)) : []
     const phaseLabel = progress?.stopped_phase ? (PHASE_LABEL[progress.stopped_phase] ?? progress.stopped_phase) : null
     const canAct = Boolean(summary?.current_batch || resumable)
+    const isExternalWithPrompt = origin?.source === "external" && Boolean(origin.continue_prompt)
+    const copyContinueCmd = () => {
+      if (!origin?.continue_prompt) return
+      navigator.clipboard.writeText(origin.continue_prompt).then(() => {
+        setCopiedCmd(true)
+        setTimeout(() => setCopiedCmd(false), 1800)
+      }).catch(() => {})
+    }
     return (
       <div className="flex min-h-13 min-w-0 flex-wrap items-center gap-x-5 gap-y-2 border-b px-6 py-3 text-sm text-muted-foreground">
         {summary && (
@@ -136,13 +211,75 @@ export function ProgressStrip({ progress, summary, resumable, onContinue, onResu
               </ul>
             </Pop>
           )}
-          {canAct && onResume && (
-            <Button size="sm" onClick={onResume}
-              title="让 Agent 接着评分并继续深度检索">由 Agent 继续</Button>
-          )}
-          {canAct && (
-            <Button size="sm" variant={onResume ? "outline" : "default"} onClick={onContinue}
-              title="按当前全部评分重新排序并生成下一批，不经过 Agent">仅取下一批</Button>
+          {origin?.last_run && <ChatDetailPop origin={origin} />}
+          {canAct && isExternalWithPrompt ? (
+            <>
+              <Button
+                size="sm"
+                onClick={copyContinueCmd}
+                title="此会话在外部 Agent 窗口发起；复制指令后粘贴回原对话窗口，即可不丢上下文继续下一批"
+              >
+                {copiedCmd ? "已复制指令" : "复制『继续』指令（回原对话粘贴）"}
+              </Button>
+              {onResume && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onResume(true)}
+                  title="在 app 后台启动 Agent 接手继续深度检索"
+                >
+                  在 app 后台接手继续
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onContinue}
+                title="按当前全部评分重新排序并生成下一批，不经过 Agent"
+              >
+                仅取下一批
+              </Button>
+            </>
+          ) : (
+            <>
+              {canAct && onResume && (
+                origin?.can_resume_same_chat ? (
+                  <Button
+                    size="sm"
+                    onClick={() => onResume(false)}
+                    title={`回到上次的 ${origin.harness_label || "Agent"} 对话（${origin.agent_session}）接着筛选下一批`}
+                  >
+                    由 Agent 继续（原对话）
+                  </Button>
+                ) : origin?.harness === "builtin" ? (
+                  <Button
+                    size="sm"
+                    onClick={() => onResume(false)}
+                    title="让内置 Agent 接着评分并继续深度检索"
+                  >
+                    由内置 Agent 继续
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => onResume(false)}
+                    title="让 Agent 接着评分并继续深度检索"
+                  >
+                    由 Agent 继续
+                  </Button>
+                )
+              )}
+              {canAct && (
+                <Button
+                  size="sm"
+                  variant={onResume ? "outline" : "default"}
+                  onClick={onContinue}
+                  title="按当前全部评分重新排序并生成下一批，不经过 Agent"
+                >
+                  仅取下一批
+                </Button>
+              )}
+            </>
           )}
         </span>
       </div>

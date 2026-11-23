@@ -39,6 +39,7 @@ import {
   type Progress,
   type Relevance,
   type SessionListEntry,
+  type SessionOrigin,
   type SessionRecord,
   type Summary,
   settingsApi,
@@ -173,6 +174,7 @@ export default function App() {
   const [record, setRecord] = React.useState<SessionRecord | null>(null)
   const [summary, setSummary] = React.useState<Summary | null>(null)
   const [resumable, setResumable] = React.useState(false)
+  const [origin, setOrigin] = React.useState<SessionOrigin | null>(null)
   const [progress, setProgress] = React.useState<Progress | null>(null)
   const [current, setCurrent] = React.useState<string | null>(null)
   const [onlyBatch, setOnlyBatch] = React.useState(true)
@@ -264,10 +266,11 @@ export default function App() {
 
   const reload = React.useCallback(() => {
     if (!sid) return
-    api.session(sid).then(({ record, summary, resumable: canResume }) => {
+    api.session(sid).then(({ record, summary, resumable: canResume, origin: sessOrigin }) => {
       setRecord(record)
       setSummary(summary)
       setResumable(Boolean(canResume))
+      setOrigin(sessOrigin ?? null)
       setError(null)
     }).catch((e) => setError(errorMessage(e)))
   }, [sid])
@@ -532,9 +535,9 @@ export default function App() {
     if (!sid) return
     api.next(sid).then(() => api.progress(sid)).then(setProgress).catch((e) => setError(errorMessage(e)))
   }, [sid])
-  const resumeSearch = React.useCallback(() => {
+  const resumeSearch = React.useCallback((forceNew = false) => {
     if (!sid) return
-    api.resume(sid).then((r) => {
+    api.resume(sid, 0, forceNew).then((r) => {
       if (r.state === "failed") {
         setError(r.error)
         return
@@ -735,7 +738,7 @@ export default function App() {
               </Button>
             </div>
           </header>
-          <ProgressStrip progress={progress} summary={summary} resumable={resumable} onContinue={continueSearch} onResume={resumeSearch} onErrorAction={handleErrorAction} />
+          <ProgressStrip progress={progress} summary={summary} resumable={resumable} origin={origin} onContinue={continueSearch} onResume={resumeSearch} onErrorAction={handleErrorAction} />
           {notice && (
             <div
               onMouseEnter={() => { noticeHoverRef.current = true }}

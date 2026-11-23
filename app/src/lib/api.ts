@@ -209,10 +209,33 @@ export interface BatchResult {
   previous: BatchPrevious[]
 }
 
+export interface SessionOrigin {
+  source: "app" | "external"
+  harness: string | null
+  harness_label: string | null
+  agent_session: string | null
+  can_resume_same_chat: boolean
+  last_run: {
+    run: string
+    state: string
+    started: string
+    finished?: string | null
+    harness?: string | null
+    harness_label?: string | null
+    agent_session?: string | null
+    resumed_chat?: boolean
+    prompt?: string | null
+    result?: string | null
+    error?: string | null
+  } | null
+  continue_prompt: string
+  changed_ratings: number
+}
+
 export const api = {
   sessions: () => call<SessionListEntry[]>("/api/sessions"),
   roundNotice: () => call<RoundNotice | null>("/api/screening/notice"),
-  session: (id: string) => call<{ record: SessionRecord; summary: Summary | null; resumable?: boolean }>(`/api/sessions/${encodeURIComponent(id)}`),
+  session: (id: string) => call<{ record: SessionRecord; summary: Summary | null; resumable?: boolean; origin?: SessionOrigin }>(`/api/sessions/${encodeURIComponent(id)}`),
   progress: (id: string) => call<Progress | null>(`/api/sessions/${encodeURIComponent(id)}/progress`),
   rate: (id: string, paper: { doi?: string; title: string }, relevance: Relevance | null) =>
     call<{ item: Item | null; edited: number }>(`/api/sessions/${encodeURIComponent(id)}/rating`,
@@ -224,7 +247,7 @@ export const api = {
     call<BatchResult>(`/api/sessions/${encodeURIComponent(id)}/batch`, { ops }),
   translation: () => call<TranslationInfo>("/api/translation"),
   next: (id: string) => call<{ started: boolean }>(`/api/sessions/${encodeURIComponent(id)}/next`, {}),
-  resume: (id: string, batches = 0) => call<SearchRun>(`/api/sessions/${encodeURIComponent(id)}/resume`, { batches }),
+  resume: (id: string, batches = 0, forceNew = false) => call<SearchRun>(`/api/sessions/${encodeURIComponent(id)}/resume`, { batches, force_new: forceNew }),
   translate: (id: string, paper: { doi?: string; title: string }) =>
     call<{ abstract_zh: string }>(`/api/sessions/${encodeURIComponent(id)}/translate`, { doi: paper.doi ?? null, title: paper.title }),
 }
@@ -356,6 +379,27 @@ export interface AppUpdateInfo {
   error: string | null
 }
 
+export interface HarnessInfo {
+  id: "claude" | "workbuddy" | "dsh" | "codex" | "builtin" | "custom"
+  label: string
+  detected: boolean
+  selected: boolean
+  binary: string | null
+  version: string | null
+  mcp_configured: boolean
+  skill_installed: boolean
+  can_sync: boolean
+  can_resume: boolean
+  detail: string
+}
+
+export interface HarnessSyncResult {
+  ok: boolean
+  harness: HarnessInfo
+  message: string
+  files: string[]
+}
+
 export const settingsApi = {
   list: () => call<SettingGroup[]>("/api/settings"),
   save: (key: string, value: unknown) => call<SettingField>("/api/settings", { key, value }),
@@ -370,6 +414,9 @@ export const settingsApi = {
   dataDir: () => call<{ path: string; exists: boolean }>("/api/data-dir"),
   quota: () => call<Record<string, ProviderUsage>>("/api/quota"),
   openalex: (fresh = false) => call<{ credits_used?: number; credits_remaining?: number; credits_limit?: number; resets_at?: string; has_key?: boolean; error?: string } | null>(`/api/quota/openalex${fresh ? "?fresh=true" : ""}`),
+  harnesses: () => call<HarnessInfo[]>("/api/harnesses"),
+  syncHarness: (id: string) => call<HarnessSyncResult>(`/api/harnesses/${encodeURIComponent(id)}/sync`, {}),
+  selectHarness: (id: string) => call<HarnessInfo[]>(`/api/harnesses/${encodeURIComponent(id)}/select`, {}),
 }
 
 // ------------------------------------------------------------------ downloads
@@ -600,6 +647,11 @@ export interface SearchRun {
   events?: { t: string; text: string }[]
   session: string | null
   resumed_from?: string | null
+  harness?: string | null
+  harness_label?: string | null
+  agent_session?: string | null
+  resumed_chat?: boolean
+  prompt?: string | null
   result: string | null
   error: string | null
 }
@@ -607,7 +659,7 @@ export interface SearchRun {
 export const searchApi = {
   plan: (form: SearchForm) => call<SearchPlan>("/api/searches/plan", form),
   start: (form: SearchForm) => call<SearchRun>("/api/searches", form),
-  resume: (session: string, batches = 0) => call<SearchRun>(`/api/sessions/${encodeURIComponent(session)}/resume`, { batches }),
+  resume: (session: string, batches = 0, forceNew = false) => call<SearchRun>(`/api/sessions/${encodeURIComponent(session)}/resume`, { batches, force_new: forceNew }),
   list: () => call<SearchRun[]>("/api/searches"),
   get: (run: string) => call<SearchRun>(`/api/searches/${encodeURIComponent(run)}`),
   cancel: (run: string) => call<{ cancelled: boolean }>(`/api/searches/${encodeURIComponent(run)}/cancel`, {}),

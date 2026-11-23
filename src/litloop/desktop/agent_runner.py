@@ -25,6 +25,7 @@ from typing import Any
 
 from .. import config as _config
 from .. import db, store
+from . import harnesses
 
 # What the agent tells the app, by tool: shown under the run as it works.
 _TOOL_TEXT = {
@@ -34,6 +35,12 @@ _TOOL_TEXT = {
     "litloop_find": "正在查找文献",
     "litloop_config": "正在读取设置",
     "litloop_diagnostics": "正在检测设置",
+}
+_DEEP_ACTION_TEXT = {
+    "start": "深度检索：正在构建候选池",
+    "rate": "深度检索：正在保存本批评分",
+    "next": "深度检索：正在生成下一批",
+    "status": "深度检索：正在查看进度",
 }
 _SESSION_RE = re.compile(r'"session"\s*:\s*"([^"]+)"')
 _LOCK = threading.Lock()
@@ -136,7 +143,10 @@ def _command() -> list[str]:
 
 def _backend() -> str:
     """Which backend runs a search started here: the agent command or a model API."""
-    return "builtin" if str(_config.load_config().get("agent_backend") or "") == "builtin" else "command"
+    cfg = _config.load_config()
+    if str(cfg.get("agent_backend") or "") == "builtin" or str(cfg.get("agent_harness") or "") == "builtin":
+        return "builtin"
+    return "command"
 
 
 def _write(run: str, data: dict[str, Any]) -> None:
@@ -191,7 +201,98 @@ def _new_run_id() -> str:
     return run
 
 
-def build_resume_prompt(session: str, *, batches: int = 0, skill: bool = True) -> str:
+def _count_changed_ratings(record: dict[str, Any] | None) -> int:
+    if not isinstance(record, dict):
+        return 0
+    return sum(
+        1
+        for it in (record.get("items") or [])
+        if isinstance(it, dict) and it.get("user_relevance") and it.get("user_relevance") != it.get("relevance")
+    )
+
+
+def build_external_continue_prompt(session: str, *, changed_ratings: int = 0) -> str:
+    """Concise prompt for users to paste into an external Claude Code / WorkBuddy / DSH chat."""
+    note = f"（手动调整了 {int(changed_ratings)} 篇评分）" if changed_ratings else ""
+    return (
+        f"我已在 LitLoop 桌面端复核完会话 {session} 的上一批文献{note}。"
+        f"请先调用 litloop_deep_search(action='status', session={session!r}) 同步最新进度，"
+        "如有 unrated 先用 action='rate' 评完，再调用 action='next' 生成并逐篇评分下一批。"
+    )
+
+
+def session_origin(session: str) -> dict[str, Any]:
+    """Identify whether a session was started in the app or in an external agent chat."""
+    try:
+        record = db.load_screening(session)
+    except Exception:
+        record = {"items": []}
+    changed_ratings = _count_changed_ratings(record)
+    continue_prompt = build_external_continue_prompt(session, changed_ratings=changed_ratings)
+
+    matched_runs: list[dict[str, Any]] = []
+    if runs_dir().is_dir():
+        for p in sorted(runs_dir().glob("*.json"), reverse=True):
+            try:
+                d = get(p.stem)
+            except ValueError:
+                d = None
+            if not isinstance(d, dict):
+                continue
+            if d.get("session") == session or d.get("resumed_from") == session:
+                matched_runs.append(d)
+
+    if matched_runs:
+        last_run = matched_runs[0]
+        agent_session = next(
+            (str(r.get("agent_session")).strip() for r in matched_runs if str(r.get("agent_session") or "").strip()),
+            None,
+        )
+        harness = str(
+            last_run.get("harness")
+            or ("builtin" if last_run.get("builtin") else "claude")
+        ).strip()
+        harness_label = harnesses.HARNESS_LABELS.get(harness, harness)
+        can_resume = bool(agent_session and harness in harnesses.RESUMABLE_HARNESSES)
+        return {
+            "source": "app",
+            "harness": harness,
+            "harness_label": harness_label,
+            "agent_session": agent_session,
+            "can_resume_same_chat": can_resume,
+            "last_run": {
+                "run": last_run.get("run"),
+                "state": last_run.get("state"),
+                "started": last_run.get("started"),
+                "finished": last_run.get("finished"),
+                "harness": harness,
+                "harness_label": harness_label,
+                "agent_session": agent_session,
+                "resumed_chat": bool(last_run.get("resumed_chat")),
+            },
+            "continue_prompt": continue_prompt,
+            "changed_ratings": changed_ratings,
+        }
+
+    return {
+        "source": "external",
+        "harness": None,
+        "harness_label": None,
+        "agent_session": None,
+        "can_resume_same_chat": False,
+        "last_run": None,
+        "continue_prompt": continue_prompt,
+        "changed_ratings": changed_ratings,
+    }
+
+
+def build_resume_prompt(
+    session: str,
+    *,
+    batches: int = 0,
+    skill: bool = True,
+    continuing_conversation: bool = False,
+) -> str:
     """Build the prompt to resume an interrupted or paused deep-search session.
 
     Reads only the small screening record and optional summary; never reads the
@@ -202,6 +303,19 @@ def build_resume_prompt(session: str, *, batches: int = 0, skill: bool = True) -
     if not deep_search.has_pool(session):
         raise ValueError("无法继续检索：这不是深度检索会话")
     record = screening.load(session)
+    limit_note = f"本次最多再筛 {int(batches)} 批，" if batches else ""
+
+    if continuing_conversation:
+        changed = _count_changed_ratings(record)
+        changed_note = f"（手动调整了 {changed} 篇评分）" if changed else ""
+        return (
+            f"我已在 LitLoop 桌面端复核完上一批文献评分{changed_note}。请继续会话 {session}："
+            f"先调用 litloop_deep_search(action='status', session={session!r}) 查看进度与未评文献，"
+            f"如有 unrated 先用 action='rate' 评完，再调用 action='next' 生成并逐篇评分下一批，"
+            f"{limit_note}返回 stop_suggested=true 时停止。"
+            "不要提问、不要下载、不要推送 Zotero；结束时用两三句中文汇报筛选会话名、总篇数和各相关度数量。"
+        )
+
     summary = db.load_summary(session)
 
     question = str(record.get("question") or "").strip()
@@ -217,7 +331,6 @@ def build_resume_prompt(session: str, *, batches: int = 0, skill: bool = True) -
         parts.append(f"已有进度：已生成 {done_batches} 批，已评分 {screened}/{pool_size} 篇。")
     else:
         parts.append("上次检索在生成首批结果前中断，候选池基础记录已保存。")
-    limit_note = f"本次最多再筛 {int(batches)} 批，" if batches else ""
     if skill:
         parts.append(
             f"不要重新调用 litloop_deep_search(action='start')。请从这个会话接着做："
@@ -240,7 +353,15 @@ def build_resume_prompt(session: str, *, batches: int = 0, skill: bool = True) -
     return "\n\n".join(parts)
 
 
-def _launch(run: str, data: dict[str, Any], prompt: str, builtin: bool) -> dict[str, Any]:
+def _launch(
+    run: str,
+    data: dict[str, Any],
+    prompt: str,
+    builtin: bool,
+    *,
+    harness_id: str | None = None,
+    resume_agent_session: str | None = None,
+) -> dict[str, Any]:
     _write(run, data)
     if builtin:
         if not str(_config.load_config().get("builtin_agent_model") or "").strip():
@@ -253,11 +374,17 @@ def _launch(run: str, data: dict[str, Any], prompt: str, builtin: bool) -> dict[
             _BUILTIN[run] = thread
         thread.start()
         return data
-    cmd = _command()
+    cfg = _config.load_config()
+    cmd, extra_env, resolved_harness = harnesses.build_invocation(
+        cfg, harness_id=harness_id, resume_session=resume_agent_session
+    )
+    data["harness"] = resolved_harness
+    data["harness_label"] = harnesses.HARNESS_LABELS.get(resolved_harness, resolved_harness)
+    _write(run, data)
     try:
         proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            cwd=str(Path.home()), env={**os.environ, "PYTHONUTF8": "1"},
+            cwd=str(Path.home()), env={**os.environ, "PYTHONUTF8": "1", **extra_env},
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except OSError:
         data.update(state="failed", doing=None, error=f"无法启动 Agent（{cmd[0]}）。在「设置 → Agent」中检查 Agent 命令")
@@ -270,22 +397,58 @@ def _launch(run: str, data: dict[str, Any], prompt: str, builtin: bool) -> dict[
 
 
 def start(form: dict[str, Any]) -> dict[str, Any]:
-    builtin = _backend() == "builtin"
+    cfg = _config.load_config()
+    harness_id = harnesses.resolve_harness(cfg)
+    builtin = harness_id == "builtin" or _backend() == "builtin"
+    if builtin:
+        harness_id = "builtin"
     prompt = build_prompt(form, skill=not builtin)
     if running():
         raise RuntimeError("已有检索在进行，完成或取消后再开始新的检索")
     run = _new_run_id()
     runs_dir().mkdir(parents=True, exist_ok=True)
-    data = {"run": run, "state": "running", "started": datetime.now().isoformat(timespec="seconds"),
-            "question": str(form.get("question")).strip(), "mode": form.get("mode") or "quick",
-            "form": form, "prompt": prompt, "doing": "正在启动 Agent", "events": [],
-            "session": None, "agent_session": None, "result": None, "error": None}
-    return _launch(run, data, prompt, builtin)
+    data = {
+        "run": run,
+        "state": "running",
+        "started": datetime.now().isoformat(timespec="seconds"),
+        "question": str(form.get("question")).strip(),
+        "mode": form.get("mode") or "quick",
+        "form": form,
+        "prompt": prompt,
+        "doing": "正在启动 Agent",
+        "events": [],
+        "harness": harness_id,
+        "harness_label": harnesses.HARNESS_LABELS.get(harness_id, harness_id),
+        "session": None,
+        "agent_session": None,
+        "resumed_chat": False,
+        "result": None,
+        "error": None,
+    }
+    return _launch(run, data, prompt, builtin, harness_id=harness_id)
 
 
-def resume(session: str, *, batches: int = 0) -> dict[str, Any]:
-    builtin = _backend() == "builtin"
-    prompt = build_resume_prompt(session, batches=batches, skill=not builtin)
+def resume(session: str, *, batches: int = 0, force_new: bool = False) -> dict[str, Any]:
+    cfg = _config.load_config()
+    configured_harness = harnesses.resolve_harness(cfg)
+    builtin = configured_harness == "builtin" or _backend() == "builtin"
+    origin = session_origin(session)
+
+    if not builtin and not force_new and origin.get("can_resume_same_chat"):
+        harness_id = str(origin.get("harness") or configured_harness)
+        resume_agent_session = str(origin.get("agent_session") or "").strip() or None
+        continuing = bool(resume_agent_session)
+    else:
+        harness_id = "builtin" if builtin else configured_harness
+        resume_agent_session = None
+        continuing = False
+
+    prompt = build_resume_prompt(
+        session,
+        batches=batches,
+        skill=not builtin,
+        continuing_conversation=continuing,
+    )
     if running():
         raise RuntimeError("已有检索在进行，完成或取消后再开始新的检索")
     from ..search import screening
@@ -293,13 +456,33 @@ def resume(session: str, *, batches: int = 0) -> dict[str, Any]:
     run = _new_run_id()
     runs_dir().mkdir(parents=True, exist_ok=True)
     question = str(record.get("question") or "").strip() or session
-    data = {"run": run, "state": "running", "started": datetime.now().isoformat(timespec="seconds"),
-            "question": question, "mode": "deep",
-            "form": {"question": question, "mode": "deep", "batches": int(batches or 0), "session": session},
-            "prompt": prompt, "doing": "正在继续深度检索", "events": [],
-            "session": session, "resumed_from": session, "agent_session": None,
-            "result": None, "error": None}
-    return _launch(run, data, prompt, builtin)
+    data = {
+        "run": run,
+        "state": "running",
+        "started": datetime.now().isoformat(timespec="seconds"),
+        "question": question,
+        "mode": "deep",
+        "form": {"question": question, "mode": "deep", "batches": int(batches or 0), "session": session},
+        "prompt": prompt,
+        "doing": "正在继续深度检索",
+        "events": [],
+        "harness": harness_id,
+        "harness_label": harnesses.HARNESS_LABELS.get(harness_id, harness_id),
+        "session": session,
+        "resumed_from": session,
+        "agent_session": resume_agent_session,
+        "resumed_chat": continuing,
+        "result": None,
+        "error": None,
+    }
+    return _launch(
+        run,
+        data,
+        prompt,
+        builtin,
+        harness_id=harness_id,
+        resume_agent_session=resume_agent_session,
+    )
 
 
 def _event(data: dict[str, Any], text: str) -> None:
@@ -307,43 +490,159 @@ def _event(data: dict[str, Any], text: str) -> None:
     data["events"] = data["events"][-200:]
 
 
+def _strip_tool_prefix(raw_name: str) -> str:
+    name = str(raw_name or "").strip()
+    if "__" in name:
+        name = name.split("__")[-1]
+    for prefix in ("litloop:", "litloop."):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+    return name
+
+
+def _tool_doing_text(name: str, action: str | None = None) -> str:
+    text = _TOOL_TEXT.get(name, f"正在调用 {name}")
+    if name == "litloop_deep_search" and action:
+        text = _DEEP_ACTION_TEXT.get(action, text)
+    return text
+
+
+def _parse_input_action(raw_input: Any) -> str | None:
+    if isinstance(raw_input, str) and raw_input.strip():
+        try:
+            raw_input = json.loads(raw_input)
+        except ValueError:
+            return None
+    if isinstance(raw_input, dict):
+        val = raw_input.get("action")
+        return str(val) if val else None
+    return None
+
+
+def _stringify_tool_body(body: Any) -> str:
+    if isinstance(body, str):
+        return body
+    if isinstance(body, dict):
+        return json.dumps(body, ensure_ascii=False)
+    if isinstance(body, list):
+        parts: list[str] = []
+        for x in body:
+            if isinstance(x, str):
+                parts.append(x)
+            elif isinstance(x, dict):
+                if isinstance(x.get("text"), str):
+                    parts.append(x["text"])
+                else:
+                    parts.append(json.dumps(x, ensure_ascii=False))
+        return " ".join(parts)
+    return ""
+
+
 def _read(data: dict[str, Any], line: str) -> None:
-    """One line of ``--output-format stream-json``; other output is kept in the log only."""
+    """One line of JSONL stream output from Claude/WorkBuddy, DSH, or Codex CLI."""
     try:
         msg = json.loads(line)
     except ValueError:
         return
+    if not isinstance(msg, dict):
+        return
+
     kind = msg.get("type")
+
+    # Session ID capture across harnesses
     if kind == "system" and msg.get("session_id"):
         data["agent_session"] = msg["session_id"]
-    for c in ((msg.get("message") or {}).get("content") or []) if kind in ("assistant", "user") else []:
-        if not isinstance(c, dict):
-            continue
-        if c.get("type") == "tool_use":
-            name = str(c.get("name") or "").split("__")[-1]
-            data["_last_tool"] = name
-            if c.get("id"):
-                data.setdefault("_tools", {})[c["id"]] = name
-            action = (c.get("input") or {}).get("action")
-            text = _TOOL_TEXT.get(name, f"正在调用 {name}")
-            if name == "litloop_deep_search" and action:
-                text = {"start": "深度检索：正在构建候选池", "rate": "深度检索：正在保存本批评分",
-                        "next": "深度检索：正在生成下一批", "status": "深度检索：正在查看进度"}.get(action, text)
-            data["doing"] = text
-            _event(data, text)
-        elif c.get("type") == "tool_result":
-            body = c.get("content")
-            body = body if isinstance(body, str) else " ".join(
-                x.get("text", "") for x in body or [] if isinstance(x, dict))
-            tool_id = c.get("tool_use_id")
-            tool = (data.get("_tools") or {}).get(tool_id) if tool_id else None
-            if not tool:
-                tool = data.get("_last_tool")
-            session = _session_from(tool, body or "")
-            if session:
-                data["session"] = session
-        elif c.get("type") == "text" and kind == "assistant" and c.get("text", "").strip():
-            data["doing"] = "Agent 正在评分"
+    elif msg.get("session_id") and not data.get("agent_session"):
+        data["agent_session"] = msg["session_id"]
+
+    if kind == "session" and msg.get("sessionId"):
+        data["agent_session"] = msg["sessionId"]
+    elif msg.get("sessionId") and not data.get("agent_session"):
+        data["agent_session"] = msg["sessionId"]
+
+    if kind == "thread.started" and msg.get("thread_id"):
+        data["agent_session"] = msg["thread_id"]
+
+    # DeepSeek Harness status event
+    if kind == "status":
+        if msg.get("phase") == "turn_start" and data.get("doing") == "正在启动 Agent":
+            data["doing"] = "Agent 正在思考"
+        return
+
+    # DeepSeek Harness final event
+    if kind == "final":
+        if msg.get("sessionId"):
+            data["agent_session"] = msg["sessionId"]
+        reason = msg.get("reason") or {}
+        if isinstance(reason, dict) and reason.get("kind") == "error":
+            err_obj = reason.get("error")
+            err_msg = (
+                (err_obj.get("message") if isinstance(err_obj, dict) else str(err_obj or "")).strip()
+                or str(msg.get("text") or "").strip()
+                or "无法完成检索：DeepSeek Harness 出错"
+            )
+            data["error"] = err_msg
+            data["result"] = None
+        else:
+            text_out = str(msg.get("text") or "").strip()
+            if text_out:
+                data["result"] = text_out
+        return
+
+    # Codex CLI item.started / item.completed events
+    if kind in ("item.started", "item.completed") and isinstance(msg.get("item"), dict):
+        item = msg["item"]
+        item_type = item.get("type")
+        if item_type in ("mcp_tool_call", "tool_call"):
+            name = _strip_tool_prefix(str(item.get("tool") or item.get("name") or ""))
+            if name:
+                data["_last_tool"] = name
+                action = _parse_input_action(item.get("arguments") or item.get("input"))
+                if kind == "item.started":
+                    text = _tool_doing_text(name, action)
+                    data["doing"] = text
+                    _event(data, text)
+                else:
+                    raw_out = (
+                        item.get("result")
+                        if item.get("result") is not None
+                        else (item.get("output") if item.get("output") is not None else item.get("content"))
+                    )
+                    session = _session_from(name, _stringify_tool_body(raw_out))
+                    if session:
+                        data["session"] = session
+        elif kind == "item.completed" and item_type in ("agent_message", "message") and item.get("text"):
+            data["result"] = str(item["text"]).strip()
+        return
+
+    # Claude Code & WorkBuddy stream-json assistant/user messages
+    if kind in ("assistant", "user"):
+        for c in (msg.get("message") or {}).get("content") or []:
+            if not isinstance(c, dict):
+                continue
+            if c.get("type") == "tool_use":
+                name = _strip_tool_prefix(str(c.get("name") or ""))
+                data["_last_tool"] = name
+                if c.get("id"):
+                    data.setdefault("_tools", {})[c["id"]] = name
+                action = _parse_input_action(c.get("input"))
+                text = _tool_doing_text(name, action)
+                data["doing"] = text
+                _event(data, text)
+            elif c.get("type") == "tool_result":
+                body = _stringify_tool_body(c.get("content"))
+                tool_id = c.get("tool_use_id")
+                tool = (data.get("_tools") or {}).get(tool_id) if tool_id else None
+                if not tool:
+                    tool = data.get("_last_tool")
+                session = _session_from(tool, body)
+                if session:
+                    data["session"] = session
+            elif c.get("type") == "text" and kind == "assistant" and c.get("text", "").strip():
+                data["doing"] = "Agent 正在评分"
+        return
+
+    # Claude Code & WorkBuddy result message
     if kind == "result":
         data["result"] = str(msg.get("result") or "").strip() or None
         if msg.get("is_error"):
@@ -353,6 +652,58 @@ def _read(data: dict[str, Any], line: str) -> None:
                 data["error"] = f"无法完成检索：Agent 未登录。在终端运行 {cmd} 登录后重试"
             data["result"] = None
         data["cost_usd"] = msg.get("total_cost_usd")
+        return
+
+    # DeepSeek Harness / generic flat tool call and tool result events
+    is_tool_call = kind in ("tool_call", "tool_use", "tool_start") or (
+        kind not in ("tool_result", "tool_end", "tool_output")
+        and bool(msg.get("toolName") or msg.get("name"))
+        and not any(k in msg for k in ("output", "result"))
+    )
+    if is_tool_call:
+        raw_tool = str(msg.get("toolName") or msg.get("name") or "")
+        name = _strip_tool_prefix(raw_tool)
+        if name:
+            data["_last_tool"] = name
+            call_id = msg.get("callId") or msg.get("toolCallId") or msg.get("id")
+            if call_id:
+                data.setdefault("_tools", {})[call_id] = name
+            action = _parse_input_action(msg.get("input") or msg.get("arguments") or msg.get("args"))
+            text = _tool_doing_text(name, action)
+            data["doing"] = text
+            _event(data, text)
+
+    is_tool_result = kind in ("tool_result", "tool_end", "tool_output") or any(
+        k in msg for k in ("output", "result", "content")
+    )
+    if is_tool_result:
+        raw_tool = str(msg.get("toolName") or msg.get("name") or "")
+        tool = _strip_tool_prefix(raw_tool) if raw_tool else None
+        if not tool:
+            call_id = msg.get("callId") or msg.get("toolCallId") or msg.get("tool_use_id") or msg.get("id")
+            if call_id:
+                tool = (data.get("_tools") or {}).get(call_id)
+        if not tool:
+            tool = data.get("_last_tool")
+        raw_body = (
+            msg.get("output")
+            if msg.get("output") is not None
+            else (msg.get("result") if msg.get("result") is not None else msg.get("content"))
+        )
+        session = _session_from(tool, _stringify_tool_body(raw_body))
+        if session:
+            data["session"] = session
+            return
+
+    # Fallback for any JSON line reporting a LitLoop screening/deep_search session directly
+    last_tool = data.get("_last_tool")
+    if isinstance(msg.get("session"), str) and msg["session"]:
+        if last_tool in _SESSION_TOOLS or any(k in msg for k in ("pool", "screened", "unrated", "items")):
+            data["session"] = msg["session"]
+    elif last_tool in _SESSION_TOOLS:
+        m = _SESSION_RE.search(line)
+        if m:
+            data["session"] = m.group(1)
 
 
 def _session_from(tool: str | None, body: str) -> str | None:
