@@ -1,5 +1,23 @@
 # 更新日志
 
+## v1.18.5 (2026-11-23)
+
+### 改进与修复
+
+- **内置 Agent 启动与连接修复**：修复桌面端启动内置 Agent 时漏传配置导致报「还没有填模型名」的问题；兼容直接填写完整接口路径（如 `.../v1/chat/completions` 或 `.../v1/messages`）；检索方案预览改为生成纯英文短语检索词。
+- **TUN 代理模式兼容与引导优化**：当 Windows 下代理软件（v2rayN / `sing-box` / Clash）开启 TUN 模式并将 `python.exe` 设为直连时，内置 Agent 与摘要翻译接口在连接超时后自动回退系统 `curl`；「设置 → 网络」补充海外模型接口与 Sci-Hub 代理规则的排序说明。
+- **深度检索建池提速（消除双重展开）**：修复深度检索建池阶段对术语表变体与英美拼写的二次重复展开问题，在保持候选池召回结果完全不变的前提下将关键词检索请求次数减少 50%–67%。
+- **MSI 安装向导高对比度背景**：将 MSI 安装向导背景图（`wix-dialog.bmp`）改为左蓝（164 px 品牌栏）右白布局，大幅提升右侧黑色中文向导文字的可读性。
+- **代码清理**：移除已完成过渡的 `litloop.app_server` 转发模块。
+
+### 安装与校验
+
+- Windows 桌面端二选一：`LitLoop_1.18.5_x64-setup.exe`（NSIS，推荐个人使用）或 `LitLoop_1.18.5_x64_zh-CN.msi`（MSI，可选安装目录）。安装包未签名，首次运行 SmartScreen 点「更多信息 → 仍要运行」。
+- 命令行 / MCP：`pip install -U litloop` 或 `uvx litloop run`。
+- 校验文件见附件 `SHA256SUMS.txt`；使用说明与已知限制见 [README](https://github.com/dysprosium231/litloop-paper-agent#readme)。
+
+**完整变更记录**：https://github.com/dysprosium231/litloop-paper-agent/compare/v1.18.4...v1.18.5
+
 ## v1.18.4 (2026-11-22)
 
 ### 新增功能

@@ -566,3 +566,23 @@ def test_deferred_refs_continue_even_without_new_high_seeds(tmp_path, monkeypatc
     assert calls == [["R2"]]
     assert "10.1/extra" in [b["doi"] for b in out["batch"]]
     assert deep_search._load(sid)["deferred_refs"] == 0
+
+
+def test_keyword_candidates_do_not_double_expand_glossary_variants(monkeypatch):
+    import litloop.search.quick as s
+
+    collected_queries: list[str] = []
+
+    def fake_collect_one(q, pool, year_from, year_to, sort, errors=None):
+        collected_queries.append(q)
+        return []
+
+    monkeypatch.setattr(s, "_collect_one", fake_collect_one)
+    variants, _, _ = deep_search._glossary_expansions(["SiC aluminum composite"], ["SiC", "Al"])
+    all_queries = list(dict.fromkeys(["SiC aluminum composite"] + variants.get("SiC aluminum composite", [])))
+    assert "SiC aluminium composite" in all_queries
+
+    deep_search._keyword_candidates(all_queries, None, None)
+    # Each expanded query must be fetched once, not re-expanded inside quick._collect
+    assert sorted(collected_queries) == sorted(all_queries)
+    assert len(collected_queries) == len(all_queries)

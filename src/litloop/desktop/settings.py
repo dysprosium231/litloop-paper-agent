@@ -425,6 +425,7 @@ def test_network() -> list[dict[str, Any]]:
                           "将这些规则移到列表最上方并保存。规则按顺序生效。"],
                 "copy": [{"label": "程序名", "lines": names},
                          {"label": "完整路径（填程序名不生效时使用）", "lines": paths}],
+                "note": "如同时使用需经代理访问的海外模型接口或 Sci-Hub，将那些域名的代理规则排在进程直连规则上方。",
             })
         if any("Clash" in p or p == "mihomo" for p in found["programs"]):
             guides.append({
@@ -432,7 +433,7 @@ def test_network() -> list[dict[str, Any]]:
                 "steps": ["右键当前订阅，选择「编辑规则」。",
                           "在「前置规则」中添加下方的规则并保存。"],
                 "copy": [{"label": "规则", "lines": [f"PROCESS-NAME,{n},DIRECT" for n in names]}],
-                "note": "如果规则未生效，在「扩展配置」中加入 find-process-mode: always。",
+                "note": "如果规则未生效，在「扩展配置」中加入 find-process-mode: always；如同时使用需经代理访问的海外模型接口或 Sci-Hub，将那些域名的代理规则排在进程直连规则上方。",
             })
         out.append(_result("代理软件", False,
                            f"{programs} 正以 TUN 模式运行，学校认证的流量会经代理出口，学校无法识别你的身份。"

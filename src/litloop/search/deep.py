@@ -306,7 +306,7 @@ def _keyword_candidates(queries: list[str], year_from: int | None, year_to: int 
 
     def one(q: str) -> list[dict[str, Any]]:
         try:
-            return _collect(q, 100, 100, year_from, year_to, None, None, None)
+            return _collect(q, 100, 100, year_from, year_to, None, None, None, expand_glossary=False)
         except Exception as exc:
             logger.warning("deep search: query %r failed (%s)", q, exc)
             return []
@@ -726,7 +726,7 @@ def _start(session: str, t0: float, question: str, queries: list[str], seeds: li
            core_terms: list[str], must_find: list[str] | None, year_from: int | None, year_to: int | None,
            batch_size: int, cap: int) -> dict[str, Any]:
     query_variants, glossary_alts, glossary_used = _glossary_expansions(queries, core_terms)
-    all_queries = queries + [v for q in queries for v in query_variants.get(q, [])]
+    all_queries = list(dict.fromkeys(queries + [v for q in queries for v in query_variants.get(q, [])]))
     years = _year_filter(year_from, year_to)
     pool: dict[str, dict] = {}
     seed_recs = _by_filter("doi", [canonical_doi(s) for s in seeds])

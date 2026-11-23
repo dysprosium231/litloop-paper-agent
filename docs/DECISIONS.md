@@ -1,5 +1,12 @@
 # 决定与实验记录
 
+## 2026-11-23：MSI 向导左蓝右白位图、TUN 代理与翻译回退、深度检索去重展开并发布 `1.18.5`
+
+- **MSI 向导高对比度位图**：更新 [scripts/make_installer_images.py](scripts/make_installer_images.py) 的 `dialog()`，将 `app/src-tauri/icons/wix-dialog.bmp`（`493×312`）由全幅深蓝底改为左侧 `164×312` 蓝色渐变品牌栏 + 右侧 `329×312` 纯白文字区，解决 WiX 默认黑色中文向导文字在深蓝底上对比度偏低的问题。
+- **TUN 代理规则顺序指引与翻译接口回退**：[src/litloop/desktop/translate.py](src/litloop/desktop/translate.py) 的 `_deepseek()` 与 `_deepl()` 接入 `_post_json()`，在 TUN 模式 `python.exe` 直连规则导致海外接口连接超时时自动回退系统 `curl`；[src/litloop/desktop/settings.py](src/litloop/desktop/settings.py) 的 `test_network()` 为 v2rayN 与 Clash Verge 补充说明「如同时使用需经代理访问的海外模型接口或 Sci-Hub，将那些域名的代理规则排在进程直连规则上方」。
+- **消除深度检索建池对术语表变体的双重展开**：[src/litloop/search/deep.py](src/litloop/search/deep.py) 的 `_start()` 先通过 `_glossary_expansions()` 将 `queries` 展开为 `all_queries`，随后 `_keyword_candidates()` 调用 `quick._collect(q)` 时，原先 `quick._collect()` 内部又对每个变体二次调用 `_glossary_variants()`，导致含术语/英美拼写的检索词被重复请求 4 遍。现给 [src/litloop/search/quick.py](src/litloop/search/quick.py) 的 `_collect()` 增加 `expand_glossary: bool = True` 参数，在 `deep._keyword_candidates()` 中传 `expand_glossary=False` 并对 `all_queries` 去重，召回集合完全不变而关键词请求次数减少 50%–67%。
+- **发布 `1.18.5`**：统一将 7 处版本清单升至 `1.18.5`，更新 [CHANGELOG.md](CHANGELOG.md)，通过 `scripts/prepare_release.py` 全套检查后推送 `v1.18.5` 标签触发 GitHub Release 与 PyPI 自动发布。
+
 ## 2026-11-23：内置 Agent 真 Key 实测、云端 Windows 虚拟机安装包验收与清理 `app_server.py`
 
 - **内置 Agent 真 Key 全流程实测（待实测 15）**：

@@ -51,37 +51,75 @@ def _key(name: str, config: dict[str, Any]) -> str:
     return key
 
 
-def _fail(service: str, r: requests.Response) -> TranslationError:
-    if r.status_code in (401, 403):
+def _fail_code(service: str, status_code: int) -> TranslationError:
+    if status_code in (401, 403):
         return TranslationError(f"{service} Key 无效")
-    if r.status_code == 402:
+    if status_code == 402:
         return TranslationError(f"{service} 账户余额不足")
-    if r.status_code == 456:
+    if status_code == 456:
         return TranslationError("DeepL 本月额度已用完")
-    if r.status_code == 429:
+    if status_code == 429:
         return TranslationError(f"{service} 请求过于频繁，已被限流")
-    return TranslationError(f"{service} 返回错误（HTTP {r.status_code}）")
+    return TranslationError(f"{service} 返回错误（HTTP {status_code}）")
+
+
+def _fail(service: str, r: requests.Response) -> TranslationError:
+    return _fail_code(service, r.status_code)
+
+
+def _post_json(service: str, url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[str, Any]:
+    from urllib.parse import urlparse
+    from ..agents import client as aclient
+
+    host = (urlparse(url).hostname or "").lower()
+    if host and host in aclient._CURL_HOSTS and aclient._curl_bin():
+        try:
+            return aclient._post_curl(url, headers, body, "", 60)
+        except RuntimeError as exc:
+            msg = str(exc)
+            if msg.startswith("HTTP ") and msg[5:8].isdigit():
+                raise _fail_code(service, int(msg[5:8])) from exc
+            raise requests.ConnectionError(msg) from exc
+
+    try:
+        r = requests.post(url, timeout=60, headers=headers, json=body)
+    except (requests.Timeout, requests.ConnectionError):
+        if host and aclient._curl_bin():
+            try:
+                data = aclient._post_curl(url, headers, body, "", 60)
+                aclient._CURL_HOSTS.add(host)
+                return data
+            except RuntimeError as exc:
+                msg = str(exc)
+                if msg.startswith("HTTP ") and msg[5:8].isdigit():
+                    raise _fail_code(service, int(msg[5:8])) from exc
+        raise
+    if r.status_code != 200:
+        raise _fail(service, r)
+    return r.json()
 
 
 def _deepseek(text: str, config: dict[str, Any]) -> str:
-    r = requests.post("https://api.deepseek.com/chat/completions", timeout=60,
-                      headers={"Authorization": f"Bearer {_key('deepseek', config)}"},
-                      json={"model": config.get("deepseek_model") or "deepseek-chat", "temperature": 1.3,
-                            "messages": [{"role": "system", "content": PROMPT}, {"role": "user", "content": text}]})
-    if r.status_code != 200:
-        raise _fail("DeepSeek", r)
-    return r.json()["choices"][0]["message"]["content"].strip()
+    data = _post_json(
+        "DeepSeek",
+        "https://api.deepseek.com/chat/completions",
+        headers={"Authorization": f"Bearer {_key('deepseek', config)}"},
+        body={"model": config.get("deepseek_model") or "deepseek-chat", "temperature": 1.3,
+              "messages": [{"role": "system", "content": PROMPT}, {"role": "user", "content": text}]},
+    )
+    return data["choices"][0]["message"]["content"].strip()
 
 
 def _deepl(text: str, config: dict[str, Any]) -> str:
     key = _key("deepl", config)
     host = "api-free.deepl.com" if key.endswith(":fx") else "api.deepl.com"
-    r = requests.post(f"https://{host}/v2/translate", timeout=60,
-                      headers={"Authorization": f"DeepL-Auth-Key {key}"},
-                      json={"text": [text], "source_lang": "EN", "target_lang": "ZH-HANS"})
-    if r.status_code != 200:
-        raise _fail("DeepL", r)
-    return r.json()["translations"][0]["text"].strip()
+    data = _post_json(
+        "DeepL",
+        f"https://{host}/v2/translate",
+        headers={"Authorization": f"DeepL-Auth-Key {key}"},
+        body={"text": [text], "source_lang": "EN", "target_lang": "ZH-HANS"},
+    )
+    return data["translations"][0]["text"].strip()
 
 
 def translate_text(text: str, config: dict[str, Any] | None = None) -> str:

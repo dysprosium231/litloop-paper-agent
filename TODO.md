@@ -88,9 +88,8 @@
 
 ### app
 - [~] 后端 B：内置 Agent（`agents/client.py`、`agents/runner.py`、`agents/tools.py`、`agents/system.py`、步数、分任务模型 `builtin_agent_plan_model`/`rate_model`、`POST /api/searches/plan` 检索方案预览，以及 `deepseek-v4-pro` + `deepseek-v4.1-flash` 真 Key 实测均已完成，见 DECISIONS）。还差：用测试集存档比较各模型的评分质量。
-- [~] 安装包与自动更新（`v1.18.4` 双安装包已在云端干净 Windows 虚拟机完成 Defender 扫描、向导截图、自定义目录安装、跨版本升级、运行期卸载、深度链接注册表与诊断包导出验收，见 DECISIONS）。还差：
-  - [ ] 生成并填入 Tauri 自动更新公钥（`tauri.conf.json` + GitHub Secrets）完成端到端自动更新；
-  - [ ] MSI 向导背景图 `dialog.bmp` 右侧文字区改为浅色底以提高默认黑色中文文字的对比度（可选视觉优化）。
+- [~] 安装包与自动更新（`v1.18.4` 双安装包已在云端干净 Windows 虚拟机完成 Defender 扫描、向导截图、自定义目录安装、跨版本升级、运行期卸载、深度链接注册表与诊断包导出验收，且 `v1.18.5` 已将 MSI 向导背景图 `wix-dialog.bmp` 改为左蓝右白高对比布局，见 DECISIONS）。还差：
+  - [ ] 生成并填入 Tauri 自动更新公钥（`tauri.conf.json` + GitHub Secrets）完成端到端自动更新。
 
 ### 测试
 - [~] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；2026-11-05 又补 `bib_import`、`bibtex_crossref`、`http_utils`、`europepmc`、`oa_discovery`、`models`、`pdf_extractor`、`profile_health`、`remote_assist`、`camofox_api`、`cloakbrowser_compat`、`cli/commands` 的辅助函数、`extractors` 的 HTML 路由（7 家出版商 + 兜底 + 大小写不敏感，11 个）与通用适配器 `publisher_adapters/generic.py`（标题/摘要/正文/图注/参考文献/作者的回退顺序，14 个）。顺手修了四个真 bug（citekey 撞键、`to_text` 多空行、PDF 段落分隔被拼掉、远程协助页面 500）。还剩 `desktop/` 的一些分支。

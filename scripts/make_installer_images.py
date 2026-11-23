@@ -45,17 +45,22 @@ def banner() -> Image.Image:
 
 
 def dialog() -> Image.Image:
-    img = Image.new("RGB", (493, 312), BLUE)
+    # WiX WixUI_InstallDir places black title/body text on the right (x >= 175)
+    # and expects a 164x312 brand panel on the left.
+    panel_w = 164
+    img = Image.new("RGB", (493, 312), "white")
     draw = ImageDraw.Draw(img)
-    for y in range(312):  # vertical gradient, dark at the bottom
+    for y in range(312):  # vertical gradient on the left brand panel
         t = y / 311
-        draw.line([(0, y), (493, y)], fill=(int(0 + 8 * t), int(76 - 30 * t), int(216 - 90 * t)))
-    img.paste(_mark(96), (36, 40), _mark(96))
-    draw.text((36, 168), "LitLoop", font=_font("seguisb.ttf", 34), fill="white")
-    draw.text((38, 214), "检索 · 筛选 · 下载 · Zotero", font=_font("msyh.ttc", 15), fill=(222, 232, 255))
-    draw.text((38, 240), "学术文献 Agent", font=_font("msyh.ttc", 15), fill=(222, 232, 255))
-    draw.text((38, 278), "github.com/dysprosium231/litloop-paper-agent",
-              font=_font("segoeui.ttf", 11), fill=(170, 196, 245))
+        draw.line([(0, y), (panel_w - 1, y)], fill=(int(0 + 8 * t), int(76 - 30 * t), int(216 - 90 * t)))
+    draw.line([(panel_w, 0), (panel_w, 311)], fill=(226, 232, 240))
+    mark = _mark(72)
+    img.paste(mark, ((panel_w - 72) // 2, 34), mark)
+    draw.text((22, 124), "LitLoop", font=_font("seguisb.ttf", 26), fill="white")
+    draw.text((22, 166), "检索 · 筛选", font=_font("msyh.ttc", 13), fill=(222, 232, 255))
+    draw.text((22, 188), "下载 · Zotero", font=_font("msyh.ttc", 13), fill=(222, 232, 255))
+    draw.text((22, 222), "学术文献 Agent", font=_font("msyh.ttc", 13), fill=(195, 215, 252))
+    draw.text((22, 282), "litloop-paper-agent", font=_font("segoeui.ttf", 11), fill=(170, 196, 245))
     return img
 
 

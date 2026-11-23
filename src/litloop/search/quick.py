@@ -424,7 +424,9 @@ def _glossary_variants(query: str) -> tuple[list[str], list[dict[str, Any]]]:
 
 def _collect(query, pool, limit, year_from, year_to, sort, author, author_id,
              expansions: list[dict[str, Any]] | None = None,
-             errors: list[str] | None = None) -> list[dict[str, Any]]:
+             errors: list[str] | None = None,
+             *,
+             expand_glossary: bool = True) -> list[dict[str, Any]]:
     if author_id or author:
         return search_papers(
             query, limit=pool, year_from=year_from, year_to=year_to, sort=sort,
@@ -432,7 +434,7 @@ def _collect(query, pool, limit, year_from, year_to, sort, author, author_id,
         )
     if not query:
         return []
-    variants, used = _glossary_variants(query)
+    variants, used = _glossary_variants(query) if expand_glossary else ([], [])
     if expansions is not None:
         expansions += used
     if not variants:
