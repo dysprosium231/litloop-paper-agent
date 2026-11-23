@@ -112,22 +112,11 @@ jobs:
           $msi183 = Join-Path (Split-Path $msi184) "LitLoop_1.18.3_prev.msi"
           Copy-Item $msi184 $msi183 -Force
 
-          # Patch copy's ProductVersion=1.18.3 and ProductCode to a new GUID (keeping UpgradeCode) to test MajorUpgrade
-          $installer = New-Object -ComObject WindowsInstaller.Installer
-          $db = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($msi183, 1))
+          # Patch copy's ProductVersion=1.18.3 and ProductCode to a new GUID (keeping UpgradeCode) via msi.dll to test MajorUpgrade
+          $msiCsharp = 'using System; using System.Runtime.InteropServices; public class MsiPatcher { [DllImport("msi.dll", CharSet = CharSet.Unicode)] public static extern uint MsiOpenDatabase(string path, IntPtr persist, out IntPtr db); [DllImport("msi.dll", CharSet = CharSet.Unicode)] public static extern uint MsiDatabaseOpenView(IntPtr db, string sql, out IntPtr view); [DllImport("msi.dll")] public static extern uint MsiViewExecute(IntPtr view, IntPtr rec); [DllImport("msi.dll")] public static extern uint MsiViewClose(IntPtr view); [DllImport("msi.dll")] public static extern uint MsiDatabaseCommit(IntPtr db); [DllImport("msi.dll")] public static extern uint MsiCloseHandle(IntPtr h); public static void Patch(string path, string newGuid) { IntPtr db; if (MsiOpenDatabase(path, (IntPtr)1, out db) != 0) throw new Exception("MsiOpenDatabase failed"); foreach (var sql in new[] { "UPDATE `Property` SET `Value` = ''1.18.3'' WHERE `Property` = ''ProductVersion''", "UPDATE `Property` SET `Value` = ''" + newGuid + "'' WHERE `Property` = ''ProductCode''" }) { IntPtr view; if (MsiDatabaseOpenView(db, sql, out view) != 0) throw new Exception("MsiDatabaseOpenView failed: " + sql); if (MsiViewExecute(view, IntPtr.Zero) != 0) throw new Exception("MsiViewExecute failed: " + sql); MsiViewClose(view); MsiCloseHandle(view); } if (MsiDatabaseCommit(db) != 0) throw new Exception("MsiDatabaseCommit failed"); MsiCloseHandle(db); } }'
+          Add-Type -TypeDefinition $msiCsharp
           $newGuid = "{$([Guid]::NewGuid().ToString().ToUpper())}"
-          foreach ($sql in @(
-            "UPDATE Property SET Value = '1.18.3' WHERE Property = 'ProductVersion'",
-            "UPDATE Property SET Value = '$newGuid' WHERE Property = 'ProductCode'"
-          )) {
-            $view = $db.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $db, @($sql))
-            $view.GetType().InvokeMember("Execute", "InvokeMethod", $null, $view, $null) | Out-Null
-            $view.GetType().InvokeMember("Close", "InvokeMethod", $null, $view, $null) | Out-Null
-          }
-          $db.GetType().InvokeMember("Commit", "InvokeMethod", $null, $db, $null) | Out-Null
-          [System.Runtime.InteropServices.Marshal]::ReleaseComObject($db) | Out-Null
-          [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null
-          [GC]::Collect(); [GC]::WaitForPendingFinalizers()
+          [MsiPatcher]::Patch($msi183, $newGuid)
 
           $t0 = Get-Date
           $p1 = Start-Process msiexec.exe -ArgumentList "/i `"$msi183`" INSTALLDIR=`"D:\LitLoopCustom`" APPLICATIONFOLDER=`"D:\LitLoopCustom`" /qn /l*v artifacts\msi_183_install.log" -Wait -PassThru
