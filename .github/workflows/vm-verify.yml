@@ -12,13 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download v1.18.2 and v1.18.4 release installers
+      - name: Download v1.18.4 release installers
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          New-Item -ItemType Directory -Force -Path installers/v1.18.2, installers/v1.18.4, artifacts | Out-Null
-          gh release download v1.18.2 --pattern "*zh-CN.msi" -D installers/v1.18.2
+          New-Item -ItemType Directory -Force -Path installers/v1.18.4, artifacts | Out-Null
           gh release download v1.18.4 -D installers/v1.18.4
           Get-ChildItem installers -Recurse | Select-Object FullName, Length
 
@@ -85,13 +84,10 @@ jobs:
           # 1) Launch MSI wizard GUI
           $msiPath = (Resolve-Path "installers\v1.18.4\LitLoop_1.18.4_x64_zh-CN.msi").Path
           $msiProc = Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`"" -PassThru
+          Start-Sleep -Seconds 4
           $hwnd = [IntPtr]::Zero
-          for ($i = 0; $i -lt 30; $i++) {
-            Start-Sleep -Milliseconds 500
-            $win = Get-Process msiexec -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
-            if ($win) { $hwnd = $win.MainWindowHandle; break }
-          }
-          Start-Sleep -Seconds 2
+          $win = Get-Process msiexec -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+          if ($win) { $hwnd = $win.MainWindowHandle }
           Capture-WindowOrScreen $hwnd (Join-Path (Resolve-Path "artifacts").Path "msi_wizard.png")
           Get-Process msiexec -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 2
@@ -99,29 +95,44 @@ jobs:
           # 2) Launch NSIS wizard GUI
           $nsisPath = (Resolve-Path "installers\v1.18.4\LitLoop_1.18.4_x64-setup.exe").Path
           $nsisProc = Start-Process $nsisPath -PassThru
+          Start-Sleep -Seconds 3
           $hwnd2 = [IntPtr]::Zero
-          for ($i = 0; $i -lt 30; $i++) {
-            Start-Sleep -Milliseconds 500
-            $nsisProc.Refresh()
-            if ($nsisProc.MainWindowHandle -ne 0) { $hwnd2 = $nsisProc.MainWindowHandle; break }
-          }
-          Start-Sleep -Seconds 2
+          $nsisProc.Refresh()
+          if ($nsisProc.MainWindowHandle -ne 0) { $hwnd2 = $nsisProc.MainWindowHandle }
           Capture-WindowOrScreen $hwnd2 (Join-Path (Resolve-Path "artifacts").Path "nsis_wizard.png")
           if (-not $nsisProc.HasExited) { Stop-Process -Id $nsisProc.Id -Force -ErrorAction SilentlyContinue }
           Start-Sleep -Seconds 2
 
-      - name: Verify MSI custom-dir install, 1.18.2 -> 1.18.4 upgrade, embedded backend, and running-app uninstall
+      - name: Verify MSI custom-dir install, 1.18.3 -> 1.18.4 upgrade, embedded backend, and running-app uninstall
         shell: pwsh
         run: |
           $report = New-Object System.Collections.Generic.List[string]
-          $report.Add("=== 3. MSI Install (1.18.2) & Upgrade to 1.18.4 in Custom Folder D:\LitLoopCustom ===")
-          $msi182 = (Resolve-Path "installers\v1.18.2\LitLoop_1.18.2_x64_zh-CN.msi").Path
+          $report.Add("=== 3. MSI Install (1.18.3) & Upgrade to 1.18.4 in Custom Folder D:\LitLoopCustom ===")
           $msi184 = (Resolve-Path "installers\v1.18.4\LitLoop_1.18.4_x64_zh-CN.msi").Path
+          $msi183 = Join-Path (Split-Path $msi184) "LitLoop_1.18.3_prev.msi"
+          Copy-Item $msi184 $msi183 -Force
+
+          # Patch copy's ProductVersion=1.18.3 and ProductCode to a new GUID (keeping UpgradeCode) to test MajorUpgrade
+          $installer = New-Object -ComObject WindowsInstaller.Installer
+          $db = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($msi183, 1))
+          $newGuid = "{$([Guid]::NewGuid().ToString().ToUpper())}"
+          foreach ($sql in @(
+            "UPDATE Property SET Value = '1.18.3' WHERE Property = 'ProductVersion'",
+            "UPDATE Property SET Value = '$newGuid' WHERE Property = 'ProductCode'"
+          )) {
+            $view = $db.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $db, @($sql))
+            $view.GetType().InvokeMember("Execute", "InvokeMethod", $null, $view, $null) | Out-Null
+            $view.GetType().InvokeMember("Close", "InvokeMethod", $null, $view, $null) | Out-Null
+          }
+          $db.GetType().InvokeMember("Commit", "InvokeMethod", $null, $db, $null) | Out-Null
+          [System.Runtime.InteropServices.Marshal]::ReleaseComObject($db) | Out-Null
+          [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null
+          [GC]::Collect(); [GC]::WaitForPendingFinalizers()
 
           $t0 = Get-Date
-          $p1 = Start-Process msiexec.exe -ArgumentList "/i `"$msi182`" INSTALLDIR=`"D:\LitLoopCustom`" APPLICATIONFOLDER=`"D:\LitLoopCustom`" /qn /l*v artifacts\msi_182_install.log" -Wait -PassThru
-          $report.Add("MSI 1.18.2 install exit=$($p1.ExitCode) in $([math]::Round(((Get-Date)-$t0).TotalSeconds, 1))s")
-          if ($p1.ExitCode -ne 0) { throw "MSI 1.18.2 install failed with $($p1.ExitCode)" }
+          $p1 = Start-Process msiexec.exe -ArgumentList "/i `"$msi183`" INSTALLDIR=`"D:\LitLoopCustom`" APPLICATIONFOLDER=`"D:\LitLoopCustom`" /qn /l*v artifacts\msi_183_install.log" -Wait -PassThru
+          $report.Add("MSI 1.18.3 install exit=$($p1.ExitCode) in $([math]::Round(((Get-Date)-$t0).TotalSeconds, 1))s")
+          if ($p1.ExitCode -ne 0) { throw "MSI 1.18.3 install failed with $($p1.ExitCode)" }
 
           $t1 = Get-Date
           $p2 = Start-Process msiexec.exe -ArgumentList "/i `"$msi184`" INSTALLDIR=`"D:\LitLoopCustom`" APPLICATIONFOLDER=`"D:\LitLoopCustom`" /qn /l*v artifacts\msi_184_upgrade.log" -Wait -PassThru
