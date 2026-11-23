@@ -503,8 +503,9 @@ def _run_builtin(run: str, data: dict[str, Any], prompt: str) -> None:
         # One batch costs a rate + a next call; building the pool and the final
         # answer need a few more (2026-11-06: the old flat 8 stopped deep runs).
         steps = min(4 + 2 * batches, 24) if deep else 8
-        out = run_task(prompt, TOOLS, functions=FUNCTIONS, system=system_prompt(),
-                       max_steps=steps, on_event=on_event, task_for_step=default_task_for_step)
+        out = run_task(prompt, TOOLS, functions=FUNCTIONS, config=_config.load_config(),
+                       system=system_prompt(), max_steps=steps, on_event=on_event,
+                       task_for_step=default_task_for_step)
         data["result"] = str(out.get("text") or "").strip() or None
         data["state"] = "cancelled" if stop.is_set() else "done"
     except _Cancelled:

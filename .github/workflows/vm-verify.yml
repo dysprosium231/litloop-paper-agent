@@ -1,0 +1,236 @@
+name: VM Installer Verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-windows-installers:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download v1.18.2 and v1.18.4 release installers
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force -Path installers/v1.18.2, installers/v1.18.4, artifacts | Out-Null
+          gh release download v1.18.2 --pattern "*zh-CN.msi" -D installers/v1.18.2
+          gh release download v1.18.4 -D installers/v1.18.4
+          Get-ChildItem installers -Recurse | Select-Object FullName, Length
+
+      - name: Verify SHA256SUMS and scan with Windows Defender
+        shell: pwsh
+        run: |
+          $report = New-Object System.Collections.Generic.List[string]
+          $report.Add("=== 1. SHA256 Checksums ===")
+          Push-Location installers/v1.18.4
+          Get-Content SHA256SUMS.txt | ForEach-Object {
+            if ($_ -match '^([0-9a-f]{64})\s+(.+)$') {
+              $expected = $Matches[1]
+              $file = $Matches[2].Trim()
+              $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+              if ($actual -ne $expected) { throw "SHA256 mismatch for ${file}: $actual != $expected" }
+              $report.Add("OK: $file ($actual)")
+            }
+          }
+          Pop-Location
+
+          $report.Add("=== 2. Windows Defender Scan ===")
+          $mpcmd = "C:\Program Files\Windows Defender\MpCmdRun.exe"
+          if (Test-Path $mpcmd) {
+            $scanPath = (Resolve-Path "installers\v1.18.4").Path
+            & $mpcmd -Scan -ScanType 3 -File $scanPath
+            $report.Add("Defender scan exit code: $LASTEXITCODE")
+          } else {
+            $report.Add("MpCmdRun.exe not present on runner")
+          }
+          $report | Out-File -FilePath artifacts/vm_report.txt -Encoding utf8
+
+      - name: Capture GUI screenshots of MSI and NSIS installer wizards
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          Add-Type @"
+          using System;
+          using System.Runtime.InteropServices;
+          public class Win32Window {
+              [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+              [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+              [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+              [StructLayout(LayoutKind.Sequential)]
+              public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+          }
+"@
+          [Win32Window]::SetProcessDPIAware() | Out-Null
+
+          function Capture-WindowOrScreen([IntPtr]$hwnd, [string]$outPath) {
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $left = $bounds.Left; $top = $bounds.Top; $w = $bounds.Width; $h = $bounds.Height
+            if ($hwnd -ne [IntPtr]::Zero) {
+              [Win32Window]::SetForegroundWindow($hwnd) | Out-Null
+              Start-Sleep -Milliseconds 500
+              $rect = New-Object Win32Window+RECT
+              if ([Win32Window]::GetWindowRect($hwnd, [ref]$rect)) {
+                $rw = $rect.Right - $rect.Left
+                $rh = $rect.Bottom - $rect.Top
+                if ($rw -gt 100 -and $rh -gt 100) {
+                  $left = $rect.Left; $top = $rect.Top; $w = $rw; $h = $rh
+                }
+              }
+            }
+            $bmp = New-Object System.Drawing.Bitmap($w, $h)
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.CopyFromScreen($left, $top, 0, 0, (New-Object System.Drawing.Size($w, $h)))
+            $g.Dispose()
+            $bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
+            $bmp.Dispose()
+          }
+
+          # 1) Launch MSI wizard GUI
+          $msiPath = (Resolve-Path "installers\v1.18.4\LitLoop_1.18.4_x64_zh-CN.msi").Path
+          $msiProc = Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`"" -PassThru
+          $hwnd = [IntPtr]::Zero
+          for ($i = 0; $i -lt 30; $i++) {
+            Start-Sleep -Milliseconds 500
+            $win = Get-Process msiexec -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+            if ($win) { $hwnd = $win.MainWindowHandle; break }
+          }
+          Start-Sleep -Seconds 2
+          Capture-WindowOrScreen $hwnd (Join-Path (Resolve-Path "artifacts").Path "msi_wizard.png")
+          Get-Process msiexec -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+
+          # 2) Launch NSIS wizard GUI
+          $nsisPath = (Resolve-Path "installers\v1.18.4\LitLoop_1.18.4_x64-setup.exe").Path
+          $nsisProc = Start-Process $nsisPath -PassThru
+          $hwnd2 = [IntPtr]::Zero
+          for ($i = 0; $i -lt 30; $i++) {
+            Start-Sleep -Milliseconds 500
+            $nsisProc.Refresh()
+            if ($nsisProc.MainWindowHandle -ne 0) { $hwnd2 = $nsisProc.MainWindowHandle; break }
+          }
+          Start-Sleep -Seconds 2
+          Capture-WindowOrScreen $hwnd2 (Join-Path (Resolve-Path "artifacts").Path "nsis_wizard.png")
+          if (-not $nsisProc.HasExited) { Stop-Process -Id $nsisProc.Id -Force -ErrorAction SilentlyContinue }
+          Start-Sleep -Seconds 2
+
+      - name: Verify MSI custom-dir install, 1.18.2 -> 1.18.4 upgrade, embedded backend, and running-app uninstall
+        shell: pwsh
+        run: |
+          $report = New-Object System.Collections.Generic.List[string]
+          $report.Add("=== 3. MSI Install (1.18.2) & Upgrade to 1.18.4 in Custom Folder D:\LitLoopCustom ===")
+          $msi182 = (Resolve-Path "installers\v1.18.2\LitLoop_1.18.2_x64_zh-CN.msi").Path
+          $msi184 = (Resolve-Path "installers\v1.18.4\LitLoop_1.18.4_x64_zh-CN.msi").Path
+
+          $t0 = Get-Date
+          $p1 = Start-Process msiexec.exe -ArgumentList "/i `"$msi182`" INSTALLDIR=`"D:\LitLoopCustom`" APPLICATIONFOLDER=`"D:\LitLoopCustom`" /qn /l*v artifacts\msi_182_install.log" -Wait -PassThru
+          $report.Add("MSI 1.18.2 install exit=$($p1.ExitCode) in $([math]::Round(((Get-Date)-$t0).TotalSeconds, 1))s")
+          if ($p1.ExitCode -ne 0) { throw "MSI 1.18.2 install failed with $($p1.ExitCode)" }
+
+          $t1 = Get-Date
+          $p2 = Start-Process msiexec.exe -ArgumentList "/i `"$msi184`" INSTALLDIR=`"D:\LitLoopCustom`" APPLICATIONFOLDER=`"D:\LitLoopCustom`" /qn /l*v artifacts\msi_184_upgrade.log" -Wait -PassThru
+          $report.Add("MSI 1.18.4 upgrade exit=$($p2.ExitCode) in $([math]::Round(((Get-Date)-$t1).TotalSeconds, 1))s")
+          if ($p2.ExitCode -ne 0) { throw "MSI 1.18.4 upgrade failed with $($p2.ExitCode)" }
+
+          $arp = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue |
+                 Where-Object { $_.DisplayName -eq "LitLoop" }
+          $arpCount = @($arp).Count
+          $arpVer = ($arp | Select-Object -First 1).DisplayVersion
+          $report.Add("ARP entries for LitLoop: count=$arpCount, DisplayVersion=$arpVer")
+          if ($arpCount -ne 1 -or $arpVer -ne "1.18.4") {
+            throw "Expected exactly 1 ARP entry at 1.18.4, got count=$arpCount version=$arpVer"
+          }
+
+          # Find where MSI placed litloop-app.exe
+          $exe = @("D:\LitLoopCustom\litloop-app.exe", "C:\Program Files\LitLoop\litloop-app.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $exe) { throw "litloop-app.exe not found after MSI install" }
+          $installRoot = Split-Path -Parent $exe
+          $py = Join-Path $installRoot "python\python.exe"
+          $report.Add("Installed exe: $exe (python=$py)")
+
+          # Smoke test embedded Python backend + diagnostic bundle export
+          $smokeOut = & $py scripts/smoke_app.py 2>&1
+          $report.Add("Embedded Python smoke_app.py: $smokeOut")
+          if ($LASTEXITCODE -ne 0) { throw "Embedded smoke_app.py failed" }
+
+          $diagOut = & $py -c "from litloop.diagnostics import write_bundle; import pathlib, tempfile; p = write_bundle(pathlib.Path(tempfile.gettempdir()) / 'diag.zip'); print('diag_zip_bytes=', p.stat().st_size); assert p.stat().st_size > 100" 2>&1
+          $report.Add("Diagnostic bundle check: $diagOut")
+          if ($LASTEXITCODE -ne 0) { throw "Diagnostic bundle check failed" }
+
+          # Create user data sentinel in ~/.litloop
+          $dataDir = Join-Path $env:USERPROFILE ".litloop"
+          New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+          $sentinel = Join-Path $dataDir "sentinel.txt"
+          Set-Content -Path $sentinel -Value "keep-user-data" -Encoding utf8
+
+          # Start litloop-app.exe and keep it running while uninstalling MSI
+          $appProc = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 3
+          $runningBefore = [bool](Get-Process -Name "litloop-app" -ErrorAction SilentlyContinue)
+          $report.Add("litloop-app running before MSI uninstall: $runningBefore (PID=$($appProc.Id))")
+
+          $t2 = Get-Date
+          $p3 = Start-Process msiexec.exe -ArgumentList "/x `"$msi184`" /qn /l*v artifacts\msi_184_uninstall.log" -Wait -PassThru
+          $report.Add("MSI 1.18.4 uninstall while app running: exit=$($p3.ExitCode) in $([math]::Round(((Get-Date)-$t2).TotalSeconds, 1))s")
+          if ($p3.ExitCode -ne 0) { throw "MSI uninstall failed with $($p3.ExitCode)" }
+
+          $runningAfter = [bool](Get-Process -Name "litloop-app" -ErrorAction SilentlyContinue)
+          $sentinelKept = Test-Path $sentinel
+          $rbfErr = Select-String -Path "artifacts\msi_184_uninstall.log" -Pattern "\.rbf" -ErrorAction SilentlyContinue
+          $report.Add("After MSI uninstall: app_running=$runningAfter, sentinel_kept=$sentinelKept, rbf_errors=$(@($rbfErr).Count)")
+          if ($runningAfter -or -not $sentinelKept) {
+            throw "MSI uninstall post-check failed: app_running=$runningAfter sentinel_kept=$sentinelKept"
+          }
+          $report | Out-File -FilePath artifacts/vm_report.txt -Append -Encoding utf8
+
+      - name: Verify NSIS install, litloop:// deep-link registry, and uninstall data retention
+        shell: pwsh
+        run: |
+          $report = New-Object System.Collections.Generic.List[string]
+          $report.Add("=== 4. NSIS Install, Deep-Link Registry & Uninstall Data Retention ===")
+          $nsis184 = (Resolve-Path "installers\v1.18.4\LitLoop_1.18.4_x64-setup.exe").Path
+          $sentinel = Join-Path $env:USERPROFILE ".litloop\sentinel.txt"
+
+          $t0 = Get-Date
+          $p = Start-Process $nsis184 -ArgumentList "/S" -Wait -PassThru
+          $report.Add("NSIS 1.18.4 install exit=$($p.ExitCode) in $([math]::Round(((Get-Date)-$t0).TotalSeconds, 1))s")
+          if ($p.ExitCode -ne 0) { throw "NSIS install failed with $($p.ExitCode)" }
+
+          # Check litloop:// deep-link registry key
+          $protoKey = @("Registry::HKEY_CLASSES_ROOT\litloop", "HKCU:\Software\Classes\litloop", "HKLM:\Software\Classes\litloop") |
+                      Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $protoKey) { throw "litloop:// URL protocol key not found in registry after NSIS install" }
+          $cmdKey = Join-Path $protoKey "shell\open\command"
+          $cmdVal = (Get-ItemProperty $cmdKey -ErrorAction SilentlyContinue).'(default)'
+          $report.Add("Deep-link registry key: $protoKey -> command: $cmdVal")
+
+          # Find NSIS uninstaller and run silent uninstall (/S triggers /SD IDNO in hooks.nsh)
+          $uninst = @(
+            "$env:LOCALAPPDATA\Programs\LitLoop\uninstall.exe",
+            "C:\Program Files\LitLoop\uninstall.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $uninst) { throw "NSIS uninstall.exe not found" }
+          $report.Add("Found NSIS uninstaller: $uninst")
+
+          $pu = Start-Process $uninst -ArgumentList "/S" -Wait -PassThru
+          Start-Sleep -Seconds 3
+          $sentinelAfterNsis = Test-Path $sentinel
+          $report.Add("NSIS silent uninstall exit=$($pu.ExitCode), sentinel_kept=$sentinelAfterNsis")
+          if (-not $sentinelAfterNsis) { throw "~/.litloop/sentinel.txt was deleted during NSIS silent uninstall!" }
+
+          $report | Out-File -FilePath artifacts/vm_report.txt -Append -Encoding utf8
+          Get-Content artifacts/vm_report.txt
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: vm-verification-results
+          path: |
+            artifacts/msi_wizard.png
+            artifacts/nsis_wizard.png
+            artifacts/vm_report.txt

@@ -255,3 +255,39 @@ def test_plan_search_endpoint_and_build_prompt(monkeypatch):
         "planned_core_terms": body["core_terms"],
     })
     assert "已确认检索词" in prompt and "SiC aluminum infiltration" in prompt and "已确认核心词" in prompt
+
+
+def test_endpoint_normalization_and_curl_fallback(monkeypatch):
+    import requests
+    from litloop.agents import client
+
+    assert client._endpoint({"protocol": "openai", "base_url": "https://api.b.ai/v1/chat/completions"}) == "https://api.b.ai/v1/chat/completions"
+    assert client._endpoint({"protocol": "openai", "base_url": "https://api.b.ai/v1"}) == "https://api.b.ai/v1/chat/completions"
+    assert client._endpoint({"protocol": "anthropic", "base_url": "https://api.anthropic.com/v1/messages"}) == "https://api.anthropic.com/v1/messages"
+    assert client._endpoint({"protocol": "anthropic", "base_url": "https://api.anthropic.com/v1"}) == "https://api.anthropic.com/v1/messages"
+
+    client._CURL_HOSTS.clear()
+    calls = {"requests": 0, "curl": 0}
+
+    def fail_post(*a, **kw):
+        calls["requests"] += 1
+        raise requests.ReadTimeout("handshake timed out")
+
+    def fake_curl(url, headers, body, proxy_url, timeout):
+        calls["curl"] += 1
+        return {"choices": [{"finish_reason": "stop", "message": {"content": "ok"}}]}
+
+    monkeypatch.setattr(client.requests, "post", fail_post)
+    monkeypatch.setattr(client, "_curl_bin", lambda: "curl")
+    monkeypatch.setattr(client, "_post_curl", fake_curl)
+
+    res1 = client._post("https://api.b.ai/v1/chat/completions", {}, {}, {}, 10)
+    assert res1["choices"][0]["message"]["content"] == "ok"
+    assert calls == {"requests": 1, "curl": 1}
+    assert "api.b.ai" in client._CURL_HOSTS
+
+    # Subsequent calls to the same host go straight to _post_curl without waiting on requests.post
+    res2 = client._post("https://api.b.ai/v1/chat/completions", {}, {}, {}, 10)
+    assert res2["choices"][0]["message"]["content"] == "ok"
+    assert calls == {"requests": 1, "curl": 2}
+    client._CURL_HOSTS.clear()

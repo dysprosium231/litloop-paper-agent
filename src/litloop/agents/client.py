@@ -8,7 +8,12 @@ runner that drives a task is built on top of ``chat()``.
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import subprocess
+import tempfile
 import time
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -31,7 +36,9 @@ _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 def model_config(config: dict[str, Any] | None = None, *, task: str = "default") -> dict[str, str]:
     """The configured model, with the provider's defaults filled in."""
-    config = config or {}
+    if config is None:
+        from ..config import load_config
+        config = load_config()
     provider = (config.get("builtin_agent_provider") or "openai").strip().lower()
     if provider not in PROVIDERS:
         provider = "openai"
@@ -51,9 +58,16 @@ def model_config(config: dict[str, Any] | None = None, *, task: str = "default")
 
 
 def _endpoint(cfg: dict[str, str]) -> str:
+    base = cfg["base_url"].rstrip("/")
     if cfg["protocol"] == "anthropic":
-        return f"{cfg['base_url']}/v1/messages"
-    return f"{cfg['base_url']}/chat/completions"
+        if base.endswith("/v1/messages") or base.endswith("/messages"):
+            return base
+        if base.endswith("/v1"):
+            return f"{base}/messages"
+        return f"{base}/v1/messages"
+    if base.endswith("/chat/completions"):
+        return base
+    return f"{base}/chat/completions"
 
 
 def _headers(cfg: dict[str, str]) -> dict[str, str]:
@@ -111,12 +125,81 @@ def _parse(cfg: dict[str, str], data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+# Hosts where Python's direct socket timed out (e.g. when a TUN proxy sets a
+# ``process_name: python.exe -> direct`` rule for campus downloads, which also
+# forces python.exe's foreign LLM calls off the proxy) while system curl works.
+_CURL_HOSTS: set[str] = set()
+
+
+def _curl_bin() -> str | None:
+    if os.name == "nt":
+        sys_curl = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "curl.exe"
+        if sys_curl.is_file():
+            return str(sys_curl)
+    return shutil.which("curl.exe" if os.name == "nt" else "curl") or shutil.which("curl")
+
+
+def _post_curl(url: str, headers: dict[str, str], body: dict[str, Any], proxy_url: str,
+               timeout: float) -> dict[str, Any]:
+    curl = _curl_bin()
+    if not curl:
+        raise RuntimeError("curl is not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        body_path = Path(tmp) / "body.json"
+        body_path.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+        cmd = [curl, "-sS", "-m", str(max(10, int(timeout))), "-w", "\n%{http_code}"]
+        if os.name == "nt":
+            cmd.append("--ssl-no-revoke")
+        if proxy_url:
+            cmd += ["--proxy", proxy_url]
+        cfg_lines = [f'url = "{url}"', f'data-binary = "@{body_path.as_posix()}"']
+        for k, v in headers.items():
+            escaped = str(v).replace("\\", "\\\\").replace('"', '\\"')
+            cfg_lines.append(f'header = "{k}: {escaped}"')
+        cmd += ["--config", "-"]
+        proc = subprocess.run(
+            cmd,
+            input="\n".join(cfg_lines),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=max(15.0, float(timeout) + 5.0),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    if proc.returncode != 0:
+        raise RuntimeError(f"curl failed (rc={proc.returncode}): {(proc.stderr or proc.stdout).strip()[:240]}")
+    out = proc.stdout or ""
+    raw_body, _, code_str = out.rpartition("\n")
+    try:
+        status_code = int(code_str.strip())
+    except ValueError:
+        status_code = 200
+        raw_body = out
+    if status_code >= 400:
+        detail = raw_body.strip().replace("\n", " ")[:300]
+        raise RuntimeError(f"HTTP {status_code}: {detail}")
+    return json.loads(raw_body)
+
+
 def _post(url: str, headers: dict[str, str], body: dict[str, Any], config: dict[str, Any],
           timeout: float) -> dict[str, Any]:
     host = (urlparse(url).hostname or "").lower()
-    proxies = {} if host in _LOCAL_HOSTS else proxy_dict(select_proxy_for_url(url, config))
-    resp = requests.post(url, headers={**headers, "User-Agent": user_agent()}, json=body,
-                         timeout=timeout, proxies=proxies)
+    proxy_url = "" if host in _LOCAL_HOSTS else select_proxy_for_url(url, config)
+    proxies = {} if host in _LOCAL_HOSTS else proxy_dict(proxy_url)
+    req_headers = {**headers, "User-Agent": user_agent()}
+    if host and host in _CURL_HOSTS and _curl_bin():
+        return _post_curl(url, req_headers, body, proxy_url, timeout)
+    conn_timeout = min(6.0, float(timeout)) if timeout else 6.0
+    try:
+        resp = requests.post(url, headers=req_headers, json=body,
+                             timeout=(conn_timeout, timeout), proxies=proxies)
+    except (requests.Timeout, requests.ConnectionError):
+        if host and host not in _LOCAL_HOSTS and _curl_bin():
+            data = _post_curl(url, req_headers, body, proxy_url, timeout)
+            _CURL_HOSTS.add(host)
+            return data
+        raise
     if resp.status_code >= 400:
         detail = (resp.text or "").strip().replace("\n", " ")[:300]
         raise RuntimeError(f"HTTP {resp.status_code}: {detail or resp.reason}")

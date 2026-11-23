@@ -123,8 +123,8 @@ def plan_search(form: dict[str, Any], *, config: dict[str, Any] | None = None) -
     system = (
         "你是学术文献检索规划助手。只输出一个合法 JSON 对象，不要输出任何额外说明或代码块以外的文字。"
         'JSON 字段固定为：{"queries": ["..."], "core_terms": ["..."], "criteria": ["..."]}。'
-        "其中 queries 给 2–5 条适合 OpenAlex/Crossref 的英文布尔或短语检索式；"
-        "core_terms 给 2–4 条用于过滤候选池的核心概念词（同义词可用 | 连接）；"
+        "其中 queries 给 3–5 条空格分隔的纯英文关键词短语（每条 3–6 个词，如 \"pressureless infiltration SiC aluminum\"，不要写 AND/OR、括号或引号）；"
+        "core_terms 给 2–4 条用于过滤候选池的英文核心概念词（每个概念一条，同义词用 | 连接，如 \"Al|aluminum|aluminium\"）；"
         "criteria 给 2–5 条简洁明确的中文纳入标准（如果用户已提供纳入标准，保留并微调即可）。"
     )
     user_parts = [f"检索问题：{question}", f"检索方式：{'深度检索' if mode == 'deep' else '快速查找'}"]

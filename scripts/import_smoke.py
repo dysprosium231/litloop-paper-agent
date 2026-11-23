@@ -11,7 +11,7 @@ import importlib
 import sys
 
 MODULES = [
-    "litloop.cli.main", "litloop.cli.commands", "litloop.server", "litloop.desktop.server", "litloop.app_server",
+    "litloop.cli.main", "litloop.cli.commands", "litloop.server", "litloop.desktop.server",
     "litloop.institutional.auth", "litloop.sources", "litloop.desktop.download_jobs", "litloop.institutional.schools",
     "litloop.browser.engine",
     "litloop.search.quick", "litloop.search.deep", "litloop.search.scansci_find",
