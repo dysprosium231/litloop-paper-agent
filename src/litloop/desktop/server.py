@@ -17,6 +17,7 @@ described in docs/APP_DATA.md, read and written through ``store``.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import re
 import secrets
@@ -234,15 +235,28 @@ def _find(items: list[dict[str, Any]], doi: str | None, title: str | None) -> di
 
 def create_app(token: str) -> FastAPI:
     app = FastAPI(title="LitLoop app backend", version=__version__, docs_url=None, redoc_url=None)
-    app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_methods=["GET", "POST"],
-                       allow_headers=["X-LitLoop-Token", "Content-Type"])
+    # WebView2 158+ treats tauri.localhost -> 127.0.0.1 as a local-network request
+    # and sends a Private Network Access preflight first; refusing it (Starlette's
+    # default, 400) made every call fail as "无法连接后台" (2026-11-23).
+    has_pna = "allow_private_network" in inspect.signature(CORSMiddleware.__init__).parameters
+    cors_kwargs: dict[str, Any] = {
+        "allow_origins": ORIGINS,
+        "allow_methods": ["GET", "POST", "DELETE"],
+        "allow_headers": ["X-LitLoop-Token", "Content-Type"],
+    }
+    if has_pna:
+        cors_kwargs["allow_private_network"] = True
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
 
     @app.middleware("http")
     async def require_token(request: Request, call_next):
         if request.method != "OPTIONS" and not secrets.compare_digest(
                 request.headers.get("X-LitLoop-Token", ""), token):
             return JSONResponse({"detail": "missing or wrong token"}, status_code=401)
-        return await call_next(request)
+        response = await call_next(request)
+        if not has_pna and request.headers.get("access-control-request-private-network") == "true":
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:

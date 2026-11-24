@@ -21,9 +21,9 @@
 | 分析归纳 | ⬜ | 待办池「分析归纳」；开工前和用户确认验收标准 |
 | app：地基 | ✅ | |
 | app：筛选页 | 🔶 | 深度链接 2026-11-05 做了（`litloop://session/<id>`，待实测）；完成通知 2026-11-04 做了（待实测 12） |
-| app：任务层 + 后端 A（外部 Agent） | 🔶 | 6 种 Harness（Claude Code / WorkBuddy / DeepSeek Harness / Codex CLI / 内置 Agent / 自定义命令）自动探测、运行时 MCP/模型配置注入与一键全局同步、`--resume`/`--session-id`/`exec resume` 原对话续接与外部对话粘贴指令区分、以及桌面端对话详情展示已做（2026-11-23，见 DECISIONS）；还差待实测 5（真实检索） |
-| app：后端 B（内置 Agent，多家模型） | 🔶 | 客户端、任务循环、五个工具、`agent_backend` 开关、系统提示词、按批步数、分任务模型（规划/打分）、检索方案预览以及 `deepseek-v4-pro` / `deepseek-v4.1-flash` 真 Key 全流程实测均已完成（2026-11-23）；还差用测试集存档比较各模型的评分质量（待办池「app」） |
-| app：初次引导与设置 | ✅ | 后端 B 的模型配置随后端 B 做 |
+| app：内置 Agent（主路径，多家模型） | 🔶 | 客户端、任务循环、五个工具、`agent_backend` 开关、系统提示词、按批步数、分任务模型（规划/打分）、检索方案预览以及 `deepseek-v4-pro` / `deepseek-v4.1-flash` 真 Key 全流程实测均已完成（2026-11-23）；按新定位（2026-11-24）还差：默认后端切为 `builtin` 并前置到首次引导、服务商一键预设与 Token/费用展示、会话级续接记忆与纠偏、小批并发评分提速，以及测试集评分质量对比（待办池「app」） |
+| app：外部 Agent 与 MCP 联动（可选） | 🔶 | 6 种 Harness（Claude Code / WorkBuddy / DeepSeek Harness / Codex CLI / 内置 Agent / 自定义命令）自动探测、运行时 MCP/模型配置注入与一键全局同步、`--resume`/`--session-id`/`exec resume` 原对话续接与外部对话粘贴指令区分、以及桌面端对话详情展示已做（2026-11-23，见 DECISIONS）；还差待实测 5（真实检索） |
+| app：初次引导与设置 | 🔶 | 现有首次引导与每组检测已可用；按新定位（2026-11-24）需将「内置 Agent」模型预设与检测前置进首次引导，并将外部 Agent / MCP 联动收为可选设置 |
 | app：术语表 | 🔶 | 待实测 7 |
 | app：下载队列与 Zotero | 🔶 | 待实测 1–5 |
 | 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | `v1.18.4` NSIS（96.0 MiB）与 MSI（120.8 MiB）已在干净 Windows 虚拟机通过 Defender 扫描、向导截图、D 盘自定义目录安装（10.1s）、`1.18.3 -> 1.18.4` 覆盖升级、嵌入式后台冒烟、诊断包导出、运行中卸载（`CloseRunningApp` 17.2s）、`litloop://` 注册表校验与卸载留数据（2026-11-23，见 DECISIONS）；还差生成并填入 Tauri 自动更新公钥与按需组件版面分析点击安装实测 |
@@ -31,7 +31,7 @@
 
 ## 正在做
 
-（2026-11-23：已完成① 五项 Harness 交互决策落地：6 种 Harness 自动探测、运行时 MCP/技能自动注入与一键全局同步、`--resume`/`--session-id` 原对话续接与外部对话指令区分、桌面端对话详情展示；② 内置 Agent `deepseek-v4-pro` + `deepseek-v4.1-flash` 真 Key 全流程实测与 3 项连接/配置修复；③ OpenAlex 无 Key 首次引导提示实测；④ 云端干净 Windows 虚拟机对 `v1.18.4` MSI + NSIS 双安装包的 Defender 扫描、向导 GUI 截图、跨版本升级、运行中卸载、`litloop://` 注册表、嵌入式后台冒烟与诊断包导出全套验收，以及 `v1.18.5` MSI 向导左蓝右白位图与深度检索去重展开。当前等待：① 用户按「待实测 1–12」在日常使用中顺带核对下载与 Zotero 交互；② 提交 MCP 目录（`docs/DIRECTORIES.md` 素材已备好）；③ 用户拍板「待用户决定」中的停止规则结项与「分析归纳」验收标准。）
+（2026-11-24：已完成① 修复 Windows WebView2 158+ 访问 `127.0.0.1` 的 Private Network Access 预检被拒与启动握手加固（待用户本机实测确认后发版）；② 根据新定位（独立桌面工具、内置 Agent 为主路径、外部 Agent / MCP 为可选附加功能）完成 [CHARTER.md](CHARTER.md)、[docs/DECISIONS.md](docs/DECISIONS.md)、[TODO.md](TODO.md) 与中英文 README 更新。下一步：优先推进内置 Agent 主路径升级（默认切换 `builtin` 并前置首次引导、服务商一键预设与 Token/费用透明），同时等待用户配合「待实测 1–12」及「待用户决定」中的停止规则结项与「分析归纳」验收标准。）
 
 ## 待用户决定
 
@@ -87,7 +87,18 @@
 - [~] 快速检索提速：扩大候选池后单组 5–30 秒，目标 15 秒以内（用户 2026-10-15：不急）。**结果缓存已落地（2026-11-21）**：`quick.search_papers_v2` 新增默认 **7 天（168 小时）**结果缓存（配置项 `search_cache_ttl_hours`，设 `0` 关闭，接入 `litloop_cache_clear`），含完整检索参数/数据源 Key/术语表指纹，`sort="date"`、定期追踪（`use_cache=False`）、空结果与出错均不入缓存。后续如仍需提速再考虑并发或缓存外部检索源。
 
 ### app
-- [~] 后端 B：内置 Agent（`agents/client.py`、`agents/runner.py`、`agents/tools.py`、`agents/system.py`、步数、分任务模型 `builtin_agent_plan_model`/`rate_model`、`POST /api/searches/plan` 检索方案预览，以及 `deepseek-v4-pro` + `deepseek-v4.1-flash` 真 Key 实测均已完成，见 DECISIONS）。还差：用测试集存档比较各模型的评分质量。
+- [~] 内置 Agent 主路径升级（基础已完成：`agents/client.py`、`agents/runner.py`、`agents/tools.py`、`agents/system.py`、步数、分任务模型 `builtin_agent_plan_model`/`rate_model`、`POST /api/searches/plan` 检索方案预览，以及 `deepseek-v4-pro` + `deepseek-v4.1-flash` 真 Key 实测，见 DECISIONS）。按已对齐的三期架构路线，待做：
+  - **阶段 1（地基与开箱体验）**：
+    - [ ] 默认后端改为 `builtin`（已有外部 Agent 配置的老用户保持不覆盖），并将内置 Agent 模型配置前置到首次使用引导；外部 Agent / MCP 联动收进可选设置。
+    - [ ] 常见模型服务商一键预设（DeepSeek、通义千问、Kimi、智谱 GLM、硅基流动、OpenAI、Anthropic、OpenRouter、本地 Ollama），一键填充地址与推荐规划/评分模型。
+    - [ ] 并发评分子流水线（每片 5 篇 × 3 路并发、每片完成即落盘刷新、缺项自动重试）、注入用户最近修正评分作 Few-shot 纠偏样本，并修复快速查找未传摘要给模型的缺陷。
+    - [ ] 累计 Token 消耗并在已知单价模型上展示参考估算费用。
+  - **阶段 2（常驻对话栏与交互闭环）**：
+    - [ ] SQLite 按检索会话持久化 `agent_messages` 与纠偏备注，发消息自动感知当前会话进度与右侧当前文献。
+    - [ ] `agents/client.py` 支持 SSE 流式输出（兼容 `curl` 回退）及桌面后台流式对话接口。
+    - [ ] 前端右侧可折叠 `Ctrl+L` Agent 对话抽屉（宽屏记忆开关状态）与分级权限可编辑动作确认卡（启动检索、修改标准续跑、发起下载、推送 Zotero、写术语表）。
+  - **阶段 3（PDF 全文问答与分析归纳）**：
+    - [ ] 接入已下载 PDF → Markdown（带页码）的只读阅读与并发抽取工具，支持对话追问单篇全文与「分析归纳」对比表（另：用测试集存档比较各模型评分质量）。
 - [~] 安装包与自动更新（`v1.18.4` 双安装包已在云端干净 Windows 虚拟机完成 Defender 扫描、向导截图、自定义目录安装、跨版本升级、运行期卸载、深度链接注册表与诊断包导出验收，且 `v1.18.5` 已将 MSI 向导背景图 `wix-dialog.bmp` 改为左蓝右白高对比布局，见 DECISIONS）。还差：
   - [ ] 生成并填入 Tauri 自动更新公钥（`tauri.conf.json` + GitHub Secrets）完成端到端自动更新。
 

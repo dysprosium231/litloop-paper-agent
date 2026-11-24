@@ -143,9 +143,15 @@ let backend: Promise<BackendInfo> | null = null
 function getBackend(): Promise<BackendInfo> {
   // In the Tauri window the shell knows where the backend is; in a plain browser
   // (vite dev without Tauri) give it as ?port=…&token=… in the address.
-  backend ??= "__TAURI_INTERNALS__" in window
-    ? invoke<BackendInfo>("backend")
-    : Promise.resolve(Object.fromEntries(new URLSearchParams(location.search)) as unknown as BackendInfo)
+  if (!backend) {
+    const p = "__TAURI_INTERNALS__" in window
+      ? invoke<BackendInfo>("backend")
+      : Promise.resolve(Object.fromEntries(new URLSearchParams(location.search)) as unknown as BackendInfo)
+    backend = p.catch((err) => {
+      backend = null
+      throw err
+    })
+  }
   return backend
 }
 
@@ -163,23 +169,36 @@ export function errorMessage(e: unknown): string {
   return "无法连接后台。重启 LitLoop 后重试"
 }
 
+const GET_RETRY_DELAYS = [100, 250, 500]
+
 async function call<T>(path: string, body?: unknown, method?: string): Promise<T> {
   const { port, token } = await getBackend()
-  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
-    method: method ?? (body === undefined ? "GET" : "POST"),
-    headers: { "X-LitLoop-Token": token, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const text = await res.text()
+  const verb = method ?? (body === undefined ? "GET" : "POST")
+  const maxAttempts = verb === "GET" ? GET_RETRY_DELAYS.length + 1 : 1
+  let res: Response | undefined
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      res = await fetch(`http://127.0.0.1:${port}${path}`, {
+        method: verb,
+        headers: { "X-LitLoop-Token": token, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      break
+    } catch (err) {
+      if (attempt >= maxAttempts - 1) throw err
+      await new Promise((resolve) => setTimeout(resolve, GET_RETRY_DELAYS[attempt]))
+    }
+  }
+  if (!res!.ok) {
+    const text = await res!.text()
     let detail = text
     try {
       const d = JSON.parse(text).detail
       if (typeof d === "string") detail = d
     } catch { /* not JSON: keep the text */ }
-    throw new ApiError(res.status, detail || `HTTP ${res.status}`)
+    throw new ApiError(res!.status, detail || `HTTP ${res!.status}`)
   }
-  return res.json() as Promise<T>
+  return res!.json() as Promise<T>
 }
 
 export interface BatchOp {

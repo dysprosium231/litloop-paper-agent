@@ -29,6 +29,17 @@ def test_every_request_needs_the_token(client):
     assert client.get("/api/health").json()["schema"] == store.SCHEMA
 
 
+def test_webview_private_network_preflight_is_allowed():
+    """WebView2 158+ preflights tauri.localhost -> 127.0.0.1 as a private-network request (2026-11-23)."""
+    c = TestClient(app_server.create_app(TOKEN))
+    for method, path in (("GET", "/api/sessions"), ("DELETE", "/api/watches/1")):
+        r = c.options(path, headers={
+            "Origin": "http://tauri.localhost", "Access-Control-Request-Method": method,
+            "Access-Control-Request-Headers": "x-litloop-token", "Access-Control-Request-Private-Network": "true"})
+        assert r.status_code == 200
+        assert r.headers.get("access-control-allow-private-network") == "true"
+
+
 def test_the_data_dir_is_told_to_the_app(client):
     """Settings shows where papers and sessions live, so an install does not look empty."""
     from litloop.config import DATA_DIR

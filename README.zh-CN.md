@@ -3,7 +3,7 @@
 <div align="center">
   <img src="assets/brand/litloop-icon.png" width="88" alt="LitLoop" />
   <h1>LitLoop</h1>
-  <p><strong>文献检索、筛选、下载、归档的桌面 app</strong> · Agent 在后台检索和评分，你在 app 里做决定</p>
+  <p><strong>内置 AI Agent 的独立桌面文献研究工作台</strong> · 检索、筛选、下载、归档 Zotero 一体完成（可选联动外部 Agent / MCP）</p>
 
   <a href="https://pypi.org/project/litloop/"><img alt="PyPI" src="https://img.shields.io/pypi/v/litloop?style=flat-square" /></a>
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0F766E?style=flat-square" /></a>
@@ -11,10 +11,10 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square" />
   <img alt="Status" src="https://img.shields.io/badge/%E7%8A%B6%E6%80%81-%E5%BC%80%E5%8F%91%E4%B8%AD-F59E0B?style=flat-square" />
 
-  [截图](#截图) · [为什么用它](#为什么用它) · [一次完整的流程](#一次完整的流程) · [app 的四个页面](#app-的四个页面) · [深度检索](#深度检索怎么查全) · [下载](#下载怎么拿到全文) · [安装与启动](#安装与启动) · [搭配 Agent 使用](#搭配-agent-使用) · [项目状态](#项目状态) · [更新日志](CHANGELOG.md)
+  [截图](#截图) · [为什么用它](#为什么用它) · [一次完整的流程](#一次完整的流程) · [app 的四个页面](#app-的四个页面) · [深度检索](#深度检索怎么查全) · [下载](#下载怎么拿到全文) · [安装与启动](#安装与启动) · [可选：搭配外部 Agent 与 MCP 使用](#可选搭配外部-agent-与-mcp-使用) · [项目状态](#项目状态) · [更新日志](CHANGELOG.md)
 </div>
 
-> **项目还在开发中。** 检索、筛选、下载、存进 Zotero 这条流程已经能用，并在真实课题和测试集上验收过；桌面 app 的筛选、下载、Zotero、设置、内置 Agent 和追踪已经能用，也能自己打安装包。系统综述目前只做到流程统计和导出，分析归纳还没做。详见[项目状态](#项目状态)。
+> **项目还在开发中。** LitLoop 是一个**独立桌面文献工具**：检索、筛选、下载、存进 Zotero 全流程可在桌面端独立走完，并在真实课题和测试集上验收过；内置 Agent 支持 Anthropic / OpenAI 兼容接口及分任务选模，也能自己打 Windows 安装包。如需在 Claude Code、WorkBuddy、DeepSeek Harness 或 Codex 等外部 Agent 中使用，也保留了可选的 MCP（21 个工具）与 CLI 联动。系统综述目前只做到流程统计和导出，分析归纳还没做。详见[项目状态](#项目状态)。
 >
 > LitLoop 是 [Rimagination/scansci-pdf](https://github.com/Rimagination/scansci-pdf)（Apache-2.0）的独立衍生项目，由 [dysprosium231](https://github.com/dysprosium231) 维护，与原作者无隶属关系。下载和机构通道的大部分能力来自原项目，LitLoop 的改动见 [NOTICE](NOTICE)。
 
@@ -48,7 +48,7 @@
 
 以“稀土掺杂的非晶纳米材料作药物载体”为例：
 
-1. **提出问题。** 在 app 的「筛选」页点「新建检索」填写问题和纳入标准，或者直接对 Agent（Claude Code、Codex 等）说：“把稀土掺杂非晶纳米载体做药物递送的文献尽量查全，分批给我筛”。不想开对话时，在「设置 → 内置 Agent」填一个支持工具调用的模型，app 就自己跑检索，不用外部 Agent。
+1. **提出问题。** 在「设置 → 内置 Agent」填好模型接口（如 DeepSeek、通义千问、Claude 或本地 Ollama）并选为执行后端，然后在「筛选」页点「新建检索」填写问题和纳入标准、预览检索方案并开始，无需安装任何外部命令行工具。如果你习惯用外部 Agent（Claude Code、WorkBuddy、DeepSeek Harness、Codex 等），也可以在对话里直接说：“把稀土掺杂非晶纳米载体做药物递送的文献尽量查全，分批给我筛”。
 2. **Agent 检索和评分。** 快速检索几秒出结果；深度检索先建候选池（几千篇），每批推给你 30 篇，Agent 先评一遍。
 3. **你在 app 里筛。** 左边是本批列表，右边是摘要（可译成中文）、期刊分区、被引数和 Agent 的理由。键盘上 `↑`/`↓` 换篇、`1`–`4` 评分、`空格` 加入下载。评完点「继续检索」生成下一批，不用回到对话。
 4. **下载。** 「下载」页汇总了各次检索里选中、还没下到的文章，点「全部下载」。每篇显示它正在做什么、最后从哪里下到；需要你登录学校账号或点人机验证时，页面顶部出现琥珀色提示。
@@ -87,7 +87,8 @@
 ### 设置
 
 - 检索接口 Key、筛选与翻译、接口额度、下载、网络、学校认证、Agent、Zotero，每组都有「检测」按钮。
-- **内置 Agent**：不装 Agent 命令也能用。填 Anthropic 或 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、Ollama、vLLM 等）的地址、Key 和模型名，还支持分别指定规划模型与打分模型；点「检测」会当场验证模型会不会发起工具调用——不会发起的模型不能用来跑任务。填好后「用哪个后端」选「内置 Agent」，app 里发起的检索就由它来做，启动前可预览并修改检索计划。
+- **内置 Agent（核心能力）**：不装任何外部 Agent 命令即可独立使用。填 Anthropic 或 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、智谱 GLM、OpenRouter、Ollama、vLLM 等）的地址、Key 和模型名，支持分别指定规划模型与打分模型；点「检测」会当场验证模型会不会发起工具调用——不会发起的模型不能用来跑任务。切为内置 Agent 后，app 里发起的检索直接由它执行，启动前可预览并修改检索计划。
+- **外部 Agent 联动（可选）**：在「设置 → Agent」中自动探测本机已安装的 Claude Code、WorkBuddy、DeepSeek Harness、Codex CLI，支持一键同步 MCP 配置与技能文档，并在后台启动与原对话续接。
 - **可选组件**：版面分析（约 65 MB，只影响 PDF 转 Markdown 的排版）默认不装，需要时在同一组点「安装」，下载慢可以填国内镜像。
 - **接口额度**：各接口今天的用量和官方限额。
 - **诊断包导出**：在设置页一键导出脱敏诊断包用于排障（CLI 与 API 同样支持）。
@@ -218,9 +219,9 @@ python scripts/build_release.py --bundle
 
 全部配置项见 [docs/CONFIG.md](docs/CONFIG.md)。
 
-## 搭配 Agent 使用
+## 可选：搭配外部 Agent 与 MCP 使用
 
-LitLoop 同时是一个 MCP 服务器（21 个工具）和命令行工具。装进 Claude Code、Codex、ZCode 后，可以不打开 app，直接用一句话走完流程：
+面向已经在使用外部 AI 编程工具的用户，LitLoop 仍完整保留 MCP 服务器（21 个工具）与命令行接口。在「设置 → Agent」一键同步（或手动配置）进 Claude Code、WorkBuddy、DeepSeek Harness、Codex 后，也可以不打开 app 或与 app 配合，用一句话走完流程：
 
 ```text
 找一下近五年城市热岛和绿地降温的论文，只要中科院 2 区以上，排除撤稿
@@ -291,7 +292,7 @@ MCP 工具全表、手动配置 MCP（Claude Desktop、Cursor、Cline 等）、�
 
 按计划顺序排列，详细进度见 [TODO.md](TODO.md)。
 
-1. **桌面 app**：NSIS 和 MSI 安装包都已能打，还差自动更新和签名。内置 Agent（app 直接调 Anthropic / OpenAI 兼容接口）已支持分任务选模型与检索计划预览，还差用测试集比较它和外部 Agent 的评分质量。
+1. **桌面端与内置 Agent 主路径**：完善独立工具开箱体验（默认后端切换为内置 Agent、模型配置前置首次引导、常见服务商一键预设、Token 与费用透明、会话级自然语言纠偏、摘要并发评分提速以及测试集评分质量对比）；补全安装包自动更新与签名。
 2. **系统综述支持**：检索流程统计（命中、去重、纳入、排除及理由）、Markdown 导出与深度检索断点续跑已经做了；还差更完整的综述报告与核查项。
 3. **定期追踪**：保存检索式、app 打开时自动检查并通知、检查后列出新文献并一键加入下载都已经做了；还差把这些新文献直接并进某次检索的筛选列表。
 4. **分析归纳**：PDF 转 Markdown 已经有了；下一步从全文抽取要点、做对比表、起草综述。

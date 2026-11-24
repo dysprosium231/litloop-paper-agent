@@ -1,5 +1,42 @@
 # 决定与实验记录
 
+## 2026-11-24：内置 Agent 架构设计共识（混合执行、分级确认、会话持久化与三期路线）
+
+- **经与用户逐项确认，确定后续内置 Agent 的 7 项核心架构决策**：
+  1. **产品交互形态**：保留「结构化工作台 + 键盘速筛（`↑`/`↓`/`1`–`4`/`空格`）」的主体界面，新增**右侧可折叠 Agent 对话抽屉**（快捷键 `Ctrl+L` 或顶部按钮切换，宽屏记忆上次开关状态），既不挤占速筛阅读空间，又支持随时自然语言提问、发起检索或纠偏。
+  2. **执行架构（混合架构）**：主对话 Agent 走轻量 Tool-Calling 负责沟通、规划检索词、解释结果与调度；批量文献摘要评分与后续 PDF 全文抽取交给后端**确定性并发子流水线**执行，避免几十篇长摘要塞爆主对话上下文。
+  3. **分级权限与动作确认卡**：只读与分析操作（查会话进度、拟检索方案、读已下 PDF 问答/抽表）直接执行；会消耗积分或写外部状态的操作（启动深度检索、修改标准续跑下一批、发起下载、推送 Zotero、写术语表）在对话内弹出可编辑确认卡，经用户点击确认后执行；**永不替用户做最终纳入/排除决定**。
+  4. **上下文作用域与记忆存储**：按检索会话在 SQLite 持久化独立对话历史（`agent_messages`）与纠偏备注，切换课题互不串台；发消息时自动注入当前会话进度及右侧正在浏览的文献摘要/评分，支持直接追问当前论文或微调下批方向。
+  5. **并发评分子流水线与纠偏策略**：采用**每片 5 篇 × 3 路并发**，每片完成即落盘并刷新界面，个别分片 JSON 异常或漏评自动针对缺项重试；评分请求注入原始纳入标准、对话纠偏备注与**用户最近手动修正的评分 Few-shot 样本**；同步修复 [src/litloop/agents/tools.py](src/litloop/agents/tools.py) 快速查找未向模型传递摘要的缺陷。
+  6. **模型配置、流式输出与费用透明**：沿用简洁单套配置字段，新增主流服务商一键预设（DeepSeek、通义千问、Kimi、智谱 GLM、硅基流动、OpenAI、Anthropic、OpenRouter、本地 Ollama），一键填充地址与推荐规划/评分模型；对话栏支持 SSE 流式输出（兼容 `curl` 回退）；累计 Token 并在已知单价模型上显示参考费用。
+  7. **默认切换与老用户保护**：新用户默认切为 `builtin` 并将内置 Agent 配置前置到首次使用引导；已有 `config.json` 显式配置过外部 Agent 的老用户保持不覆盖。
+- **三期落地路线**：
+  - **阶段 1（地基与开箱体验）**：默认切 `builtin`（保护老用户配置）+ 首次引导前置 + 服务商一键预设 + 5×3 并发评分子流水线/Few-shot 纠偏/修复快速查找传摘要 + Token 与估算费用展示。
+  - **阶段 2（常驻对话栏与交互闭环）**：SQLite 会话级 `agent_messages` / `steering_notes` 持久化 + `client.py` SSE 流式输出 + 右侧可折叠 `Ctrl+L` 对话抽屉 + 对话内分级动作确认卡。
+  - **阶段 3（PDF 全文问答与分析归纳）**：接入已下载 PDF → Markdown（带页码）的只读阅读与并发抽取工具，落地对话追问单篇全文与「分析归纳」结构化对比表。
+
+## 2026-11-24：项目定位调整为独立桌面工具（内置 Agent 为主，外部 Agent / MCP 为可选联动）
+
+- **原设计**：2026-10-15/16 纲领将 LitLoop 定位为围绕 MCP 的 Agent 工具 + 可视化 app，后端 A（外部 Agent 命令）与后端 B（内置 Agent）并列、默认后端为 `command`，分析归纳交由宿主 Agent 完成。
+- **新决定（用户确认）**：正式将定位转为**独立桌面文献研究工具**，加强内置 Agent 的核心权重并将其作为默认主路径，将外部 Agent 协同与 MCP 服务器保留为可选附加功能。
+- **理由**：
+  1. 降低广大科研用户的使用门槛：无需预装 Claude Code / Codex / DeepSeek Harness 或配置 `mcp.json`，下载安装包并填入模型 API Key（或连本地 Ollama）即可走完全流程。
+  2. 规避外部 Harness 接口碎片化与无法反向回调的摩擦，在桌面端完全掌控检索规划/打分分模、并发提速、会话级自然语言纠偏与后续 PDF 分析归纳闭环。
+  3. 保留已落地的 21 个 MCP 工具与外部 Harness 自动探测/一键同步能力，继续服务已有外部 Agent 工作流的用户并保留社区分发入口。
+- **演进重点**：
+  1. 第一步：默认后端切换为 `builtin` 并前置到首次使用引导，新增常见模型服务商一键预设（DeepSeek、通义千问、Kimi、智谱 GLM、硅基流动、OpenRouter、Ollama 等）与 Token / 估算费用展示，外部 Agent 与 MCP 联动收进可选设置。
+  2. 第二步：为内置 Agent 补齐会话级续接记忆与自然语言纠偏、摘要小批并发评分与实时落盘提速，并依托内置 Agent 落地「分析归纳」结构化对比表。
+
+## 2026-11-24：修复 WebView2 158+ Private Network Access 预检被拒与桌面端启动握手加固
+
+- **根因**：Windows 桌面端 WebView2 升级至 158+（实测 `158.0.4370.21`）后，会将 `http://tauri.localhost` 对 `http://127.0.0.1:<port>` 的本地请求视为私有网络访问，在每次请求前先发送带 `Access-Control-Request-Private-Network: true` 的 `OPTIONS` 预检。Starlette `CORSMiddleware` 默认 `allow_private_network=False`，直接返回 `400 Disallowed CORS private-network`，导致 WebView2 丢弃后续真实请求，前端全部报「无法连接后台」。此外原先 `allow_methods` 未包含追踪删除接口所需的 `DELETE`。
+- **修复**：
+  1. [src/litloop/desktop/server.py](src/litloop/desktop/server.py)：`create_app()` 中通过 `inspect.signature(CORSMiddleware.__init__)` 检测是否支持 `allow_private_network`；支持时传入 `allow_private_network=True` 并开启 `["GET", "POST", "DELETE"]`，若搭配旧版 Starlette 则在 `require_token` 中间件对带 `Access-Control-Request-Private-Network: true` 的请求补写 `Access-Control-Allow-Private-Network: true`。
+  2. [app/src-tauri/src/lib.rs](app/src-tauri/src/lib.rs)：`start_backend()` 读到端口号后使用 `TcpStream::connect_timeout` 确认 `127.0.0.1:<port>` 已进入监听态再返回 `BackendInfo` 给前端。
+  3. [app/src/lib/api.ts](app/src/lib/api.ts)：`getBackend()` 在调用失败时清除缓存句柄 `backend = null` 以便重试；`call()` 对幂等 `GET` 请求在遇到网络层异常时增加最多 3 次短间隔退避重试（`100ms` / `250ms` / `500ms`）。
+  4. [tests/test_app_server.py](tests/test_app_server.py) 与 [scripts/smoke_app.py](scripts/smoke_app.py)：补充模拟 WebView2 `Origin: http://tauri.localhost` + `Access-Control-Request-Private-Network: true` 的 `GET` / `DELETE` 预检回归测试与冒烟检查。
+- **实测验证（2026-11-24）**：通过 `LITLOOP_PYTHON` 指向开发环境 Python 真实启动本机 `D:\Program Files\LitLoop\litloop-app.exe`（PID 18092，后台监听 `127.0.0.1:58591`），WebView2（PID 20964）成功建立多条连接并完成请求；向真实后台发送 `GET /api/sessions` 与 `DELETE /api/watches/1` 的 `OPTIONS` PNA 预检均返回 `200` 且含 `access-control-allow-private-network: true` 与 `access-control-allow-methods: GET, POST, DELETE`。
+
 ## 2026-11-23：五项 Harness 交互决策落地（自动探测、MCP 注入与一键同步、原对话续接与对话详情透明化）
 
 - 背景：桌面端调起外部 Agent（后端 A）原先只靠手填 `agent_command` / `agent_args`（默认 `claude -p`），每次「由 Agent 继续」都重新启动一个无记忆的新进程，且在外部对话窗口（Claude Code / WorkBuddy / DeepSeek Harness）发起的会话与在 app 内发起的会话混用同一个续跑按钮，用户也看不到发给 Agent 的提示词与最终回复。按与用户对齐的五项交互决策一次性落地：

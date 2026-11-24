@@ -48,13 +48,22 @@ def parse_port_line(line: str) -> int | None:
     return None
 
 
-def _http_get(url: str, headers: dict[str, str] | None = None, timeout: float = 3.0) -> tuple[int, str]:
-    req = urllib.request.Request(url, headers=headers or {}, method="GET")
+def _http_request(
+    url: str, *, method: str = "GET", headers: dict[str, str] | None = None, timeout: float = 3.0
+) -> tuple[int, dict[str, str], str]:
+    req = urllib.request.Request(url, headers=headers or {}, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return int(resp.status), resp.read().decode("utf-8", errors="replace")
+            hdrs = {k.lower(): v for k, v in resp.headers.items()}
+            return int(resp.status), hdrs, resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as err:
-        return int(err.code), err.read().decode("utf-8", errors="replace")
+        hdrs = {k.lower(): v for k, v in err.headers.items()} if err.headers else {}
+        return int(err.code), hdrs, err.read().decode("utf-8", errors="replace")
+
+
+def _http_get(url: str, headers: dict[str, str] | None = None, timeout: float = 3.0) -> tuple[int, str]:
+    code, _, body = _http_request(url, method="GET", headers=headers, timeout=timeout)
+    return code, body
 
 
 def _terminate_tree(proc: subprocess.Popen[Any]) -> None:
@@ -161,6 +170,21 @@ def smoke_backend(python_exe: Path, *, timeout: float = 25.0) -> dict[str, Any]:
         sess_code, sess_body = _http_get(f"{base}/api/sessions", headers={"X-LitLoop-Token": token})
         if sess_code != 200 or not isinstance(json.loads(sess_body), list):
             raise AssertionError(f"/api/sessions check failed: {sess_code} {sess_body[:200]}")
+
+        opt_code, opt_headers, opt_body = _http_request(
+            f"{base}/api/sessions",
+            method="OPTIONS",
+            headers={
+                "Origin": "http://tauri.localhost",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "x-litloop-token",
+                "Access-Control-Request-Private-Network": "true",
+            },
+        )
+        if opt_code != 200 or opt_headers.get("access-control-allow-private-network") != "true":
+            raise AssertionError(
+                f"WebView2 PNA preflight check failed: {opt_code} {opt_headers!r} {opt_body[:200]}"
+            )
 
         return {
             "python": str(python_exe),

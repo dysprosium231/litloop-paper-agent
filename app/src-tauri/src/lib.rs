@@ -2,9 +2,11 @@
 //! hands its address and token to the web front end.
 
 use std::io::{BufRead, BufReader};
+use std::net::{SocketAddr, TcpStream};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::{Duration, Instant};
 
 use tauri::{Emitter, Manager, RunEvent};
 
@@ -111,7 +113,28 @@ fn start_backend(
         .and_then(|v| v.get("port").and_then(|p| p.as_u64()))
         .and_then(|p| u16::try_from(p).ok());
     match port {
-        Some(port) => Ok(BackendInfo { port, token }),
+        Some(port) => {
+            // Confirm uvicorn is actually listening on 127.0.0.1:port before waking the UI.
+            let addr = SocketAddr::from(([127, 0, 0, 1], port));
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                if stopping.load(Ordering::Acquire) {
+                    if let Some(mut c) = child_slot.lock().unwrap().take() {
+                        let _ = c.kill();
+                    }
+                    return Err("LitLoop 正在退出".into());
+                }
+                if let Ok(stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(50)) {
+                    drop(stream);
+                    break;
+                }
+                if Instant::now() >= deadline {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(15));
+            }
+            Ok(BackendInfo { port, token })
+        }
         None => {
             if let Some(mut c) = child_slot.lock().unwrap().take() {
                 let _ = c.kill();

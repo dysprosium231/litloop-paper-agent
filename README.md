@@ -3,7 +3,7 @@
 <div align="center">
   <img src="assets/brand/litloop-icon.png" width="88" alt="LitLoop" />
   <h1>LitLoop</h1>
-  <p><strong>A desktop app for finding, screening, downloading and filing papers</strong> · an agent searches and scores in the background, you make the calls in the app</p>
+  <p><strong>A standalone desktop literature workbench with a built-in AI agent</strong> · search, screen, download and file into Zotero end to end (optional external agent / MCP support)</p>
 
   <a href="https://pypi.org/project/litloop/"><img alt="PyPI" src="https://img.shields.io/pypi/v/litloop?style=flat-square" /></a>
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-0F766E?style=flat-square" /></a>
@@ -11,10 +11,10 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square" />
   <img alt="Status" src="https://img.shields.io/badge/status-in%20development-F59E0B?style=flat-square" />
 
-  [Screenshots](#screenshots) · [Why](#why-litloop) · [One full run](#one-full-run) · [The four screens](#the-four-screens) · [Deep search](#deep-search-how-it-gets-the-whole-topic) · [Downloading](#downloading-how-it-gets-the-pdf) · [Install](#install-and-run) · [Using it with an agent](#using-it-with-an-agent) · [Status](#project-status) · [Changelog](CHANGELOG.md)
+  [Screenshots](#screenshots) · [Why](#why-litloop) · [One full run](#one-full-run) · [The four screens](#the-four-screens) · [Deep search](#deep-search-how-it-gets-the-whole-topic) · [Downloading](#downloading-how-it-gets-the-pdf) · [Install](#install-and-run) · [Optional: external agents & MCP](#optional-using-with-external-agents--mcp) · [Status](#project-status) · [Changelog](CHANGELOG.md)
 </div>
 
-> **Still in development.** Search → screening → download → Zotero works end to end and has been checked against real topics and a small test set. The desktop app covers screening, downloads, Zotero, settings, the built-in agent and watched searches, and you can build your own installer. Systematic-review support stops at flow counts and export; analysis and synthesis are not built yet. See [Project status](#project-status).
+> **Still in development.** LitLoop is a **standalone desktop literature tool**: search → screening → download → Zotero works end to end inside the app and has been checked against real topics and a small test set. Its built-in agent supports Anthropic / OpenAI-compatible APIs with per-task models, and Windows installers are provided. Optional MCP (21 tools) and CLI integration are also kept for external agents such as Claude Code, WorkBuddy, DeepSeek Harness and Codex. Systematic-review support stops at flow counts and export; analysis and synthesis are not built yet. See [Project status](#project-status).
 >
 > LitLoop is an independent derivative of [Rimagination/scansci-pdf](https://github.com/Rimagination/scansci-pdf) (Apache-2.0), maintained by [dysprosium231](https://github.com/dysprosium231); it is not affiliated with the original author. Most of the download and institutional-access machinery comes from that project; LitLoop's changes are listed in [NOTICE](NOTICE).
 
@@ -48,7 +48,7 @@ A few rules it follows:
 
 Take "rare-earth-doped amorphous nanomaterials as drug carriers" as an example:
 
-1. **Ask the question.** In the app's Screening screen, click "New search" and fill in the question and inclusion criteria — or just tell an agent (Claude Code, Codex, etc.): "find as much of the literature on rare-earth-doped amorphous nanocarriers for drug delivery as you can, and hand it to me in batches". If you would rather not keep a chat open, fill in a tool-calling model under Settings → Built-in agent and the app runs the search itself.
+1. **Ask the question.** Configure a model endpoint (such as DeepSeek, Qwen, Claude or local Ollama) under Settings → Built-in agent and select it as the backend, then click "New search" in Screening to enter your question and criteria, preview the search plan and launch — no external CLI required. If you prefer an external agent (Claude Code, WorkBuddy, DeepSeek Harness, Codex, etc.), you can also tell it in chat: "find as much of the literature on rare-earth-doped amorphous nanocarriers for drug delivery as you can, and hand it to me in batches".
 2. **The agent searches and scores.** Quick search answers in seconds; deep search first builds a candidate pool (a few thousand papers) and then hands you 30 at a time, already scored.
 3. **You screen in the app.** The batch list is on the left, the abstract (translatable to Chinese), journal quartile, citation count and the agent's reason on the right. `↑`/`↓` moves, `1`–`4` scores, `space` adds to downloads. Click "Continue search" for the next batch without going back to the chat.
 4. **Download.** The Downloads screen collects everything you picked across searches that has not been downloaded yet; click "Download all". Each paper shows what it is doing and where it finally came from; when it needs your campus login or a captcha, an amber banner appears at the top.
@@ -87,7 +87,8 @@ Take "rare-earth-doped amorphous nanomaterials as drug carriers" as an example:
 ### Settings
 
 - Search API keys, screening and translation, API quota, downloads, network, campus login, agent, Zotero — every group has a "Test" button.
-- **Built-in agent**: works without any agent command installed. Fill in an Anthropic or OpenAI-compatible endpoint (DeepSeek, Qwen, Kimi, GLM, OpenRouter, Ollama, vLLM …) with its key and model name, plus optional separate models for planning and scoring; "Test" checks on the spot that the model actually issues tool calls — a model that does not cannot run tasks. Set "Which backend" to "Built-in agent" and searches started in the app run on it, with search plan preview/editing before launch.
+- **Built-in agent (core path)**: works standalone without any external agent command installed. Fill in an Anthropic or OpenAI-compatible endpoint (DeepSeek, Qwen, Kimi, GLM, OpenRouter, Ollama, vLLM …) with its key and model name, plus optional separate models for planning and scoring; "Test" checks on the spot that the model actually issues tool calls — a model that does not cannot run tasks. Once switched to the built-in agent, searches started in the app run directly on it with search plan preview/editing before launch.
+- **External agent integration (optional)**: Settings → Agent automatically detects installed Claude Code, WorkBuddy, DeepSeek Harness and Codex CLI on your machine, with one-click MCP & skill sync, background runs and same-conversation resume.
 - **Optional components**: layout analysis (about 65 MB, only affects how PDFs are converted to Markdown) is not installed by default; click "Install" in the same group when needed, and set a mirror if the download is slow.
 - **API quota**: today's usage and the official limit for each API.
 - **Diagnostic bundle**: one-click export of a redacted diagnostic zip for troubleshooting (also available from the CLI and API).
@@ -219,9 +220,9 @@ Both ship Python and the dependencies inside — the target machine needs nothin
 
 Every configuration key is in [docs/CONFIG.md](docs/CONFIG.md).
 
-## Using it with an agent
+## Optional: using with external agents & MCP
 
-LitLoop is also an MCP server (21 tools) and a command-line tool. Installed into Claude Code, Codex or ZCode, the whole flow can be one sentence, without opening the app:
+For users who already rely on external AI coding assistants, LitLoop keeps a full MCP server (21 tools) and CLI. After one-click sync in Settings → Agent (or manual setup) into Claude Code, WorkBuddy, DeepSeek Harness or Codex, the whole flow can also run from a single sentence:
 
 ```text
 Find papers from the last five years on urban heat islands and green-space cooling, CAS zone 2 or better, no retractions
@@ -292,7 +293,7 @@ Run end to end on a real topic (precursor-derived SiBCN ceramics for insulation 
 
 In planned order; progress is tracked in [TODO.md](TODO.md).
 
-1. **Desktop app**: NSIS and MSI installers can be built; auto-update and signing remain. The built-in agent (the app calling Anthropic / OpenAI-compatible APIs itself) supports per-task model selection and search plan preview; a test-set quality comparison against an external agent is still open.
+1. **Desktop app & built-in agent primary path**: streamline standalone onboarding (switch the default backend to the built-in agent, move model setup into the first-run guide, add provider presets, show token/cost estimates, add session-level natural-language steering, speed up scoring with concurrent mini-batches, and benchmark model quality on the test set); add auto-update and installer signing.
 2. **Systematic-review support**: flow counts (identified, deduplicated, included, excluded, with reasons), Markdown export, and resuming an interrupted deep search are done; fuller review reporting and checks remain.
 3. **Watched searches**: saving a query, checking when the app opens, notifying, and listing the new papers with a one-click "add to downloads" are done; feeding those papers straight into a screening session is not.
 4. **Analysis and synthesis**: PDF to Markdown exists; extracting findings from full text, building comparison tables and drafting a review are next.
