@@ -17,13 +17,20 @@ def fresh(tmp_path, monkeypatch):
 def test_a_new_user_gets_the_guide_until_done(fresh):
     o = app_settings.onboarding()
     assert o["done"] is False
-    assert [s["group"] for s in o["steps"]] == ["sources", "screening", "downloads", "network", "school", "components", "zotero"]
+    assert [s["group"] for s in o["steps"]] == [
+        "builtin_agent", "sources", "screening", "downloads", "network", "school", "components", "zotero"
+    ]
     assert all(s["group"] in {g["id"] for g in app_settings.GROUPS} for s in o["steps"])
     app_settings.finish_onboarding()
     assert app_settings.onboarding()["done"] is True
 
 
-@pytest.mark.parametrize("key, value", [("openalex_api_key", "k"), ("elsevier_api_key", "k"), ("email", "me@uni.edu")])
+@pytest.mark.parametrize("key, value", [
+    ("builtin_agent_model", "deepseek-chat"),
+    ("openalex_api_key", "k"),
+    ("elsevier_api_key", "k"),
+    ("email", "me@uni.edu"),
+])
 def test_someone_already_set_up_is_left_alone(fresh, key, value):
     config.update_config(key, value)
     assert app_settings.onboarding()["done"] is True
@@ -43,9 +50,15 @@ def test_optional_components_step_says_what_a_missing_piece_costs(monkeypatch):
     monkeypatch.setattr(deps, "check_dependency", lambda m: m == "socks")
     monkeypatch.setattr(embedded_tor, "is_tor_installed", lambda cfg: False)
     monkeypatch.setattr(shutil, "which", lambda cmd: None)
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_backend", "command")
     rows = {r["name"]: r for r in app_settings.run_test("components")["results"]}
     assert rows["浏览器组件"]["ok"] is False and "找不到 Chrome" in rows["浏览器组件"]["detail"]
     assert rows["WebVPN 加密"]["ok"] is False and "pycryptodome" in rows["WebVPN 加密"]["detail"]
     assert rows["SOCKS 代理"]["ok"] is True
     assert rows["Tor"]["ok"] is None  # optional: not a failure
     assert rows["Agent 命令"]["ok"] is None and "找不到 claude" in rows["Agent 命令"]["detail"]
+
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_backend", "builtin")
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "builtin_agent_model", "")
+    rows_builtin = {r["name"]: r for r in app_settings.run_test("components")["results"]}
+    assert rows_builtin["Agent 命令"]["ok"] is None and "内置 Agent" in rows_builtin["Agent 命令"]["detail"]

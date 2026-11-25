@@ -1,8 +1,9 @@
 import * as React from "react"
-import { BookAIcon, ChevronDownIcon, HistoryIcon, PlusIcon, Undo2Icon, XIcon } from "lucide-react"
+import { BookAIcon, BotIcon, ChevronDownIcon, HistoryIcon, PlusIcon, Undo2Icon, XIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
+import { AgentDrawer } from "@/components/agent-drawer"
 import { AppSidebar, RAIL_COLLAPSED, RAIL_OPEN, type Section } from "@/components/app-sidebar"
 import { PaperList, type PaperRow, type QuickBatchKind } from "@/components/paper-list"
 import { DownloadsOverview, JobPane, OVERVIEW, useDownloads } from "@/components/downloads-view"
@@ -33,6 +34,7 @@ import {
   paperKey,
   rating,
   RELEVANCE,
+  type AgentActionCard,
   type BatchOp,
   type ErrorAction,
   type Item,
@@ -95,6 +97,26 @@ function useStoredWidths(): [Record<Resizable, number>, (s: Resizable, w: number
 }
 
 const RAIL_KEY = "litloop.railOpen"
+const DRAWER_KEY = "litloop.agentDrawerOpen"
+
+function useDrawerOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = React.useState(() => {
+    try {
+      return localStorage.getItem(DRAWER_KEY) === "1"
+    } catch {
+      return false
+    }
+  })
+  const set = React.useCallback((v: boolean) => {
+    setOpen(v)
+    try {
+      localStorage.setItem(DRAWER_KEY, v ? "1" : "0")
+    } catch {
+      /* storage unavailable */
+    }
+  }, [])
+  return [open, set]
+}
 
 function useRailOpen(): [boolean, (open: boolean) => void] {
   const [open, setOpen] = React.useState(() => {
@@ -182,6 +204,7 @@ export default function App() {
   const [error, setError] = React.useState<string | null>(null)
   const [widths, setWidth] = useStoredWidths()
   const [railOpen, setRailOpen] = useRailOpen()
+  const [drawerOpen, setDrawerOpen] = useDrawerOpen()
   const railExtra = railOpen ? RAIL_OPEN - RAIL_COLLAPSED : 0
   const [section, setSection] = React.useState<Section>("screen")
   const [history, setHistory] = React.useState(false)  // the screening section's history page
@@ -235,7 +258,7 @@ export default function App() {
     if (section === "settings") settingsApi.openalex().catch(() => {})
   }, [section])
   const [groups, setGroups] = React.useState<SettingGroup[]>([])
-  const [settingsGroup, setSettingsGroup] = React.useState("sources")
+  const [settingsGroup, setSettingsGroup] = React.useState("builtin_agent")
   const downloads = useDownloads(section === "download")
   useSystemNotices()
   const [downloadView, setDownloadView] = React.useState(OVERVIEW)
@@ -564,10 +587,15 @@ export default function App() {
     }).catch((e) => setError(errorMessage(e)))
   }, [sid, paper, reload, pushUndo])
 
-  // Keyboard: ↑↓ move, 1-4 rate, space select, Ctrl+Z undo, Esc clear checks. Not while typing in a field.
+  // Keyboard: Ctrl+L toggle agent drawer (even in inputs), ↑↓ move, 1-4 rate, space select, Ctrl+Z undo, Esc clear checks.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (section !== "screen" || fullPage) return
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "l") {
+        e.preventDefault()
+        setDrawerOpen(!drawerOpen)
+        return
+      }
       const t = e.target as HTMLElement
       if (t.closest("input, textarea, select, [contenteditable=true]")) return
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "z") {
@@ -593,7 +621,34 @@ export default function App() {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [shown, idx, rate, toggleSelect, section, fullPage, undo, checked.size, clearCheck])
+  }, [shown, idx, rate, toggleSelect, section, fullPage, undo, checked.size, clearCheck, drawerOpen, setDrawerOpen])
+
+  const handleAgentActionConfirmed = React.useCallback((action: AgentActionCard, result?: Record<string, unknown>) => {
+    if (action.kind === "start_search") {
+      api.sessions().then(setSessions).catch(() => {})
+      if (result && typeof result.session === "string" && result.session) {
+        setSid(result.session)
+      } else {
+        reload()
+      }
+    } else if (action.kind === "resume_search") {
+      reload()
+      if (sid) api.progress(sid).then(setProgress).catch(() => {})
+    } else if (action.kind === "download") {
+      if (result && typeof result.job === "string" && result.job) {
+        openJob(result.job)
+      } else {
+        setSection("download")
+      }
+      downloads.refresh()
+    } else if (action.kind === "zotero_push") {
+      zotero.refresh()
+      setZoteroView("queue")
+      setSection("zotero")
+    } else if (action.kind === "add_glossary") {
+      showNotice("已更新术语表")
+    }
+  }, [sid, reload, downloads, zotero, showNotice])
 
   const heading = summary && onlyBatch && summary.current_batch?.length
     ? `第 ${summary.batches.length} 批 · ${summary.current_batch.length} 篇`
@@ -730,6 +785,15 @@ export default function App() {
               <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setNewSearch(true)}>
                 <PlusIcon />新建检索
               </Button>
+              <Button
+                size="sm"
+                variant={drawerOpen ? "secondary" : "ghost"}
+                className={drawerOpen ? "shrink-0 bg-accent text-accent-foreground" : "shrink-0"}
+                onClick={() => setDrawerOpen(!drawerOpen)}
+                title="AI 助手（Ctrl+L）"
+              >
+                <BotIcon />AI 助手
+              </Button>
               <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setHistory(true)}>
                 <HistoryIcon />筛选历史
               </Button>
@@ -738,40 +802,53 @@ export default function App() {
               </Button>
             </div>
           </header>
-          <ProgressStrip progress={progress} summary={summary} resumable={resumable} origin={origin} onContinue={continueSearch} onResume={resumeSearch} onErrorAction={handleErrorAction} />
-          {notice && (
-            <div
-              onMouseEnter={() => { noticeHoverRef.current = true }}
-              onMouseLeave={() => { noticeHoverRef.current = false }}
-              className="flex shrink-0 items-center justify-between gap-3 border-b bg-accent/40 px-6 py-2 text-sm"
-            >
-              <span className="min-w-0 truncate">{notice.text}</span>
-              <div className="flex shrink-0 items-center gap-2">
-                {notice.canUndo && undoStack.length > 0 && (
-                  <Button size="sm" variant="outline" disabled={batchBusy} onClick={() => void undo()} className="h-7 px-2.5 text-xs">
-                    撤销
-                  </Button>
-                )}
-                <button
-                  type="button"
-                  aria-label="关闭提示"
-                  onClick={() => setNotice(null)}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+          <div className="flex min-h-0 flex-1">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <ProgressStrip progress={progress} summary={summary} resumable={resumable} origin={origin} onContinue={continueSearch} onResume={resumeSearch} onErrorAction={handleErrorAction} />
+              {notice && (
+                <div
+                  onMouseEnter={() => { noticeHoverRef.current = true }}
+                  onMouseLeave={() => { noticeHoverRef.current = false }}
+                  className="flex shrink-0 items-center justify-between gap-3 border-b bg-accent/40 px-6 py-2 text-sm"
                 >
-                  <XIcon className="size-3.5" />
-                </button>
-              </div>
+                  <span className="min-w-0 truncate">{notice.text}</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {notice.canUndo && undoStack.length > 0 && (
+                      <Button size="sm" variant="outline" disabled={batchBusy} onClick={() => void undo()} className="h-7 px-2.5 text-xs">
+                        撤销
+                      </Button>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="关闭提示"
+                      onClick={() => setNotice(null)}
+                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <XIcon className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              <DetailPane
+                paper={paper}
+                emptyHint={papers.length > 0 && shown.length === 0 ? "当前筛选条件下没有匹配的文献" : undefined}
+                onRate={rate}
+                onSelect={toggleSelect}
+                onExclude={exclude}
+                translation={translation}
+                onTranslate={translateAbstract}
+              />
             </div>
-          )}
-          <DetailPane
-            paper={paper}
-            emptyHint={papers.length > 0 && shown.length === 0 ? "当前筛选条件下没有匹配的文献" : undefined}
-            onRate={rate}
-            onSelect={toggleSelect}
-            onExclude={exclude}
-            translation={translation}
-            onTranslate={translateAbstract}
-          />
+            {drawerOpen && (
+              <AgentDrawer
+                sessionId={sid ?? "__draft__"}
+                sessionTitle={record?.question ?? null}
+                currentPaper={paper}
+                onClose={() => setDrawerOpen(false)}
+                onActionConfirmed={handleAgentActionConfirmed}
+              />
+            )}
+          </div>
           </>)}
             </React.Suspense>
           )}

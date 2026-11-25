@@ -19,7 +19,7 @@
 | `tor/` | Tor | `proxy.py`（tor.py）、`embedded.py`（embedded_tor.py） |
 | `zotero/` | Zotero | `client.py`（zotero.py）、`bridge.py`（zotero_bridge.py，在 zotero-mcp 的 Python 里按文件路径运行，不能 import litloop） |
 | `extractors/` | 从 HTML、PDF 抽内容 | 未变 |
-| `agents/` | 内置 Agent（后端 B）直接调模型接口 | `client.py`（Anthropic 原生与 OpenAI 兼容两种协议、工具调用、测试连通性）、`runner.py`（问模型 → 跑工具 → 再问的循环）、`tools.py`（检索、深度检索三步、保存评分的函数与 schema）、`system.py`（写给内置模型的规则：四档相关度、快速/深度检索的步骤，等同于外部 Agent 读的技能文档） |
+| `agents/` | 内置 Agent（后端 B）直接调模型接口 | `client.py`（Anthropic 原生与 OpenAI 兼容两种协议、流式 SSE、预设、费用统计、测试连通性）、`chat_agent.py`（分级权限主对话引擎、上下文注入与动作确认卡执行）、`runner.py`（问模型 → 跑工具 → 再问的循环，以及内置快查/深检/续跑流水线）、`scorer.py`（并发分片评分、缺漏重试与用户纠偏样本收集）、`tools.py`（检索、深度检索三步、保存评分的函数与 schema）、`system.py`（写给内置模型的规则：四档相关度、快速/深度检索的步骤，等同于外部 Agent 读的技能文档） |
 
 顶层：`server.py`（MCP 服务）、`config.py`、`store.py`、`db.py`、`network.py`、`http_utils.py`、`identifiers.py`、`models.py`、`quota.py`、`updates.py`、`cache.py`、`deps.py`、`log.py`、`optional.py`（按需安装的组件：版面分析，装进 `<数据目录>/packages` 并加进 `sys.path`）、`diagnostics.py`（诊断包：版本、系统、脱敏后的设置与最近日志打成 zip）、`_source_hygiene.py`、`__init__.py`、`__main__.py`。
 

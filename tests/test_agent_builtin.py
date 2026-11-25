@@ -41,43 +41,52 @@ def builtin(monkeypatch):
 
 def test_a_missing_model_name_is_reported_before_anything_runs(builtin, monkeypatch):
     builtin["builtin_agent_model"] = ""
+    monkeypatch.setattr("litloop.agents.run_builtin_search", lambda *a, **k: pytest.fail("no request expected"))
     monkeypatch.setattr("litloop.agents.run_task", lambda *a, **k: pytest.fail("no request expected"))
     d = agent_runner.start({"question": "x"})
     assert d["state"] == "failed" and "模型名" in d["error"]
 
 
-def test_the_session_and_the_answer_come_back(builtin, monkeypatch):
-    def fake_run(goal, tools, *, functions, on_event, **kwargs):
+def test_the_session_and_the_answer_come_back(builtin, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    usage = {"input_tokens": 100, "output_tokens": 40, "total_tokens": 140, "cost_text": "约 ¥0.0003"}
+
+    def fake_search(form, *, config=None, stop_event=None, on_event=None):
+        assert form["question"] == "x"
+        on_event("progress", {"text": "正在规划检索词"})
         on_event("tool", {"name": "deep_search_start", "arguments": {}, "step": 1})
         on_event("result", {"name": "deep_search_start", "result": '{"session": "20261104-1-x"}', "step": 1})
         on_event("text", {"text": "找到 12 篇。", "step": 2})
-        return {"text": "找到 12 篇。", "steps": 2, "tool_calls": []}
+        return {"text": "找到 12 篇。", "session": "20261104-1-x", "usage": usage}
 
-    monkeypatch.setattr("litloop.agents.run_task", fake_run)
+    monkeypatch.setattr("litloop.agents.run_builtin_search", fake_search)
     run = agent_runner.start({"question": "x"})["run"]
     d = _wait(run)
+    _idle()
     assert d["state"] == "done" and d["session"] == "20261104-1-x"
     assert d["result"] == "找到 12 篇。"
-    assert [e["text"] for e in d["events"]][0] == "深度检索：正在构建候选池"
+    assert d["usage"] == usage
+    events = [e["text"] for e in d["events"]]
+    assert "正在规划检索词" in events and "深度检索：正在构建候选池" in events
+    assert agent_runner.list_runs()[0]["usage"] == usage
+    assert agent_runner.session_origin("20261104-1-x")["last_run"]["usage"] == usage
 
 
-def test_the_model_gets_the_rules_and_a_step_budget_that_fits_the_batches(builtin, monkeypatch):
+def test_builtin_search_receives_form_config_and_stop_event(builtin, monkeypatch):
     seen = {}
 
-    def fake_run(goal, tools, *, functions, on_event, **kwargs):
-        seen.update(kwargs)
-        seen["goal"] = goal
-        return {"text": "完成", "steps": 1, "tool_calls": []}
+    def fake_search(form, *, config=None, stop_event=None, on_event=None):
+        seen["form"] = form
+        seen["config"] = config
+        seen["stop_event"] = stop_event
+        return {"text": "完成", "session": "s1", "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}}
 
-    monkeypatch.setattr("litloop.agents.run_task", fake_run)
+    monkeypatch.setattr("litloop.agents.run_builtin_search", fake_search)
     _wait(agent_runner.start({"question": "x", "mode": "deep", "batches": 3})["run"])
     _idle()
-    assert "相关度" in seen["system"] and "高 / 中 / 低 / 不相关" in seen["system"]
-    assert seen["max_steps"] == 10  # 4 + 2 per batch
-    seen.clear()
-    _wait(agent_runner.start({"question": "y"})["run"])
-    _idle()
-    assert seen["max_steps"] == 8  # a quick search does not need more
+    assert seen["form"]["mode"] == "deep" and seen["form"]["batches"] == 3
+    assert seen["config"]["builtin_agent_model"] == "deepseek-chat"
+    assert isinstance(seen["stop_event"], threading.Event)
 
 
 def test_the_builtin_prompt_does_not_point_at_a_skill_it_cannot_read():
@@ -90,7 +99,7 @@ def test_a_failing_model_fails_the_run_with_its_message(builtin, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("HTTP 401: bad key")
 
-    monkeypatch.setattr("litloop.agents.run_task", boom)
+    monkeypatch.setattr("litloop.agents.run_builtin_search", boom)
     d = _wait(agent_runner.start({"question": "x"})["run"])
     assert d["state"] == "failed" and "HTTP 401" in d["error"]
 
@@ -99,14 +108,14 @@ def test_cancel_stops_a_builtin_run(builtin, monkeypatch):
     started = threading.Event()
     release = threading.Event()
 
-    def slow_run(goal, tools, *, functions, on_event, **kwargs):
+    def slow_search(form, *, config=None, stop_event=None, on_event=None):
         started.set()
         while not release.is_set():
             time.sleep(0.02)
-            on_event("tool", {"name": "search", "arguments": {}, "step": 1})
-        return {"text": "查完了", "steps": 1, "tool_calls": []}
+            on_event("progress", {"text": "正在评分 1/10"})
+        return {"text": "查完了", "cancelled": True}
 
-    monkeypatch.setattr("litloop.agents.run_task", slow_run)
+    monkeypatch.setattr("litloop.agents.run_builtin_search", slow_search)
     run = agent_runner.start({"question": "x"})["run"]
     assert started.wait(2.0)
     assert agent_runner.cancel(run) is True
@@ -119,6 +128,17 @@ def test_cancel_stops_a_builtin_run(builtin, monkeypatch):
     while agent_runner.running() is not None and time.monotonic() < deadline:
         time.sleep(0.02)
     assert agent_runner.running() is None
+
+
+def test_cancelled_flag_from_builtin_search_marks_run_cancelled(builtin, monkeypatch):
+    monkeypatch.setattr(
+        "litloop.agents.run_builtin_search",
+        lambda *a, **k: {"text": "已取消", "cancelled": True, "usage": {"input_tokens": 5, "output_tokens": 2, "total_tokens": 7}},
+    )
+    d = _wait(agent_runner.start({"question": "x"})["run"])
+    _idle()
+    assert d["state"] == "cancelled"
+    assert d["usage"]["total_tokens"] == 7
 
 
 def test_a_run_that_finishes_while_being_read_is_not_called_interrupted(
@@ -142,7 +162,7 @@ def test_a_run_that_finishes_while_being_read_is_not_called_interrupted(
 
 
 def test_a_new_run_can_start_the_moment_the_last_one_finishes(builtin, monkeypatch):
-    monkeypatch.setattr("litloop.agents.run_task", lambda *a, **k: {"text": "好了", "steps": 1, "tool_calls": []})
+    monkeypatch.setattr("litloop.agents.run_builtin_search", lambda *a, **k: {"text": "好了", "session": "s1"})
     first = agent_runner.start({"question": "x"})["run"]
     assert _wait(first)["state"] == "done"
     # No sleep: the finished run must be out of the running table already.
@@ -163,14 +183,14 @@ def test_resume_runs_builtin_agent_and_blocks_concurrent_runs(builtin, tmp_path,
     started = threading.Event()
     release = threading.Event()
 
-    def fake_run(goal, tools, *, functions, on_event, **kwargs):
-        seen.update(goal=goal, system=kwargs.get("system", ""))
+    def fake_resume(session, *, batches=0, steering_notes=None, config=None, stop_event=None, on_event=None):
+        seen.update(session=session, batches=batches)
         started.set()
         release.wait(2.0)
-        return {"text": "续跑完成", "steps": 2, "tool_calls": []}
+        return {"text": "续跑完成", "session": session, "usage": {"input_tokens": 50, "output_tokens": 20, "total_tokens": 70}}
 
-    monkeypatch.setattr("litloop.agents.run_task", fake_run)
-    run = agent_runner.resume(sid)["run"]
+    monkeypatch.setattr("litloop.agents.run_builtin_resume", fake_resume)
+    run = agent_runner.resume(sid, batches=2)["run"]
     assert started.wait(2.0)
     with pytest.raises(RuntimeError, match="已有检索在进行"):
         agent_runner.resume(sid)
@@ -178,7 +198,8 @@ def test_resume_runs_builtin_agent_and_blocks_concurrent_runs(builtin, tmp_path,
     d = _wait(run)
     _idle()
     assert d["state"] == "done" and d["resumed_from"] == sid and d["session"] == sid
-    assert "deep_search_status" in seen["goal"] and "deep_search_rate" in seen["system"]
+    assert d["usage"]["total_tokens"] == 70
+    assert seen["session"] == sid and seen["batches"] == 2
 
 
 def test_per_task_model_selection_and_step_switching(monkeypatch):
@@ -291,3 +312,53 @@ def test_endpoint_normalization_and_curl_fallback(monkeypatch):
     assert res2["choices"][0]["message"]["content"] == "ok"
     assert calls == {"requests": 1, "curl": 2}
     client._CURL_HOSTS.clear()
+
+
+def test_resume_merges_active_steering_notes_from_db(builtin, tmp_path, monkeypatch):
+    from litloop import db
+    from litloop.search import screening
+
+    monkeypatch.setattr(screening._config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    sid = screening.save("SiC/Al", [{"doi": "10.1/a", "title": "A", "relevance": "高", "reason": "r"}], mode="deep")["session"]
+    db.save_pool_state({"session": sid, "pool": {}})
+    n1 = db.add_steering_note(sid, "偏重实验验证论文")
+    n2 = db.add_steering_note(sid, "排除纯分子动力学模拟")
+    db.remove_steering_note(n2["id"])
+
+    seen = {}
+
+    def fake_resume(session, *, batches=0, steering_notes=None, config=None, stop_event=None, on_event=None):
+        seen["steering_notes"] = steering_notes
+        return {"text": "续跑完成", "session": session}
+
+    monkeypatch.setattr("litloop.agents.run_builtin_resume", fake_resume)
+    run = agent_runner.resume(sid, batches=1, steering_notes=["偏重实验验证论文", "关注界面相容性"])["run"]
+    d = _wait(run)
+    _idle()
+    assert d["state"] == "done"
+    assert seen["steering_notes"] == ["偏重实验验证论文", "关注界面相容性"]
+    assert d["steering_notes"] == ["偏重实验验证论文", "关注界面相容性"]
+    assert n1["note"] in d["steering_notes"]
+
+
+def test_start_from_draft_migrates_chat_and_steering_to_new_session(builtin, tmp_path, monkeypatch):
+    from litloop import db
+
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    db.add_agent_message("__draft__", "user", "帮我搜 SiC/Al")
+    db.add_steering_note("__draft__", "排除纯仿真")
+
+    def fake_search(form, *, config=None, on_event=None, stop_event=None):
+        if on_event:
+            on_event("result", {"name": "deep_search_start", "result": '{"session": "20261125-migrated"}'})
+        return {"text": "完成", "session": "20261125-migrated", "usage": None}
+
+    monkeypatch.setattr("litloop.agents.run_builtin_search", fake_search)
+    d = _wait(agent_runner.start({"question": "SiC/Al", "mode": "deep", "from_draft": True})["run"])
+    _idle()
+    assert d["state"] == "done" and d["session"] == "20261125-migrated"
+    assert db.list_agent_messages("__draft__") == []
+    assert db.list_steering_notes("__draft__") == []
+    assert [m["content"] for m in db.list_agent_messages("20261125-migrated")] == ["帮我搜 SiC/Al"]
+    assert [n["note"] for n in db.list_steering_notes("20261125-migrated")] == ["排除纯仿真"]

@@ -27,6 +27,7 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", data_dir)
     monkeypatch.setattr(config, "CONFIG_FILE", data_dir / "config.json")
     monkeypatch.setattr(screening._config, "DATA_DIR", data_dir)
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_backend", "command")
     monkeypatch.setattr(harnesses, "_home", lambda: home_dir)
     monkeypatch.setattr(harnesses, "_system_install_dirs", lambda kind: [])
     monkeypatch.setattr(harnesses.shutil, "which", lambda cmd: None)

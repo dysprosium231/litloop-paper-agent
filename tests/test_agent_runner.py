@@ -49,6 +49,7 @@ def agent(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.json")
     script = tmp_path / "fake_agent.py"
     script.write_text(FAKE, encoding="utf-8")
+    monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_backend", "command")
     monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_command", sys.executable)
     monkeypatch.setitem(config.DEFAULT_CONFIG, "agent_args", f'"{script}"')
     return tmp_path

@@ -26,7 +26,7 @@ from .terms.text import paper_key
 
 logger = get_logger()
 
-DB_SCHEMA = 1
+DB_SCHEMA = 2
 
 
 def db_path() -> Path:
@@ -127,8 +127,38 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
         conn.execute(stmt)
 
 
+def _migrate_v2(conn: sqlite3.Connection) -> None:
+    statements = [
+        """
+        CREATE TABLE IF NOT EXISTS agent_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL DEFAULT '',
+            actions_json TEXT NOT NULL DEFAULT '[]',
+            usage_json TEXT,
+            created TEXT NOT NULL DEFAULT ''
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_agent_messages_session ON agent_messages(session_id, id)",
+        """
+        CREATE TABLE IF NOT EXISTS steering_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            note TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            created TEXT NOT NULL DEFAULT ''
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_steering_notes_session ON steering_notes(session_id, active, id)",
+    ]
+    for stmt in statements:
+        conn.execute(stmt)
+
+
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
+    (2, "agent messages and steering notes", _migrate_v2),
 ]
 
 
@@ -1918,5 +1948,223 @@ def get_batch_paper(
         if isinstance(b, dict) and paper_key({"doi": b.get("doi"), "title": b.get("title")}) == target_key:
             return {f: b.get(f) for f in _BATCH_FIELDS}
     return None
+
+
+def _row_to_agent_message(row: sqlite3.Row) -> dict[str, Any]:
+    try:
+        actions = json.loads(row["actions_json"] or "[]")
+        if not isinstance(actions, list):
+            actions = []
+    except (ValueError, TypeError):
+        actions = []
+    usage: dict[str, Any] | None = None
+    if row["usage_json"]:
+        try:
+            parsed = json.loads(row["usage_json"])
+            if isinstance(parsed, dict):
+                usage = parsed
+        except (ValueError, TypeError):
+            usage = None
+    return {
+        "id": int(row["id"]),
+        "session_id": str(row["session_id"]),
+        "role": str(row["role"]),
+        "content": str(row["content"]),
+        "actions": actions,
+        "usage": usage,
+        "created": str(row["created"]),
+    }
+
+
+def list_agent_messages(
+    session_id: str,
+    limit: int = 100,
+    *,
+    db_file: Path | str | None = None,
+) -> list[dict[str, Any]]:
+    """Return the most recent ``limit`` agent chat messages for ``session_id`` ordered by ``id ASC``."""
+    if limit <= 0:
+        return []
+    with connect(db_file) as conn:
+        rows = conn.execute(
+            """
+            SELECT id, session_id, role, content, actions_json, usage_json, created
+            FROM (
+                SELECT id, session_id, role, content, actions_json, usage_json, created
+                FROM agent_messages
+                WHERE session_id = ?
+                ORDER BY id DESC
+                LIMIT ?
+            )
+            ORDER BY id ASC
+            """,
+            (session_id, int(limit)),
+        ).fetchall()
+    return [_row_to_agent_message(r) for r in rows]
+
+
+def add_agent_message(
+    session_id: str,
+    role: str,
+    content: str,
+    *,
+    actions: list[dict[str, Any]] | None = None,
+    usage: dict[str, Any] | None = None,
+    db_file: Path | str | None = None,
+) -> dict[str, Any]:
+    """Append an agent chat message for ``session_id`` and return the stored record."""
+    created = _now_iso()
+    actions_list = list(actions) if actions is not None else []
+    actions_json = json.dumps(actions_list, ensure_ascii=False)
+    usage_json = json.dumps(usage, ensure_ascii=False) if usage is not None else None
+    with transaction(db_file) as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO agent_messages (session_id, role, content, actions_json, usage_json, created)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (session_id, role, content, actions_json, usage_json, created),
+        )
+        msg_id = int(cur.lastrowid)
+    return {
+        "id": msg_id,
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+        "actions": actions_list,
+        "usage": dict(usage) if usage is not None else None,
+        "created": created,
+    }
+
+
+def update_agent_action(
+    message_id: int,
+    action_id: str,
+    status: str,
+    result: dict[str, Any] | None = None,
+    *,
+    db_file: Path | str | None = None,
+) -> dict[str, Any] | None:
+    """Update status (and optional result) of an action card inside ``agent_messages``."""
+    with transaction(db_file) as conn:
+        row = conn.execute(
+            "SELECT actions_json FROM agent_messages WHERE id = ?",
+            (int(message_id),),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            actions = json.loads(row["actions_json"] or "[]")
+        except (ValueError, TypeError):
+            actions = []
+        if not isinstance(actions, list):
+            return None
+        updated: dict[str, Any] | None = None
+        for item in actions:
+            if isinstance(item, dict) and item.get("id") == action_id:
+                item["status"] = status
+                if result is not None:
+                    item["result"] = result
+                updated = dict(item)
+                break
+        if updated is None:
+            return None
+        conn.execute(
+            "UPDATE agent_messages SET actions_json = ? WHERE id = ?",
+            (json.dumps(actions, ensure_ascii=False), int(message_id)),
+        )
+        return updated
+
+
+def clear_agent_messages(session_id: str, *, db_file: Path | str | None = None) -> int:
+    """Delete all agent chat messages for ``session_id`` and return the deleted row count."""
+    with transaction(db_file) as conn:
+        cur = conn.execute("DELETE FROM agent_messages WHERE session_id = ?", (session_id,))
+        return int(cur.rowcount)
+
+
+def migrate_agent_session(
+    from_session: str,
+    to_session: str,
+    *,
+    db_file: Path | str | None = None,
+) -> None:
+    """Move ``agent_messages`` and ``steering_notes`` from ``from_session`` to ``to_session``."""
+    if from_session == to_session:
+        return
+    with transaction(db_file) as conn:
+        conn.execute(
+            "UPDATE agent_messages SET session_id = ? WHERE session_id = ?",
+            (to_session, from_session),
+        )
+        conn.execute(
+            "UPDATE steering_notes SET session_id = ? WHERE session_id = ?",
+            (to_session, from_session),
+        )
+
+
+def list_steering_notes(
+    session_id: str,
+    active_only: bool = True,
+    *,
+    db_file: Path | str | None = None,
+) -> list[dict[str, Any]]:
+    """Return steering notes for ``session_id`` ordered by ``id ASC``."""
+    sql = (
+        "SELECT id, session_id, note, active, created FROM steering_notes "
+        "WHERE session_id = ?"
+    )
+    if active_only:
+        sql += " AND active = 1"
+    sql += " ORDER BY id ASC"
+    with connect(db_file) as conn:
+        rows = conn.execute(sql, (session_id,)).fetchall()
+    return [
+        {
+            "id": int(r["id"]),
+            "session_id": str(r["session_id"]),
+            "note": str(r["note"]),
+            "active": bool(r["active"]),
+            "created": str(r["created"]),
+        }
+        for r in rows
+    ]
+
+
+def add_steering_note(
+    session_id: str,
+    note: str,
+    *,
+    db_file: Path | str | None = None,
+) -> dict[str, Any]:
+    """Add an active steering note for ``session_id`` and return it."""
+    created = _now_iso()
+    with transaction(db_file) as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO steering_notes (session_id, note, active, created)
+            VALUES (?, ?, 1, ?)
+            """,
+            (session_id, note, created),
+        )
+        note_id = int(cur.lastrowid)
+    return {
+        "id": note_id,
+        "session_id": session_id,
+        "note": note,
+        "active": True,
+        "created": created,
+    }
+
+
+def remove_steering_note(note_id: int, *, db_file: Path | str | None = None) -> bool:
+    """Deactivate a steering note by ``note_id``, returning ``False`` if not found or already inactive."""
+    with transaction(db_file) as conn:
+        cur = conn.execute(
+            "UPDATE steering_notes SET active = 0 WHERE id = ? AND active = 1",
+            (int(note_id),),
+        )
+        return cur.rowcount > 0
+
 
 

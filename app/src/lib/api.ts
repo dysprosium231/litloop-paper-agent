@@ -228,6 +228,29 @@ export interface BatchResult {
   previous: BatchPrevious[]
 }
 
+export interface RunUsage {
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  currency?: string | null
+  estimated?: number | null
+  cost_text?: string | null
+  by_model?: Record<string, { input_tokens: number; output_tokens: number; total_tokens: number }>
+}
+
+export interface ProviderPreset {
+  id: string
+  label: string
+  protocol: "openai" | "anthropic"
+  base_url: string
+  model: string
+  plan_model: string
+  rate_model: string
+  needs_key: boolean
+  note: string
+  link: string
+}
+
 export interface SessionOrigin {
   source: "app" | "external"
   harness: string | null
@@ -246,6 +269,7 @@ export interface SessionOrigin {
     prompt?: string | null
     result?: string | null
     error?: string | null
+    usage?: RunUsage | null
   } | null
   continue_prompt: string
   changed_ratings: number
@@ -436,6 +460,8 @@ export const settingsApi = {
   harnesses: () => call<HarnessInfo[]>("/api/harnesses"),
   syncHarness: (id: string) => call<HarnessSyncResult>(`/api/harnesses/${encodeURIComponent(id)}/sync`, {}),
   selectHarness: (id: string) => call<HarnessInfo[]>(`/api/harnesses/${encodeURIComponent(id)}/select`, {}),
+  builtinPresets: () => call<ProviderPreset[]>("/api/builtin-agent/presets"),
+  applyBuiltinPreset: (preset: string) => call<SettingField[]>("/api/builtin-agent/preset", { preset }),
 }
 
 // ------------------------------------------------------------------ downloads
@@ -652,6 +678,7 @@ export interface SearchPlan {
   estimated_credits: string
   credit_note: string
   model: string
+  usage?: RunUsage | null
 }
 
 /** A search the app sent to the agent: agent_runs/<run>.json. */
@@ -673,6 +700,7 @@ export interface SearchRun {
   prompt?: string | null
   result: string | null
   error: string | null
+  usage?: RunUsage | null
 }
 
 export const searchApi = {
@@ -777,3 +805,146 @@ export const zoteroApi = {
     call<{ trashed: string[]; attached: boolean }>("/api/zotero/repair",
       { item_key: it.key, doi: it.doi, trash: it.empty_attachments, attach }),
 }
+
+// ------------------------------------------------------------------ built-in agent chat
+
+export interface AgentActionCard {
+  id: string
+  kind: "start_search" | "resume_search" | "download" | "zotero_push" | "add_glossary"
+  title: string
+  summary: string
+  params: Record<string, unknown>
+  status: "pending" | "confirmed" | "cancelled" | "failed"
+  result?: Record<string, unknown> | null
+}
+
+export interface AgentMessage {
+  id: number
+  session_id: string
+  role: "user" | "assistant"
+  content: string
+  actions: AgentActionCard[]
+  usage?: RunUsage | null
+  created: string
+}
+
+export interface SteeringNote {
+  id: number
+  session_id: string
+  note: string
+  active: boolean
+  created: string
+}
+
+export interface AgentViewContext {
+  current_paper?: {
+    doi?: string | null
+    title?: string
+    year?: number | string | null
+    journal?: string | null
+    relevance?: string | null
+    user_relevance?: string | null
+    reason?: string | null
+    abstract?: string | null
+  } | null
+}
+
+export type AgentChatEvent =
+  | { type: "user_message"; message: AgentMessage }
+  | { type: "delta"; text: string }
+  | { type: "tool"; name: string; label?: string }
+  | { type: "action"; action: AgentActionCard }
+  | { type: "done"; message: AgentMessage }
+  | { type: "error"; error: string }
+
+function parseSseBlock(block: string): AgentChatEvent | null {
+  const dataLines: string[] = []
+  for (const rawLine of block.split(/\r?\n/)) {
+    if (rawLine.startsWith("data:")) {
+      dataLines.push(rawLine.slice(5).trimStart())
+    }
+  }
+  if (!dataLines.length) return null
+  const payload = dataLines.join("\n").trim()
+  if (!payload) return null
+  try {
+    return JSON.parse(payload) as AgentChatEvent
+  } catch {
+    return null
+  }
+}
+
+export const agentChatApi = {
+  load: (sessionId: string) =>
+    call<{ session_id: string; messages: AgentMessage[]; steering_notes: SteeringNote[] }>(
+      `/api/agent/chat/${encodeURIComponent(sessionId)}`,
+    ),
+  clear: (sessionId: string) =>
+    call<{ cleared: number }>(`/api/agent/chat/${encodeURIComponent(sessionId)}/clear`, {}),
+  confirmAction: (sessionId: string, messageId: number, actionId: string, params?: Record<string, unknown>) =>
+    call<{ ok: boolean; action: AgentActionCard; result?: Record<string, unknown>; error?: string | null }>(
+      "/api/agent/actions/confirm",
+      { session_id: sessionId, message_id: messageId, action_id: actionId, params },
+    ),
+  cancelAction: (sessionId: string, messageId: number, actionId: string) =>
+    call<{ action: AgentActionCard }>(
+      "/api/agent/actions/cancel",
+      { session_id: sessionId, message_id: messageId, action_id: actionId },
+    ),
+  addSteering: (sessionId: string, note: string) =>
+    call<SteeringNote>(`/api/agent/steering/${encodeURIComponent(sessionId)}`, { note }),
+  removeSteering: (noteId: number) =>
+    call<{ removed: boolean }>(`/api/agent/steering/${noteId}`, undefined, "DELETE"),
+  stream: async (
+    sessionId: string,
+    message: string,
+    view: AgentViewContext | undefined,
+    onEvent: (ev: AgentChatEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    const { port, token } = await getBackend()
+    const res = await fetch(`http://127.0.0.1:${port}/api/agent/chat/${encodeURIComponent(sessionId)}`, {
+      method: "POST",
+      headers: {
+        "X-LitLoop-Token": token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message, view }),
+      signal,
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      let detail = text
+      try {
+        const d = JSON.parse(text).detail
+        if (typeof d === "string") detail = d
+      } catch { /* not JSON: keep the text */ }
+      throw new ApiError(res.status, detail || `HTTP ${res.status}`)
+    }
+    if (!res.body) return
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder("utf-8")
+    let buffer = ""
+    while (true) {
+      const { value, done } = await reader.read()
+      if (value) {
+        buffer += decoder.decode(value, { stream: !done })
+        const parts = buffer.split(/\r?\n\r?\n/)
+        buffer = parts.pop() ?? ""
+        for (const part of parts) {
+          const ev = parseSseBlock(part)
+          if (ev) onEvent(ev)
+        }
+      }
+      if (done) break
+    }
+    const tail = buffer + decoder.decode()
+    if (tail.trim()) {
+      for (const part of tail.split(/\r?\n\r?\n/)) {
+        const ev = parseSseBlock(part)
+        if (ev) onEvent(ev)
+      }
+    }
+  },
+}
+

@@ -28,7 +28,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from .. import __version__, db, store
@@ -49,6 +49,10 @@ class Rating(BaseModel):
 class Setting(BaseModel):
     key: str
     value: Any = None
+
+
+class BuiltinPreset(BaseModel):
+    preset: str
 
 
 class Paper(BaseModel):
@@ -175,6 +179,28 @@ class BatchUpdate(BaseModel):
     ops: list[BatchOp]
 
 
+class ChatStreamRequest(BaseModel):
+    message: str
+    view: dict[str, Any] | None = None
+
+
+class ActionConfirmRequest(BaseModel):
+    session_id: str
+    message_id: int
+    action_id: str
+    params: dict[str, Any] | None = None
+
+
+class ActionCancelRequest(BaseModel):
+    session_id: str
+    message_id: int
+    action_id: str
+
+
+class SteeringNoteRequest(BaseModel):
+    note: str
+
+
 _OPENALEX: dict[str, Any] = {"at": 0.0, "data": None}  # see /api/quota/openalex
 _APP_UPDATE: dict[str, Any] = {"at": 0.0, "data": None}  # see /api/app-update
 _APP_UPDATE_URL = "https://api.github.com/repos/dysprosium231/litloop-paper-agent/releases/latest"
@@ -223,6 +249,12 @@ def _record_path(session: str) -> str:
     if not db.session_exists(session):
         raise HTTPException(404, "无法打开检索会话：此会话已不存在")
     return session
+
+
+def _chat_session_id(session_id: str) -> str:
+    if session_id == "__draft__":
+        return session_id
+    return _record_path(session_id)
 
 
 def _find(items: list[dict[str, Any]], doi: str | None, title: str | None) -> dict[str, Any]:
@@ -586,6 +618,30 @@ def create_app(token: str) -> FastAPI:
             raise HTTPException(400, "无法保存：此项暂不支持在 app 中修改") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.get("/api/builtin-agent/presets")
+    def builtin_agent_presets() -> list[dict[str, Any]]:
+        from ..agents import PROVIDER_PRESETS
+        return PROVIDER_PRESETS
+
+    @app.post("/api/builtin-agent/preset")
+    def builtin_agent_apply_preset(body: BuiltinPreset) -> list[dict[str, Any]]:
+        from .. import config
+        from ..agents import get_preset
+        from . import settings as app_settings
+
+        preset = get_preset(body.preset)
+        if preset is None:
+            raise HTTPException(400, "不支持这个服务商预设")
+        config.update_config("builtin_agent_preset", str(preset["id"]))
+        config.update_config("builtin_agent_provider", str(preset["protocol"]))
+        config.update_config("builtin_agent_base_url", str(preset.get("base_url") or ""))
+        config.update_config("builtin_agent_model", str(preset.get("model") or ""))
+        config.update_config("builtin_agent_plan_model", str(preset.get("plan_model") or ""))
+        config.update_config("builtin_agent_rate_model", str(preset.get("rate_model") or ""))
+        config.update_config("agent_backend", "builtin")
+        group = next(g for g in app_settings.settings() if g["id"] == "builtin_agent")
+        return group["fields"]
 
     @app.get("/api/onboarding")
     def onboarding() -> dict[str, Any]:
@@ -957,6 +1013,82 @@ def create_app(token: str) -> FastAPI:
     def search_cancel(run: str) -> dict[str, Any]:
         from . import agent_runner
         return {"cancelled": agent_runner.cancel(run)}
+
+    @app.get("/api/agent/chat/{session_id}")
+    def agent_chat_get(session_id: str) -> dict[str, Any]:
+        sid = _chat_session_id(session_id)
+        return {
+            "session_id": sid,
+            "messages": db.list_agent_messages(sid),
+            "steering_notes": db.list_steering_notes(sid, active_only=True),
+        }
+
+    @app.post("/api/agent/chat/{session_id}/stream")
+    def agent_chat_stream(session_id: str, body: ChatStreamRequest) -> StreamingResponse:
+        from ..agents import chat_agent
+        from ..config import load_config
+
+        sid = _chat_session_id(session_id)
+        text = body.message.strip()
+        if not text:
+            raise HTTPException(400, "发送的消息不能为空")
+        cfg = load_config()
+
+        def event_stream():
+            for ev in chat_agent.stream_chat_turn(sid, text, view=body.view, config=cfg):
+                yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.post("/api/agent/chat/{session_id}/clear")
+    def agent_chat_clear(session_id: str) -> dict[str, Any]:
+        sid = _chat_session_id(session_id)
+        return {"cleared": db.clear_agent_messages(sid)}
+
+    @app.post("/api/agent/actions/confirm")
+    def agent_action_confirm(body: ActionConfirmRequest) -> dict[str, Any]:
+        from ..agents import chat_agent
+
+        sid = _chat_session_id(body.session_id)
+        try:
+            return chat_agent.execute_action(
+                sid,
+                body.message_id,
+                body.action_id,
+                edited_params=body.params,
+            )
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except ValueError as exc:
+            msg = str(exc)
+            status = 404 if any(k in msg for k in ("不存在", "未找到", "not found")) else 400
+            raise HTTPException(status, msg) from exc
+
+    @app.post("/api/agent/actions/cancel")
+    def agent_action_cancel(body: ActionCancelRequest) -> dict[str, Any]:
+        _chat_session_id(body.session_id)
+        updated = db.update_agent_action(body.message_id, body.action_id, "cancelled")
+        if updated is None:
+            raise HTTPException(404, "未找到对应的待确认操作")
+        return {"action": updated}
+
+    @app.post("/api/agent/steering/{session_id}")
+    def agent_steering_add(session_id: str, body: SteeringNoteRequest) -> dict[str, Any]:
+        sid = _chat_session_id(session_id)
+        note = body.note.strip()
+        if not note:
+            raise HTTPException(400, "纠偏备注不能为空")
+        return db.add_steering_note(sid, note)
+
+    @app.delete("/api/agent/steering/{note_id}")
+    def agent_steering_delete(note_id: int) -> dict[str, Any]:
+        if not db.remove_steering_note(note_id):
+            raise HTTPException(404, "未找到该纠偏备注")
+        return {"removed": True}
 
     @app.post("/api/downloads/parse")
     def downloads_parse(body: PastedList) -> dict[str, Any]:

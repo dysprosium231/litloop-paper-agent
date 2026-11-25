@@ -405,3 +405,134 @@ def test_batch_validation_errors(client, session):
     assert client.post(f"/api/sessions/{session}/batch", json={"ops": []}).status_code == 400
     assert client.post(f"/api/sessions/{session}/batch", json={"ops": [{"doi": "10.1/a", "relevance": "bad"}]}).status_code == 400
     assert client.post(f"/api/sessions/{session}/batch", json={"ops": [{"doi": "10.1/a", "decision": "maybe"}]}).status_code == 400
+
+
+def test_builtin_agent_presets_and_apply(client, config_home):
+    from litloop import config
+
+    config.update_config("builtin_agent_api_key", "sk-keep-me")
+    r_list = client.get("/api/builtin-agent/presets")
+    assert r_list.status_code == 200
+    presets = r_list.json()
+    assert any(p["id"] == "deepseek" for p in presets)
+
+    r_bad = client.post("/api/builtin-agent/preset", json={"preset": "no-such-provider"})
+    assert r_bad.status_code == 400
+
+    r_apply = client.post("/api/builtin-agent/preset", json={"preset": "deepseek"})
+    assert r_apply.status_code == 200
+    fields = {f["key"]: f for f in r_apply.json()}
+    assert fields["builtin_agent_provider"]["value"] == "openai"
+    assert fields["builtin_agent_model"]["value"]
+    assert fields["builtin_agent_api_key"]["set"] is True
+    cfg = config.load_config()
+    assert cfg["builtin_agent_preset"] == "deepseek"
+    assert cfg["builtin_agent_api_key"] == "sk-keep-me"
+    assert cfg["agent_backend"] == "builtin"
+
+
+def test_agent_chat_read_clear_and_steering_routes(client, session):
+    from litloop import db
+
+    assert client.get("/api/agent/chat/no-such-session").status_code == 404
+    assert client.get("/api/agent/chat/.bad").status_code == 400
+
+    draft = client.get("/api/agent/chat/__draft__")
+    assert draft.status_code == 200
+    assert draft.json() == {"session_id": "__draft__", "messages": [], "steering_notes": []}
+
+    assert client.post(f"/api/agent/steering/{session}", json={"note": "   "}).status_code == 400
+    note_res = client.post(f"/api/agent/steering/{session}", json={"note": "优先实验验证类论文"})
+    assert note_res.status_code == 200
+    note_id = note_res.json()["id"]
+
+    db.add_agent_message(session, "user", "帮我总结高相关文献")
+    chat_res = client.get(f"/api/agent/chat/{session}")
+    assert chat_res.status_code == 200
+    body = chat_res.json()
+    assert len(body["messages"]) == 1
+    assert body["messages"][0]["content"] == "帮我总结高相关文献"
+    assert [n["note"] for n in body["steering_notes"]] == ["优先实验验证类论文"]
+
+    del_res = client.delete(f"/api/agent/steering/{note_id}")
+    assert del_res.status_code == 200 and del_res.json() == {"removed": True}
+    assert client.delete(f"/api/agent/steering/{note_id}").status_code == 404
+
+    clear_res = client.post(f"/api/agent/chat/{session}/clear")
+    assert clear_res.status_code == 200 and clear_res.json()["cleared"] == 1
+    assert client.get(f"/api/agent/chat/{session}").json()["messages"] == []
+
+
+def test_agent_chat_stream_and_action_confirm_cancel(client, session, monkeypatch):
+    import json
+    from litloop import db
+    from litloop.agents import chat_agent
+
+    assert client.post(f"/api/agent/chat/{session}/stream", json={"message": "  "}).status_code == 400
+
+    seen = {}
+
+    def fake_stream(sid, text, *, view=None, config=None):
+        seen["sid"] = sid
+        seen["text"] = text
+        seen["view"] = view
+        yield {"type": "user_message", "message": {"id": 1, "role": "user", "content": text}}
+        yield {"type": "delta", "text": "收到"}
+        yield {"type": "done", "message": {"id": 2, "role": "assistant", "content": "收到"}}
+
+    monkeypatch.setattr(chat_agent, "stream_chat_turn", fake_stream)
+    res = client.post(
+        f"/api/agent/chat/{session}/stream",
+        json={"message": "分析当前文献", "view": {"paper": {"doi": "10.1/b"}}},
+    )
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/event-stream")
+    assert res.headers.get("cache-control") == "no-cache"
+    assert res.headers.get("x-accel-buffering") == "no"
+    events = [
+        json.loads(line[len("data: "):])
+        for line in res.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert [e["type"] for e in events] == ["user_message", "delta", "done"]
+    assert seen == {"sid": session, "text": "分析当前文献", "view": {"paper": {"doi": "10.1/b"}}}
+
+    msg = db.add_agent_message(
+        session,
+        "assistant",
+        "确认操作",
+        actions=[{"id": "act-1", "kind": "add_glossary", "title": "添加术语", "summary": "s", "params": {"terms": ["SiC"]}, "status": "pending", "result": None}],
+    )
+
+    def fake_execute(sid, message_id, action_id, *, edited_params=None):
+        if action_id == "missing":
+            raise LookupError("未找到操作")
+        if action_id == "done":
+            raise ValueError("该操作已处理")
+        return {"ok": True, "action": {"id": action_id, "status": "confirmed"}, "result": edited_params}
+
+    monkeypatch.setattr(chat_agent, "execute_action", fake_execute)
+    ok_res = client.post(
+        "/api/agent/actions/confirm",
+        json={"session_id": session, "message_id": msg["id"], "action_id": "act-1", "params": {"terms": ["SiC", "碳化硅"]}},
+    )
+    assert ok_res.status_code == 200 and ok_res.json()["ok"] is True
+    assert client.post(
+        "/api/agent/actions/confirm",
+        json={"session_id": session, "message_id": msg["id"], "action_id": "missing"},
+    ).status_code == 404
+    assert client.post(
+        "/api/agent/actions/confirm",
+        json={"session_id": session, "message_id": msg["id"], "action_id": "done"},
+    ).status_code == 400
+
+    cancel_res = client.post(
+        "/api/agent/actions/cancel",
+        json={"session_id": session, "message_id": msg["id"], "action_id": "act-1"},
+    )
+    assert cancel_res.status_code == 200
+    assert cancel_res.json()["action"]["status"] == "cancelled"
+    assert client.post(
+        "/api/agent/actions/cancel",
+        json={"session_id": session, "message_id": msg["id"], "action_id": "no-such-act"},
+    ).status_code == 404

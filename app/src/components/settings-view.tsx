@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, PageBody, PageHeader } from "@/components/page"
 import { Switch } from "@/components/ui/switch"
-import { downloadsApi, settingsApi, type AppUpdateInfo, type ComponentStatus, type HarnessInfo, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
+import { downloadsApi, settingsApi, type AppUpdateInfo, type ComponentStatus, type HarnessInfo, type ProviderPreset, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 // The native chooser exists only inside the app window, not in a browser preview.
@@ -44,8 +44,8 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 
 // Groups of the settings list; ids the backend adds later fall into the last one.
 const SECTIONS: { title: string; ids: string[] }[] = [
-  { title: "检索与筛选", ids: ["sources", "screening", QUOTA] },
-  { title: "下载与连接", ids: ["downloads", "network", "school", "zotero"] },
+  { title: "检索与筛选", ids: ["builtin_agent", "sources", "screening", QUOTA] },
+  { title: "下载与连接", ids: ["downloads", "network", "school", "zotero", "components", "agent"] },
 ]
 
 // One line under each page title.
@@ -356,6 +356,105 @@ function HarnessCards({ harnesses, onReload, onFieldUpdated }: {
   )
 }
 
+function BuiltinPresetCard({ fields, onFieldUpdated }: {
+  fields: SettingField[]
+  onFieldUpdated: (f: SettingField) => void
+}) {
+  const [presets, setPresets] = React.useState<ProviderPreset[] | null>(null)
+  const [busyId, setBusyId] = React.useState<string | null>(null)
+  const [feedback, setFeedback] = React.useState<{ ok: boolean; text: string; link?: string; note?: string } | null>(null)
+
+  React.useEffect(() => {
+    let cancelled = false
+    settingsApi.builtinPresets().then((list) => {
+      if (!cancelled) setPresets(list)
+    }).catch(() => {
+      if (!cancelled) setPresets([])
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  const currentBaseUrl = String(fields.find((f) => f.key === "builtin_agent_base_url")?.value ?? "")
+  const currentProtocol = String(fields.find((f) => f.key === "builtin_agent_protocol")?.value ?? "")
+
+  const applyPreset = async (p: ProviderPreset) => {
+    setBusyId(p.id)
+    setFeedback(null)
+    try {
+      const updated = await settingsApi.applyBuiltinPreset(p.id)
+      updated.forEach(onFieldUpdated)
+      setFeedback({
+        ok: true,
+        text: p.needs_key
+          ? `已填入 ${p.label} 接口与推荐模型，填写 Key 后点右上角「检测」即可`
+          : `已填入 ${p.label} 接口与推荐模型，点右上角「检测」即可`,
+        link: p.link || undefined,
+        note: p.note || undefined,
+      })
+    } catch (e) {
+      setFeedback({ ok: false, text: errorMessage(e) })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <Card className="space-y-3 p-5">
+      <div className="space-y-1">
+        <div className="text-sm font-medium">常见服务商一键预设</div>
+        <p className="text-xs text-muted-foreground">点击服务商自动填入接口地址、协议与推荐模型；除本地 Ollama 外均需填写对应 Key。</p>
+      </div>
+      {presets === null ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <LoaderIcon className="size-3.5 animate-spin" />正在加载服务商预设…
+        </div>
+      ) : presets.length === 0 ? (
+        <p className="text-xs text-muted-foreground">暂无可用预设</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {presets.map((p) => {
+            const active = currentBaseUrl === p.base_url && currentProtocol === p.protocol
+            const applying = busyId === p.id
+            return (
+              <Button
+                key={p.id}
+                type="button"
+                variant={active ? "secondary" : "outline"}
+                size="sm"
+                disabled={Boolean(busyId)}
+                onClick={() => applyPreset(p)}
+                title={p.note || p.base_url}
+              >
+                {applying && <LoaderIcon className="animate-spin" />}
+                <span>{p.label}</span>
+                {!p.needs_key && <span className="text-[11px] text-muted-foreground">（免 Key）</span>}
+              </Button>
+            )
+          })}
+        </div>
+      )}
+      {feedback && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span className={feedback.ok ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}>
+            {feedback.text}
+          </span>
+          {feedback.note && <span className="text-muted-foreground">{feedback.note}</span>}
+          {feedback.link && (
+            <a
+              href={feedback.link}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-0.5 text-primary hover:underline"
+            >
+              申请 Key<ExternalLinkIcon className="size-3" />
+            </a>
+          )}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 // Keyed by group id: switching groups starts a fresh pane, so a check still running
 // for the previous group cannot show its results here.
 /** One settings group: its fields, and its check when it has one. The first-run guide shows these too. */
@@ -526,6 +625,9 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
       )}
       {group.id === "agent" && (
         <HarnessCards harnesses={harnesses} onReload={loadHarnesses} onFieldUpdated={onSaved} />
+      )}
+      {group.id === "builtin_agent" && (
+        <BuiltinPresetCard fields={group.fields} onFieldUpdated={handleFieldSaved} />
       )}
       {group.fields.length > 0 && (() => {
         const harnessVal = String(group.fields.find((f) => f.key === "agent_harness")?.value ?? "")

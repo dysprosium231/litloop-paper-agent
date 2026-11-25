@@ -33,10 +33,21 @@ def test_schema_wal_and_foreign_keys_cascade(tmp_path):
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             ).fetchall()
         }
-        assert {"schema_migrations", "sessions", "pool_items", "decisions", "watches"} <= tables
+        assert {
+            "schema_migrations",
+            "sessions",
+            "pool_items",
+            "decisions",
+            "watches",
+            "agent_messages",
+            "steering_notes",
+        } <= tables
 
         m_rows = conn.execute("SELECT version, note FROM schema_migrations ORDER BY version").fetchall()
-        assert [(r["version"], r["note"]) for r in m_rows] == [(1, "initial schema")]
+        assert [(r["version"], r["note"]) for r in m_rows] == [
+            (1, "initial schema"),
+            (2, "agent messages and steering notes"),
+        ]
 
     # Verify ON DELETE CASCADE from sessions -> pool_items & decisions
     with db.transaction() as conn:
@@ -66,30 +77,30 @@ def test_schema_too_new_raises_and_closes(tmp_path):
 
 
 def test_simulated_v2_migration_hook(tmp_path, monkeypatch):
-    # Initialize at v1 first
+    base_ver = db.DB_SCHEMA
+    next_ver = base_ver + 1
+    # Initialize at current schema first
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == base_ver
 
-    def _migrate_v2(conn: sqlite3.Connection) -> None:
-        conn.execute("CREATE TABLE test_v2_ext (id TEXT PRIMARY KEY)")
+    def _migrate_next(conn: sqlite3.Connection) -> None:
+        conn.execute("CREATE TABLE test_next_ext (id TEXT PRIMARY KEY)")
 
-    monkeypatch.setattr(db, "DB_SCHEMA", 2)
-    monkeypatch.setattr(db, "MIGRATIONS", [*db.MIGRATIONS, (2, "add test_v2_ext", _migrate_v2)])
+    monkeypatch.setattr(db, "DB_SCHEMA", next_ver)
+    monkeypatch.setattr(db, "MIGRATIONS", [*db.MIGRATIONS, (next_ver, "add test_next_ext", _migrate_next)])
 
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == next_ver
         tables = {
             r[0]
             for r in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             ).fetchall()
         }
-        assert "test_v2_ext" in tables
+        assert "test_next_ext" in tables
         rows = conn.execute("SELECT version, note FROM schema_migrations ORDER BY version").fetchall()
-        assert [(r["version"], r["note"]) for r in rows] == [
-            (1, "initial schema"),
-            (2, "add test_v2_ext"),
-        ]
+        assert rows[-1]["version"] == next_ver
+        assert rows[-1]["note"] == "add test_next_ext"
 
 
 def test_concurrent_multi_connection_read_write(tmp_path):
@@ -510,5 +521,96 @@ def test_auto_import_legacy_pool_and_summary_on_demand(tmp_path):
     assert db.get_batch_paper(sid, "10.1/l1", None)["title"] == "Legacy 1"
     assert db.load_summary(sid)["pool"] == 1
     assert pool_file.exists() and summary_file.exists()
+
+
+def test_v1_to_v2_migration(tmp_path, monkeypatch):
+    v1_db = tmp_path / "v1.db"
+    with monkeypatch.context() as mp:
+        mp.setattr(db, "DB_SCHEMA", 1)
+        mp.setattr(db, "MIGRATIONS", [m for m in db.MIGRATIONS if m[0] == 1])
+        with db.connect(v1_db) as conn:
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+            tables_v1 = {
+                r[0]
+                for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+            }
+            assert "agent_messages" not in tables_v1
+            assert "steering_notes" not in tables_v1
+
+    with db.connect(v1_db) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+        tables_v2 = {
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+        }
+        assert {"agent_messages", "steering_notes"} <= tables_v2
+        indexes = {
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'index'").fetchall()
+        }
+        assert {"idx_agent_messages_session", "idx_steering_notes_session"} <= indexes
+
+
+def test_agent_messages_actions_and_clear(tmp_path):
+    # Supports "__draft__" without any row in sessions table
+    m1 = db.add_agent_message("__draft__", "user", "hello")
+    m2 = db.add_agent_message(
+        "__draft__",
+        "assistant",
+        "sure",
+        actions=[{"id": "act-1", "kind": "start_search", "status": "pending", "result": None}],
+        usage={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+    )
+    m3 = db.add_agent_message("__draft__", "user", "next")
+
+    all_msgs = db.list_agent_messages("__draft__", limit=100)
+    assert [m["id"] for m in all_msgs] == [m1["id"], m2["id"], m3["id"]]
+    assert all_msgs[1]["actions"][0]["id"] == "act-1"
+    assert all_msgs[1]["usage"] == {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
+
+    recent = db.list_agent_messages("__draft__", limit=2)
+    assert [m["id"] for m in recent] == [m2["id"], m3["id"]]
+
+    updated = db.update_agent_action(m2["id"], "act-1", "confirmed", {"run": "r1"})
+    assert updated is not None
+    assert updated["status"] == "confirmed"
+    assert updated["result"] == {"run": "r1"}
+    assert db.update_agent_action(m2["id"], "missing", "confirmed") is None
+    assert db.update_agent_action(999999, "act-1", "confirmed") is None
+
+    reloaded = db.list_agent_messages("__draft__")
+    assert reloaded[1]["actions"][0]["status"] == "confirmed"
+    assert reloaded[1]["actions"][0]["result"] == {"run": "r1"}
+
+    deleted = db.clear_agent_messages("__draft__")
+    assert deleted == 3
+    assert db.list_agent_messages("__draft__") == []
+
+
+def test_steering_notes_and_migrate_agent_session(tmp_path):
+    db.add_agent_message("__draft__", "user", "draft msg")
+    n1 = db.add_steering_note("__draft__", "只要近五年")
+    n2 = db.add_steering_note("__draft__", "排除综述")
+
+    active_notes = db.list_steering_notes("__draft__", active_only=True)
+    assert [n["id"] for n in active_notes] == [n1["id"], n2["id"]]
+    assert all(n["active"] is True for n in active_notes)
+
+    assert db.remove_steering_note(n1["id"]) is True
+    assert db.remove_steering_note(n1["id"]) is False
+    assert db.remove_steering_note(999999) is False
+
+    active_after = db.list_steering_notes("__draft__", active_only=True)
+    assert [n["id"] for n in active_after] == [n2["id"]]
+    all_notes = db.list_steering_notes("__draft__", active_only=False)
+    assert len(all_notes) == 2
+    assert all_notes[0]["active"] is False
+
+    db.migrate_agent_session("__draft__", "sess-real-1")
+    assert db.list_agent_messages("__draft__") == []
+    assert db.list_steering_notes("__draft__", active_only=False) == []
+    assert len(db.list_agent_messages("sess-real-1")) == 1
+    assert [n["note"] for n in db.list_steering_notes("sess-real-1")] == ["排除综述"]
+
 
 

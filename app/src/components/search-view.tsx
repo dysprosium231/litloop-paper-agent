@@ -190,6 +190,13 @@ export function SearchPage({ onBack, onOpen }: { onBack: () => void; onOpen: (se
                 <h3 className="text-sm font-semibold">检索方案预览</h3>
                 <p className="text-xs text-muted-foreground">
                   模型：{plan.model} · 预计消耗 {plan.estimated_credits}（{plan.credit_note}）
+                  {plan.usage && (
+                    <>
+                      {" · 本次规划 Token "}
+                      <span className="tabular-nums">{plan.usage.total_tokens.toLocaleString()}</span>
+                      {plan.usage.cost_text ? `（${plan.usage.cost_text}）` : ""}
+                    </>
+                  )}
                 </p>
               </div>
               <Button size="sm" variant="ghost" onClick={() => setPlan(null)}>收起方案</Button>
@@ -230,7 +237,7 @@ function RunRow({ run: r, busy, onOpen, onResume, onCancel }: {
   const [showDetail, setShowDetail] = React.useState(false)
   const [copiedPrompt, setCopiedPrompt] = React.useState(false)
   const steps = r.events?.slice(-4) ?? []
-  const hasDetail = Boolean(r.prompt || r.agent_session)
+  const hasDetail = Boolean(r.prompt || r.agent_session || r.usage)
 
   const copyPrompt = () => {
     if (!r.prompt) return
@@ -252,6 +259,14 @@ function RunRow({ run: r, busy, onOpen, onResume, onCancel }: {
         <span className="shrink-0 rounded border px-1.5 text-xs text-muted-foreground">{r.mode === "deep" ? "深度检索" : "快速检索"}</span>
         <span className={cn("shrink-0 text-xs", r.state === "failed" ? "text-destructive" : "text-muted-foreground")}>{STATE[r.state]}</span>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{r.started.slice(5, 16).replace("T", " ")}</span>
+        {r.state !== "running" && r.usage && (
+          <span
+            className="shrink-0 text-xs tabular-nums text-muted-foreground"
+            title={`输入 ${r.usage.input_tokens.toLocaleString()} / 输出 ${r.usage.output_tokens.toLocaleString()}`}
+          >
+            Token {r.usage.total_tokens.toLocaleString()}{r.usage.cost_text ? ` (${r.usage.cost_text})` : ""}
+          </span>
+        )}
         {hasDetail && (
           <Button size="sm" variant="ghost" onClick={() => setShowDetail((v) => !v)}>
             {showDetail ? "收起对话详情" : "查看对话详情"}
@@ -278,6 +293,19 @@ function RunRow({ run: r, busy, onOpen, onResume, onCancel }: {
       {r.error && <p className="text-xs text-destructive">{r.error}</p>}
       {showDetail && hasDetail && (
         <div className="mt-2 space-y-2.5 rounded-lg border bg-muted/30 p-3 text-xs">
+          {r.usage && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+              <span>
+                Token 消耗：<span className="font-medium tabular-nums text-foreground">{r.usage.total_tokens.toLocaleString()}</span>
+                （输入 {r.usage.input_tokens.toLocaleString()} / 输出 {r.usage.output_tokens.toLocaleString()}）
+              </span>
+              {r.usage.cost_text && (
+                <span>
+                  参考费用：<span className="font-medium text-foreground">{r.usage.cost_text}</span>
+                </span>
+              )}
+            </div>
+          )}
           {r.agent_session && (
             <div className="flex items-center gap-2">
               <span className="shrink-0 text-muted-foreground">会话 ID：</span>

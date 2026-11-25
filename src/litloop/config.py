@@ -200,7 +200,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # tools and skills are allowed, since nobody is there to approve anything.
     # Which backend runs a search started in the app: "command" (backend A,
     # the agent above) or "builtin" (backend B, the model API configured below).
-    "agent_backend": "command",
+    "agent_backend": "builtin",
     "agent_harness": "auto",
     "agent_command": "claude",
     # An agent run that prints nothing for this long is stopped (it hung or
@@ -210,6 +210,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Backend B: the app calls a model API itself instead of starting an agent
     # command. "openai" also covers DeepSeek, 通义, Kimi, GLM, OpenRouter, Ollama
     # and vLLM; the address is what points at the one you use.
+    "builtin_agent_preset": "",
     "builtin_agent_provider": "openai",
     "builtin_agent_base_url": "",
     "builtin_agent_api_key": "",

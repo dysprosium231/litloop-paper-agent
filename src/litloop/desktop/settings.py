@@ -95,23 +95,6 @@ GROUPS: list[dict[str, Any]] = [
         ],
     },
     {
-        "id": "agent", "title": "Agent", "test": "agent",
-        "fields": [
-            {"key": "agent_backend", "label": "用哪个后端", "type": "select",
-             "options": [["command", "Agent 命令（在后端 A 里跑，用你自己的账号）"],
-                         ["builtin", "内置 Agent（app 直接调模型接口）"]],
-             "help": "内置 Agent 的接口和模型在下面一组里设置"},
-            {"key": "agent_harness", "label": "外部 Agent（Harness）", "type": "select",
-             "options": [["auto", "自动选择已安装的 Agent"], ["claude", "Claude Code"], ["workbuddy", "WorkBuddy"],
-                         ["dsh", "DeepSeek Harness"], ["codex", "Codex CLI"], ["custom", "自定义命令"]],
-             "help": "选择本机安装的 Agent；选「自定义命令」时才使用下方的命令与参数"},
-            {"key": "agent_command", "label": "Agent 命令", "type": "text", "placeholder": "claude",
-             "help": "在 app 里发起检索时，把检索要求发给这个 Agent"},
-            {"key": "agent_args", "label": "命令参数", "type": "text",
-             "help": "检索要求从标准输入传入；默认只允许 Agent 调用 LitLoop 的工具"},
-        ],
-    },
-    {
         # Backend B: no agent command, the app talks to a model API itself.
         "id": "builtin_agent", "title": "内置 Agent", "test": "builtin_agent",
         "intro": "不装 Agent 命令，让 app 自己调模型接口。模型必须支持工具调用，点「测试」会当场验证。",
@@ -132,6 +115,23 @@ GROUPS: list[dict[str, Any]] = [
             {"key": "builtin_agent_rate_model", "label": "评分模型", "type": "text",
              "placeholder": "留空沿用模型名",
              "help": "逐批读摘要评分时使用，可填更快更省的模型"},
+        ],
+    },
+    {
+        "id": "agent", "title": "外部 Agent（可选）", "test": "agent",
+        "fields": [
+            {"key": "agent_backend", "label": "用哪个后端", "type": "select",
+             "options": [["builtin", "内置 Agent（app 直接调模型接口）"],
+                         ["command", "Agent 命令（在后端 A 里跑，用你自己的账号）"]],
+             "help": "内置 Agent 的接口和模型在「内置 Agent」里设置"},
+            {"key": "agent_harness", "label": "外部 Agent（Harness）", "type": "select",
+             "options": [["auto", "自动选择已安装的 Agent"], ["claude", "Claude Code"], ["workbuddy", "WorkBuddy"],
+                         ["dsh", "DeepSeek Harness"], ["codex", "Codex CLI"], ["custom", "自定义命令"]],
+             "help": "选择本机安装的 Agent；选「自定义命令」时才使用下方的命令与参数"},
+            {"key": "agent_command", "label": "Agent 命令", "type": "text", "placeholder": "claude",
+             "help": "在 app 里发起检索时，把检索要求发给这个 Agent"},
+            {"key": "agent_args", "label": "命令参数", "type": "text",
+             "help": "检索要求从标准输入传入；默认只允许 Agent 调用 LitLoop 的工具"},
         ],
     },
     {
@@ -158,6 +158,7 @@ _FIELDS = {f["key"]: f for g in GROUPS for f in g["fields"]}
 # The first-run guide: settings groups in the order a new user needs them, each
 # with why it matters. Every step can be checked on the spot or skipped.
 STEPS = [
+    {"group": "builtin_agent", "intro": "配置一个模型接口即可在 app 内独立完成检索与评分。选择常见服务商预设可自动填好接口地址和推荐模型；也可以先跳过，稍后再设。"},
     {"group": "sources", "intro": "检索和补摘要靠这些接口。什么都不填也能先试一次快速检索（退回 Crossref）；"
                                   "要长期用，OpenAlex Key 免费，在 help.openalex.org 申请；不填时用的是同一个网络出口共享的匿名额度，"
                                   "别人用完了就会被限流。"
@@ -171,7 +172,7 @@ STEPS = [
                                      "装好后选择「检测」再看一次。"},
     {"group": "zotero", "intro": "下载的文献可推送到 Zotero。需要 Zotero 7 以上和 zotero-mcp；推荐授权本地写入，速度最快。"},
 ]
-_CONFIGURED = ("openalex_api_key", "elsevier_api_key", "springer_meta_api_key")
+_CONFIGURED = ("builtin_agent_model", "openalex_api_key", "elsevier_api_key", "springer_meta_api_key")
 
 
 def onboarding() -> dict[str, Any]:

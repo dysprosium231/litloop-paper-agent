@@ -14,14 +14,16 @@ def test_search_trims_the_result_and_reports_filters(monkeypatch):
         calls.update(query=query, **kwargs)
         kwargs["stats"].update({"retracted": 2})
         kwargs["expansions"].append({"term": "SEM", "ok": True})
-        return [{"doi": "10.1/a", "title": "A", "year": 2020, "journal": "J", "cited_by_count": 5,
-                 "abstract": "long text", "authors": ["X"], "is_oa": True}]
+        return [{"doi": "10.1/a", "title": "A", "year": 2020, "journal": "J", "journal_rank": "CAS 1区",
+                 "cited_by_count": 5, "abstract": "A" * 1000, "abstract_missing": False,
+                 "authors": ["X"], "is_oa": True}]
 
     monkeypatch.setattr(tools, "search_papers_v2", fake)
     out = tools.search("SiC", limit=99)
     assert calls["limit"] == 50  # capped, whatever the model asked for
     assert out["count"] == 1 and out["papers"] == [
-        {"doi": "10.1/a", "title": "A", "year": 2020, "journal": "J", "cited_by_count": 5, "is_oa": True}]
+        {"doi": "10.1/a", "title": "A", "year": 2020, "journal": "J", "journal_rank": "CAS 1区",
+         "cited_by_count": 5, "abstract": "A" * 800, "abstract_missing": False, "is_oa": True}]
     assert out["filtered"] == {"retracted": 2} and out["glossary"][0]["term"] == "SEM"
 
 

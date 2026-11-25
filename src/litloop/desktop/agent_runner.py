@@ -269,6 +269,7 @@ def session_origin(session: str) -> dict[str, Any]:
                 "harness_label": harness_label,
                 "agent_session": agent_session,
                 "resumed_chat": bool(last_run.get("resumed_chat")),
+                "usage": last_run.get("usage"),
             },
             "continue_prompt": continue_prompt,
             "changed_ratings": changed_ratings,
@@ -420,6 +421,7 @@ def start(form: dict[str, Any]) -> dict[str, Any]:
         "harness": harness_id,
         "harness_label": harnesses.HARNESS_LABELS.get(harness_id, harness_id),
         "session": None,
+        "from_draft": bool(form.get("from_draft")),
         "agent_session": None,
         "resumed_chat": False,
         "result": None,
@@ -428,7 +430,13 @@ def start(form: dict[str, Any]) -> dict[str, Any]:
     return _launch(run, data, prompt, builtin, harness_id=harness_id)
 
 
-def resume(session: str, *, batches: int = 0, force_new: bool = False) -> dict[str, Any]:
+def resume(
+    session: str,
+    *,
+    batches: int = 0,
+    force_new: bool = False,
+    steering_notes: list[str] | None = None,
+) -> dict[str, Any]:
     cfg = _config.load_config()
     configured_harness = harnesses.resolve_harness(cfg)
     builtin = configured_harness == "builtin" or _backend() == "builtin"
@@ -442,6 +450,23 @@ def resume(session: str, *, batches: int = 0, force_new: bool = False) -> dict[s
         harness_id = "builtin" if builtin else configured_harness
         resume_agent_session = None
         continuing = False
+
+    merged_notes: list[str] = []
+    if builtin:
+        seen_notes: set[str] = set()
+        raw_notes: list[str] = []
+        for item in db.list_steering_notes(session, active_only=True):
+            text = str(item.get("note") or "").strip() if isinstance(item, dict) else str(item).strip()
+            if text:
+                raw_notes.append(text)
+        for item in (steering_notes or []):
+            text = str(item or "").strip()
+            if text:
+                raw_notes.append(text)
+        for text in raw_notes:
+            if text not in seen_notes:
+                seen_notes.add(text)
+                merged_notes.append(text)
 
     prompt = build_resume_prompt(
         session,
@@ -472,6 +497,7 @@ def resume(session: str, *, batches: int = 0, force_new: bool = False) -> dict[s
         "resumed_from": session,
         "agent_session": resume_agent_session,
         "resumed_chat": continuing,
+        "steering_notes": merged_notes,
         "result": None,
         "error": None,
     }
@@ -776,6 +802,7 @@ def _follow(run: str, proc: subprocess.Popen, prompt: str, data: dict[str, Any])
                 seen[0] = time.time()
                 fh.write(raw)
                 _read(data, raw.decode("utf-8", errors="replace").strip())
+                _maybe_migrate_draft(data, data.get("session"))
                 if time.time() - last > 1.0:
                     _write(run, data)
                     last = time.time()
@@ -798,6 +825,14 @@ def _follow(run: str, proc: subprocess.Popen, prompt: str, data: dict[str, Any])
         with _LOCK:
             _PROCS.pop(run, None)
             _CANCELLED.discard(run)
+
+
+def _maybe_migrate_draft(data: dict[str, Any], session: str | None) -> None:
+    """When a search started from __draft__ creates a real session, move draft chat & notes over."""
+    if not session or session == "__draft__" or not data.get("from_draft") or data.get("_draft_migrated"):
+        return
+    db.migrate_agent_session("__draft__", session)
+    data["_draft_migrated"] = True
 
 
 def _session_of(result: Any) -> str | None:
@@ -823,6 +858,8 @@ def _run_builtin(run: str, data: dict[str, Any], prompt: str) -> None:
     with _LOCK:
         _STOP[run] = stop
     last = [0.0]
+    last_progress = [0.0]
+    last_progress_text = [""]
 
     def on_event(kind: str, ev: dict[str, Any]) -> None:
         if stop.is_set():
@@ -835,6 +872,15 @@ def _run_builtin(run: str, data: dict[str, Any], prompt: str) -> None:
             session = _session_of(ev.get("result"))
             if session:
                 data["session"] = session
+                _maybe_migrate_draft(data, session)
+        elif kind == "progress":
+            text = str(ev.get("text") or "")
+            data["doing"] = text
+            now = time.time()
+            if text and (text != last_progress_text[0] or now - last_progress[0] >= 2.0):
+                _event(data, text)
+                last_progress[0] = now
+                last_progress_text[0] = text
         elif kind == "error":
             _event(data, f"{ev.get('name')} 出错：{str(ev.get('detail') or '')[:200]}")
         elif kind == "text":
@@ -844,21 +890,34 @@ def _run_builtin(run: str, data: dict[str, Any], prompt: str) -> None:
             last[0] = time.time()
 
     try:
-        from ..agents import FUNCTIONS, TOOLS, run_task
-        from ..agents.runner import default_task_for_step
-        from ..agents.system import system_prompt
+        from ..agents import run_builtin_resume, run_builtin_search
 
         form = data.get("form") or {}
-        deep = form.get("mode") == "deep"
-        batches = int(form.get("batches") or 0) or 5
-        # One batch costs a rate + a next call; building the pool and the final
-        # answer need a few more (2026-11-06: the old flat 8 stopped deep runs).
-        steps = min(4 + 2 * batches, 24) if deep else 8
-        out = run_task(prompt, TOOLS, functions=FUNCTIONS, config=_config.load_config(),
-                       system=system_prompt(), max_steps=steps, on_event=on_event,
-                       task_for_step=default_task_for_step)
-        data["result"] = str(out.get("text") or "").strip() or None
-        data["state"] = "cancelled" if stop.is_set() else "done"
+        cfg = _config.load_config()
+        if data.get("resumed_from"):
+            out = run_builtin_resume(
+                str(data["resumed_from"]),
+                batches=int(form.get("batches") or 0),
+                steering_notes=data.get("steering_notes") or None,
+                config=cfg,
+                on_event=on_event,
+                stop_event=stop,
+            )
+        else:
+            out = run_builtin_search(
+                form,
+                config=cfg,
+                on_event=on_event,
+                stop_event=stop,
+            )
+        if isinstance(out, dict):
+            if out.get("session") and not data.get("session"):
+                data["session"] = out["session"]
+            _maybe_migrate_draft(data, data.get("session"))
+            if out.get("usage") is not None:
+                data["usage"] = out["usage"]
+        data["result"] = str((out or {}).get("text") or "").strip() or None
+        data["state"] = "cancelled" if (stop.is_set() or (isinstance(out, dict) and out.get("cancelled"))) else "done"
     except _Cancelled:
         data["state"] = "cancelled"
     except Exception as e:

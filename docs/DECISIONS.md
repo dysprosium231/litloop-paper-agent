@@ -1,5 +1,31 @@
 # 决定与实验记录
 
+## 2026-11-25：内置 Agent 深水区加固（429/5xx 重试、草稿迁移、上下文裁剪与安全 Markdown 渲染）
+
+- **改动**：
+  1. [src/litloop/agents/client.py](src/litloop/agents/client.py)：`_post()` 与 `chat_stream()` 对 `HTTP 429`（优先尊重 `Retry-After` 响应头）及 `500/502/503/504` 增加最多 3 次指数退避重试（上限 15 秒，覆盖 `requests` 与流式/非流式 `curl` 回退路径），`400/401/403` 立即失败不重试。
+  2. [src/litloop/agents/chat_agent.py](src/litloop/agents/chat_agent.py)：`list_papers` 的 `decision` 过滤参数对齐 `selected`/`rejected`/`undecided` 并兼容 `include`/`exclude` 别名；`execute_action()` 修复 `start_search` 的 `queries`/`core_terms` → `planned_queries`/`planned_core_terms` 映射与 `from_draft` 标记，以及 `resume_search` 的 `steering_note` 写入 `target_session`；`stream_chat_turn()` 增加 `_trim_history`（12000 字预算）与只读工具返回值封顶截断（8000 字）。
+  3. [src/litloop/desktop/agent_runner.py](src/litloop/desktop/agent_runner.py)：`start()` 与 `_run_builtin()`/`_follow()` 通过 `_maybe_migrate_draft()` 在捕获到新 `session` 时幂等迁移 `"__draft__"` 对话与纠偏备注。
+  4. [app/src/components/agent-drawer.tsx](app/src/components/agent-drawer.tsx)：新增零外部依赖、无 `dangerouslySetInnerHTML` 的 `SimpleMarkdown` 组件渲染助手消息（支持加粗、斜体、标题、列表、代码块、表格与仅允许 `http(s)://` 的链接）。
+
+## 2026-11-24：内置 Agent 阶段 2 落地（SQLite v2 会话记忆、双协议 SSE、Ctrl+L 抽屉与分级确认卡）
+
+- **改动内容**：
+  1. **SQLite v2 会话级持久化**：[src/litloop/db.py](src/litloop/db.py) 将 `DB_SCHEMA` 升至 `2` 并新增 `_migrate_v2`，创建 `agent_messages` 与 `steering_notes` 表（无外键约束以支持 `"__draft__"` 草稿会话），导出 `list_agent_messages`、`add_agent_message`、`update_agent_action`、`clear_agent_messages`、`migrate_agent_session`、`list_steering_notes`、`add_steering_note`、`remove_steering_note`（同步更新 [docs/APP_DATA.md](docs/APP_DATA.md)）。
+  2. **双协议 SSE 流式输出**：[src/litloop/agents/client.py](src/litloop/agents/client.py) 新增 `chat_stream()`，支持 OpenAI 与 Anthropic 双协议 SSE 增量文本（`on_delta`）、增量 `tool_calls`/`input_json_delta` 与 `usage` 解析、普通 JSON 响应降级及 `curl -sSN --no-buffer` 流式回退。
+  3. **分级权限主对话引擎与纠偏续跑**：新建 [src/litloop/agents/chat_agent.py](src/litloop/agents/chat_agent.py)（并在 [src/litloop/agents/__init__.py](src/litloop/agents/__init__.py) 导出、`docs/LAYOUT.md` 登记），实现 `build_context_block()`（注入当前会话进度、纠偏备注与右侧正在浏览的文献）、4 个只读工具自动执行与 5 个 `propose_*` 工具转为 `pending` 动作确认卡、`stream_chat_turn()` 实时流式生成与 `execute_action()` 执行确认；[src/litloop/desktop/agent_runner.py](src/litloop/desktop/agent_runner.py) 的 `resume()` 在走内置 Agent 时自动合并 SQLite 活跃 `steering_notes` 注入 `run_builtin_resume`。
+  4. **桌面后台接口与前端 `Ctrl+L` 常驻抽屉**：[src/litloop/desktop/server.py](src/litloop/desktop/server.py) 新增 `/api/agent/chat/{session_id}`、`/stream`（SSE）、`/clear`、`/api/agent/actions/confirm`、`/cancel`、`/api/agent/steering/{session_id}` 与 `DELETE /api/agent/steering/{note_id}`；[app/src/lib/api.ts](app/src/lib/api.ts)、新建 [app/src/components/agent-drawer.tsx](app/src/components/agent-drawer.tsx) 与 [app/src/App.tsx](app/src/App.tsx) 落地右侧可折叠 `380px` 对话抽屉（`Ctrl+L` / `Cmd+L` 切换并记忆状态、纠偏备注芯片、SSE 实时渲染、5 类可编辑动作确认卡及执行后联动刷新）。
+- **验证**：新增 [tests/test_agent_chat.py](tests/test_agent_chat.py) 并补充 `test_db.py`、`test_app_server.py`、`test_agent_builtin.py`；全量 `pytest -q` 输出 `1300 passed, 3 skipped, 1 warning`，`scripts/check_release_consistency.py`、`scripts/import_smoke.py`、`scripts/smoke_app.py`、`npm run build`、`npm run lint:copy` 全部通过（全部修改与新增文件为纯 LF）。
+
+## 2026-11-24：内置 Agent 阶段 1 落地（默认 builtin、9 家服务商预设、5×3 并发评分与费用统计）
+
+- **改动内容**：
+  1. **默认后端切换与设置/引导前置**：[src/litloop/config.py](src/litloop/config.py) 将 `DEFAULT_CONFIG["agent_backend"]` 改为 `"builtin"` 并新增 `builtin_agent_preset`（老用户已有显式配置不受影响）；[src/litloop/desktop/settings.py](src/litloop/desktop/settings.py) 将 `builtin_agent` 移至 `agent`（「外部 Agent（可选）」）之前、纳入首次使用引导 `STEPS` 首位与 `_CONFIGURED`；[app/src/components/settings-view.tsx](app/src/components/settings-view.tsx) 与 [app/src/App.tsx](app/src/App.tsx) 将设置默认页及左侧导航调整为内置 Agent 优先。
+  2. **9 家常见服务商一键预设**：[src/litloop/agents/client.py](src/litloop/agents/client.py) 新增 `PROVIDER_PRESETS` 与 `get_preset()`（DeepSeek、通义千问、Kimi、智谱 GLM、硅基流动、OpenAI、Anthropic、OpenRouter、本地 Ollama）；[src/litloop/desktop/server.py](src/litloop/desktop/server.py) 新增 `GET /api/builtin-agent/presets` 与 `POST /api/builtin-agent/preset`（不覆盖已有 API Key）；[app/src/components/settings-view.tsx](app/src/components/settings-view.tsx) 在「内置 Agent」分组上方展示一键预设卡片与申请 Key 外链。
+  3. **5×3 并发评分子流水线、Few-shot 纠偏与摘要修复**：新建 [src/litloop/agents/scorer.py](src/litloop/agents/scorer.py) 实现 `collect_user_feedback()` 与 `score_papers()`（每片 5 篇 × 3 路并发、摘要截断 1200 字、缺漏/解析失败单片重试 1 次、锁内 `on_chunk_done` 落盘与 `stop_event` 取消）；[src/litloop/agents/runner.py](src/litloop/agents/runner.py) 新增 `run_builtin_search()` 与 `run_builtin_resume()`（注入用户手动修正评分作为 Few-shot 样本）并接入 [src/litloop/desktop/agent_runner.py](src/litloop/desktop/agent_runner.py)；[src/litloop/agents/tools.py](src/litloop/agents/tools.py) 修复 `_brief()`，补充传给模型的 `abstract`（截断至 800 字）、`abstract_missing` 与 `journal_rank`。
+  4. **Token 累计与参考费用展示**：`client.py` 新增 `normalize_usage()` 与 `estimate_cost()`；`plan_search()`、`run_task()`、`run_builtin_search()`、`run_builtin_resume()` 累计并输出 `usage`；`agent_runner.py` 将 `usage` 持久化到 `agent_runs/<id>.json`（同步更新 [docs/APP_DATA.md](docs/APP_DATA.md)）；[app/src/components/search-view.tsx](app/src/components/search-view.tsx) 与 [app/src/components/progress-strip.tsx](app/src/components/progress-strip.tsx) 展示方案规划、运行记录与对话详情的 Token 消耗和参考费用。
+- **验证**：新增 [tests/test_builtin_scorer.py](tests/test_builtin_scorer.py) 并更新 `test_agent_builtin.py`、`test_agent_runner.py`、`test_harnesses.py`、`test_onboarding.py`、`test_app_server.py`；`scripts/check_release_consistency.py`、`scripts/import_smoke.py`、`scripts/smoke_app.py`、`npm run build`、`npm run lint:copy` 均通过。
+
 ## 2026-11-24：内置 Agent 架构设计共识（混合执行、分级确认、会话持久化与三期路线）
 
 - **经与用户逐项确认，确定后续内置 Agent 的 7 项核心架构决策**：

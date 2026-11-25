@@ -80,7 +80,7 @@ function ChatDetailPop({ origin }: { origin: SessionOrigin }) {
   const run = origin.last_run
   if (!run) return null
   const sessionId = run.agent_session || origin.agent_session
-  if (!run.prompt && !run.result && !sessionId) return null
+  if (!run.prompt && !run.result && !sessionId && !run.usage) return null
   const agentLabel = run.harness_label || origin.harness_label || "Agent"
 
   const copyPrompt = () => {
@@ -108,6 +108,15 @@ function ChatDetailPop({ origin }: { origin: SessionOrigin }) {
           <div className="flex items-center justify-between gap-2">
             <span className="shrink-0 text-muted-foreground">会话 ID</span>
             <code className="truncate font-mono text-[11px] text-foreground" title={sessionId}>{sessionId}</code>
+          </div>
+        )}
+        {run.usage && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="shrink-0 text-muted-foreground">Token 消耗</span>
+            <span className="text-right tabular-nums text-foreground">
+              总计 {run.usage.total_tokens.toLocaleString()} · 输入 {run.usage.input_tokens.toLocaleString()} / 输出 {run.usage.output_tokens.toLocaleString()}
+              {run.usage.cost_text ? `（${run.usage.cost_text}）` : ""}
+            </span>
           </div>
         )}
       </div>

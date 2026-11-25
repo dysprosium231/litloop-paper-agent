@@ -15,9 +15,22 @@ from ..search.quick import search_papers_v2
 
 def _brief(paper: dict[str, Any]) -> dict[str, Any]:
     out = {}
-    for key in ("doi", "title", "year", "journal", "cited_by_count", "is_oa", "retracted"):
+    for key in (
+        "doi",
+        "title",
+        "year",
+        "journal",
+        "journal_rank",
+        "cited_by_count",
+        "is_oa",
+        "retracted",
+        "abstract_missing",
+    ):
         if paper.get(key) not in (None, "", []):
             out[key] = paper[key]
+    abstract = str(paper.get("abstract") or "").strip()
+    if abstract:
+        out["abstract"] = abstract[:800]
     return out
 
 

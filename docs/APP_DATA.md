@@ -4,9 +4,9 @@
 
 ## 规则
 
-- **SQLite 数据库（`litloop.db`）**：筛选会话（`sessions` 表，含 `summary_json` 与 `pool_state_json` 元数据）、每篇文献的评分与用户决策（`decisions` 表）、定期追踪（`watches` 表）及深度检索候选池表（`pool_items`）存放在 `<litloop home>/litloop.db`，由 [`src/litloop/db.py`](../src/litloop/db.py) 读写（WAL 模式 + `busy_timeout=30000` + `IMMEDIATE` 写事务，支持多进程并发安全更新，app 对单篇评分/决定的修改直接走按行事务更新）。旧版 `<session>.json` / `<session>.pool.json` / `<session>.summary.json` / `watches.json` 在首次读取时自动幂等导入 `litloop.db`（不删除原文件），新会话不再写入这些旧 JSON 文件。
+- **SQLite 数据库（`litloop.db`）**：筛选会话（`sessions` 表，含 `summary_json` 与 `pool_state_json` 元数据）、每篇文献的评分与用户决策（`decisions` 表）、定期追踪（`watches` 表）、深度检索候选池表（`pool_items`）、内置 Agent 对话记录（`agent_messages` 表）与纠偏备注（`steering_notes` 表）存放在 `<litloop home>/litloop.db`，由 [`src/litloop/db.py`](../src/litloop/db.py) 读写（WAL 模式 + `busy_timeout=30000` + `IMMEDIATE` 写事务，支持多进程并发安全更新，app 对单篇评分/决定的修改直接走按行事务更新）。旧版 `<session>.json` / `<session>.pool.json` / `<session>.summary.json` / `watches.json` 在首次读取时自动幂等导入 `litloop.db`（不删除原文件），新会话不再写入这些旧 JSON 文件。
 - **JSON 文件（`store.py`）**：其余共享 JSON 文件（进度、下载任务、Agent 续跑记录、术语表等）由 [`src/litloop/store.py`](../src/litloop/store.py) 读写，写前拿 `.lock` 锁在锁内“读 → 改 → 写”并先写临时文件再原子替换，读时直接调用 `store.read_json(path)`。
-- **版本**：每个 JSON 文件带 `schema`（`store.SCHEMA`，当前为 1），`litloop.db` 通过 `PRAGMA user_version`（`db.DB_SCHEMA`）和 `schema_migrations` 表记录迁移版本。读到比自己新的版本时抛 `SchemaTooNew`，app 应提示“请更新 LitLoop”，不要硬读。改字段含义或删字段时加版本号；只加字段不用。
+- **版本**：每个 JSON 文件带 `schema`（`store.SCHEMA`，当前为 1），`litloop.db` 通过 `PRAGMA user_version`（`db.DB_SCHEMA`，当前为 2）和 `schema_migrations` 表记录迁移版本。读到比自己新的版本时抛 `SchemaTooNew`，app 应提示“请更新 LitLoop”，不要硬读。改字段含义或删字段时加版本号；只加字段不用。
 - **app 不读候选池**：`pool_items` 表一次深度检索可达数千篇、上百 MB，只给 Agent（`deep.py`）用；app 需要的都在 `sessions`（含 `summary_json`、`pool_state_json` 的 `last_batch`）、`decisions` 表和进度文件里。
 - **刷新**：进度文件每 0.5 秒内最多写一次，app 每 1–2 秒读一次即可；概况与筛选记录每出一批或每存一次评分才变，可按修改时间或接口响应判断是否重读。
 
@@ -18,6 +18,8 @@
 |---|---|---|
 | `litloop.db`（`sessions`、`decisions` 表） | Agent、app | 筛选记录：问题、检索历史、每篇的评分与理由、用户的决定，以及深度检索概况 `summary_json` 与候选池元数据 `pool_state_json`（旧 `<session>.json` / `<session>.summary.json` 只读兼容自动导入） |
 | `litloop.db`（`pool_items` 表） | Agent | 深度检索候选池（app 不读；旧 `<session>.pool.json` 只读兼容自动导入） |
+| `litloop.db`（`agent_messages` 表，`DB_SCHEMA = 2`） | 内置 Agent、app | 内置 Agent 对话历史（`id`、`session_id`、`role`、`content`、`actions_json`、`usage_json`、`created`），无外键约束以支持 `"__draft__"` 草稿会话，待确认动作卡片状态持久化在 `actions_json` 中 |
+| `litloop.db`（`steering_notes` 表，`DB_SCHEMA = 2`） | 内置 Agent、app | 用户对会话的纠偏备注（`id`、`session_id`、`note`、`active`、`created`），深度检索续跑时自动注入模型上下文，无外键约束以支持 `"__draft__"` 会话 |
 | `<session>.md` | Agent、app | 筛选记录的表格版，给人读，app 不用 |
 | `<session>.progress.json` | Agent | 正在运行的这一轮在做什么，只有深度检索有 |
 
@@ -172,6 +174,7 @@ app 的「新建检索」把表单拼成一段话（`agent_runner.build_prompt`�
   "session": "20261017-194530-SiC-…",
   "agent_session": "…",
   "resumed_chat": false,
+  "usage": {"input_tokens": 1200, "output_tokens": 350, "total_tokens": 1550, "currency": "CNY", "estimated": 0.0035, "cost_text": "约 ¥0.0035"},
   "result": "已保存 …",
   "error": null
 }
@@ -182,6 +185,7 @@ app 的「新建检索」把表单拼成一段话（`agent_runner.build_prompt`�
 - `session`：Agent 保存的筛选会话（从工具返回里取到的最后一个），app 据此打开结果；`agent_session` 是 Agent 自己的对话编号（如 Claude Code / WorkBuddy 的 `session_id`、DeepSeek Harness 的 `sessionId`、Codex CLI 的 `thread_id`），供下一批继续检索时通过 `--resume` / `--session-id` / `exec resume` 续接同一对话。
 - `resumed_chat`：布尔值，本次续跑是否复用了上一轮的 `agent_session` 原对话上下文。
 - `resumed_from`（可选，2026-11-19 起）：从筛选页或历史任务「继续检索」发起的续跑记录，写明续跑的原筛选会话 ID。
+- `usage`（可选）：内置 Agent 本次运行的 Token 用量与估算费用（`input_tokens`、`output_tokens`、`total_tokens`，以及可选的 `currency`、`estimated`、`cost_text`、`by_model`）。
 - `events` 只保留最近 200 条，`doing` 是当前一步，结束后为 `null`。
 
 ### 术语表 `<litloop home>/glossary.json`

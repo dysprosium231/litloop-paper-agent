@@ -6,8 +6,40 @@ protocols — Anthropic's own Messages API and the OpenAI-compatible one that
 DeepSeek, 通义千问, Kimi, 智谱 GLM, OpenRouter, Ollama and vLLM speak.
 """
 
-from .client import PROVIDERS, chat, model_config, test_model
-from .runner import ToolError, run_task
+from .chat_agent import execute_action, stream_chat_turn
+from .client import (
+    PROVIDERS,
+    PROVIDER_PRESETS,
+    chat,
+    chat_stream,
+    estimate_cost,
+    get_preset,
+    model_config,
+    normalize_usage,
+    test_model,
+)
+from .runner import ToolError, run_builtin_resume, run_builtin_search, run_task
+from .scorer import collect_user_feedback, score_papers
 from .tools import FUNCTIONS, TOOLS
 
-__all__ = ["FUNCTIONS", "PROVIDERS", "TOOLS", "ToolError", "chat", "model_config", "run_task", "test_model"]
+__all__ = [
+    "FUNCTIONS",
+    "PROVIDERS",
+    "PROVIDER_PRESETS",
+    "TOOLS",
+    "ToolError",
+    "chat",
+    "chat_stream",
+    "collect_user_feedback",
+    "estimate_cost",
+    "execute_action",
+    "get_preset",
+    "model_config",
+    "normalize_usage",
+    "run_builtin_resume",
+    "run_builtin_search",
+    "run_task",
+    "score_papers",
+    "stream_chat_turn",
+    "test_model",
+]
