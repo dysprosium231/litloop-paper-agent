@@ -53,9 +53,12 @@ function formatUsage(usage?: RunUsage | null): string | null {
   return parts.length ? parts.join(" · ") : null
 }
 
-function renderInlineMarkdown(text: string): React.ReactNode[] {
+function renderInlineMarkdown(
+  text: string,
+  onSelectPaperByNumber?: (n: number) => void,
+): React.ReactNode[] {
   const nodes: React.ReactNode[] = []
-  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\)|\[#\d+\])/g
   let lastIndex = 0
   let match: RegExpExecArray | null
   let keyIdx = 0
@@ -75,6 +78,30 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
       nodes.push(<strong key={k} className="font-semibold">{token.slice(2, -2)}</strong>)
     } else if (token.startsWith("*") && token.endsWith("*")) {
       nodes.push(<em key={k}>{token.slice(1, -1)}</em>)
+    } else if (/^\[#\d+\]$/.test(token)) {
+      const num = Number(token.slice(2, -1))
+      if (onSelectPaperByNumber && Number.isFinite(num)) {
+        nodes.push(
+          <button
+            key={k}
+            type="button"
+            onClick={() => onSelectPaperByNumber(num)}
+            title={`跳转到文献 #${num}`}
+            className="mx-0.5 inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-medium text-primary transition-colors hover:bg-primary/20"
+          >
+            {token}
+          </button>,
+        )
+      } else {
+        nodes.push(
+          <span
+            key={k}
+            className="mx-0.5 inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-medium text-primary"
+          >
+            {token}
+          </span>,
+        )
+      }
     } else if (token.startsWith("[")) {
       const m = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token)
       if (m && /^https?:\/\//i.test(m[2].trim())) {
@@ -107,7 +134,13 @@ function splitTableRow(line: string): string[] {
   return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim())
 }
 
-function SimpleMarkdown({ content }: { content: string }) {
+function SimpleMarkdown({
+  content,
+  onSelectPaperByNumber,
+}: {
+  content: string
+  onSelectPaperByNumber?: (n: number) => void
+}) {
   const lines = content.replace(/\r\n/g, "\n").split("\n")
   const blocks: React.ReactNode[] = []
   let i = 0
@@ -149,7 +182,7 @@ function SimpleMarkdown({ content }: { content: string }) {
             <thead>
               <tr className="border-b bg-muted/40">
                 {headers.map((h, hi) => (
-                  <th key={hi} className="px-2 py-1 font-medium">{renderInlineMarkdown(h)}</th>
+                  <th key={hi} className="px-2 py-1 font-medium">{renderInlineMarkdown(h, onSelectPaperByNumber)}</th>
                 ))}
               </tr>
             </thead>
@@ -157,7 +190,7 @@ function SimpleMarkdown({ content }: { content: string }) {
               {rows.map((row, ri) => (
                 <tr key={ri} className="border-b last:border-b-0">
                   {headers.map((_, ci) => (
-                    <td key={ci} className="px-2 py-1 align-top">{renderInlineMarkdown(row[ci] ?? "")}</td>
+                    <td key={ci} className="px-2 py-1 align-top">{renderInlineMarkdown(row[ci] ?? "", onSelectPaperByNumber)}</td>
                   ))}
                 </tr>
               ))}
@@ -172,7 +205,7 @@ function SimpleMarkdown({ content }: { content: string }) {
     if (heading) {
       blocks.push(
         <p key={`b-${bIdx++}`} className="mt-1.5 mb-0.5 font-semibold text-foreground">
-          {renderInlineMarkdown(heading[2])}
+          {renderInlineMarkdown(heading[2], onSelectPaperByNumber)}
         </p>,
       )
       i += 1
@@ -187,7 +220,7 @@ function SimpleMarkdown({ content }: { content: string }) {
       }
       blocks.push(
         <ul key={`b-${bIdx++}`} className="my-1 list-disc space-y-0.5 pl-4">
-          {items.map((it, ii) => <li key={ii}>{renderInlineMarkdown(it)}</li>)}
+          {items.map((it, ii) => <li key={ii}>{renderInlineMarkdown(it, onSelectPaperByNumber)}</li>)}
         </ul>,
       )
       continue
@@ -201,7 +234,7 @@ function SimpleMarkdown({ content }: { content: string }) {
       }
       blocks.push(
         <ol key={`b-${bIdx++}`} className="my-1 list-decimal space-y-0.5 pl-4">
-          {items.map((it, ii) => <li key={ii}>{renderInlineMarkdown(it)}</li>)}
+          {items.map((it, ii) => <li key={ii}>{renderInlineMarkdown(it, onSelectPaperByNumber)}</li>)}
         </ol>,
       )
       continue
@@ -229,7 +262,7 @@ function SimpleMarkdown({ content }: { content: string }) {
         {paraLines.map((pl, pi) => (
           <React.Fragment key={pi}>
             {pi > 0 && <br />}
-            {renderInlineMarkdown(pl)}
+            {renderInlineMarkdown(pl, onSelectPaperByNumber)}
           </React.Fragment>
         ))}
       </p>,
@@ -267,6 +300,38 @@ function glossaryTextFromParams(params: Record<string, unknown>): string {
   return ""
 }
 
+interface BatchScreenItem {
+  n: number
+  doi?: string
+  title?: string
+  cur_relevance?: string
+  cur_decision?: "selected" | "rejected" | null
+  relevance?: string
+  decision?: "selected" | "rejected" | null
+  reject_reason?: string
+  note?: string
+}
+
+function decisionLabel(d?: string | null): string {
+  if (d === "selected") return "入选"
+  if (d === "rejected") return "排除"
+  return "未定"
+}
+
+function ReasoningBlock({ text, streaming }: { text: string; streaming?: boolean }) {
+  return (
+    <details className="mb-1.5 max-w-[92%] rounded-lg border bg-muted/35 px-2.5 py-1.5 text-xs text-muted-foreground">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 select-none font-medium text-muted-foreground hover:text-foreground">
+        {streaming && <LoaderIcon className="size-3 shrink-0 animate-spin" />}
+        <span>思考过程（可选展开）</span>
+      </summary>
+      <div className="mt-1.5 max-h-56 overflow-y-auto whitespace-pre-wrap border-t pt-1.5 text-[11px] leading-relaxed">
+        {text}
+      </div>
+    </details>
+  )
+}
+
 function ActionCardView({
   sessionId,
   messageId,
@@ -280,17 +345,26 @@ function ActionCardView({
   onUpdated: (messageId: number, nextAction: AgentActionCard) => void
   onConfirmed?: (action: AgentActionCard, result?: Record<string, unknown>) => void
 }) {
+  const batchItems = React.useMemo<BatchScreenItem[]>(
+    () => (action.kind === "batch_screen" && Array.isArray(action.params.items)
+      ? (action.params.items as BatchScreenItem[])
+      : []),
+    [action.kind, action.params.items],
+  )
   const [params, setParams] = React.useState<Record<string, unknown>>(() => ({ ...action.params }))
   const [glossaryInput, setGlossaryInput] = React.useState(() => glossaryTextFromParams(action.params))
+  const [selectedNos, setSelectedNos] = React.useState<Set<number>>(() => new Set(batchItems.map((it) => it.n)))
   const [busy, setBusy] = React.useState<"confirm" | "cancel" | null>(null)
   const [cardError, setCardError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     setParams({ ...action.params })
     setGlossaryInput(glossaryTextFromParams(action.params))
-  }, [action.id, action.params])
+    setSelectedNos(new Set(batchItems.map((it) => it.n)))
+  }, [action.id, action.params, batchItems])
 
   const isPending = action.status === "pending"
+  const canAct = messageId > 0
   const meta = STATUS_META[action.status]
 
   const setField = (key: string, value: unknown) => {
@@ -298,6 +372,9 @@ function ActionCardView({
   }
 
   const buildSubmitParams = (): Record<string, unknown> => {
+    if (action.kind === "batch_screen") {
+      return { ...params, items: batchItems.filter((it) => selectedNos.has(it.n)) }
+    }
     if (action.kind !== "add_glossary") return params
     const items = glossaryInput
       .split(/[,，\n]+/)
@@ -313,7 +390,7 @@ function ActionCardView({
   }
 
   const handleConfirm = async () => {
-    if (busy) return
+    if (!canAct || busy) return
     setBusy("confirm")
     setCardError(null)
     try {
@@ -333,7 +410,7 @@ function ActionCardView({
   }
 
   const handleCancel = async () => {
-    if (busy) return
+    if (!canAct || busy) return
     setBusy("cancel")
     setCardError(null)
     try {
@@ -466,6 +543,24 @@ function ActionCardView({
                   <span className="font-medium text-foreground">{downloadCount} 篇</span>
                 </div>
               )}
+              {typeof params.skipped_downloaded === "number" && params.skipped_downloaded > 0 && (
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>跳过本机已有</span>
+                  <span className="font-medium text-foreground">{params.skipped_downloaded} 篇</span>
+                </div>
+              )}
+              {Array.isArray(params.preview_titles) && params.preview_titles.length > 0 && (
+                <div className="space-y-1 rounded-md border bg-background/60 p-2">
+                  <div className="text-[11px] text-muted-foreground">文献预览（前 {Math.min(5, params.preview_titles.length)} 篇）</div>
+                  <ul className="space-y-0.5 text-[11px] text-foreground">
+                    {params.preview_titles.slice(0, 5).map((t, ti) => (
+                      <li key={ti} className="truncate" title={String(t)}>
+                        · {String(t)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <label className="block space-y-1">
                 <span className="text-muted-foreground">任务名称</span>
                 <Input
@@ -477,6 +572,100 @@ function ActionCardView({
               </label>
             </div>
           )}
+
+          {action.kind === "retry_download" && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>目标任务</span>
+                <span className="font-mono font-medium text-foreground">{String(params.job ?? "")}</span>
+              </div>
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>重试模式</span>
+                <span className="font-medium text-foreground">
+                  {params.mode === "publisher_queue"
+                    ? `启动出版商队列：${String(params.publisher ?? "")}`
+                    : "失败文献重试"}
+                </span>
+              </div>
+              {typeof params.count === "number" && (
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>涉及文献</span>
+                  <span className="font-medium text-foreground">{params.count} 篇</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {action.kind === "batch_screen" && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>已选 {selectedNos.size}/{batchItems.length} 篇</span>
+                <button
+                  type="button"
+                  disabled={!canAct || busy !== null || batchItems.length === 0}
+                  onClick={() => {
+                    if (selectedNos.size === batchItems.length) {
+                      setSelectedNos(new Set())
+                    } else {
+                      setSelectedNos(new Set(batchItems.map((it) => it.n)))
+                    }
+                  }}
+                  className="text-primary hover:underline disabled:opacity-50"
+                >
+                  {selectedNos.size === batchItems.length ? "取消全选" : "全选"}
+                </button>
+              </div>
+              <div className="max-h-52 space-y-1.5 overflow-y-auto pr-0.5">
+                {batchItems.map((it) => {
+                  const checked = selectedNos.has(it.n)
+                  const targetRel = it.relevance ?? it.cur_relevance
+                  const targetDec = it.decision !== undefined ? it.decision : it.cur_decision
+                  const reasonText = it.reject_reason || it.note
+                  return (
+                    <label
+                      key={it.n}
+                      className="flex cursor-pointer items-start gap-2 rounded-md border bg-background/70 p-2 text-[11px] hover:bg-accent/40"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!canAct || busy !== null}
+                        onChange={(e) => {
+                          setSelectedNos((prev) => {
+                            const next = new Set(prev)
+                            if (e.target.checked) next.add(it.n)
+                            else next.delete(it.n)
+                            return next
+                          })
+                        }}
+                        className="mt-0.5 size-3.5 shrink-0 accent-primary"
+                      />
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="truncate font-medium text-foreground" title={it.title || it.doi || `文献 #${it.n}`}>
+                          <span className="mr-1 font-mono text-muted-foreground">[#{it.n}]</span>
+                          {it.title || it.doi || `文献 #${it.n}`}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                          <span>
+                            {it.cur_relevance || "未评"}
+                            {it.cur_decision ? ` (${decisionLabel(it.cur_decision)})` : ""}
+                          </span>
+                          <span>→</span>
+                          <span className="rounded bg-primary/10 px-1 py-0.5 font-medium text-primary">
+                            {targetRel || "未评"}
+                            {targetDec ? ` · ${decisionLabel(targetDec)}` : ""}
+                          </span>
+                        </div>
+                        {reasonText && (
+                          <div className="line-clamp-2 text-[10px] text-muted-foreground">{reasonText}</div>
+                        )}
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -485,24 +674,31 @@ function ActionCardView({
       )}
 
       {isPending && (
-        <div className="mt-3 flex items-center justify-end gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2.5 text-xs"
-            disabled={busy !== null}
-            onClick={() => void handleCancel()}
-          >
-            {busy === "cancel" ? <LoaderIcon className="size-3 animate-spin" /> : "取消"}
-          </Button>
-          <Button
-            size="sm"
-            className="h-7 px-3 text-xs"
-            disabled={busy !== null}
-            onClick={() => void handleConfirm()}
-          >
-            {busy === "confirm" ? <LoaderIcon className="size-3 animate-spin" /> : "确认执行"}
-          </Button>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          {!canAct ? (
+            <span className="text-[11px] text-muted-foreground">生成中，完成后可操作</span>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2.5 text-xs"
+              disabled={!canAct || busy !== null}
+              onClick={() => void handleCancel()}
+            >
+              {busy === "cancel" ? <LoaderIcon className="size-3 animate-spin" /> : "取消"}
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 px-3 text-xs"
+              disabled={!canAct || busy !== null}
+              onClick={() => void handleConfirm()}
+            >
+              {busy === "confirm" ? <LoaderIcon className="size-3 animate-spin" /> : "确认执行"}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -528,6 +724,7 @@ export interface AgentDrawerProps {
   currentPaper: Paper | null
   onClose: () => void
   onActionConfirmed?: (action: AgentActionCard, result?: Record<string, unknown>) => void
+  onSelectPaperByNumber?: (n: number) => void
 }
 
 export function AgentDrawer({
@@ -536,6 +733,7 @@ export function AgentDrawer({
   currentPaper,
   onClose,
   onActionConfirmed,
+  onSelectPaperByNumber,
 }: AgentDrawerProps) {
   const [messages, setMessages] = React.useState<AgentMessage[]>([])
   const [steeringNotes, setSteeringNotes] = React.useState<SteeringNote[]>([])
@@ -544,6 +742,8 @@ export function AgentDrawer({
   const [input, setInput] = React.useState("")
   const [streaming, setStreaming] = React.useState(false)
   const [streamText, setStreamText] = React.useState("")
+  const [streamReasoning, setStreamReasoning] = React.useState("")
+  const [reasoningMap, setReasoningMap] = React.useState<Record<number, string>>({})
   const [streamActions, setStreamActions] = React.useState<AgentActionCard[]>([])
   const [toolLabel, setToolLabel] = React.useState<string | null>(null)
   const [streamError, setStreamError] = React.useState<string | null>(null)
@@ -552,14 +752,24 @@ export function AgentDrawer({
   const [noteBusy, setNoteBusy] = React.useState(false)
 
   const abortRef = React.useRef<AbortController | null>(null)
+  const stoppedByUserRef = React.useRef(false)
+  const streamTextRef = React.useRef("")
+  const streamReasoningRef = React.useRef("")
+  const streamActionsRef = React.useRef<AgentActionCard[]>([])
   const scrollRef = React.useRef<HTMLDivElement | null>(null)
   const inputRef = React.useRef<HTMLTextAreaElement | null>(null)
 
   React.useEffect(() => {
+    stoppedByUserRef.current = false
     abortRef.current?.abort()
     abortRef.current = null
     setStreaming(false)
+    streamTextRef.current = ""
+    streamReasoningRef.current = ""
+    streamActionsRef.current = []
     setStreamText("")
+    setStreamReasoning("")
+    setReasoningMap({})
     setStreamActions([])
     setToolLabel(null)
     setStreamError(null)
@@ -591,7 +801,7 @@ export function AgentDrawer({
     const el = scrollRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-  }, [messages, streamText, streamActions, toolLabel])
+  }, [messages, streamText, streamReasoning, streamActions, toolLabel])
 
   const sendMessage = React.useCallback(
     async (rawText?: string) => {
@@ -599,8 +809,13 @@ export function AgentDrawer({
       if (!text || streaming) return
 
       if (!rawText) setInput("")
+      stoppedByUserRef.current = false
+      streamTextRef.current = ""
+      streamReasoningRef.current = ""
+      streamActionsRef.current = []
       setStreamError(null)
       setStreamText("")
+      setStreamReasoning("")
       setStreamActions([])
       setToolLabel(null)
       setStreaming(true)
@@ -627,16 +842,30 @@ export function AgentDrawer({
           (ev) => {
             if (ev.type === "user_message") {
               setMessages((prev) => prev.map((m) => (m.id === tempId ? ev.message : m)))
+            } else if (ev.type === "reasoning") {
+              setToolLabel(null)
+              streamReasoningRef.current += ev.text
+              setStreamReasoning(streamReasoningRef.current)
             } else if (ev.type === "delta") {
               setToolLabel(null)
-              setStreamText((prev) => prev + ev.text)
+              streamTextRef.current += ev.text
+              setStreamText(streamTextRef.current)
             } else if (ev.type === "tool") {
               setToolLabel(ev.label || `正在调用 ${ev.name}…`)
             } else if (ev.type === "action") {
-              setStreamActions((prev) => [...prev, ev.action])
+              streamActionsRef.current = [...streamActionsRef.current, ev.action]
+              setStreamActions(streamActionsRef.current)
             } else if (ev.type === "done") {
+              const savedReasoning = streamReasoningRef.current.trim()
+              if (savedReasoning) {
+                setReasoningMap((prev) => ({ ...prev, [ev.message.id]: streamReasoningRef.current }))
+              }
               setMessages((prev) => [...prev, ev.message])
+              streamTextRef.current = ""
+              streamReasoningRef.current = ""
+              streamActionsRef.current = []
               setStreamText("")
+              setStreamReasoning("")
               setStreamActions([])
               setToolLabel(null)
             } else if (ev.type === "error") {
@@ -646,13 +875,42 @@ export function AgentDrawer({
           controller.signal,
         )
       } catch (e) {
-        if ((e as Error)?.name !== "AbortError") {
+        if ((e as Error)?.name === "AbortError") {
+          if (stoppedByUserRef.current) {
+            const partialText = streamTextRef.current
+            const partialReasoning = streamReasoningRef.current
+            const partialActions = streamActionsRef.current
+            const partialId = -Date.now() - 1
+            const content = partialText.trim() ? `${partialText}\n\n（已停止生成）` : "（已停止生成）"
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: partialId,
+                session_id: sessionId,
+                role: "assistant",
+                content,
+                actions: partialActions,
+                created: new Date().toISOString(),
+              },
+            ])
+            if (partialReasoning.trim()) {
+              setReasoningMap((prev) => ({ ...prev, [partialId]: partialReasoning }))
+            }
+            streamTextRef.current = ""
+            streamReasoningRef.current = ""
+            streamActionsRef.current = []
+            setStreamText("")
+            setStreamReasoning("")
+            setStreamActions([])
+          }
+        } else {
           setStreamError(errorMessage(e))
         }
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null
         }
+        stoppedByUserRef.current = false
         setStreaming(false)
         setToolLabel(null)
       }
@@ -661,6 +919,7 @@ export function AgentDrawer({
   )
 
   const handleStop = () => {
+    stoppedByUserRef.current = true
     abortRef.current?.abort()
   }
 
@@ -669,6 +928,7 @@ export function AgentDrawer({
     try {
       await agentChatApi.clear(sessionId)
       setMessages([])
+      setReasoningMap({})
       setStreamError(null)
     } catch (e) {
       setStreamError(errorMessage(e))
@@ -857,15 +1117,17 @@ export function AgentDrawer({
         {messages.map((m) => {
           const isUser = m.role === "user"
           const usageText = !isUser ? formatUsage(m.usage) : null
+          const reasoningText = !isUser ? reasoningMap[m.id] : undefined
           return (
             <div key={m.id} className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+              {reasoningText && <ReasoningBlock text={reasoningText} />}
               <div
                 className={cn(
                   "max-w-[92%] break-words rounded-xl px-3 py-2 text-[13px] leading-relaxed",
                   isUser ? "whitespace-pre-wrap bg-primary text-primary-foreground" : "bg-muted/65 text-foreground",
                 )}
               >
-                {isUser ? m.content : <SimpleMarkdown content={m.content} />}
+                {isUser ? m.content : <SimpleMarkdown content={m.content} onSelectPaperByNumber={onSelectPaperByNumber} />}
               </div>
               {!isUser && m.actions?.length > 0 && (
                 <div className="w-full max-w-[96%]">
@@ -896,9 +1158,10 @@ export function AgentDrawer({
                 <span>{toolLabel}</span>
               </div>
             )}
+            {streamReasoning && <ReasoningBlock text={streamReasoning} streaming={!streamText} />}
             {streamText && (
               <div className="max-w-[92%] break-words rounded-xl bg-muted/65 px-3 py-2 text-[13px] leading-relaxed text-foreground">
-                <SimpleMarkdown content={streamText} />
+                <SimpleMarkdown content={streamText} onSelectPaperByNumber={onSelectPaperByNumber} />
               </div>
             )}
             {streamActions.length > 0 && (
@@ -915,7 +1178,7 @@ export function AgentDrawer({
                 ))}
               </div>
             )}
-            {!toolLabel && !streamText && streamActions.length === 0 && (
+            {!toolLabel && !streamReasoning && !streamText && streamActions.length === 0 && (
               <div className="flex items-center gap-1.5 rounded-xl bg-muted/65 px-3 py-2 text-xs text-muted-foreground">
                 <LoaderIcon className="size-3 animate-spin" />
                 <span>正在思考…</span>

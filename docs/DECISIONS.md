@@ -1,5 +1,22 @@
 # 决定与实验记录
 
+## 2026-11-26：内置 Agent 主链路优化（包 A 检索对齐与前置修复 + 包 B 筛选稳健性/内置摘要翻译/批量改判卡 + 包 C 下载与 Zotero 感知闭环）
+
+- **背景**：在内置 Agent 阶段 1/2 落地后，补齐与 MCP 工具及桌面端的链路对齐，覆盖检索过滤、思考模型兼容、内置摘要翻译、批量改判交互及下载/Zotero 闭环。
+- **改动**：
+  1. **包 A（检索对齐与前置修复）**：
+     - [src/litloop/agents/runner.py](src/litloop/agents/runner.py)：快速查找透传 `max_cas_zone`、`max_jcr_quartile`、`exclude_warning` 并修复多组检索词过早 `break` 缺陷（按 `per_query` 逐条执行后用 `quick._take_in_turns()` 交错去重截取）；深度检索将期刊过滤转为偏好标准追加去重到 `criteria`，支持 `seed_collection` 合并 Zotero 分类种子，无种子时由评分模型从前 3 组检索词交错候选中经 `_select_seeds()` 精选 1–3 篇代表作。
+     - [app/src/lib/api.ts](app/src/lib/api.ts) 与 [app/src/components/agent-drawer.tsx](app/src/components/agent-drawer.tsx)：修正 `agentChatApi.stream()` 路径缺失 `/stream` 后缀的缺陷；流式生成期间临时动作卡（`messageId <= 0`）禁用确认/取消按钮。
+  2. **包 B（筛选稳健性、内置摘要翻译与批量改判卡）**：
+     - [src/litloop/agents/client.py](src/litloop/agents/client.py)、[src/litloop/agents/scorer.py](src/litloop/agents/scorer.py) 与 [src/litloop/agents/runner.py](src/litloop/agents/runner.py)：新增 `strip_thinking()` 剥离 `<think>...</think>`（含未闭合截断），`plan_search()` 与 `_parse_chunk_ratings()` 解析 JSON 前先剥离思考标签；`_parse()` 与 `chat_stream()` 分离 `reasoning_content` 至 `reasoning`/`on_reasoning`；新增 `recommended_concurrency()`（本地 Ollama 1 路、云端 3 路）与 429 轻度退避；无摘要文献禁止直接判「不相关」，保守评「中」/「低」并注明「仅凭标题：」。
+     - [src/litloop/desktop/translate.py](src/litloop/desktop/translate.py)、[src/litloop/desktop/settings.py](src/litloop/desktop/settings.py) 与 [src/litloop/desktop/server.py](src/litloop/desktop/server.py)：新增 `"builtin"` 翻译提供方及 `is_ready()`，默认 `"agent"` 在已配置内置模型时亦可直接按需翻译摘要并经 `strip_thinking()` 清理。
+     - [src/litloop/agents/chat_agent.py](src/litloop/agents/chat_agent.py)、[app/src/components/agent-drawer.tsx](app/src/components/agent-drawer.tsx) 与 [app/src/App.tsx](app/src/App.tsx)：SSE 透传 `reasoning` 并在助手气泡上方可折叠展示；新增 `propose_batch_screen`（`kind="batch_screen"`）批量改判确认卡（支持单条取消勾选与即时刷新列表）；`SimpleMarkdown` 将 `[#n]` 渲染为可点击定位芯片；「停止生成」保留已输出的半段流式文本。
+  3. **包 C（下载与 Zotero 感知闭环）**：
+     - [src/litloop/desktop/download_jobs.py](src/litloop/desktop/download_jobs.py)：新增 `retry_failed()` 抽取指定任务中失败的文献，保留原 `session` 与 `zotero_target` 发起重试任务。
+     - [src/litloop/agents/chat_agent.py](src/litloop/agents/chat_agent.py)：新增只读感知工具 `get_download_status()` 与 `get_zotero_status()`；扩展 `propose_download`（解析当前会话筛选结果、跳过本机已下文献并附标题预览）、新增 `propose_retry_download`（`kind="retry_download"`，支持失败重试与启动出版商队列），并在 `build_context_block()` 注入关联下载任务与待推送 Zotero 概况。
+     - [app/src/lib/api.ts](app/src/lib/api.ts)、[app/src/components/agent-drawer.tsx](app/src/components/agent-drawer.tsx) 与 [app/src/App.tsx](app/src/App.tsx)：前端渲染 `download` 跳过提示与标题预览、`retry_download` 确认卡及确认执行后的状态提示。
+- **验证**：全量 `pytest -q` 输出 `1319 passed, 3 skipped, 1 warning`，`scripts/check_release_consistency.py`、`npm run build`、`npm run lint:copy` 及全量 LF 校验均通过。
+
 ## 2026-11-25：内置 Agent 深水区加固（429/5xx 重试、草稿迁移、上下文裁剪与安全 Markdown 渲染）
 
 - **改动**：

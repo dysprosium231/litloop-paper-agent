@@ -21,7 +21,7 @@ import requests
 
 from ..config import load_config
 
-PROVIDERS = ("deepseek", "deepl", "agent")
+PROVIDERS = ("builtin", "deepseek", "deepl", "agent")
 
 # DeepSeek is a chat model: say what to keep, so formulas, units and names survive.
 PROMPT = ("把下面的英文论文摘要翻译成简体中文学术语言。化学式、元素符号、缩写、数值和单位、"
@@ -39,8 +39,28 @@ def provider(config: dict[str, Any] | None = None) -> str:
 
 
 def by_api(config: dict[str, Any] | None = None) -> bool:
-    """True when the app translates (DeepSeek / DeepL), not the agent."""
+    """True when the app translates (DeepSeek / DeepL / builtin), not the agent."""
     return provider(config) != "agent"
+
+
+def _builtin_ready(config: dict[str, Any]) -> bool:
+    from ..agents import client as aclient
+
+    cfg = aclient.model_config(config, task="rate")
+    if not cfg["model"]:
+        return False
+    if cfg["protocol"] == "anthropic" and not cfg["api_key"]:
+        return False
+    return True
+
+
+def is_ready(config: dict[str, Any] | None = None) -> bool:
+    """Whether on-demand abstract translation in the app is ready."""
+    cfg = config or load_config()
+    name = provider(cfg)
+    if name in ("builtin", "agent"):
+        return _builtin_ready(cfg)
+    return bool(str(cfg.get(f"{name}_api_key") or "").strip())
 
 
 def _key(name: str, config: dict[str, Any]) -> str:
@@ -122,14 +142,39 @@ def _deepl(text: str, config: dict[str, Any]) -> str:
     return data["translations"][0]["text"].strip()
 
 
+def _builtin(text: str, config: dict[str, Any]) -> str:
+    if not _builtin_ready(config):
+        raise TranslationError("请先在「设置 → 内置 Agent」中配置模型，或在「筛选」里填写 DeepSeek/DeepL Key")
+    from ..agents import client as aclient
+
+    try:
+        res = aclient.chat(
+            [{"role": "user", "content": text}],
+            tools=None,
+            config=config,
+            system=PROMPT,
+            max_tokens=1600,
+            timeout=60,
+            task="rate",
+        )
+    except requests.Timeout as exc:
+        raise TranslationError("连接翻译服务超时。检查网络后重试") from exc
+    except requests.RequestException as exc:
+        raise TranslationError("翻译服务没有响应。检查网络或代理设置") from exc
+    except (ValueError, RuntimeError) as exc:
+        raise TranslationError(f"内置模型翻译失败：{exc}") from exc
+    return aclient.strip_thinking(res.get("text") or "")
+
+
 def translate_text(text: str, config: dict[str, Any] | None = None) -> str:
-    """English abstract -> Chinese with the configured API provider."""
+    """English abstract -> Chinese with the configured translation provider."""
     config = config or load_config()
     name = provider(config)
-    if name == "agent":
-        raise TranslationError("翻译服务设为 Agent，由 Agent 在评分时翻译")
     try:
-        out = (_deepseek if name == "deepseek" else _deepl)(text, config)
+        if name in ("builtin", "agent"):
+            out = _builtin(text, config)
+        else:
+            out = (_deepseek if name == "deepseek" else _deepl)(text, config)
     except requests.Timeout as exc:
         raise TranslationError("连接翻译服务超时。检查网络后重试") from exc
     except requests.RequestException as exc:

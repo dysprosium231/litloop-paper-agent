@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import queue
 import threading
@@ -31,11 +32,15 @@ _TOOL_LABELS: dict[str, str] = {
     "list_papers": "查询筛选文献",
     "lookup_glossary": "查询术语表",
     "preview_search_plan": "预览检索方案",
+    "get_download_status": "查询下载任务状态",
+    "get_zotero_status": "查询 Zotero 状态",
     "propose_start_search": "生成发起检索确认卡",
     "propose_resume_search": "生成续跑检索确认卡",
     "propose_download": "生成下载确认卡",
+    "propose_retry_download": "生成重试下载确认卡",
     "propose_zotero_push": "生成 Zotero 推送确认卡",
     "propose_add_glossary": "生成添加术语确认卡",
+    "propose_batch_screen": "生成批量调整筛选结果确认卡",
 }
 
 CHAT_TOOLS: list[dict[str, Any]] = [
@@ -87,6 +92,28 @@ CHAT_TOOLS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "get_download_status",
+        "description": "查询当前会话或指定下载任务的进度、出版商排队与失败原因明细（只读）。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "关联的筛选会话 ID，默认为当前会话。"},
+                "job": {"type": "string", "description": "可选，指定下载任务 ID。"},
+                "limit": {"type": "integer", "description": "未指定 job 时最多返回的任务条数，默认 10。"},
+            },
+        },
+    },
+    {
+        "name": "get_zotero_status",
+        "description": "查询 Zotero MCP 连接状态、待推送队列、推送历史及现有分类路径列表（只读）。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "include_collections": {"type": "boolean", "description": "是否读取 Zotero 分类列表，默认 true。"},
+            },
+        },
+    },
+    {
         "name": "propose_start_search",
         "description": "提议发起一次新的文献检索（生成确认卡等待用户确认，不直接执行）。",
         "parameters": {
@@ -124,12 +151,42 @@ CHAT_TOOLS: list[dict[str, Any]] = [
                 "papers": {
                     "type": "array",
                     "items": {"type": "object"},
-                    "description": "文献对象列表，每项至少包含 doi 与 title。",
+                    "description": "直接指定的文献对象列表，每项至少包含 doi 与 title；留空时按 session + selection/paper_ns 自动选取。",
                 },
                 "title": {"type": "string", "description": "下载任务标题。"},
-                "session": {"type": "string", "description": "关联的筛选会话 ID。"},
+                "session": {"type": "string", "description": "关联的筛选会话 ID，默认为当前会话。"},
+                "selection": {
+                    "type": "string",
+                    "enum": ["selected", "high", "high_and_medium"],
+                    "description": "未传 papers 时的自动筛选范围：selected（已纳入）/high（高相关）/high_and_medium（中高相关）。",
+                },
+                "paper_ns": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "未传 papers 时按文献编号 n 精确选取。",
+                },
+                "skip_downloaded": {
+                    "type": "boolean",
+                    "description": "是否跳过本机已有或已下载过的文献，默认 true。",
+                },
             },
-            "required": ["papers", "title"],
+        },
+    },
+    {
+        "name": "propose_retry_download",
+        "description": "提议重试下载任务中失败的文献，或启动指定出版商的排队队列（生成确认卡等待用户确认）。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "job": {"type": "string", "description": "下载任务 ID。"},
+                "mode": {
+                    "type": "string",
+                    "enum": ["failed", "publisher_queue"],
+                    "description": "重试模式：failed（重试失败文献，默认）或 publisher_queue（启动出版商队列）。",
+                },
+                "publisher": {"type": "string", "description": "mode 为 publisher_queue 时必填的出版商名称。"},
+            },
+            "required": ["job"],
         },
     },
     {
@@ -160,14 +217,51 @@ CHAT_TOOLS: list[dict[str, Any]] = [
             "required": ["terms"],
         },
     },
+    {
+        "name": "propose_batch_screen",
+        "description": "提议批量调整当前会话中若干篇文献的相关度评分或纳入/排除决定（生成确认卡等待用户确认）。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "session": {"type": "string", "description": "目标会话 ID，默认为当前会话。"},
+                "summary": {"type": "string", "description": "一句话说明批量调整原因。"},
+                "items": {
+                    "type": "array",
+                    "description": "待调整的文献列表，每项指定文献编号 n 与目标字段。",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "n": {"type": "integer", "description": "文献编号 n。"},
+                            "relevance": {
+                                "type": "string",
+                                "enum": ["高", "中", "低", "不相关"],
+                                "description": "可选，目标相关度评分。",
+                            },
+                            "decision": {
+                                "type": ["string", "null"],
+                                "enum": ["selected", "rejected", None],
+                                "description": "可选，目标决定（selected/rejected/null）。",
+                            },
+                            "reject_reason": {"type": "string", "description": "可选，排除原因。"},
+                            "note": {"type": "string", "description": "可选，单篇调整原因说明。"},
+                        },
+                        "required": ["n"],
+                    },
+                },
+            },
+            "required": ["items"],
+        },
+    },
 ]
 
 _PROPOSE_SPECS: dict[str, tuple[str, str]] = {
     "propose_start_search": ("start_search", "发起文献检索"),
     "propose_resume_search": ("resume_search", "续跑深度检索"),
     "propose_download": ("download", "下载文献 PDF"),
+    "propose_retry_download": ("retry_download", "重试下载 / 启动队列"),
     "propose_zotero_push": ("zotero_push", "推送到 Zotero"),
     "propose_add_glossary": ("add_glossary", "添加术语同义词"),
+    "propose_batch_screen": ("batch_screen", "批量调整筛选结果"),
 }
 
 
@@ -230,6 +324,23 @@ def build_context_block(session_id: str, view: dict[str, Any] | None = None) -> 
         if ov["steering_notes"]:
             lines.append("活跃纠偏备注：" + "；".join(ov["steering_notes"]))
         parts.append("\n".join(lines))
+        try:
+            from ..desktop import download_jobs
+
+            sess_jobs = [j for j in download_jobs.list_jobs(limit=30) if j.get("session") == session_id]
+            if sess_jobs:
+                latest = sess_jobs[0]
+                dl_lines = [
+                    f"关联下载任务：最新 {latest['job']}（状态：{latest.get('state')}，完成 {latest.get('done', 0)}/{latest.get('total', 0)}，失败 {latest.get('failed', 0)}，排队 {latest.get('queued', 0)}）"
+                ]
+                pending_z = [p for p in download_jobs.zotero_pending() if p.get("job") == latest.get("job")]
+                if pending_z:
+                    dl_lines.append(
+                        f"待推送 Zotero：{len(pending_z[0].get('papers') or [])} 篇（目标：{pending_z[0].get('collection')}）"
+                    )
+                parts.append("\n".join(dl_lines))
+        except Exception:
+            pass
     else:
         notes = db.list_steering_notes(session_id, active_only=True) if session_id else []
         if notes:
@@ -376,6 +487,102 @@ def _exec_readonly_tool(
         plan = runner.plan_search(form, config=config)
         return _truncate_tool_result(json.dumps(plan, ensure_ascii=False))
 
+    if name == "get_download_status":
+        from ..desktop import download_jobs
+
+        job_id = str(args.get("job") or "").strip()
+        if job_id:
+            data = download_jobs.get(job_id)
+            items = data.get("items") or []
+            counts = {
+                "total": len(items),
+                "done": sum(1 for i in items if i.get("status") == "done"),
+                "failed": sum(1 for i in items if i.get("status") == "failed"),
+                "queued": sum(1 for i in items if i.get("status") == "queued"),
+                "waiting": sum(1 for i in items if i.get("status") == "waiting"),
+            }
+            failed_items = [
+                {
+                    "doi": i.get("doi"),
+                    "title": i.get("title"),
+                    "error": i.get("error"),
+                    "error_text": i.get("error_text"),
+                    "error_hint": i.get("error_hint"),
+                }
+                for i in items
+                if i.get("status") == "failed"
+            ]
+            return _truncate_tool_result(
+                json.dumps(
+                    {
+                        "job": data.get("job") or job_id,
+                        "title": data.get("title"),
+                        "session": data.get("session"),
+                        "state": data.get("state"),
+                        "counts": counts,
+                        "queues": data.get("queues") or [],
+                        "failed_items": failed_items,
+                        "zotero": data.get("zotero"),
+                    },
+                    ensure_ascii=False,
+                )
+            )
+
+        sid = str(args.get("session_id") or default_session)
+        limit = max(1, min(50, int(args.get("limit") or 10)))
+        all_jobs = download_jobs.list_jobs(limit=50)
+        matched = [j for j in all_jobs if j.get("session") == sid] if sid and sid != "__draft__" else []
+        session_matched = bool(matched)
+        jobs_out = matched[:limit] if session_matched else all_jobs[:limit]
+        return _truncate_tool_result(
+            json.dumps(
+                {
+                    "session_id": sid,
+                    "session_matched": session_matched,
+                    "jobs": jobs_out,
+                },
+                ensure_ascii=False,
+            )
+        )
+
+    if name == "get_zotero_status":
+        from ..config import load_config
+        from ..desktop import download_jobs
+        from ..zotero import client as zotero_client
+
+        cfg = config if config is not None else load_config()
+        mcp_found = bool(zotero_client.discover_zotero_mcp(cfg))
+        out: dict[str, Any] = {
+            "mcp_found": mcp_found,
+            "pending": download_jobs.zotero_pending(),
+            "history": download_jobs.zotero_history()[:10],
+        }
+        if default_session and default_session != "__draft__":
+            question = ""
+            if db.session_exists(default_session):
+                question = str(db.load_screening(default_session).get("question") or "").strip()
+            out["recommended_collection"] = download_jobs.default_collection(question or default_session)
+
+        include_cols = args.get("include_collections", True)
+        if include_cols and mcp_found:
+            try:
+                col_res = zotero_client.zotero_collections(cfg)
+                if col_res.get("success"):
+                    raw_cols = col_res.get("collections") or []
+                    out["collections"] = [
+                        (c.get("path") or c.get("name")) if isinstance(c, dict) else str(c)
+                        for c in raw_cols
+                    ]
+                else:
+                    out["collections"] = []
+                    out["collections_error"] = col_res.get("error") or "读取分类失败"
+            except Exception as exc:
+                out["collections"] = []
+                out["collections_error"] = str(exc)
+        else:
+            out["collections"] = []
+        return _truncate_tool_result(json.dumps(out, ensure_ascii=False))
+
     raise ValueError(f"未知只读工具：{name}")
 
 
@@ -394,12 +601,199 @@ def _build_action_card(name: str, args: dict[str, Any], default_session: str) ->
         if params.get("steering_note"):
             summary += f" | 备注：{params['steering_note']}"
     elif kind == "download":
-        count = len(params.get("papers") or [])
-        summary = f"任务：{params.get('title', '')}（{count} 篇）"
+        from ..desktop import download_jobs
+
+        target_session = str(params.get("session") or default_session)
+        skip_downloaded = bool(params.get("skip_downloaded", True))
+        missing_doi = 0
+        skipped_downloaded = 0
+        raw_papers = params.get("papers")
+        session_question = ""
+
+        if not raw_papers:
+            raw_papers = []
+            if target_session and target_session != "__draft__" and db.session_exists(target_session):
+                screening = db.load_screening(target_session)
+                session_question = str(screening.get("question") or "").strip()
+                all_items = screening.get("items") or screening.get("papers") or []
+                paper_ns = params.get("paper_ns")
+                if isinstance(paper_ns, list) and paper_ns:
+                    wanted_ns: set[int] = set()
+                    for n in paper_ns:
+                        try:
+                            wanted_ns.add(int(n))
+                        except (TypeError, ValueError):
+                            continue
+                    candidates = []
+                    for it in all_items:
+                        try:
+                            item_n = int(it.get("n"))
+                        except (TypeError, ValueError):
+                            continue
+                        if item_n in wanted_ns:
+                            candidates.append(it)
+                else:
+                    selection = str(params.get("selection") or "selected").strip()
+                    if selection == "high":
+                        candidates = [
+                            it
+                            for it in all_items
+                            if str(it.get("user_relevance") or it.get("relevance") or "").strip() == "高"
+                        ]
+                    elif selection == "high_and_medium":
+                        candidates = [
+                            it
+                            for it in all_items
+                            if str(it.get("user_relevance") or it.get("relevance") or "").strip() in ("高", "中")
+                        ]
+                    else:
+                        candidates = [it for it in all_items if it.get("decision") == "selected"]
+
+                for it in candidates:
+                    doi = str(it.get("doi") or "").strip()
+                    if not doi:
+                        missing_doi += 1
+                        continue
+                    raw_papers.append(
+                        {
+                            "doi": doi,
+                            "title": it.get("title") or doi,
+                            "year": it.get("year"),
+                            "journal": it.get("journal"),
+                        }
+                    )
+        else:
+            normalized_raw: list[dict[str, Any]] = []
+            for p in raw_papers:
+                if not isinstance(p, dict):
+                    continue
+                doi = str(p.get("doi") or "").strip()
+                if not doi:
+                    missing_doi += 1
+                    continue
+                normalized_raw.append(
+                    {
+                        "doi": doi,
+                        "title": p.get("title") or doi,
+                        "year": p.get("year"),
+                        "journal": p.get("journal"),
+                    }
+                )
+            raw_papers = normalized_raw
+
+        if skip_downloaded and raw_papers:
+            got_dois = download_jobs.downloaded_dois()
+            final_papers: list[dict[str, Any]] = []
+            for p in raw_papers:
+                if download_jobs.same_paper(p["doi"]) & got_dois:
+                    skipped_downloaded += 1
+                else:
+                    final_papers.append(p)
+        else:
+            final_papers = list(raw_papers)
+
+        dl_title = str(params.get("title") or "").strip() or session_question or (
+            target_session if target_session and target_session != "__draft__" else "文献下载"
+        )
+        preview_titles = [str(p.get("title") or p.get("doi") or "") for p in final_papers[:5]]
+        params = {
+            "papers": final_papers,
+            "title": dl_title,
+            "skipped_downloaded": skipped_downloaded,
+            "missing_doi": missing_doi,
+            "preview_titles": preview_titles,
+        }
+        if target_session and target_session != "__draft__":
+            params["session"] = target_session
+
+        summary = f"任务：{dl_title}（{len(final_papers)} 篇）"
+        if skipped_downloaded:
+            summary += f" | 跳过已有 {skipped_downloaded} 篇"
+        if missing_doi:
+            summary += f" | 缺 DOI {missing_doi} 篇"
+    elif kind == "retry_download":
+        from ..desktop import download_jobs
+
+        job_id = str(params.get("job") or "").strip()
+        mode = "publisher_queue" if params.get("mode") == "publisher_queue" else "failed"
+        publisher = str(params.get("publisher") or "").strip()
+        try:
+            data = download_jobs.get(job_id) if job_id else {}
+        except (OSError, ValueError):
+            data = {}
+        items = data.get("items") or []
+        if mode == "publisher_queue":
+            count = sum(
+                1
+                for it in items
+                if it.get("status") == "queued"
+                and (it.get("publisher") or download_jobs.OTHER_PUBLISHER) == publisher
+            )
+            summary = f"任务：{job_id} | 启动出版商队列：{publisher}（{count} 篇）"
+        else:
+            count = sum(1 for it in items if it.get("status") == "failed")
+            summary = f"任务：{job_id} | 失败文献重试（{count} 篇）"
+        params = {"job": job_id, "mode": mode, "count": count}
+        if publisher:
+            params["publisher"] = publisher
     elif kind == "zotero_push":
         summary = f"任务：{params.get('job', '')}"
         if params.get("collection"):
             summary += f" → 分类：{params['collection']}"
+    elif kind == "batch_screen":
+        target_session = str(params.get("session") or default_session)
+        by_n: dict[int, dict[str, Any]] = {}
+        if target_session and target_session != "__draft__" and db.session_exists(target_session):
+            screening = db.load_screening(target_session)
+            for it in screening.get("items") or screening.get("papers") or []:
+                try:
+                    item_n = int(it["n"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                by_n[item_n] = it
+
+        normalized_items: list[dict[str, Any]] = []
+        for raw in params.get("items") or []:
+            if not isinstance(raw, dict):
+                continue
+            try:
+                n_val = int(raw["n"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            hit = by_n.get(n_val)
+            if hit is None:
+                continue
+            entry: dict[str, Any] = {
+                "n": n_val,
+                "doi": hit.get("doi") or "",
+                "title": hit.get("title") or "",
+                "cur_relevance": hit.get("user_relevance") or hit.get("relevance") or "",
+                "cur_decision": hit.get("decision"),
+            }
+            if "relevance" in raw and raw.get("relevance") not in (None, ""):
+                entry["relevance"] = str(raw["relevance"])
+            if "decision" in raw:
+                dec = raw.get("decision")
+                if isinstance(dec, str):
+                    dec_norm = _DECISION_ALIASES.get(dec.strip().lower(), dec.strip().lower())
+                    entry["decision"] = None if dec_norm == "undecided" or not dec_norm else dec_norm
+                else:
+                    entry["decision"] = None
+            if "reject_reason" in raw and raw.get("reject_reason") not in (None, ""):
+                entry["reject_reason"] = str(raw["reject_reason"])
+            if "note" in raw and raw.get("note") not in (None, ""):
+                entry["note"] = str(raw["note"])
+            normalized_items.append(entry)
+
+        reason_summary = str(params.get("summary") or "").strip()
+        params = {
+            "session": target_session,
+            "summary": reason_summary,
+            "items": normalized_items,
+        }
+        summary = f"共 {len(normalized_items)} 篇"
+        if reason_summary:
+            summary += f" | {reason_summary}"
     else:
         terms = params.get("terms") or []
         summary = " / ".join(str(t) for t in terms)
@@ -425,15 +819,22 @@ def _stream_round(
 
     def _run() -> None:
         try:
-            reply = chat_stream(
-                messages,
-                CHAT_TOOLS,
-                config=config,
-                system=system,
-                max_tokens=2048,
-                timeout=120,
-                on_delta=lambda chunk: q.put(("delta", chunk)),
-            )
+            stream_kwargs: dict[str, Any] = {
+                "config": config,
+                "system": system,
+                "max_tokens": 2048,
+                "timeout": 120,
+                "on_delta": lambda chunk: q.put(("delta", chunk)),
+            }
+            try:
+                sig = inspect.signature(chat_stream)
+                if "on_reasoning" in sig.parameters or any(
+                    p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+                ):
+                    stream_kwargs["on_reasoning"] = lambda r: q.put(("reasoning", r))
+            except (TypeError, ValueError):
+                pass
+            reply = chat_stream(messages, CHAT_TOOLS, **stream_kwargs)
             q.put(("reply", reply))
         except Exception as exc:
             q.put(("error", exc))
@@ -442,8 +843,8 @@ def _stream_round(
     t.start()
     while True:
         kind, payload = q.get()
-        if kind == "delta":
-            yield ("delta", payload)
+        if kind in ("delta", "reasoning"):
+            yield (kind, payload)
         elif kind == "reply":
             yield ("reply", payload)
             break
@@ -491,6 +892,8 @@ def stream_chat_turn(
             ):
                 if ev_kind == "delta":
                     yield {"type": "delta", "text": ev_val}
+                elif ev_kind == "reasoning":
+                    yield {"type": "reasoning", "text": ev_val}
                 elif ev_kind == "reply":
                     reply = ev_val
 
@@ -602,6 +1005,31 @@ def execute_action(
             if dl_session is None and session_id != "__draft__":
                 dl_session = session_id
             result = download_jobs.start(papers, title, session=dl_session)
+        elif kind == "retry_download":
+            from ..desktop import download_jobs
+
+            job_id = str(params.get("job") or "").strip()
+            mode = str(params.get("mode") or "failed")
+            if mode == "publisher_queue":
+                publisher = str(params.get("publisher") or "").strip()
+                if not publisher:
+                    raise ValueError("启动出版商队列时必须指定 publisher")
+                job_data = download_jobs.start_queue(job_id, publisher)
+                result = {
+                    "job": job_data.get("job") or job_id,
+                    "mode": mode,
+                    "publisher": publisher,
+                    "message": f"已启动 {publisher} 队列下载",
+                }
+            else:
+                job_data = download_jobs.retry_failed(job_id)
+                new_job = job_data.get("job") or ""
+                result = {
+                    "job": new_job,
+                    "mode": mode,
+                    "count": len(job_data.get("items") or []),
+                    "message": f"已创建重试下载任务 {new_job}",
+                }
         elif kind == "zotero_push":
             from ..desktop import download_jobs
 
@@ -612,6 +1040,37 @@ def execute_action(
             terms = [str(t) for t in (params.get("terms") or [])]
             note = str(params.get("note") or "")
             result = glossary.add(terms, note=note)
+        elif kind == "batch_screen":
+            target_session = str(params.get("session") or session_id)
+            raw_items = params.get("items") or []
+            ops: list[dict[str, Any]] = []
+            for it in raw_items:
+                if not isinstance(it, dict):
+                    continue
+                op: dict[str, Any] = {
+                    "doi": it.get("doi"),
+                    "title": it.get("title"),
+                }
+                if "relevance" in it and it.get("relevance") not in (None, ""):
+                    op["relevance"] = str(it["relevance"])
+                if "decision" in it:
+                    dec = it.get("decision")
+                    if isinstance(dec, str):
+                        dec_norm = _DECISION_ALIASES.get(dec.strip().lower(), dec.strip().lower())
+                        op["decision"] = None if dec_norm == "undecided" or not dec_norm else dec_norm
+                    else:
+                        op["decision"] = None
+                if "reject_reason" in it and it.get("reject_reason") not in (None, ""):
+                    op["reject_reason"] = str(it["reject_reason"])
+                ops.append(op)
+            if not ops:
+                raise ValueError("请至少保留 1 篇待调整的文献")
+            res = db.batch_update_items(target_session, ops)
+            result = {
+                "updated": res.get("updated", len(ops)),
+                "count": len(ops),
+                "message": f"已更新 {len(ops)} 篇筛选记录",
+            }
         else:
             raise ValueError(f"未知动作类型：{kind}")
     except Exception as exc:

@@ -10,6 +10,7 @@ from __future__ import annotations
 import itertools
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -136,6 +137,7 @@ PROVIDER_PRESETS: list[dict[str, Any]] = [
         "model": "qwen2.5:14b",
         "plan_model": "qwen2.5:14b",
         "rate_model": "qwen2.5:7b",
+        "max_workers": 1,
         "needs_key": False,
         "note": "本机运行，无需 API Key，数据不出本地",
         "link": "",
@@ -239,6 +241,25 @@ def estimate_cost(usage_by_model: dict[str, dict[str, int]]) -> dict[str, Any]:
 
 ANTHROPIC_VERSION = "2023-06-01"
 _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+_THINK_CLOSED_RE = re.compile(r"<think\b[^>]*>.*?</think>", re.IGNORECASE | re.DOTALL)
+_THINK_UNCLOSED_RE = re.compile(r"<think\b[^>]*>.*\Z", re.IGNORECASE | re.DOTALL)
+
+
+def strip_thinking(text: str) -> str:
+    """Strip ``<think>...</think>`` blocks (including unclosed trailing blocks) and trim whitespace."""
+    s = str(text or "")
+    s = _THINK_CLOSED_RE.sub("", s)
+    s = _THINK_UNCLOSED_RE.sub("", s)
+    return s.strip()
+
+
+def recommended_concurrency(config: dict[str, Any] | None = None, *, task: str = "rate") -> int:
+    """Recommend worker concurrency based on whether the configured endpoint is local."""
+    cfg = model_config(config, task=task)
+    host = (urlparse(cfg.get("base_url") or "").hostname or "").strip().lower()
+    if host in _LOCAL_HOSTS:
+        return 1
+    return 3
 
 
 def model_config(config: dict[str, Any] | None = None, *, task: str = "default") -> dict[str, str]:
@@ -316,8 +337,12 @@ def _parse(cfg: dict[str, str], data: dict[str, Any]) -> dict[str, Any]:
                                           "arguments": block.get("input") or {}})
         out["stop"] = data.get("stop_reason") or ""
         return out
+    reasoning_parts: list[str] = []
     for choice in data.get("choices") or []:
         message = choice.get("message") or {}
+        reasoning = message.get("reasoning_content")
+        if reasoning:
+            reasoning_parts.append(str(reasoning))
         out["text"] += message.get("content") or ""
         for call in message.get("tool_calls") or []:
             fn = call.get("function") or {}
@@ -329,6 +354,8 @@ def _parse(cfg: dict[str, str], data: dict[str, Any]) -> dict[str, Any]:
             out["tool_calls"].append({"id": call.get("id", ""), "name": fn.get("name", ""),
                                       "arguments": args})
         out["stop"] = choice.get("finish_reason") or ""
+    if reasoning_parts:
+        out["reasoning"] = "".join(reasoning_parts)
     return out
 
 
@@ -470,8 +497,10 @@ def chat(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = No
 def _parse_openai_sse(
     lines: Iterable[str],
     on_delta: Callable[[str], None] | None = None,
+    on_reasoning: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     text_parts: list[str] = []
+    reasoning_parts: list[str] = []
     tool_buf: dict[int, dict[str, str]] = {}
     stop = ""
     usage: dict[str, Any] = {}
@@ -497,6 +526,12 @@ def _parse_openai_sse(
             if choice.get("finish_reason"):
                 stop = str(choice["finish_reason"])
             delta = choice.get("delta") or {}
+            reasoning = delta.get("reasoning_content")
+            if reasoning:
+                r_str = str(reasoning)
+                reasoning_parts.append(r_str)
+                if on_reasoning is not None:
+                    on_reasoning(r_str)
             content = delta.get("content")
             if content:
                 text_parts.append(content)
@@ -525,7 +560,10 @@ def _parse_openai_sse(
             args = {}
         tool_calls.append({"id": entry["id"], "name": entry["name"], "arguments": args})
 
-    return {"text": "".join(text_parts), "tool_calls": tool_calls, "stop": stop, "usage": usage}
+    out: dict[str, Any] = {"text": "".join(text_parts), "tool_calls": tool_calls, "stop": stop, "usage": usage}
+    if reasoning_parts:
+        out["reasoning"] = "".join(reasoning_parts)
+    return out
 
 
 def _parse_anthropic_sse(
@@ -627,10 +665,11 @@ def _parse_sse_lines(
     cfg: dict[str, str],
     lines: Iterable[str],
     on_delta: Callable[[str], None] | None,
+    on_reasoning: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     if cfg["protocol"] == "anthropic":
         return _parse_anthropic_sse(lines, on_delta)
-    return _parse_openai_sse(lines, on_delta)
+    return _parse_openai_sse(lines, on_delta, on_reasoning=on_reasoning)
 
 
 def _curl_http_status(header_path: Path) -> int:
@@ -653,6 +692,7 @@ def _post_stream_curl(
     proxy_url: str,
     timeout: float,
     on_delta: Callable[[str], None] | None,
+    on_reasoning: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     curl = _curl_bin()
     if not curl:
@@ -717,12 +757,14 @@ def _post_stream_curl(
             if isinstance(data, dict) and data.get("error") and not data.get("choices") and not data.get("content"):
                 raise RuntimeError(str(data["error"]))
             res = _parse(cfg, data)
+            if res.get("reasoning") and on_reasoning is not None:
+                on_reasoning(res["reasoning"])
             if res["text"] and on_delta is not None:
                 on_delta(res["text"])
             return res
 
         lines = itertools.chain([first_non_empty] if first_non_empty else [], proc.stdout)
-        res = _parse_sse_lines(cfg, lines, on_delta)
+        res = _parse_sse_lines(cfg, lines, on_delta, on_reasoning=on_reasoning)
         stderr_out = proc.stderr.read()
         rc = proc.wait()
         status_code = _curl_http_status(header_path)
@@ -746,9 +788,10 @@ def _post_stream_once(
     host: str,
     timeout: float,
     on_delta: Callable[[str], None] | None,
+    on_reasoning: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     if host and host in _CURL_HOSTS and _curl_bin():
-        return _post_stream_curl(cfg, url, req_headers, body, proxy_url, timeout, on_delta)
+        return _post_stream_curl(cfg, url, req_headers, body, proxy_url, timeout, on_delta, on_reasoning=on_reasoning)
     conn_timeout = min(6.0, float(timeout)) if timeout else 6.0
     try:
         resp = requests.post(
@@ -761,7 +804,7 @@ def _post_stream_once(
         )
     except (requests.Timeout, requests.ConnectionError):
         if host and host not in _LOCAL_HOSTS and _curl_bin():
-            res = _post_stream_curl(cfg, url, req_headers, body, proxy_url, timeout, on_delta)
+            res = _post_stream_curl(cfg, url, req_headers, body, proxy_url, timeout, on_delta, on_reasoning=on_reasoning)
             _CURL_HOSTS.add(host)
             return res
         raise
@@ -775,11 +818,13 @@ def _post_stream_once(
         if "application/json" in ctype:
             data = resp.json()
             res = _parse(cfg, data)
+            if res.get("reasoning") and on_reasoning is not None:
+                on_reasoning(res["reasoning"])
             if res["text"] and on_delta is not None:
                 on_delta(res["text"])
             return res
         resp.encoding = resp.encoding or "utf-8"
-        return _parse_sse_lines(cfg, resp.iter_lines(decode_unicode=True), on_delta)
+        return _parse_sse_lines(cfg, resp.iter_lines(decode_unicode=True), on_delta, on_reasoning=on_reasoning)
 
 
 def _post_stream(
@@ -790,6 +835,7 @@ def _post_stream(
     config: dict[str, Any],
     timeout: float,
     on_delta: Callable[[str], None] | None,
+    on_reasoning: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     host = (urlparse(url).hostname or "").lower()
     proxy_url = "" if host in _LOCAL_HOSTS else select_proxy_for_url(url, config)
@@ -797,7 +843,9 @@ def _post_stream(
     req_headers = {**headers, "User-Agent": user_agent()}
     for attempt in range(_MAX_RETRIES + 1):
         try:
-            return _post_stream_once(cfg, url, req_headers, body, proxy_url, proxies, host, timeout, on_delta)
+            return _post_stream_once(
+                cfg, url, req_headers, body, proxy_url, proxies, host, timeout, on_delta, on_reasoning=on_reasoning
+            )
         except _RetryableHTTPError as exc:
             if attempt >= _MAX_RETRIES:
                 raise RuntimeError(str(exc)) from exc
@@ -815,6 +863,7 @@ def chat_stream(
     timeout: float = 120,
     task: str = "default",
     on_delta: Callable[[str], None] | None = None,
+    on_reasoning: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Streaming round trip over OpenAI or Anthropic SSE, returning the same shape as ``chat()``."""
     cfg = model_config(config, task=task)
@@ -830,7 +879,7 @@ def chat_stream(
     body["stream"] = True
     if cfg["protocol"] == "openai":
         body["stream_options"] = {"include_usage": True}
-    return _post_stream(cfg, _endpoint(cfg), _headers(cfg), body, config or {}, timeout, on_delta)
+    return _post_stream(cfg, _endpoint(cfg), _headers(cfg), body, config or {}, timeout, on_delta, on_reasoning=on_reasoning)
 
 
 _PING_TOOL = {

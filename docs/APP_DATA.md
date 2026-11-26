@@ -18,7 +18,7 @@
 |---|---|---|
 | `litloop.db`（`sessions`、`decisions` 表） | Agent、app | 筛选记录：问题、检索历史、每篇的评分与理由、用户的决定，以及深度检索概况 `summary_json` 与候选池元数据 `pool_state_json`（旧 `<session>.json` / `<session>.summary.json` 只读兼容自动导入） |
 | `litloop.db`（`pool_items` 表） | Agent | 深度检索候选池（app 不读；旧 `<session>.pool.json` 只读兼容自动导入） |
-| `litloop.db`（`agent_messages` 表，`DB_SCHEMA = 2`） | 内置 Agent、app | 内置 Agent 对话历史（`id`、`session_id`、`role`、`content`、`actions_json`、`usage_json`、`created`），无外键约束以支持 `"__draft__"` 草稿会话，待确认动作卡片状态持久化在 `actions_json` 中 |
+| `litloop.db`（`agent_messages` 表，`DB_SCHEMA = 2`） | 内置 Agent、app | 内置 Agent 对话历史（`id`、`session_id`、`role`、`content`、`actions_json`、`usage_json`、`created`），无外键约束以支持 `"__draft__"` 草稿会话，待确认动作卡片状态持久化在 `actions_json` 中（支持 `start_search`、`resume_search`、`batch_screen`、`download`、`retry_download`、`zotero_push`、`add_glossary`） |
 | `litloop.db`（`steering_notes` 表，`DB_SCHEMA = 2`） | 内置 Agent、app | 用户对会话的纠偏备注（`id`、`session_id`、`note`、`active`、`created`），深度检索续跑时自动注入模型上下文，无外键约束以支持 `"__draft__"` 会话 |
 | `<session>.md` | Agent、app | 筛选记录的表格版，给人读，app 不用 |
 | `<session>.progress.json` | Agent | 正在运行的这一轮在做什么，只有深度检索有 |
@@ -57,7 +57,7 @@
 ```
 
 - `relevance`、`reason`：Agent 的评分和理由，取值 `高`、`中`、`低`、`不相关`。
-- `abstract_zh`：中文摘要（可选）。翻译服务为 DeepSeek / DeepL 时由 **app 写**（用户打开文献时翻译一次，见 `desktop/translate.py`）；为 Agent 时由 Agent 在评分时写，或用 `litloop_screening(action="translate")` 补。重新评分不会抹掉它。
+- `abstract_zh`：中文摘要（可选）。翻译服务为 `builtin`、DeepSeek、DeepL，或为 `agent` 且已配置内置模型时，均由 **app 写**（用户打开文献时按需翻译一次，见 `desktop/translate.py`）；未配内置模型且为 `agent` 时由外部 Agent 在评分时写，或用 `litloop_screening(action="translate")` 补。重新评分不会抹掉它。
 - 只有用户评过、Agent 还没评的文献（app 里「继续检索」出的批次）：**app 写**，`reason` 为空，`relevance` 和 `user_relevance` 都是用户的评分；Agent 之后评分时填上自己的 `relevance` 和 `reason`，`user_relevance` 保留。`litloop_deep_search(action="status")` 的 `unrated` 列出最近一批里 Agent 还没评的。
 - `user_relevance`：**app 写**。用户改过的评分，覆盖 Agent 的（排序、停止判断都用它）；Agent 再评同一篇时不会抹掉它。没改过就没有这个字段。
 - `decision`：**app 写**（或 Agent 按用户的话写）。`selected`（选中下载）、`rejected`（排除）或 `null`。

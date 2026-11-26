@@ -236,6 +236,30 @@ def start(papers: list[dict[str, Any]], title: str, session: str | None = None,
         raise
 
 
+def retry_failed(job: str) -> dict[str, Any]:
+    """Start a new download job for items that failed in an existing job."""
+    data = get(job)
+    failed_papers = [
+        {
+            "doi": it.get("doi"),
+            "title": it.get("title"),
+            "year": it.get("year"),
+            "journal": it.get("journal"),
+        }
+        for it in (data.get("items") or [])
+        if it.get("status") == "failed"
+    ]
+    if not failed_papers:
+        raise ValueError("这个任务里没有下载失败的文献")
+    title = f"{data.get('title') or job}（重试）"
+    return start(
+        failed_papers,
+        title,
+        session=data.get("session"),
+        zotero_target=data.get("zotero_target"),
+    )
+
+
 def start_queue(job: str, publisher: str) -> dict[str, Any]:
     """Download the papers of one publisher's queue (see the module doc)."""
     path = job_path(job)
@@ -259,6 +283,30 @@ def start_queue(job: str, publisher: str) -> dict[str, Any]:
         _CURRENT.update(job=None)
         _RUN_LOCK.release()
         raise
+
+
+def retry_failed(job: str) -> dict[str, Any]:
+    """Start a new download job for items that failed in an existing job."""
+    data = get(job)
+    failed_papers = [
+        {
+            "doi": it.get("doi"),
+            "title": it.get("title"),
+            "year": it.get("year"),
+            "journal": it.get("journal"),
+        }
+        for it in (data.get("items") or [])
+        if it.get("status") == "failed"
+    ]
+    if not failed_papers:
+        raise ValueError("这个任务里没有下载失败的文献")
+    title = f"{data.get('title') or job}（重试）"
+    return start(
+        failed_papers,
+        title,
+        session=data.get("session"),
+        zotero_target=data.get("zotero_target"),
+    )
 
 
 def cancel() -> bool:

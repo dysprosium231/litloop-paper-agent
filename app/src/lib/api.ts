@@ -810,7 +810,7 @@ export const zoteroApi = {
 
 export interface AgentActionCard {
   id: string
-  kind: "start_search" | "resume_search" | "download" | "zotero_push" | "add_glossary"
+  kind: "start_search" | "resume_search" | "download" | "retry_download" | "zotero_push" | "add_glossary" | "batch_screen"
   title: string
   summary: string
   params: Record<string, unknown>
@@ -852,6 +852,7 @@ export interface AgentViewContext {
 export type AgentChatEvent =
   | { type: "user_message"; message: AgentMessage }
   | { type: "delta"; text: string }
+  | { type: "reasoning"; text: string }
   | { type: "tool"; name: string; label?: string }
   | { type: "action"; action: AgentActionCard }
   | { type: "done"; message: AgentMessage }
@@ -903,7 +904,7 @@ export const agentChatApi = {
     signal?: AbortSignal,
   ): Promise<void> => {
     const { port, token } = await getBackend()
-    const res = await fetch(`http://127.0.0.1:${port}/api/agent/chat/${encodeURIComponent(sessionId)}`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/agent/chat/${encodeURIComponent(sessionId)}/stream`, {
       method: "POST",
       headers: {
         "X-LitLoop-Token": token,

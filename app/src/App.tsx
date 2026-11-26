@@ -641,14 +641,38 @@ export default function App() {
         setSection("download")
       }
       downloads.refresh()
+      showNotice(typeof result?.message === "string" && result.message ? result.message : "已发起下载任务，可在下载页查看进度")
+    } else if (action.kind === "retry_download") {
+      if (result && typeof result.job === "string" && result.job) {
+        openJob(result.job)
+      } else {
+        setSection("download")
+      }
+      downloads.refresh()
+      showNotice(typeof result?.message === "string" && result.message ? result.message : "已发起重试下载，可在下载页查看进度")
     } else if (action.kind === "zotero_push") {
       zotero.refresh()
       setZoteroView("queue")
       setSection("zotero")
+      showNotice(typeof result?.message === "string" && result.message ? result.message : "已提交 Zotero 推送，可在 Zotero 页查看进度")
     } else if (action.kind === "add_glossary") {
       showNotice("已更新术语表")
+    } else if (action.kind === "batch_screen") {
+      reload()
+      const msg = typeof result?.message === "string" && result.message ? result.message : "已更新筛选记录"
+      showNotice(msg)
     }
   }, [sid, reload, downloads, zotero, showNotice])
+
+  const handleSelectPaperByNumber = React.useCallback((n: number) => {
+    const hit = papers.find((p) => p.item?.n === n)
+    if (hit) {
+      setCurrent(paperKey(hit))
+      showNotice(`已切换到文献 #${n}`)
+    } else {
+      showNotice(`当前列表中未找到文献 #${n}`)
+    }
+  }, [papers, showNotice])
 
   const heading = summary && onlyBatch && summary.current_batch?.length
     ? `第 ${summary.batches.length} 批 · ${summary.current_batch.length} 篇`
@@ -846,6 +870,7 @@ export default function App() {
                 currentPaper={paper}
                 onClose={() => setDrawerOpen(false)}
                 onActionConfirmed={handleAgentActionConfirmed}
+                onSelectPaperByNumber={handleSelectPaperByNumber}
               />
             )}
           </div>

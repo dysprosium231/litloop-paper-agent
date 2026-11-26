@@ -436,3 +436,101 @@ def test_client_retries_429_and_5xx_and_fails_fast_on_401(monkeypatch):
     with pytest.raises(RuntimeError, match="HTTP 401"):
         client.chat([{"role": "user", "content": "hi"}], config=cfg)
     assert calls["n"] == 1 and sleeps == []
+
+
+def test_strip_thinking_closed_multiple_and_unclosed():
+    from litloop.agents import client
+
+    assert client.strip_thinking("<think>reasoning</think>\n{\"a\": 1}") == '{"a": 1}'
+    assert client.strip_thinking("<think>a</think>hello <think>b</think>world") == "hello world"
+    assert client.strip_thinking("<think>truncated reasoning without close") == ""
+    assert client.strip_thinking("prefix\n<think>unclosed tail") == "prefix"
+
+
+def test_reasoning_content_separated_in_parse_and_sse(monkeypatch):
+    from litloop.agents import client
+
+    parsed = client._parse(
+        {"protocol": "openai"},
+        {
+            "choices": [
+                {
+                    "message": {"content": "最终答案", "reasoning_content": "先想一步"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+        },
+    )
+    assert parsed["text"] == "最终答案"
+    assert parsed["reasoning"] == "先想一步"
+
+    class _FakeSSEResp:
+        status_code = 200
+        headers = {"content-type": "text/event-stream"}
+        encoding = "utf-8"
+
+        def iter_lines(self, decode_unicode: bool = True):
+            return iter([
+                'data: {"choices":[{"delta":{"reasoning_content":"思考1"}}]}',
+                'data: {"choices":[{"delta":{"reasoning_content":"思考2","content":"正文A"}}]}',
+                'data: {"choices":[{"delta":{"content":"正文B"},"finish_reason":"stop"}]}',
+                "data: [DONE]",
+            ])
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(client.requests, "post", lambda *a, **k: _FakeSSEResp())
+    deltas: list[str] = []
+    reasonings: list[str] = []
+    out = client.chat_stream(
+        [{"role": "user", "content": "hi"}],
+        config={"builtin_agent_provider": "openai", "builtin_agent_model": "deepseek-reasoner", "builtin_agent_api_key": "k"},
+        on_delta=deltas.append,
+        on_reasoning=reasonings.append,
+    )
+    assert deltas == ["正文A", "正文B"]
+    assert reasonings == ["思考1", "思考2"]
+    assert out["text"] == "正文A正文B"
+    assert out["reasoning"] == "思考1思考2"
+
+
+def test_recommended_concurrency_local_vs_cloud():
+    from litloop.agents import client
+
+    assert get_preset("ollama")["max_workers"] == 1
+    assert client.recommended_concurrency({"builtin_agent_base_url": "http://127.0.0.1:11434/v1"}) == 1
+    assert client.recommended_concurrency({"builtin_agent_base_url": "http://localhost:11434/v1"}) == 1
+    assert client.recommended_concurrency({"builtin_agent_base_url": "http://[::1]:11434/v1"}) == 1
+    assert client.recommended_concurrency({"builtin_agent_base_url": "https://api.deepseek.com/v1"}) == 3
+
+
+def test_scorer_missing_abstract_prompt_and_think_stripping(monkeypatch):
+    assert "（无摘要）" in scorer._SYSTEM_PROMPT
+    assert "仅凭标题：" in scorer._SYSTEM_PROMPT
+
+    raw = '<think>let me think\n{"ratings": [{"n": 99}]}\n</think>\n```json\n{"ratings": [{"n": 1, "relevance": "中", "reason": "仅凭标题：可能相关"}]}\n```'
+    parsed = scorer._parse_chunk_ratings(raw, {1})
+    assert parsed[1]["relevance"] == "中"
+    assert parsed[1]["reason"] == "仅凭标题：可能相关"
+
+    monkeypatch.setattr(
+        scorer,
+        "chat",
+        lambda *a, **k: {
+            "text": '<think>分析中</think>{"ratings": [{"n": 1, "relevance": "低", "reason": "仅凭标题：弱相关"}]}',
+            "usage": {"prompt_tokens": 20, "completion_tokens": 10},
+        },
+    )
+    res = score_papers(
+        "SiC/Al",
+        [],
+        [{"title": "Some title", "abstract": ""}],
+        config={"builtin_agent_provider": "openai", "builtin_agent_base_url": "http://127.0.0.1:11434/v1", "builtin_agent_model": "qwen2.5:7b"},
+    )
+    assert res["missing"] == []
+    assert res["ratings"][0]["relevance"] == "低"

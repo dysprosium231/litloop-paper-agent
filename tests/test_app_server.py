@@ -536,3 +536,76 @@ def test_agent_chat_stream_and_action_confirm_cancel(client, session, monkeypatc
         "/api/agent/actions/cancel",
         json={"session_id": session, "message_id": msg["id"], "action_id": "no-such-act"},
     ).status_code == 404
+
+
+def test_translation_uses_builtin_model_when_configured(client, monkeypatch):
+    from litloop import config as _config, db
+    from litloop.agents import client as aclient
+    from litloop.desktop import translate
+
+    sid = screening.save("q", [{
+        "doi": "10.1/abs",
+        "title": "Abstract Paper",
+        "abstract": "We report a novel catalyst.",
+        "relevance": "高",
+        "reason": "r",
+    }])["session"]
+
+    cfg_ready = {
+        "translation_provider": "agent",
+        "builtin_agent_provider": "openai",
+        "builtin_agent_model": "deepseek-chat",
+        "builtin_agent_api_key": "sk-test",
+    }
+    monkeypatch.setattr(_config, "load_config", lambda: cfg_ready)
+    monkeypatch.setattr(translate, "load_config", lambda: cfg_ready)
+    res_ready = client.get("/api/translation")
+    assert res_ready.status_code == 200
+    assert res_ready.json()["provider"] == "agent"
+    assert res_ready.json()["ready"] is True
+
+    monkeypatch.setattr(
+        aclient,
+        "chat",
+        lambda *a, **k: {"text": "<think>内部思考</think>\n我们报道了一种新型催化剂。", "tool_calls": [], "stop": "stop", "usage": {}},
+    )
+    res_tr = client.post(f"/api/sessions/{sid}/translate", json={"doi": "10.1/abs", "title": "Abstract Paper"})
+    assert res_tr.status_code == 200
+    assert res_tr.json() == {"abstract_zh": "我们报道了一种新型催化剂。"}
+    saved = db.load_screening(sid)["items"][0]
+    assert saved["abstract_zh"] == "我们报道了一种新型催化剂。"
+
+    # 未配置内置模型时返回 502 并附友好引导
+    cfg_empty = {"translation_provider": "agent"}
+    monkeypatch.setattr(_config, "load_config", lambda: cfg_empty)
+    monkeypatch.setattr(translate, "load_config", lambda: cfg_empty)
+    assert client.get("/api/translation").json()["ready"] is False
+    sid2 = screening.save("q2", [{
+        "doi": "10.1/abs2",
+        "title": "Abstract Paper 2",
+        "abstract": "Another abstract.",
+        "relevance": "高",
+        "reason": "r",
+    }])["session"]
+    res_fail = client.post(f"/api/sessions/{sid2}/translate", json={"doi": "10.1/abs2", "title": "Abstract Paper 2"})
+    assert res_fail.status_code == 502
+    assert "内置 Agent" in res_fail.json()["detail"]
+
+
+def test_agent_chat_stream_requires_stream_suffix(client, session, monkeypatch):
+    from litloop.agents import chat_agent
+
+    monkeypatch.setattr(
+        chat_agent,
+        "stream_chat_turn",
+        lambda sid, text, *, view=None, config=None: iter([
+            {"type": "delta", "text": "ok"},
+            {"type": "done", "message": {"id": 1, "role": "assistant", "content": "ok"}},
+        ]),
+    )
+    ok_res = client.post(f"/api/agent/chat/{session}/stream", json={"message": "你好"})
+    assert ok_res.status_code == 200
+    assert ok_res.headers["content-type"].startswith("text/event-stream")
+
+    bad_res = client.post(f"/api/agent/chat/{session}", json={"message": "你好"})
+    assert bad_res.status_code in (404, 405)

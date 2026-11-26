@@ -42,7 +42,7 @@
 | `publisher_site_skip_prefixes` | `["10.1201", "10.4324"]` | 第一阶段不打开出版商官网的 DOI 前缀（默认是 Taylor & Francis 的 CRC、Routledge 图书：官网慢、没有单章 PDF，学校通道能直接下整本书） |
 | `request_delay_min` / `request_delay_max` | `2.0` / `5.0` | 请求间的随机延迟（秒） |
 | `cache_ttl_hours` | `168` | 下载缓存有效期，设 0 表示不缓存 |
-| `abstract_translation` / `translation_provider` | `高` / `deepseek` | 摘要翻译的范围和服务（见 [桌面 app 能做什么](../README.md#桌面-app-能做什么)） |
+| `abstract_translation` / `translation_provider` | `高` / `deepseek` | 摘要翻译的范围（`高`/`高中`/`all`/`off`）和服务（`builtin`、`deepseek`、`deepl`、`agent`；设为 `builtin` 或在 `agent` 下已配置内置模型时直接调用内置模型按需翻译，见 [桌面 app 能做什么](../README.md#桌面-app-能做什么)） |
 | `update_check_days` | `7` | 每隔几天检查 LitLoop、easyseek、zotero-mcp 有没有新版本，有则在检索、下载结果和 app 设置页提示（不自动安装）；设 0 关闭 |
 | `agent_command` / `agent_args` | `claude` / 空 | app 里「新建检索」调起的 Agent 命令和参数（`agent_harness` 选 `custom` 时使用） |
 | `agent_harness` | `auto` | app 调起的外部 Agent（Harness）：`auto`（按已安装顺序自动选择或跟随 `agent_backend`/`agent_command`）、`claude`、`workbuddy`、`dsh`、`codex`、`builtin`、`custom` |

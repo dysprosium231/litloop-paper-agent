@@ -9,11 +9,14 @@ are the same ``{"name", "description", "parameters"}`` dicts ``chat()`` takes.
 from __future__ import annotations
 
 import json
+import math
 import threading
 from typing import Any, Callable
 
+from .. import config as _config
 from ..search import deep, quick, screening
-from .client import chat, estimate_cost, model_config, normalize_usage
+from ..zotero import client as zotero_client
+from .client import chat, estimate_cost, model_config, normalize_usage, strip_thinking
 from .scorer import collect_user_feedback, score_papers
 
 Tool = Callable[..., Any]
@@ -138,7 +141,7 @@ def plan_search(form: dict[str, Any], *, config: dict[str, Any] | None = None) -
 
     reply = chat([{"role": "user", "content": "\n".join(user_parts)}],
                  tools=None, config=config, system=system, max_tokens=1200, timeout=60, task="plan")
-    raw_text = _strip_code_fence(str(reply.get("text") or ""))
+    raw_text = _strip_code_fence(strip_thinking(str(reply.get("text") or "")))
     try:
         parsed = json.loads(raw_text)
     except ValueError:
@@ -249,6 +252,120 @@ def _as_str_list(val: Any) -> list[str]:
     return []
 
 
+def _opt_int(val: Any) -> int | None:
+    if val in (None, "", False):
+        return None
+    try:
+        n = int(val)
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
+
+
+def _opt_bool(val: Any) -> bool:
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        return val.strip().lower() not in ("", "0", "false", "no", "off")
+    return bool(val)
+
+
+def _journal_criteria_lines(
+    max_cas_zone: int | None,
+    max_jcr_quartile: int | None,
+    exclude_warning: bool,
+) -> list[str]:
+    lines: list[str] = []
+    if max_cas_zone is not None:
+        lines.append("优先中科院 1 区期刊" if max_cas_zone == 1 else f"优先中科院 1–{max_cas_zone} 区期刊")
+    if max_jcr_quartile is not None:
+        lines.append("优先 JCR Q1 期刊" if max_jcr_quartile == 1 else f"优先 JCR Q1–Q{max_jcr_quartile} 期刊")
+    if exclude_warning:
+        lines.append("排除预警期刊")
+    return lines
+
+
+def _select_seeds(
+    question: str,
+    criteria: list[str],
+    candidates: list[dict[str, Any]],
+    *,
+    config: dict[str, Any] | None = None,
+) -> tuple[list[str], dict[str, Any]]:
+    """Pick 1-3 representative seed DOIs from candidates via the rating model, with top-3 fallback."""
+    pool = [p for p in candidates if str(p.get("doi") or "").strip()]
+    if not pool:
+        return [], estimate_cost({})
+    fallback = [str(p["doi"]).strip() for p in pool[:3]]
+
+    system = (
+        "你是学术文献检索助手。请从候选文献中挑选最贴合研究课题的 1–3 篇代表作作为深度检索的起点种子文献。"
+        '只输出一个合法 JSON 对象，格式为 {"selected": [1, 4, 7]}，数字为候选文献的编号。不要输出任何其他文字。'
+    )
+    lines = [f"检索问题：{question}"]
+    if criteria:
+        lines.append("纳入标准：\n" + "\n".join(f"- {c}" for c in criteria))
+    lines.append("候选文献：")
+    for idx, p in enumerate(pool, 1):
+        year = p.get("year") or "未知年份"
+        title = str(p.get("title") or "").strip() or "无标题"
+        journal = str(p.get("journal") or "").strip()
+        doi = str(p.get("doi") or "").strip()
+        header = f"{idx}. [{year}] {title}"
+        if journal:
+            header += f" — {journal}"
+        header += f" (DOI: {doi})"
+        lines.append(header)
+        abstract = str(p.get("abstract") or "").strip()
+        if abstract:
+            lines.append(f"   摘要：{abstract[:300]}")
+
+    cfg = model_config(config, task="rate")
+    try:
+        reply = chat(
+            [{"role": "user", "content": "\n".join(lines)}],
+            tools=None,
+            config=config,
+            system=system,
+            max_tokens=256,
+            timeout=60,
+            task="rate",
+        )
+    except Exception:
+        return fallback, estimate_cost({})
+
+    usage = (
+        estimate_cost({cfg["model"]: normalize_usage(reply.get("usage"))})
+        if cfg.get("model")
+        else estimate_cost({})
+    )
+    raw_text = _strip_code_fence(str(reply.get("text") or ""))
+    try:
+        parsed = json.loads(raw_text)
+    except ValueError:
+        parsed = {}
+
+    raw_selected = parsed.get("selected") if isinstance(parsed, dict) else None
+    picked: list[str] = []
+    seen_dois: set[str] = set()
+    if isinstance(raw_selected, list):
+        for item in raw_selected:
+            if isinstance(item, bool):
+                continue
+            try:
+                num = int(item)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= num <= len(pool):
+                doi = str(pool[num - 1].get("doi") or "").strip()
+                if doi and doi.lower() not in seen_dois:
+                    seen_dois.add(doi.lower())
+                    picked.append(doi)
+                    if len(picked) >= 3:
+                        break
+    return (picked or fallback), usage
+
+
 def _format_summary(prefix: str, total_rated: int, by_rel: dict[str, int] | None, cancelled: bool) -> str:
     rel = by_rel or {}
     parts = [f"{k} {rel.get(k, 0)} 篇" for k in ("高", "中", "低", "不相关") if rel.get(k, 0)]
@@ -281,6 +398,9 @@ def run_builtin_search(
     year_from = form.get("year_from")
     year_to = form.get("year_to")
     sort = form.get("sort")
+    max_cas_zone = _opt_int(form.get("max_cas_zone"))
+    max_jcr_quartile = _opt_int(form.get("max_jcr_quartile"))
+    exclude_warning = _opt_bool(form.get("exclude_warning"))
     usage_by_model: dict[str, dict[str, int]] = {}
 
     need_plan = (not queries) or (mode == "deep" and not core_terms)
@@ -297,8 +417,8 @@ def run_builtin_search(
 
     if mode != "deep":
         limit = max(1, int(form.get("limit") or 20))
-        papers: list[dict[str, Any]] = []
-        seen_keys: set[str] = set()
+        per_query = max(10, min(limit, math.ceil(limit * 1.5 / max(1, len(queries))) + 4))
+        runs: list[list[dict[str, Any]]] = []
         for q in queries:
             if stop_event and stop_event.is_set():
                 return {
@@ -307,19 +427,18 @@ def run_builtin_search(
                     "usage": estimate_cost(usage_by_model),
                     "cancelled": True,
                 }
-            hits = quick.search_papers_v2(q, limit=limit, year_from=year_from, year_to=year_to, sort=sort)
-            for p in hits:
-                doi = str(p.get("doi") or "").strip().lower()
-                title = str(p.get("title") or "").strip().lower()
-                key = doi or title
-                if not key or key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                papers.append(p)
-                if len(papers) >= limit:
-                    break
-            if len(papers) >= limit:
-                break
+            hits = quick.search_papers_v2(
+                q,
+                limit=per_query,
+                year_from=year_from,
+                year_to=year_to,
+                sort=sort,
+                max_cas_zone=max_cas_zone,
+                max_jcr_quartile=max_jcr_quartile,
+                exclude_warning=exclude_warning,
+            )
+            runs.append(hits)
+        papers = quick._take_in_turns(runs)[:limit]
 
         if not papers:
             return {
@@ -398,10 +517,37 @@ def run_builtin_search(
         }
 
     # Deep search mode
+    for line in _journal_criteria_lines(max_cas_zone, max_jcr_quartile, exclude_warning):
+        if line not in criteria:
+            criteria.append(line)
+
     seeds = _as_str_list(form.get("seeds"))
+    seed_collection = str(form.get("seed_collection") or "").strip()
+    if seed_collection:
+        emit("progress", {"text": f"正在从 Zotero 分类「{seed_collection}」读取种子文献…"})
+        try:
+            z_res = zotero_client.collection_dois(seed_collection, config or _config.load_config())
+        except Exception as exc:
+            emit("progress", {"text": f"读取 Zotero 分类「{seed_collection}」失败（{exc}），将继续后续流程。"})
+        else:
+            if not z_res.get("success"):
+                err = z_res.get("error") or "未知错误"
+                emit("progress", {"text": f"未能从 Zotero 分类「{seed_collection}」获取种子（{err}），将继续后续流程。"})
+            else:
+                z_dois = [str(d).strip() for d in (z_res.get("dois") or []) if str(d).strip()]
+                if not z_dois:
+                    emit("progress", {"text": f"Zotero 分类「{seed_collection}」内暂无带 DOI 的文献，将继续后续流程。"})
+                else:
+                    seen_seeds = {s.lower() for s in seeds}
+                    for doi in z_dois:
+                        if doi.lower() not in seen_seeds:
+                            seen_seeds.add(doi.lower())
+                            seeds.append(doi)
+
     if not seeds:
         emit("progress", {"text": "正在快速检索种子文献…"})
-        for q in queries:
+        seed_runs: list[list[dict[str, Any]]] = []
+        for q in queries[:3]:
             if stop_event and stop_event.is_set():
                 return {
                     "text": "深度检索已取消。",
@@ -409,14 +555,24 @@ def run_builtin_search(
                     "usage": estimate_cost(usage_by_model),
                     "cancelled": True,
                 }
-            for p in quick.search_papers_v2(q, limit=10, year_from=year_from, year_to=year_to):
-                doi = str(p.get("doi") or "").strip()
-                if doi and doi not in seeds:
-                    seeds.append(doi)
-                    if len(seeds) >= 3:
-                        break
-            if len(seeds) >= 3:
-                break
+            seed_runs.append(
+                quick.search_papers_v2(
+                    q,
+                    limit=10,
+                    year_from=year_from,
+                    year_to=year_to,
+                    max_cas_zone=max_cas_zone,
+                    max_jcr_quartile=max_jcr_quartile,
+                    exclude_warning=exclude_warning,
+                )
+            )
+        seed_candidates = [
+            p for p in quick._take_in_turns(seed_runs) if str(p.get("doi") or "").strip()
+        ][:15]
+        if seed_candidates:
+            emit("progress", {"text": f"正在从 {len(seed_candidates)} 篇候选中精选代表作作为种子…"})
+            seeds, sel_usage = _select_seeds(question, criteria, seed_candidates, config=config)
+            _merge_cost(usage_by_model, sel_usage)
 
     batch_size = max(1, int(form.get("batch_size") or 20))
     batches_limit = max(0, int(form.get("batches") or 0))

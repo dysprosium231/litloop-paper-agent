@@ -362,3 +362,246 @@ def test_start_from_draft_migrates_chat_and_steering_to_new_session(builtin, tmp
     assert db.list_steering_notes("__draft__") == []
     assert [m["content"] for m in db.list_agent_messages("20261125-migrated")] == ["帮我搜 SiC/Al"]
     assert [n["note"] for n in db.list_steering_notes("20261125-migrated")] == ["排除纯仿真"]
+
+
+def test_quick_search_passes_journal_filters_and_interleaves_all_queries(monkeypatch):
+    from litloop.agents import runner
+    from litloop.search import quick, screening
+
+    search_calls: list[dict] = []
+
+    def fake_search_v2(query="", limit=10, year_from=None, year_to=None, sort=None, **kw):
+        search_calls.append({"query": query, "limit": limit, "kw": kw})
+        if query == "q1":
+            return [
+                {"doi": "10.1/a", "title": "A"},
+                {"doi": "10.1/b", "title": "B"},
+                {"doi": "10.1/c", "title": "C"},
+                {"doi": "10.1/d", "title": "D"},
+                {"doi": "10.1/e", "title": "E"},
+            ]
+        return [
+            {"doi": "10.1/x", "title": "X"},
+            {"doi": "10.1/b", "title": "B"},  # duplicate across queries
+            {"doi": "10.1/y", "title": "Y"},
+        ]
+
+    scored_papers: list[dict] = []
+
+    def fake_score(question, criteria, papers, *, config=None, steering_notes=None, stop_event=None, on_chunk_done=None):
+        scored_papers.extend(papers)
+        ratings = [{"n": p["n"], "relevance": "高", "reason": "ok"} for p in papers]
+        on_chunk_done(ratings, len(papers), len(papers), {})
+        return {"ratings": ratings, "usage": {"by_model": {}, "total_tokens": 0}, "cancelled": False}
+
+    monkeypatch.setattr(quick, "search_papers_v2", fake_search_v2)
+    monkeypatch.setattr(runner, "score_papers", fake_score)
+    monkeypatch.setattr(
+        screening,
+        "save",
+        lambda q, items, **kw: {"session": "s-quick", "total": len(items), "by_relevance": {"高": len(items)}},
+    )
+
+    out = runner.run_builtin_search(
+        {
+            "question": "SiC/Al",
+            "mode": "quick",
+            "planned_queries": ["q1", "q2"],
+            "limit": 5,
+            "max_cas_zone": 2,
+            "max_jcr_quartile": 1,
+            "exclude_warning": True,
+        }
+    )
+
+    assert out["session"] == "s-quick"
+    # Must execute both queries instead of breaking after q1 reaches limit=5.
+    assert [c["query"] for c in search_calls] == ["q1", "q2"]
+    for c in search_calls:
+        assert c["limit"] == 10  # max(10, min(5, ceil(5*1.5/2)+4))
+        assert c["kw"]["max_cas_zone"] == 2
+        assert c["kw"]["max_jcr_quartile"] == 1
+        assert c["kw"]["exclude_warning"] is True
+    # Interleaved & deduplicated: q1[0]=a, q2[0]=x, q1[1]=b, q2[1]=b(dup), q1[2]=c, q2[2]=y -> first 5
+    assert [p["doi"] for p in scored_papers] == ["10.1/a", "10.1/x", "10.1/b", "10.1/c", "10.1/y"]
+
+
+def test_deep_search_appends_journal_criteria_and_merges_zotero_collection_seeds(monkeypatch):
+    from litloop.agents import runner
+    from litloop.search import deep
+    from litloop.zotero import client as zotero_client
+
+    seen: dict = {}
+
+    monkeypatch.setattr(
+        zotero_client,
+        "collection_dois",
+        lambda col, cfg: {
+            "success": True,
+            "key": "K1",
+            "path": col,
+            "dois": ["10.1/hand", "10.1/z1", "10.1/z2"],
+            "without_doi": 0,
+        },
+    )
+
+    def fake_deep_start(question, queries, seeds, core_terms, *, criteria=None, **kw):
+        seen["seeds"] = list(seeds)
+        seen["criteria"] = list(criteria or [])
+        return {
+            "session": "s-deep",
+            "batch": [{"n": 1, "doi": "10.1/p1", "title": "P1"}],
+            "stop_suggested": True,
+            "screened": 1,
+        }
+
+    def fake_score(question, criteria, papers, *, config=None, steering_notes=None, stop_event=None, on_chunk_done=None):
+        seen["score_criteria"] = list(criteria)
+        ratings = [{"n": 1, "relevance": "高", "reason": "ok"}]
+        on_chunk_done(ratings, 1, 1, {})
+        return {"ratings": ratings, "usage": {"by_model": {}, "total_tokens": 0}, "cancelled": False}
+
+    monkeypatch.setattr(deep, "start", fake_deep_start)
+    monkeypatch.setattr(deep, "rate", lambda sid, r: {"total": 1, "by_relevance": {"高": 1}})
+    monkeypatch.setattr(runner, "score_papers", fake_score)
+
+    out = runner.run_builtin_search(
+        {
+            "question": "SiC/Al",
+            "mode": "deep",
+            "planned_queries": ["q1"],
+            "planned_core_terms": ["SiC"],
+            "criteria": ["研究界面反应", "排除预警期刊"],
+            "seeds": ["10.1/hand"],
+            "seed_collection": "LitLoop/Seeds",
+            "max_cas_zone": 2,
+            "max_jcr_quartile": 2,
+            "exclude_warning": True,
+        },
+        config={"builtin_agent_model": "m1"},
+    )
+
+    assert out["session"] == "s-deep"
+    assert seen["seeds"] == ["10.1/hand", "10.1/z1", "10.1/z2"]
+    assert seen["criteria"] == [
+        "研究界面反应",
+        "排除预警期刊",
+        "优先中科院 1–2 区期刊",
+        "优先 JCR Q1–Q2 期刊",
+    ]
+    assert seen["score_criteria"] == seen["criteria"]
+
+
+def test_deep_search_zotero_failure_falls_back_to_llm_seed_selection(monkeypatch):
+    from litloop.agents import runner
+    from litloop.search import deep, quick
+    from litloop.zotero import client as zotero_client
+
+    events: list[tuple[str, dict]] = []
+    search_calls: list[dict] = []
+    seen_chat: dict = {}
+    seen_deep: dict = {}
+
+    monkeypatch.setattr(
+        zotero_client,
+        "collection_dois",
+        lambda col, cfg: {"success": False, "error": "zotero-mcp not found"},
+    )
+
+    def fake_search_v2(query="", limit=10, year_from=None, year_to=None, **kw):
+        search_calls.append({"query": query, "limit": limit, "kw": kw})
+        idx = len(search_calls)
+        return [
+            {"doi": f"10.1/{idx}a", "title": f"Paper {idx}A", "year": 2024, "journal": "J1", "abstract": "abs"},
+            {"doi": "", "title": f"No DOI {idx}"},
+            {"doi": f"10.1/{idx}b", "title": f"Paper {idx}B", "year": 2023, "journal": "J2"},
+        ]
+
+    def fake_chat(messages, tools=None, *, config=None, system="", max_tokens=256, timeout=60, task="default"):
+        seen_chat["task"] = task
+        seen_chat["prompt"] = messages[0]["content"]
+        return {
+            "text": '```json\n{"selected": [2, 4, 99]}\n```',
+            "tool_calls": [],
+            "usage": {"input_tokens": 120, "output_tokens": 15, "total_tokens": 135},
+        }
+
+    monkeypatch.setattr(quick, "search_papers_v2", fake_search_v2)
+    monkeypatch.setattr(runner, "chat", fake_chat)
+    monkeypatch.setattr(
+        deep,
+        "start",
+        lambda q, queries, seeds, core_terms, **kw: seen_deep.update(seeds=seeds)
+        or {"session": "s-auto", "batch": [], "stop_suggested": True, "screened": 0},
+    )
+
+    out = runner.run_builtin_search(
+        {
+            "question": "SiC/Al",
+            "mode": "deep",
+            "planned_queries": ["q1", "q2", "q3", "q4"],
+            "planned_core_terms": ["SiC"],
+            "seed_collection": "Missing/Col",
+            "max_cas_zone": 1,
+            "exclude_warning": True,
+        },
+        config={"builtin_agent_provider": "openai", "builtin_agent_model": "gpt-main", "builtin_agent_rate_model": "gpt-rate"},
+        on_event=lambda k, d: events.append((k, d)),
+    )
+
+    assert out["session"] == "s-auto"
+    assert any("Missing/Col" in d.get("text", "") and "继续后续流程" in d.get("text", "") for k, d in events if k == "progress")
+    # Only first 3 queries are used for seed discovery, with journal filters forwarded
+    assert [c["query"] for c in search_calls] == ["q1", "q2", "q3"]
+    assert all(c["kw"]["max_cas_zone"] == 1 and c["kw"]["exclude_warning"] is True for c in search_calls)
+    assert seen_chat["task"] == "rate"
+    # Interleaved candidates with DOI: 1a(1), 2a(2), 3a(3), 1b(4), 2b(5), 3b(6) -> picked [2, 4]
+    assert seen_deep["seeds"] == ["10.1/2a", "10.1/1b"]
+    assert out["usage"]["total_tokens"] == 135
+    assert "gpt-rate" in out["usage"]["by_model"]
+
+
+def test_select_seeds_falls_back_to_top3_on_error_or_bad_json(monkeypatch):
+    from litloop.agents import runner
+
+    candidates = [
+        {"doi": "", "title": "Skip"},
+        {"doi": "10.1/1", "title": "T1"},
+        {"doi": "10.1/2", "title": "T2"},
+        {"doi": "10.1/3", "title": "T3"},
+        {"doi": "10.1/4", "title": "T4"},
+    ]
+    cfg = {"builtin_agent_provider": "openai", "builtin_agent_model": "gpt-main"}
+
+    monkeypatch.setattr(runner, "chat", lambda *a, **k: {"text": "not json at all", "usage": {"input_tokens": 10, "output_tokens": 5}})
+    seeds1, usage1 = runner._select_seeds("q", [], candidates, config=cfg)
+    assert seeds1 == ["10.1/1", "10.1/2", "10.1/3"]
+    assert usage1["total_tokens"] == 15
+
+    def boom(*a, **k):
+        raise RuntimeError("network error")
+
+    monkeypatch.setattr(runner, "chat", boom)
+    seeds2, usage2 = runner._select_seeds("q", [], candidates, config=cfg)
+    assert seeds2 == ["10.1/1", "10.1/2", "10.1/3"]
+    assert usage2["total_tokens"] == 0
+
+
+def test_plan_search_strips_thinking_tags_before_parsing_json(monkeypatch):
+    from litloop.agents import runner
+
+    cfg = {"builtin_agent_provider": "openai", "builtin_agent_model": "r1-plan"}
+    monkeypatch.setattr(
+        runner,
+        "chat",
+        lambda *a, **k: {
+            "text": '<think>先分析一下检索词\n{"ignored": true}</think>\n```json\n{"queries": ["SiC Al wetting", "pressureless infiltration SiC"], "core_terms": ["SiC", "Al|aluminum"], "criteria": ["研究润湿性"]}\n```',
+            "tool_calls": [],
+            "usage": {"input_tokens": 30, "output_tokens": 20},
+        },
+    )
+
+    plan = runner.plan_search({"question": "SiC/Al wetting", "mode": "deep"}, config=cfg)
+    assert plan["queries"] == ["SiC Al wetting", "pressureless infiltration SiC"]
+    assert plan["core_terms"] == ["SiC", "Al|aluminum"]
+    assert plan["criteria"] == ["研究润湿性"]

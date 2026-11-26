@@ -460,3 +460,358 @@ def test_list_papers_decision_aliases_and_history_budget_and_action_mapping(monk
     assert resumed_calls == [(sid, 2)]
     assert [n["note"] for n in db.list_steering_notes(sid)] == ["跨会话纠偏"]
     assert db.list_steering_notes("__draft__") == []
+
+
+def test_stream_chat_turn_reasoning_sse_and_legacy_compat(monkeypatch):
+    def fake_stream_with_reasoning(
+        messages,
+        tools=None,
+        *,
+        config=None,
+        system="",
+        max_tokens=2048,
+        timeout=120,
+        task="default",
+        on_delta=None,
+        on_reasoning=None,
+    ):
+        assert callable(on_reasoning)
+        on_reasoning("先分析文献相关性，")
+        on_reasoning("再给出结论。")
+        if on_delta:
+            on_delta("建议保留第 1 篇。")
+        return {
+            "text": "建议保留第 1 篇。",
+            "tool_calls": [],
+            "stop": "stop",
+            "usage": {"input_tokens": 10, "output_tokens": 5},
+        }
+
+    monkeypatch.setattr(chat_agent, "chat_stream", fake_stream_with_reasoning)
+    cfg = {
+        "builtin_agent_provider": "openai",
+        "builtin_agent_base_url": "https://api.example.com/v1",
+        "builtin_agent_api_key": "sk-test",
+        "builtin_agent_model": "deepseek-reasoner",
+    }
+    events = list(chat_agent.stream_chat_turn("sess-r1", "帮我分析", config=cfg))
+    reasonings = [e["text"] for e in events if e["type"] == "reasoning"]
+    deltas = [e["text"] for e in events if e["type"] == "delta"]
+    assert reasonings == ["先分析文献相关性，", "再给出结论。"]
+    assert deltas == ["建议保留第 1 篇。"]
+    assert events[-1]["type"] == "done"
+    assert events[-1]["message"]["content"] == "建议保留第 1 篇。"
+
+    # Legacy fake chat_stream without on_reasoning parameter must still work
+    def fake_stream_legacy(messages, tools=None, *, config=None, system="", max_tokens=2048, timeout=120, on_delta=None):
+        if on_delta:
+            on_delta("兼容旧签名。")
+        return {
+            "text": "兼容旧签名。",
+            "tool_calls": [],
+            "stop": "stop",
+            "usage": {"input_tokens": 5, "output_tokens": 3},
+        }
+
+    monkeypatch.setattr(chat_agent, "chat_stream", fake_stream_legacy)
+    legacy_events = list(chat_agent.stream_chat_turn("sess-r1", "再问一次", config=cfg))
+    assert [e["text"] for e in legacy_events if e["type"] == "delta"] == ["兼容旧签名。"]
+    assert legacy_events[-1]["type"] == "done"
+
+
+def test_propose_batch_screen_card_and_execute_action():
+    saved = db.save_screening(
+        "SiC/Al 浸渗工艺",
+        [
+            {"n": 1, "doi": "10.1/p1", "title": "Paper One", "relevance": "中", "reason": "r1"},
+            {"n": 2, "doi": "10.1/p2", "title": "Paper Two", "relevance": "中", "reason": "r2"},
+        ],
+        mode="deep",
+    )
+    sid = saved["session"]
+    db.update_item_decision(sid, "10.1/p2", "Paper Two", "selected")
+
+    card = chat_agent._build_action_card(
+        "propose_batch_screen",
+        {
+            "summary": "调高工艺文献并排除综述",
+            "items": [
+                {"n": 1, "relevance": "高", "decision": "selected", "note": "含具体温度参数"},
+                {"n": 2, "relevance": "低", "decision": "rejected", "reject_reason": "仅综述"},
+                {"n": 999, "relevance": "高"},
+            ],
+        },
+        sid,
+    )
+    assert card["kind"] == "batch_screen"
+    assert card["title"] == "批量调整筛选结果"
+    assert "共 2 篇" in card["summary"]
+    assert "调高工艺文献并排除综述" in card["summary"]
+    assert card["params"]["session"] == sid
+    items = card["params"]["items"]
+    assert [it["n"] for it in items] == [1, 2]
+    assert items[0]["doi"] == "10.1/p1"
+    assert items[0]["title"] == "Paper One"
+    assert items[0]["cur_relevance"] == "中"
+    assert items[0]["cur_decision"] is None
+    assert items[1]["doi"] == "10.1/p2"
+    assert items[1]["cur_decision"] == "selected"
+
+    # Empty items fails cleanly
+    msg_empty = db.add_agent_message(sid, "assistant", "批量调整", actions=[card])
+    res_empty = chat_agent.execute_action(sid, msg_empty["id"], card["id"], edited_params={"items": []})
+    assert res_empty["ok"] is False
+    assert res_empty["action"]["status"] == "failed"
+    assert "请至少保留 1 篇待调整的文献" in res_empty["error"]
+
+    # Partial selection persists only checked items to db.load_screening()
+    card2 = chat_agent._build_action_card(
+        "propose_batch_screen",
+        {"items": [{"n": 1, "relevance": "高", "decision": "selected"}, {"n": 2, "relevance": "低"}]},
+        sid,
+    )
+    msg_ok = db.add_agent_message(sid, "assistant", "批量调整", actions=[card2])
+    res_ok = chat_agent.execute_action(
+        sid,
+        msg_ok["id"],
+        card2["id"],
+        edited_params={"items": [card2["params"]["items"][0]]},
+    )
+    assert res_ok["ok"] is True
+    assert res_ok["result"] == {"updated": 1, "count": 1, "message": "已更新 1 篇筛选记录"}
+    assert res_ok["action"]["status"] == "confirmed"
+
+    loaded = {it["n"]: it for it in db.load_screening(sid)["items"]}
+    assert loaded[1].get("user_relevance") == "高"
+    assert loaded[1].get("decision") == "selected"
+    assert loaded[2].get("user_relevance") is None
+    assert loaded[2].get("decision") == "selected"
+
+
+def test_download_jobs_retry_failed_and_get_download_status(monkeypatch):
+    from litloop import store
+    from litloop.desktop import download_jobs
+
+    job_done_only = {
+        "schema": 1,
+        "job": "20261126-100000",
+        "title": "All Done",
+        "session": "sess-dl-1",
+        "state": "done",
+        "created": "2026-11-26 10:00:00",
+        "finished": "2026-11-26 10:01:00",
+        "items": [
+            {"doi": "10.1/ok", "title": "OK Paper", "status": "done", "file": "/tmp/ok.pdf"},
+        ],
+    }
+    store.write_json(download_jobs.job_path("20261126-100000"), job_done_only)
+    with pytest.raises(ValueError, match="没有下载失败的文献"):
+        download_jobs.retry_failed("20261126-100000")
+
+    job_mixed = {
+        "schema": 1,
+        "job": "20261126-110000",
+        "title": "SiC 文献",
+        "session": "sess-dl-1",
+        "zotero_target": "LitLoop/SiC",
+        "state": "queued",
+        "created": "2026-11-26 11:00:00",
+        "finished": None,
+        "items": [
+            {"doi": "10.1/ok", "title": "OK", "status": "done", "file": "/tmp/ok.pdf"},
+            {
+                "doi": "10.1/fail1",
+                "title": "Fail One",
+                "year": 2024,
+                "journal": "Acta",
+                "status": "failed",
+                "error": "http_403",
+                "error_text": "Forbidden",
+                "error_hint": "需机构权限",
+            },
+            {"doi": "10.1/q1", "title": "Queued One", "publisher": "Elsevier", "status": "queued"},
+        ],
+        "zotero": {"state": "done", "collection": "LitLoop/SiC"},
+    }
+    store.write_json(download_jobs.job_path("20261126-110000"), job_mixed)
+
+    captured: list[tuple[Any, ...]] = []
+    monkeypatch.setattr(
+        download_jobs,
+        "start",
+        lambda papers, title, session=None, zotero_target=None: (
+            captured.append((papers, title, session, zotero_target)),
+            {"job": "20261126-110500", "items": papers, "title": title, "session": session},
+        )[1],
+    )
+    retried = download_jobs.retry_failed("20261126-110000")
+    assert retried["job"] == "20261126-110500"
+    assert captured == [
+        (
+            [{"doi": "10.1/fail1", "title": "Fail One", "year": 2024, "journal": "Acta"}],
+            "SiC 文献（重试）",
+            "sess-dl-1",
+            "LitLoop/SiC",
+        )
+    ]
+
+    # get_download_status with explicit job
+    by_job = json.loads(
+        chat_agent._exec_readonly_tool("get_download_status", {"job": "20261126-110000"}, "sess-dl-1", None)
+    )
+    assert by_job["counts"] == {"total": 3, "done": 1, "failed": 1, "queued": 1, "waiting": 0}
+    assert by_job["queues"] == [{"publisher": "Elsevier", "count": 1}]
+    assert by_job["failed_items"] == [
+        {
+            "doi": "10.1/fail1",
+            "title": "Fail One",
+            "error": "http_403",
+            "error_text": "Forbidden",
+            "error_hint": "需机构权限",
+        }
+    ]
+    assert by_job["zotero"] == {"state": "done", "collection": "LitLoop/SiC"}
+
+    # get_download_status by session vs fallback
+    by_sess = json.loads(chat_agent._exec_readonly_tool("get_download_status", {}, "sess-dl-1", None))
+    assert by_sess["session_matched"] is True
+    assert {j["job"] for j in by_sess["jobs"]} == {"20261126-100000", "20261126-110000"}
+
+    by_other = json.loads(chat_agent._exec_readonly_tool("get_download_status", {}, "sess-other", None))
+    assert by_other["session_matched"] is False
+    assert len(by_other["jobs"]) == 2
+
+
+def test_get_zotero_status_and_graceful_degradation(monkeypatch):
+    from litloop.desktop import download_jobs
+    from litloop.zotero import client as zotero_client
+
+    saved = db.save_screening("SiC/Al 界面润湿性", [{"n": 1, "doi": "10.1/a", "title": "A", "relevance": "高"}], mode="deep")
+    sid = saved["session"]
+
+    monkeypatch.setattr(zotero_client, "discover_zotero_mcp", lambda cfg: {"cmd": ["zotero-mcp"]})
+    monkeypatch.setattr(download_jobs, "zotero_pending", lambda: [{"job": "j1", "papers": [{"doi": "10.1/a"}]}])
+    monkeypatch.setattr(download_jobs, "zotero_history", lambda: [{"job": "j0", "state": "done"}])
+    monkeypatch.setattr(
+        zotero_client,
+        "zotero_collections",
+        lambda cfg: {"success": True, "collections": [{"path": "LitLoop/SiC", "name": "SiC"}]},
+    )
+
+    res = json.loads(chat_agent._exec_readonly_tool("get_zotero_status", {"include_collections": True}, sid, {}))
+    assert res["mcp_found"] is True
+    assert res["pending"] == [{"job": "j1", "papers": [{"doi": "10.1/a"}]}]
+    assert res["history"] == [{"job": "j0", "state": "done"}]
+    assert res["recommended_collection"].startswith("LitLoop/")
+    assert res["collections"] == ["LitLoop/SiC"]
+
+    # Graceful degradation when zotero_collections raises
+    def fail_cols(cfg):
+        raise RuntimeError("bridge timeout")
+
+    monkeypatch.setattr(zotero_client, "zotero_collections", fail_cols)
+    res_err = json.loads(chat_agent._exec_readonly_tool("get_zotero_status", {}, sid, {}))
+    assert res_err["collections"] == []
+    assert "bridge timeout" in res_err["collections_error"]
+
+
+def test_propose_download_selection_dedup_and_retry_download_and_context(monkeypatch):
+    from litloop import store
+    from litloop.desktop import download_jobs
+
+    saved = db.save_screening(
+        "SiC 润湿性",
+        [
+            {"n": 1, "doi": "10.48550/arXiv.2401.00001", "title": "Already Downloaded arXiv", "relevance": "高"},
+            {"n": 2, "doi": "10.1/new1", "title": "New High Paper", "relevance": "高", "year": 2024, "journal": "Acta"},
+            {"n": 3, "doi": "", "title": "No DOI Paper", "relevance": "高"},
+            {"n": 4, "doi": "10.1/med1", "title": "Medium Paper", "relevance": "中"},
+        ],
+        mode="deep",
+    )
+    sid = saved["session"]
+    db.update_item_decision(sid, "10.1/new1", "New High Paper", "selected")
+
+    # Mark bare arXiv id as already downloaded; same_paper should match 10.48550/arXiv.2401.00001
+    monkeypatch.setattr(download_jobs, "downloaded_dois", lambda: {"2401.00001"})
+
+    card_high = chat_agent._build_action_card(
+        "propose_download",
+        {"selection": "high", "skip_downloaded": True},
+        sid,
+    )
+    assert card_high["kind"] == "download"
+    assert card_high["params"]["session"] == sid
+    assert card_high["params"]["skipped_downloaded"] == 1
+    assert card_high["params"]["missing_doi"] == 1
+    assert [p["doi"] for p in card_high["params"]["papers"]] == ["10.1/new1"]
+    assert card_high["params"]["preview_titles"] == ["New High Paper"]
+    assert "跳过已有 1 篇" in card_high["summary"]
+    assert "缺 DOI 1 篇" in card_high["summary"]
+
+    # paper_ns selection without skipping downloaded
+    card_ns = chat_agent._build_action_card(
+        "propose_download",
+        {"paper_ns": [1, 4], "skip_downloaded": False, "title": "自选下载"},
+        sid,
+    )
+    assert [p["doi"] for p in card_ns["params"]["papers"]] == ["10.48550/arXiv.2401.00001", "10.1/med1"]
+    assert card_ns["params"]["skipped_downloaded"] == 0
+
+    # retry_download card & execution (failed + publisher_queue)
+    job_data = {
+        "schema": 1,
+        "job": "20261126-120000",
+        "title": "批量下载",
+        "session": sid,
+        "state": "queued",
+        "created": "2026-11-26 12:00:00",
+        "items": [
+            {"doi": "10.1/f1", "title": "F1", "status": "failed"},
+            {"doi": "10.1/f2", "title": "F2", "status": "failed"},
+            {"doi": "10.1/q1", "title": "Q1", "publisher": "Elsevier", "status": "queued"},
+            {"doi": "10.1/d1", "title": "D1", "status": "done", "file": __file__},
+        ],
+    }
+    store.write_json(download_jobs.job_path("20261126-120000"), job_data)
+
+    ctx = chat_agent.build_context_block(sid)
+    assert "20261126-120000" in ctx
+    assert "待推送 Zotero：1 篇" in ctx
+
+    card_retry = chat_agent._build_action_card("propose_retry_download", {"job": "20261126-120000"}, sid)
+    assert card_retry["kind"] == "retry_download"
+    assert card_retry["params"] == {"job": "20261126-120000", "mode": "failed", "count": 2}
+    assert "失败文献重试（2 篇）" in card_retry["summary"]
+
+    card_queue = chat_agent._build_action_card(
+        "propose_retry_download",
+        {"job": "20261126-120000", "mode": "publisher_queue", "publisher": "Elsevier"},
+        sid,
+    )
+    assert card_queue["params"] == {
+        "job": "20261126-120000",
+        "mode": "publisher_queue",
+        "count": 1,
+        "publisher": "Elsevier",
+    }
+
+    monkeypatch.setattr(
+        download_jobs,
+        "retry_failed",
+        lambda job: {"job": "20261126-120500", "items": [{"doi": "10.1/f1"}, {"doi": "10.1/f2"}]},
+    )
+    monkeypatch.setattr(
+        download_jobs,
+        "start_queue",
+        lambda job, pub: {"job": job, "state": "running"},
+    )
+    msg = db.add_agent_message(sid, "assistant", "重试", actions=[card_retry, card_queue])
+    r_fail = chat_agent.execute_action(sid, msg["id"], card_retry["id"])
+    assert r_fail["ok"] is True
+    assert r_fail["result"]["job"] == "20261126-120500"
+    assert "20261126-120500" in r_fail["result"]["message"]
+
+    r_q = chat_agent.execute_action(sid, msg["id"], card_queue["id"])
+    assert r_q["ok"] is True
+    assert "Elsevier" in r_q["result"]["message"]

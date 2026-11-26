@@ -5,11 +5,12 @@ from __future__ import annotations
 import json
 import re
 import threading
+import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from typing import Any, Callable
 
 from .. import db
-from .client import chat, estimate_cost, model_config, normalize_usage
+from .client import chat, estimate_cost, model_config, normalize_usage, recommended_concurrency, strip_thinking
 
 VALID_RELEVANCE = frozenset({"高", "中", "低", "不相关"})
 
@@ -20,6 +21,7 @@ _SYSTEM_PROMPT = (
     "- 中：部分涉及目标问题、方法或相关体系，有参考价值。\n"
     "- 低：仅边缘提及关键词，核心主题不同。\n"
     "- 不相关：主题、对象或方法明显无关。\n"
+    "补充规则：标记为「（无摘要）」的文献，若仅凭标题无法确认无关，禁止直接判为「不相关」，应保守评为「中」或「低」并在理由开头注明「仅凭标题：」。\n"
     "只输出一个合法 JSON 对象，不要输出任何额外解释或 markdown 标记，格式固定为：\n"
     '{"ratings": [{"n": 1, "relevance": "高", "reason": "一句话中文理由"}]}'
 )
@@ -63,7 +65,7 @@ def _strip_fence(text: str) -> str:
 
 
 def _parse_chunk_ratings(raw_text: str, expected_ns: set[int]) -> dict[int, dict[str, Any]]:
-    cleaned = _strip_fence(raw_text)
+    cleaned = _strip_fence(strip_thinking(raw_text))
     parsed: Any = None
     try:
         parsed = json.loads(cleaned)
@@ -170,7 +172,7 @@ def score_papers(
     few_shots: list[dict[str, Any]] | None = None,
     steering_notes: list[str] | None = None,
     chunk_size: int = 5,
-    max_workers: int = 3,
+    max_workers: int | None = None,
     stop_event: threading.Event | None = None,
     on_chunk_done: Callable[[list[dict[str, Any]], int, int, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
@@ -199,6 +201,20 @@ def score_papers(
     results_by_n: dict[int, dict[str, Any]] = {}
     total_usage: dict[str, dict[str, int]] = {}
     cancelled = bool(stop_event and stop_event.is_set())
+    rate_limited_until = 0.0
+
+    def _note_backoff(exc: Exception | None = None) -> None:
+        nonlocal rate_limited_until
+        msg = str(exc or "")
+        if exc is None or "429" in msg or "rate" in msg.lower() or "retry" in msg.lower():
+            with lock:
+                rate_limited_until = max(rate_limited_until, time.monotonic() + 0.5)
+
+    def _wait_if_backed_off() -> None:
+        with lock:
+            delay = rate_limited_until - time.monotonic()
+        if delay > 0:
+            time.sleep(min(delay, 0.5))
 
     def _call_chunk(items: list[tuple[int, dict[str, Any]]]) -> tuple[dict[int, dict[str, Any]], dict[str, dict[str, int]]]:
         prompt = _build_user_prompt(question, criteria, items, few_shots, steering_notes)
@@ -224,20 +240,24 @@ def score_papers(
                 cancelled = True
             return
 
+        _wait_if_backed_off()
         chunk_usage: dict[str, dict[str, int]] = {}
         try:
             parsed, u1 = _call_chunk(chunk)
-        except Exception:
+        except Exception as exc:
+            _note_backoff(exc)
             parsed, u1 = {}, {}
         for m, u in u1.items():
             _merge_usage(chunk_usage, m, u)
 
         missing_items = [(n, p) for n, p in chunk if n not in parsed]
         if missing_items and not (stop_event and stop_event.is_set()):
+            _wait_if_backed_off()
             try:
                 retried, u2 = _call_chunk(missing_items)
                 parsed.update(retried)
-            except Exception:
+            except Exception as exc:
+                _note_backoff(exc)
                 u2 = {}
             for m, u in u2.items():
                 _merge_usage(chunk_usage, m, u)
@@ -254,7 +274,8 @@ def score_papers(
             if on_chunk_done and chunk_ratings:
                 on_chunk_done(chunk_ratings, done_count, total_count, chunk_cost)
 
-    workers = max(1, int(max_workers or 3))
+    resolved_workers = max_workers if max_workers is not None else recommended_concurrency(config, task="rate")
+    workers = max(1, int(resolved_workers))
     if not cancelled:
         with ThreadPoolExecutor(max_workers=workers) as pool:
             pending: set[Future[None]] = set()

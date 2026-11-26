@@ -480,7 +480,7 @@ def create_app(token: str) -> FastAPI:
         config = load_config()
         name = translate.provider(config)
         return {"provider": name, "auto": screening.translate_wanted(config),
-                "ready": name != "agent" and bool(str(config.get(f"{name}_api_key") or "").strip())}
+                "ready": translate.is_ready(config)}
 
     @app.post("/api/sessions/{session}/translate")
     def translate_abstract(session: str, body: Translate) -> dict[str, Any]:
