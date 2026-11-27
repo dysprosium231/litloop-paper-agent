@@ -479,6 +479,7 @@ def run_builtin_search(
                     if src.get(k) not in (None, "", []):
                         item[k] = src[k]
                 items.append(item)
+            from .. import __version__
             saved = screening.save(
                 question,
                 items,
@@ -486,6 +487,16 @@ def run_builtin_search(
                 query=query_str,
                 mode="quick",
                 session=session_id or None,
+                search_params={
+                    "queries": list(queries),
+                    "year_from": year_from,
+                    "year_to": year_to,
+                    "max_cas_zone": max_cas_zone,
+                    "max_jcr_quartile": max_jcr_quartile,
+                    "exclude_warning": exclude_warning,
+                    "sources": ["openalex", "crossref", "semantic_scholar"],
+                    "litloop_version": __version__,
+                },
             )
             session_id = str(saved.get("session") or session_id)
             last_saved = saved

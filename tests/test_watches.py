@@ -125,3 +125,65 @@ def test_legacy_watches_json_is_imported_idempotently_and_kept(tmp_path):
     second = watches.get("legacy01")
     assert second is not None
     assert second["seen"] == ["doi:10.1/a", "doi:10.1/b"]
+
+
+def test_merge_into_session_scores_and_dedupes(monkeypatch):
+    from litloop.agents import scorer
+    from litloop.search import screening
+
+    s = screening.save(
+        "SiC/Al interface",
+        [{"doi": "10.1/old", "title": "Existing paper", "relevance": "高", "reason": "seed"}],
+        criteria=["focus on SiC/Al"],
+        query="SiC Al",
+        mode="quick",
+    )
+    sid = s["session"]
+    w = watches.add("SiC/Al interface", "SiC Al", seen=[{"doi": "10.1/old"}], session=sid)
+
+    scored_calls: list[list[dict]] = []
+
+    def fake_score(question, criteria, papers, **kwargs):
+        scored_calls.append(papers)
+        return {
+            "ratings": [{"n": 1, "relevance": "高", "reason": "直接研究界面反应"}],
+            "usage": {},
+        }
+
+    monkeypatch.setattr(scorer, "score_papers", fake_score)
+    cfg = {
+        "builtin_agent_provider": "openai",
+        "builtin_agent_model": "deepseek-chat",
+        "builtin_agent_api_key": "sk-test",
+    }
+
+    res = watches.merge_into_session(
+        w["id"],
+        [
+            {"doi": "10.1/old", "title": "Existing paper"},
+            {"doi": "10.1/new1", "title": "New interface paper", "year": 2026, "journal": "Acta Mater"},
+        ],
+        score=True,
+        config=cfg,
+    )
+    assert res["session"] == sid
+    assert res["added"] == 1
+    assert res["total"] == 2
+    assert res["scored"] is True
+    assert len(scored_calls) == 1 and len(scored_calls[0]) == 1
+
+    # 未配置模型时回退为「中」直接并入
+    w2 = watches.add("Fallback topic", "fallback", session=sid)
+    res_fallback = watches.merge_into_session(
+        w2["id"],
+        [{"doi": "10.1/new2", "title": "Another paper"}],
+        score=True,
+        config={},
+    )
+    assert res_fallback["added"] == 1
+    assert res_fallback["scored"] is False
+    assert "未配置内置 Agent" in res_fallback["note"]
+
+    # 全是已存在文献时返回 added=0
+    res_dup = watches.merge_into_session(w["id"], [{"doi": "10.1/old", "title": "Existing paper"}], config={})
+    assert res_dup["added"] == 0

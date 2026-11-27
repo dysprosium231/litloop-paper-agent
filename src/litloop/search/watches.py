@@ -122,3 +122,153 @@ def check_due(config: dict[str, Any] | None = None) -> dict[str, Any]:
         return {"checked": done, "new_total": total}
     finally:
         _DUE_LOCK.release()
+
+
+def _model_ready(cfg: dict[str, Any]) -> bool:
+    from ..agents import client as aclient
+    mcfg = aclient.model_config(cfg, task="rate")
+    if not mcfg.get("model"):
+        return False
+    base = mcfg.get("base_url") or ""
+    return bool(mcfg.get("api_key") or "127.0.0.1" in base or "localhost" in base)
+
+
+def merge_into_session(
+    wid: str,
+    papers: list[dict[str, Any]],
+    *,
+    score: bool = True,
+    config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Merge fresh watch hits into the originating screening session (or a new one),
+    optionally scoring them with the built-in agent first."""
+    from . import screening
+    from ..agents import scorer
+
+    _ensure_legacy_imported()
+    watch = db.get_watch(wid)
+    if not watch:
+        raise ValueError("没有这个追踪")
+
+    valid_papers = [
+        p for p in (papers or [])
+        if isinstance(p, dict) and (str(p.get("title") or "").strip() or str(p.get("doi") or "").strip())
+    ]
+    if not valid_papers:
+        raise ValueError("没有可并入的新文献")
+
+    cfg = config if config is not None else config_load(config)
+    target_session = str(watch.get("session") or "").strip()
+    if target_session and db.session_exists(target_session):
+        record = screening.load(target_session)
+        question = str(record.get("question") or watch.get("question") or watch["query"])
+        criteria = list(record.get("criteria") or [])
+        mode = str(record.get("mode") or "quick")
+        existing_keys = {screening._key(it) for it in (record.get("items") or [])}
+        few_shots = scorer.collect_user_feedback(target_session)
+        steering_notes = [
+            str(n.get("note") or "").strip()
+            for n in db.list_steering_notes(target_session, active_only=True)
+            if str(n.get("note") or "").strip()
+        ]
+    else:
+        target_session = ""
+        question = str(watch.get("question") or watch["query"])
+        criteria = []
+        mode = "quick"
+        existing_keys = set()
+        few_shots = []
+        steering_notes = []
+
+    fresh: list[dict[str, Any]] = []
+    seen_fresh: set[str] = set()
+    for p in valid_papers:
+        k = screening._key(p)
+        if k in existing_keys or k in seen_fresh:
+            continue
+        seen_fresh.add(k)
+        fresh.append(p)
+
+    if not fresh:
+        total_now = len(record.get("items") or []) if target_session else 0
+        return {
+            "session": target_session,
+            "added": 0,
+            "total": total_now,
+            "scored": False,
+            "by_relevance": {},
+            "note": "这些文献已在原筛选会话中",
+        }
+
+    scored = False
+    note = ""
+    ratings_by_n: dict[int, dict[str, Any]] = {}
+    if score and _model_ready(cfg):
+        res = scorer.score_papers(
+            question,
+            criteria,
+            fresh,
+            config=cfg,
+            few_shots=few_shots or None,
+            steering_notes=steering_notes or None,
+        )
+        ratings_by_n = {
+            int(r["n"]): r
+            for r in (res.get("ratings") or [])
+            if isinstance(r, dict) and r.get("n") is not None
+        }
+        scored = bool(ratings_by_n)
+    elif score:
+        note = "未配置内置 Agent 模型，已以「中」并入筛选列表"
+    else:
+        note = "已直接并入筛选列表"
+
+    merged_items: list[dict[str, Any]] = []
+    for idx, src in enumerate(fresh, 1):
+        rated = ratings_by_n.get(idx)
+        item: dict[str, Any] = {
+            "doi": str(src.get("doi") or "").strip() or None,
+            "title": str(src.get("title") or "").strip(),
+            "relevance": rated["relevance"] if rated else "中",
+            "reason": (
+                str(rated.get("reason") or "").strip()
+                if rated
+                else ("定期追踪新文献（待复核）" if scored else "定期追踪新文献（待评分）")
+            ),
+        }
+        for k in (
+            "year",
+            "journal",
+            "journal_rank",
+            "authors",
+            "cited_by_count",
+            "abstract",
+            "abstract_missing",
+            "retracted",
+            "concern",
+        ):
+            if src.get(k) not in (None, "", []):
+                item[k] = src[k]
+        merged_items.append(item)
+
+    saved = screening.save(
+        question,
+        merged_items,
+        criteria=criteria or None,
+        query=f"[watch] {watch['query']}",
+        mode=mode,
+        session=target_session or None,
+        search_params={"source": "watch", "watch_id": wid, "sources": ["openalex", "crossref"]},
+    )
+    return {
+        "session": saved["session"],
+        "added": saved["added"],
+        "total": saved["total"],
+        "scored": scored,
+        "by_relevance": saved["by_relevance"],
+        "note": note,
+    }
+
+
+def config_load(cfg: dict[str, Any] | None) -> dict[str, Any]:
+    return cfg if cfg is not None else config.load_config()

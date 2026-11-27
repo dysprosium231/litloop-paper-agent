@@ -693,3 +693,66 @@ def test_network_route_benchmark_and_apply_endpoints(client, monkeypatch):
     cfg = _config.load_config()
     assert cfg["host_proxy_url"] == "http://127.0.0.1:10808"
     assert cfg["host_proxy_hosts"] == ["journals.sagepub.com", "arxiv.org"]
+
+
+def test_watch_merge_and_systematic_review_endpoints(client, session, monkeypatch, tmp_path):
+    import json
+    from pathlib import Path
+    from litloop import config as _config
+    from litloop.search import watches
+
+    monkeypatch.setattr(_config, "load_config", lambda: {"output_dir": str(tmp_path), "builtin_agent_api_key": ""})
+    w = watches.add("TiO2 photocatalysis", "TiO2 photocatalysis", session=session)
+
+    merge_res = client.post(
+        f"/api/watches/{w['id']}/merge",
+        json={"papers": [{"doi": "10.1/watch-new", "title": "Watch Hit", "year": 2026}], "score": True},
+    )
+    assert merge_res.status_code == 200
+    assert merge_res.json()["session"] == session
+    assert merge_res.json()["added"] == 1
+
+    repro_res = client.post(f"/api/sessions/{session}/reproducibility/export")
+    assert repro_res.status_code == 200
+    assert Path(repro_res.json()["file"]).is_file()
+
+    blind_res = client.post(f"/api/sessions/{session}/blind-review/export")
+    assert blind_res.status_code == 200
+    assert Path(blind_res.json()["file"]).is_file()
+    assert blind_res.json()["count"] >= 1
+
+    bad_cmp = client.post(f"/api/sessions/{session}/dual-review/compare", json={"raw_json": "{bad"})
+    assert bad_cmp.status_code == 400
+
+    good_cmp = client.post(
+        f"/api/sessions/{session}/dual-review/compare",
+        json={"raw_json": json.dumps({"items": [{"doi": "10.1/watch-new", "decision": "selected"}]})},
+    )
+    assert good_cmp.status_code == 200
+    assert "kappa" in good_cmp.json()
+
+
+def test_app_update_endpoint_parses_release_and_errors(client, monkeypatch):
+    import requests
+    from litloop.desktop import server as desktop_server
+
+    desktop_server._APP_UPDATE.update(at=0.0, data=None)
+
+    class _Resp:
+        status_code = 200
+        def json(self):
+            return {"tag_name": "v9.9.9", "html_url": "https://example.org/rel", "body": "notes"}
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: _Resp())
+    res = client.get("/api/app-update?fresh=true")
+    assert res.status_code == 200
+    assert res.json()["available"] is True
+    assert res.json()["latest"] == "9.9.9"
+
+    def _timeout(*a, **k):
+        raise requests.Timeout("slow")
+
+    monkeypatch.setattr(requests, "get", _timeout)
+    res_to = client.get("/api/app-update?fresh=true")
+    assert res_to.status_code == 200
+    assert "超时" in res_to.json()["error"]

@@ -127,3 +127,33 @@ def test_batch_tool_keeps_the_rounds_asked_for_on_a_long_list(monkeypatch, tmp_p
     monkeypatch.setattr(server, "load_config", lambda: {"batch_small_max": 2, "output_dir": str(tmp_path)})
     server._batch_download_impl(["10.1000/a", "10.1000/b", "10.1000/c"], output_dir=str(tmp_path), rounds="free")
     assert used == ["free"]
+
+
+def test_pipelined_round2_starts_for_too_new_paper_before_scihub_finishes(monkeypatch, tmp_path: Path):
+    import threading
+    import litloop.sources as sources
+
+    scihub_gate = threading.Event()
+    new_round2_started = threading.Event()
+    old_doi = "10.1/old-paper"
+    new_doi = "10.1016/j.jallcom.2025.999999"
+
+    def download(ident, out, **kw):
+        if kw.get("strategy") == "scihub_only":
+            assert new_round2_started.wait(timeout=2.0), "Round 2 should start for too_new paper without waiting for Sci-Hub"
+            scihub_gate.set()
+            return {"success": True, "doi": ident, "source": "Sci-Hub"}
+        if ident == new_doi:
+            new_round2_started.set()
+            assert scihub_gate.wait(timeout=2.0)
+            return {"success": True, "doi": ident, "source": "WebVPN"}
+        return {"success": False, "doi": ident}
+
+    monkeypatch.setattr(sources, "download", download)
+    monkeypatch.setattr(pipeline, "grey_allowed", lambda cfg: True)
+    monkeypatch.setattr(pipeline, "_enrich_oa_urls", lambda entries, cfg: None)
+
+    entries = [QueueEntry(identifier=old_doi), QueueEntry(identifier=new_doi)]
+    results = pipeline.run_scihub_then_single(entries, tmp_path, config={"scihub_skip_from_year": 2024})
+    assert [r["doi"] for r in results] == [old_doi, new_doi]
+    assert {r["doi"]: r["source"] for r in results} == {old_doi: "Sci-Hub", new_doi: "WebVPN"}

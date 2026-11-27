@@ -285,30 +285,6 @@ def start_queue(job: str, publisher: str) -> dict[str, Any]:
         raise
 
 
-def retry_failed(job: str) -> dict[str, Any]:
-    """Start a new download job for items that failed in an existing job."""
-    data = get(job)
-    failed_papers = [
-        {
-            "doi": it.get("doi"),
-            "title": it.get("title"),
-            "year": it.get("year"),
-            "journal": it.get("journal"),
-        }
-        for it in (data.get("items") or [])
-        if it.get("status") == "failed"
-    ]
-    if not failed_papers:
-        raise ValueError("这个任务里没有下载失败的文献")
-    title = f"{data.get('title') or job}（重试）"
-    return start(
-        failed_papers,
-        title,
-        session=data.get("session"),
-        zotero_target=data.get("zotero_target"),
-    )
-
-
 def cancel() -> bool:
     """Ask the running job to stop: pending papers are skipped, browser windows closed."""
     if not _CURRENT["job"]:

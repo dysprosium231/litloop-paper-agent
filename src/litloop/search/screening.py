@@ -145,10 +145,13 @@ def prisma(session: str) -> dict[str, Any]:
     Exclusions are counted separately for the user's "不要" and for the low
     ratings the agent gave without the user deciding, with the reasons attached.
     """
+    from .. import __version__
+
     data = load(session)
     items = data.get("items", [])
     searches = [{"query": s.get("query", ""), "time": s.get("time", ""),
-                 "results": int(s.get("results") or 0), "new": int(s.get("new") or 0)}
+                 "results": int(s.get("results") or 0), "new": int(s.get("new") or 0),
+                 "params": dict(s.get("params") or {})}
                 for s in data.get("searches", [])]
     selected = [it for it in items if it.get("decision") == "selected"]
     rejected = [it for it in items if it.get("decision") == "rejected"]
@@ -159,10 +162,11 @@ def prisma(session: str) -> dict[str, Any]:
         text = " ".join(str(it.get("reject_reason") or it.get("reason") or "").split())[:120]
         if text:
             reasons[text] = reasons.get(text, 0) + 1
+    criteria = list(data.get("criteria") or [])
     return {
         "session": data.get("id", session), "question": data.get("question", ""),
         "mode": data.get("mode", "quick"), "created": data.get("created", ""),
-        "updated": data.get("updated", ""), "searches": searches,
+        "updated": data.get("updated", ""), "criteria": criteria, "searches": searches,
         "identified": sum(s["results"] for s in searches),
         "duplicates": sum(max(0, s["results"] - s["new"]) for s in searches) if searches else 0,
         "screened": len(items),
@@ -171,6 +175,14 @@ def prisma(session: str) -> dict[str, Any]:
         "excluded": len(rejected),
         "low_without_decision": len(low),
         "reasons": [{"reason": k, "count": v} for k, v in sorted(reasons.items(), key=lambda kv: -kv[1])[:10]],
+        "reproducibility": {
+            "session": data.get("id", session),
+            "created": data.get("created", ""),
+            "updated": data.get("updated", ""),
+            "litloop_version": __version__,
+            "criteria": criteria,
+            "searches": searches,
+        },
     }
 
 
@@ -222,4 +234,174 @@ def prisma_markdown(session: str) -> str:
         lines.append("")
     if d["reasons"]:
         lines += ["## 排除理由", ""] + [f"- {r['reason']}（{r['count']} 篇）" for r in d["reasons"]] + [""]
+    repro = d.get("reproducibility") or {}
+    lines += [
+        "## 复现存档",
+        "",
+        f"- 工具版本：LitLoop {repro.get('litloop_version') or ''}",
+        f"- 会话编号：`{d['session']}`（创建 {d.get('created') or '-'}，更新 {d.get('updated') or '-'}）",
+    ]
+    if d.get("criteria"):
+        lines += ["- 纳入标准：", *[f"  - {c}" for c in d["criteria"]]]
+    for idx, s in enumerate(d.get("searches") or [], 1):
+        params = s.get("params") or {}
+        parts: list[str] = []
+        if params.get("sources"):
+            parts.append("数据源=" + ", ".join(str(x) for x in params["sources"]))
+        if params.get("year_from") or params.get("year_to"):
+            parts.append(f"年份={params.get('year_from') or ''}–{params.get('year_to') or ''}")
+        if params.get("max_cas_zone"):
+            parts.append(f"中科院分区≤{params['max_cas_zone']}")
+        if params.get("max_jcr_quartile"):
+            parts.append(f"JCR≤Q{params['max_jcr_quartile']}")
+        if params.get("core_terms"):
+            parts.append("核心词=" + ", ".join(str(x) for x in params["core_terms"]))
+        if params.get("seeds"):
+            parts.append("种子=" + ", ".join(str(x) for x in params["seeds"]))
+        if parts:
+            lines.append(f"- 检索 #{idx} 条件：{'；'.join(parts)}")
+    lines.append("")
     return "\n".join(lines)
+
+
+def _norm_binary_decision(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "selected" if value else "rejected"
+    text = str(value).strip().lower()
+    if text in ("selected", "include", "included", "keep", "纳入", "1", "true", "yes"):
+        return "selected"
+    if text in ("rejected", "exclude", "excluded", "drop", "排除", "0", "false", "no"):
+        return "rejected"
+    return None
+
+
+def _kappa_label(kappa: float | None) -> str:
+    if kappa is None:
+        return "样本不足"
+    if kappa >= 0.81:
+        return "几乎完全一致"
+    if kappa >= 0.61:
+        return "高度一致"
+    if kappa >= 0.41:
+        return "中等一致"
+    if kappa >= 0.21:
+        return "一般一致"
+    return "一致性较低"
+
+
+def export_blind_review(session: str) -> dict[str, Any]:
+    """Export a blind-review JSON packet without reviewer 1's decisions or ratings."""
+    data = load(session)
+    items = []
+    for it in data.get("items") or []:
+        row = {
+            "n": it.get("n"),
+            "doi": it.get("doi"),
+            "title": it.get("title") or "",
+            "year": it.get("year"),
+            "journal": it.get("journal") or "",
+            "authors": it.get("authors") or [],
+            "abstract": it.get("abstract") or "",
+            "abstract_zh": it.get("abstract_zh") or "",
+            "decision": None,
+            "reject_reason": "",
+        }
+        items.append(row)
+    return {
+        "schema": 1,
+        "session": data.get("id", session),
+        "question": data.get("question", ""),
+        "criteria": list(data.get("criteria") or []),
+        "exported": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "items": items,
+    }
+
+
+def compare_reviewers(session: str, reviewer2_decisions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Compare reviewer 1 (session) vs reviewer 2 decisions; compute Cohen's kappa and disagreements."""
+    data = load(session)
+    r1_items = data.get("items") or []
+    r2_by_key: dict[str, dict[str, Any]] = {}
+    for raw in reviewer2_decisions or []:
+        if not isinstance(raw, dict):
+            continue
+        k = _key(raw)
+        if not k or k == "title:":
+            continue
+        r2_by_key[k] = raw
+
+    matched_r2: set[str] = set()
+    both_include = 0
+    r1_only = 0
+    r2_only = 0
+    both_exclude = 0
+    undecided_r1 = 0
+    undecided_r2 = 0
+    disagreements: list[dict[str, Any]] = []
+
+    for it in r1_items:
+        k = _key(it)
+        r1_dec = _norm_binary_decision(it.get("decision"))
+        r2_row = r2_by_key.get(k)
+        if r2_row is not None:
+            matched_r2.add(k)
+        r2_dec = _norm_binary_decision(r2_row.get("decision") if r2_row else None)
+        if r1_dec is None:
+            undecided_r1 += 1
+        if r2_dec is None:
+            undecided_r2 += 1
+        if r1_dec is None or r2_dec is None:
+            continue
+        if r1_dec == "selected" and r2_dec == "selected":
+            both_include += 1
+        elif r1_dec == "rejected" and r2_dec == "rejected":
+            both_exclude += 1
+        else:
+            if r1_dec == "selected":
+                r1_only += 1
+            else:
+                r2_only += 1
+            disagreements.append({
+                "n": it.get("n"),
+                "doi": it.get("doi"),
+                "title": it.get("title") or "",
+                "year": it.get("year"),
+                "journal": it.get("journal") or "",
+                "r1_decision": r1_dec,
+                "r2_decision": r2_dec,
+                "r1_reason": str(it.get("reject_reason") or it.get("reason") or "").strip(),
+                "r2_reason": str((r2_row or {}).get("reject_reason") or (r2_row or {}).get("reason") or "").strip(),
+            })
+
+    compared = both_include + r1_only + r2_only + both_exclude
+    if compared == 0:
+        agreement_rate = None
+        kappa = None
+    else:
+        po = (both_include + both_exclude) / compared
+        r1_inc = both_include + r1_only
+        r2_inc = both_include + r2_only
+        r1_exc = both_exclude + r2_only
+        r2_exc = both_exclude + r1_only
+        pe = ((r1_inc * r2_inc) + (r1_exc * r2_exc)) / (compared ** 2)
+        agreement_rate = round(po, 4)
+        kappa = 1.0 if abs(1.0 - pe) < 1e-12 else round((po - pe) / (1.0 - pe), 4)
+
+    return {
+        "session": data.get("id", session),
+        "total_items": len(r1_items),
+        "compared": compared,
+        "both_include": both_include,
+        "r1_only": r1_only,
+        "r2_only": r2_only,
+        "both_exclude": both_exclude,
+        "undecided_r1": undecided_r1,
+        "undecided_r2": undecided_r2,
+        "unmatched_r2": len(r2_by_key) - len(matched_r2),
+        "agreement_rate": agreement_rate,
+        "kappa": kappa,
+        "kappa_label": _kappa_label(kappa),
+        "disagreements": disagreements,
+    }

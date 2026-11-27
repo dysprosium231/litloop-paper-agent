@@ -164,9 +164,19 @@ class Export(BaseModel):
     which: str = "selected"  # selected | high
 
 
+class DualReviewCompareRequest(BaseModel):
+    decisions: list[dict[str, Any]] = []
+    raw_json: str = ""
+
+
 class Watch(BaseModel):
     session: str
     query: str = ""
+
+
+class WatchMergeRequest(BaseModel):
+    papers: list[dict[str, Any]] = []
+    score: bool = True
 
 
 class Decision(BaseModel):
@@ -464,12 +474,55 @@ def create_app(token: str) -> FastAPI:
         except Exception as exc:  # network, quota, source outage
             raise HTTPException(502, f"无法检查追踪：{exc}") from exc
 
+    @app.post("/api/watches/{wid}/merge")
+    def merge_watch(wid: str, body: WatchMergeRequest) -> dict[str, Any]:
+        """Merge fresh watch hits back into the originating screening session and score them."""
+        from ..search import watches as saved
+        try:
+            return saved.merge_into_session(wid, body.papers, score=body.score)
+        except ValueError as exc:
+            msg = str(exc)
+            raise HTTPException(404 if msg == "没有这个追踪" else 400, msg) from exc
+        except Exception as exc:
+            raise HTTPException(502, f"无法并入筛选：{exc}") from exc
+
     @app.post("/api/sessions/{session}/prisma/export")
     def export_prisma(session: str) -> dict[str, Any]:
         """Write the session's flow counts as Markdown under <output_dir>/exports."""
         from ..citations import session_export as export
         _record_path(session)
         return export.prisma_export(session)
+
+    @app.post("/api/sessions/{session}/reproducibility/export")
+    def export_reproducibility(session: str) -> dict[str, Any]:
+        """Write the session's full reproducibility archive as JSON under <output_dir>/exports."""
+        from ..citations import session_export as export
+        _record_path(session)
+        return export.reproducibility_export(session)
+
+    @app.post("/api/sessions/{session}/blind-review/export")
+    def export_blind_review(session: str) -> dict[str, Any]:
+        """Write a blind-review JSON packet under <output_dir>/exports for a second reviewer."""
+        from ..citations import session_export as export
+        _record_path(session)
+        return export.blind_review_export(session)
+
+    @app.post("/api/sessions/{session}/dual-review/compare")
+    def compare_dual_review(session: str, body: DualReviewCompareRequest) -> dict[str, Any]:
+        """Compare current session decisions with a second reviewer's JSON decisions."""
+        _record_path(session)
+        rows = list(body.decisions or [])
+        if body.raw_json.strip():
+            try:
+                parsed = json.loads(body.raw_json)
+            except ValueError as exc:
+                raise HTTPException(400, "无法解析对比文件：请提供合法的 JSON 文件") from exc
+            if isinstance(parsed, dict):
+                parsed = parsed.get("items") if isinstance(parsed.get("items"), list) else parsed.get("decisions")
+            if not isinstance(parsed, list):
+                raise HTTPException(400, "无法解析对比文件：JSON 中应包含 items 或 decisions 列表")
+            rows = [r for r in parsed if isinstance(r, dict)]
+        return screening.compare_reviewers(session, rows)
 
     @app.post("/api/sessions/{session}/export")
     def export_session(session: str, body: Export) -> dict[str, Any]:

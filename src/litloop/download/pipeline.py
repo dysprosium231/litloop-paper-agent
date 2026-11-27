@@ -626,66 +626,130 @@ def run_scihub_then_single(
 
     from ..sources.scihub import too_new
     grey_ids = [] if rounds == "single" else [i for i in ids if i not in results and not too_new(i, config)]
-    if grey_ids and allow_grey and grey_allowed(config):
-        # Which mirror and route (proxy or direct) is fastest right now: the
-        # whole round uses it (scihub_route; a no-op for "direct").
-        _progress.update(phase="Sci-Hub 测速")
-        for i in grey_ids:
-            _progress.item_stage(i, "正在测试 Sci-Hub 镜像速度")
-        try:
-            from ..sources.scihub_speed import measure
-            measure(config)
-        except Exception as exc:
-            logger.info(f"Sci-Hub speed test skipped: {exc}")
-        _lap("Sci-Hub speed test")
-        _progress.update(phase="Sci-Hub")
-        with ThreadPoolExecutor(max_workers=min(int(config.get("scihub_round_workers", 10) or 10), len(grey_ids))) as ex:
-            for i in grey_ids:
-                _progress.item_stage(i, "正在查找 Sci-Hub")
-            # Over HTTP only: no browser, so these really run side by side; a
-            # paper whose gate needs the browser gets it in round 2.
-            futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False, _scihub_http_only=True): i
-                    for i in grey_ids}
-            for f in as_completed(futs):
-                i, r = futs[f], f.result()
-                if r.get("success"):
-                    results[i] = r
-                    _progress.item_result(i, r)
-                _progress.advance(bool(r.get("success")), current=i)  # a miss goes on to round 2
-        _lap(f"Sci-Hub round, {sum(1 for i in grey_ids if i in results)}/{len(grey_ids)} papers")
+    do_grey = bool(grey_ids and allow_grey and grey_allowed(config))
 
-    left = [i for i in ids if i not in results]
     if rounds == "free":
-        left, queued = [], left
-        for i in queued:
+        if do_grey:
+            _progress.update(phase="Sci-Hub 测速")
+            for i in grey_ids:
+                _progress.item_stage(i, "正在测试 Sci-Hub 镜像速度")
+            try:
+                from ..sources.scihub_speed import measure
+                measure(config)
+            except Exception as exc:
+                logger.info(f"Sci-Hub speed test skipped: {exc}")
+            _lap("Sci-Hub speed test")
+            _progress.update(phase="Sci-Hub")
+            with ThreadPoolExecutor(max_workers=min(int(config.get("scihub_round_workers", 10) or 10), len(grey_ids))) as ex:
+                for i in grey_ids:
+                    _progress.item_stage(i, "正在查找 Sci-Hub")
+                futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False, _scihub_http_only=True): i
+                        for i in grey_ids}
+                for f in as_completed(futs):
+                    i, r = futs[f], f.result()
+                    if r.get("success"):
+                        results[i] = r
+                        _progress.item_result(i, r)
+                    _progress.advance(bool(r.get("success")), current=i)
+            _lap(f"Sci-Hub round, {sum(1 for i in grey_ids if i in results)}/{len(grey_ids)} papers")
+        for i in [x for x in ids if x not in results]:
             results[i] = {"success": False, "doi": i, "identifier": i, "queued": True, "error_type": "queued"}
-    if left:
-        _progress.update(phase="逐篇下载")
+    else:
+        import queue
+        import threading
+
+        single_q: queue.Queue[str | None] = queue.Queue()
+        results_lock = threading.Lock()
+        round2_ids: list[str] = []
         use_vpnsci = bool(config.get("vpnsci_enabled") or config.get("ezproxy_enabled"))
-        with ThreadPoolExecutor(max_workers=max(1, min(workers, len(left)))) as ex:
-            searched = set(grey_ids) if grey_ids and allow_grey and grey_allowed(config) else set()
-            for i in left:
-                # Say what really happened: only papers the Sci-Hub round asked were "not found" there.
-                why = ("Sci-Hub 上没有" if i in searched
-                       else "发表较新，不查 Sci-Hub" if allow_grey and grey_allowed(config) and too_new(i, config)
+        n_workers = max(1, min(workers, len(ids))) if ids else 1
+
+        def _staged(i: str) -> dict[str, Any]:
+            _progress.update(current=i)
+            _progress.item_stage(i, "正在查找开放获取版本和出版商官网")
+            t_one = time.time()
+            r = _one(i, _institutional=True, use_vpnsci=use_vpnsci)
+            logger.info(f"[timing] {i}: {time.time() - t_one:.1f}s, "
+                        f"{r.get('source') if r.get('success') else 'failed'}")
+            return r
+
+        def _single_worker() -> None:
+            while True:
+                ident = single_q.get()
+                if ident is None:
+                    single_q.task_done()
+                    break
+                try:
+                    if _sources._CANCEL_GEN[0] != gen0:
+                        r = {"success": False, "doi": ident, "identifier": ident,
+                             "error": "cancelled by user", "error_type": "cancelled"}
+                    else:
+                        r = _staged(ident)
+                    with results_lock:
+                        results[ident] = r
+                        round2_ids.append(ident)
+                    _progress.advance(bool(r.get("success")), current=ident)
+                    _progress.item_result(ident, r)
+                finally:
+                    single_q.task_done()
+
+        single_threads = [
+            threading.Thread(target=_single_worker, name=f"single-pipe-{idx}", daemon=True)
+            for idx in range(n_workers)
+        ]
+        for th in single_threads:
+            th.start()
+
+        # Papers skipping Sci-Hub (e.g. too_new or grey off) start Round 2 immediately
+        # without waiting for the Sci-Hub round to finish.
+        immediate_left = [i for i in ids if i not in results and (not do_grey or i not in grey_ids)]
+        if immediate_left:
+            if not do_grey:
+                _progress.update(phase="逐篇下载")
+            for i in immediate_left:
+                why = ("发表较新，不查 Sci-Hub"
+                       if allow_grey and grey_allowed(config) and too_new(i, config)
                        else "")
                 _progress.item_stage(i, f"等待中：{why}，接下来逐篇查找" if why else "等待中，接下来逐篇查找")
+                single_q.put(i)
 
-            def _staged(i: str) -> dict[str, Any]:
-                _progress.update(current=i)
-                _progress.item_stage(i, "正在查找开放获取版本和出版商官网")
-                t_one = time.time()
-                r = _one(i, _institutional=True, use_vpnsci=use_vpnsci)
-                logger.info(f"[timing] {i}: {time.time() - t_one:.1f}s, "
-                            f"{r.get('source') if r.get('success') else 'failed'}")
-                return r
-            futs = {ex.submit(_staged, i): i for i in left}
-            for f in as_completed(futs):
-                i, r = futs[f], f.result()
-                results[i] = r
-                _progress.advance(bool(r.get("success")), current=i)
-                _progress.item_result(i, r)  # final: nothing else will be tried for it
-        _lap(f"one-by-one round, {sum(1 for i in left if results[i].get('success'))}/{len(left)} papers")
+        if do_grey:
+            _progress.update(phase="Sci-Hub 测速")
+            for i in grey_ids:
+                _progress.item_stage(i, "正在测试 Sci-Hub 镜像速度")
+            try:
+                from ..sources.scihub_speed import measure
+                measure(config)
+            except Exception as exc:
+                logger.info(f"Sci-Hub speed test skipped: {exc}")
+            _lap("Sci-Hub speed test")
+            _progress.update(phase="Sci-Hub")
+            with ThreadPoolExecutor(max_workers=min(int(config.get("scihub_round_workers", 10) or 10), len(grey_ids))) as ex:
+                for i in grey_ids:
+                    _progress.item_stage(i, "正在查找 Sci-Hub")
+                futs = {ex.submit(_one, i, strategy="scihub_only", _institutional=False, _scihub_http_only=True): i
+                        for i in grey_ids}
+                for f in as_completed(futs):
+                    i, r = futs[f], f.result()
+                    if r.get("success"):
+                        with results_lock:
+                            results[i] = r
+                        _progress.item_result(i, r)
+                        _progress.advance(True, current=i)
+                    else:
+                        # Hand misses to Round 2 immediately per paper instead of waiting for all of Sci-Hub.
+                        _progress.item_stage(i, "等待中：Sci-Hub 上没有，接下来逐篇查找")
+                        single_q.put(i)
+            _lap(f"Sci-Hub round, {sum(1 for i in grey_ids if results.get(i, {}).get('source') == 'Sci-Hub')}/{len(grey_ids)} papers")
+
+        for _ in single_threads:
+            single_q.put(None)
+        for th in single_threads:
+            th.join()
+
+        if round2_ids:
+            _lap(f"one-by-one round, {sum(1 for i in round2_ids if results.get(i, {}).get('success'))}/{len(round2_ids)} papers")
+
     logger.info(f"[timing] whole list: {time.time() - t_all:.0f}s, "
                 f"{sum(1 for r in results.values() if r.get('success'))}/{len(ids)} papers")
     _progress.finish()

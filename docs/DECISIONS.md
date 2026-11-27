@@ -1,5 +1,13 @@
 # 决定与实验记录
 
+## 2026-11-27：路线 B 核心闭环（定期追踪并回评分 + 系统综述复现与双人一致性 + 短清单按篇流水线 + 停止规则结项）
+
+- **用户决定（停止规则结项）**：确认维持现行停止规则不改（三个材料集重放「连续 2 批才停」均多读 0 篇有效文献），从 `TODO.md`「待用户决定」结项。
+- **改动**：
+  1. **定期追踪闭环（B1）**：[src/litloop/search/watches.py](src/litloop/search/watches.py) 新增 `merge_into_session()`，去重并复用原会话纳入标准、用户纠偏示例与 steering notes 调用 `scorer.score_papers()` 评分后并回原筛选会话（未配置内置模型时以「中」直接并入）；[src/litloop/desktop/server.py](src/litloop/desktop/server.py) 新增 `POST /api/watches/{wid}/merge`，[app/src/components/history-view.tsx](app/src/components/history-view.tsx)「追踪」卡片新增「并回筛选并评分」与直达筛选页按钮。
+  2. **系统综述复现与双人筛选一致性（B2）**：[src/litloop/agents/runner.py](src/litloop/agents/runner.py) 与 [src/litloop/search/deep.py](src/litloop/search/deep.py) 完整记录检索参数、数据源与 `litloop_version`；[src/litloop/search/screening.py](src/litloop/search/screening.py) 扩展 `prisma()` / `prisma_markdown()` 复现存档段，并新增 `export_blind_review()` 与 `compare_reviewers()`（计算 Cohen's κ 与分歧清单）；[src/litloop/citations/session_export.py](src/litloop/citations/session_export.py) 新增 `reproducibility_export()` 与 `blind_review_export()`；[src/litloop/desktop/server.py](src/litloop/desktop/server.py) 与 [app/src/components/history-view.tsx](app/src/components/history-view.tsx) 接入复现存档、导出盲评包、导入双人对比与分歧一键仲裁。
+  3. **短清单按篇流水线推进（B3）**：[src/litloop/download/pipeline.py](src/litloop/download/pipeline.py) 改造 `run_scihub_then_single()`（`rounds="all"`），跳过 Sci-Hub 的新文献与 Sci-Hub 失败文献立即入队逐篇通道，单浏览器 worker 串行推进不争用，取消信号安全中断未启动条目；顺手清理 [src/litloop/desktop/download_jobs.py](src/litloop/desktop/download_jobs.py) 中重复定义的 `retry_failed()`。
+
 ## 2026-11-27：首次引导与网络设置加入学术站点分流测速与动态 `host_proxy_hosts` 推荐
 
 - **背景**：高校透明加速（如 `scholar.buaa.edu.cn`）与个人代理混用时，不同出版商的直连/代理连通性与延迟差异很大（例如实测中 SAGE 直连失败而代理 325 ms、arXiv 直连 11.8 s 而代理 787 ms，但 ScienceDirect/Springer/Wiley 在校园网下必须直连以保留机构 IP 权限）。手动维护 `host_proxy_hosts` 门槛过高。

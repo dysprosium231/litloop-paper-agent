@@ -92,3 +92,26 @@ def prisma_export(session: str) -> dict[str, Any]:
     path = folder / f"{session[:15]}-prisma-{time.strftime('%H%M%S')}.md"
     path.write_text(text, encoding="utf-8", newline="\n")
     return {"file": str(path)}
+
+
+def reproducibility_export(session: str) -> dict[str, Any]:
+    """Write the session's full PRISMA + reproducibility archive as JSON under <output_dir>/exports/."""
+    import json
+    payload = screening.prisma(session)
+    payload["exported"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    folder = Path(str(load_config().get("output_dir") or "")).expanduser() / "exports"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{session[:15]}-repro-{time.strftime('%H%M%S')}.json"
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    return {"file": str(path)}
+
+
+def blind_review_export(session: str) -> dict[str, Any]:
+    """Write a blind-review JSON packet under <output_dir>/exports/ for a second reviewer."""
+    import json
+    payload = screening.export_blind_review(session)
+    folder = Path(str(load_config().get("output_dir") or "")).expanduser() / "exports"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{session[:15]}-blind-{time.strftime('%H%M%S')}.json"
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    return {"file": str(path), "count": len(payload.get("items") or [])}

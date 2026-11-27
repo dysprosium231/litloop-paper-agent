@@ -648,6 +648,19 @@ export interface SearchHit {
   title: string
   year?: number | null
   journal?: string | null
+  journal_rank?: string | null
+  authors?: string[]
+  abstract?: string
+  cited_by_count?: number
+}
+
+export interface WatchMergeResult {
+  session: string
+  added: number
+  total: number
+  scored: boolean
+  by_relevance: Record<string, number>
+  note?: string
 }
 
 export interface Watch {
@@ -672,6 +685,37 @@ export const watchesApi = {
       "/api/watches/check-due", {}),
   check: (id: string) =>
     call<{ id: string; checked: string; found: number; new: SearchHit[] }>(`/api/watches/${encodeURIComponent(id)}/check`, {}),
+  merge: (id: string, papers: SearchHit[], score = true) =>
+    call<WatchMergeResult>(`/api/watches/${encodeURIComponent(id)}/merge`, { papers, score }),
+}
+
+export interface DualReviewDisagreement {
+  n?: number | null
+  doi?: string | null
+  title: string
+  year?: number | null
+  journal?: string
+  r1_decision: "selected" | "rejected"
+  r2_decision: "selected" | "rejected"
+  r1_reason?: string
+  r2_reason?: string
+}
+
+export interface DualReviewReport {
+  session: string
+  total_items: number
+  compared: number
+  both_include: number
+  r1_only: number
+  r2_only: number
+  both_exclude: number
+  undecided_r1: number
+  undecided_r2: number
+  unmatched_r2: number
+  agreement_rate: number | null
+  kappa: number | null
+  kappa_label: string
+  disagreements: DualReviewDisagreement[]
 }
 
 export const historyApi = {
@@ -679,6 +723,12 @@ export const historyApi = {
   prisma: (id: string) => call<PrismaSummary>(`/api/sessions/${encodeURIComponent(id)}/prisma`),
   prismaExport: (id: string) =>
     call<{ file: string }>(`/api/sessions/${encodeURIComponent(id)}/prisma/export`, {}),
+  reproExport: (id: string) =>
+    call<{ file: string }>(`/api/sessions/${encodeURIComponent(id)}/reproducibility/export`, {}),
+  blindReviewExport: (id: string) =>
+    call<{ file: string; count: number }>(`/api/sessions/${encodeURIComponent(id)}/blind-review/export`, {}),
+  compareDualReview: (id: string, rawJson: string) =>
+    call<DualReviewReport>(`/api/sessions/${encodeURIComponent(id)}/dual-review/compare`, { raw_json: rawJson }),
   export: (id: string, format: "bibtex" | "ris" | "doi", which: "selected" | "high" = "selected") =>
     call<{ file: string; count: number }>(`/api/sessions/${encodeURIComponent(id)}/export`, { format, which }),
 }

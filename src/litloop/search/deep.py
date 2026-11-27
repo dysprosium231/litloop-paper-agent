@@ -708,9 +708,11 @@ def start(question: str, queries: list[str], seeds: list[str], core_terms: list[
     if not seeds:
         raise ValueError("give 1-3 seed DOIs (papers the user already knows are on topic)")
     t0 = time.time()
+    from .. import __version__
     session = screening.save(question, [], criteria=criteria, query=" | ".join(queries), mode="deep",
                              search_params={"core_terms": core_terms, "seeds": seeds,
-                                            "year_from": year_from, "year_to": year_to})["session"]
+                                            "year_from": year_from, "year_to": year_to,
+                                            "sources": ["openalex"], "litloop_version": __version__})["session"]
     _run.progress = store.Progress(session, "start")
     try:
         return _start(session, t0, question, queries, seeds, core_terms, must_find, year_from, year_to,

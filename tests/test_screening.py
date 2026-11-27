@@ -113,3 +113,64 @@ def test_prisma_export_writes_a_markdown_table(tmp_path, monkeypatch):
     text = open(out["file"], encoding="utf-8").read()
     assert out["file"].endswith(".md")
     assert "| 检索命中 | 3 |" in text and "| 纳入 | 0 |" in text and "| 排除 | 0 |" in text
+
+
+def test_prisma_reproducibility_and_dual_reviewer_agreement():
+    s = screening.save(
+        "SiC/Al wetting",
+        [
+            {"doi": "10.1/a", "title": "Paper A", "relevance": "高", "reason": "ok", "abstract": "abs A"},
+            {"doi": "10.1/b", "title": "Paper B", "relevance": "中", "reason": "ok"},
+            {"doi": "10.1/c", "title": "Paper C", "relevance": "低", "reason": "off"},
+            {"doi": "10.1/d", "title": "Paper D", "relevance": "不相关", "reason": "off"},
+        ],
+        criteria=["include SiC/Al"],
+        query="SiC Al wetting",
+        mode="quick",
+        search_params={"sources": ["openalex", "crossref"], "year_from": 2020, "year_to": 2026},
+    )
+    sid = s["session"]
+    screening.decide(sid, selected=["10.1/a", "10.1/b"], rejected=["10.1/c", "10.1/d"])
+
+    flow = screening.prisma(sid)
+    assert flow["criteria"] == ["include SiC/Al"]
+    assert flow["searches"][0]["params"]["sources"] == ["openalex", "crossref"]
+    assert flow["reproducibility"]["litloop_version"]
+    md = screening.prisma_markdown(sid)
+    assert "## 复现存档" in md
+    assert "数据源=openalex, crossref" in md
+    assert "年份=2020–2026" in md
+
+    blind = screening.export_blind_review(sid)
+    assert blind["session"] == sid
+    assert len(blind["items"]) == 4
+    assert all(it["decision"] is None and "relevance" not in it for it in blind["items"])
+
+    # 完全一致时 kappa = 1.0
+    perfect = screening.compare_reviewers(sid, [
+        {"doi": "10.1/a", "decision": "纳入"},
+        {"doi": "10.1/b", "decision": "selected"},
+        {"doi": "10.1/c", "decision": "排除"},
+        {"doi": "10.1/d", "decision": "rejected"},
+    ])
+    assert perfect["compared"] == 4
+    assert perfect["agreement_rate"] == 1.0
+    assert perfect["kappa"] == 1.0
+    assert perfect["disagreements"] == []
+
+    # 有分歧时准确计算 2x2 计数与 kappa
+    partial = screening.compare_reviewers(sid, [
+        {"doi": "10.1/a", "decision": "selected"},
+        {"doi": "10.1/b", "decision": "rejected", "reject_reason": "wrong alloy"},
+        {"doi": "10.1/c", "decision": "rejected"},
+        {"doi": "10.1/d", "decision": "rejected"},
+    ])
+    assert partial["both_include"] == 1
+    assert partial["r1_only"] == 1
+    assert partial["r2_only"] == 0
+    assert partial["both_exclude"] == 2
+    assert partial["agreement_rate"] == 0.75
+    assert partial["kappa"] == 0.5
+    assert len(partial["disagreements"]) == 1
+    assert partial["disagreements"][0]["doi"] == "10.1/b"
+    assert partial["disagreements"][0]["r2_reason"] == "wrong alloy"
