@@ -29,6 +29,7 @@
 | `elsevier_api_fulltext` | `true` | 是否通过 Elsevier API 下载全文；设为 `false` 时不请求全文，补摘要和 Scopus 仍使用 |
 | `network_proxy` | 空 | HTTP/SOCKS 代理；环境变量 `HTTP(S)_PROXY` 会被忽略 |
 | `host_proxy_url` | 空 | 只给指定出版商域名走的代理，Sci-Hub、LibGen 选代理线路时也走它 |
+| `host_proxy_hosts` | `[]` | 需要走 `host_proxy_url` 的域名列表，可在「设置 → 网络」或首次引导的学术站点分流测速后一键生成 |
 | `browser_executable` | 空 | 指定浏览器程序，例如本机 Chrome 的副本 |
 | `vpnsci_enabled` / `vpnsci_school` | `false` / 空 | WebVPN |
 | `carsi_enabled` / `carsi_idp_name` | `false` / 空 | CARSI |

@@ -609,3 +609,87 @@ def test_agent_chat_stream_requires_stream_suffix(client, session, monkeypatch):
 
     bad_res = client.post(f"/api/agent/chat/{session}", json={"message": "你好"})
     assert bad_res.status_code in (404, 405)
+
+
+def test_recommend_site_route_campus_and_speedup_rules():
+    from litloop.institutional.proxy_check import recommend_site_route
+
+    campus_site = {"name": "ScienceDirect", "host": "www.sciencedirect.com", "campus_sensitive": True}
+    oa_site = {"name": "arXiv", "host": "arxiv.org", "campus_sensitive": False}
+
+    # 校园网下直连可用时，即使代理更快也不建议切代理，以免丢失学校 IP 权限
+    r1 = recommend_site_route(
+        campus_site,
+        {"ok": True, "status": 200, "ms": 4200, "error": ""},
+        {"ok": True, "status": 200, "ms": 300, "error": ""},
+        is_campus=True,
+    )
+    assert r1["route"] == "direct"
+
+    # 校园网下直连失败而代理可达时，建议走代理
+    r2 = recommend_site_route(
+        campus_site,
+        {"ok": False, "status": 0, "ms": 6000, "error": "SSLError"},
+        {"ok": True, "status": 200, "ms": 325, "error": ""},
+        is_campus=True,
+    )
+    assert r2["route"] == "proxy"
+
+    # 非权限敏感 OA 站，直连 >=2000ms 且比代理慢 2 倍以上时建议走代理
+    r3 = recommend_site_route(
+        oa_site,
+        {"ok": True, "status": 200, "ms": 5000, "error": ""},
+        {"ok": True, "status": 200, "ms": 750, "error": ""},
+        is_campus=True,
+    )
+    assert r3["route"] == "proxy"
+
+    # 直连本身较快（<2000ms）保持直连
+    r4 = recommend_site_route(
+        oa_site,
+        {"ok": True, "status": 200, "ms": 800, "error": ""},
+        {"ok": True, "status": 200, "ms": 300, "error": ""},
+        is_campus=False,
+    )
+    assert r4["route"] == "direct"
+
+    # 未检测到代理时
+    r5 = recommend_site_route(oa_site, {"ok": False, "status": 0, "ms": 3000, "error": "Timeout"}, None, is_campus=False)
+    assert r5["route"] == "unavailable"
+
+
+def test_network_route_benchmark_and_apply_endpoints(client, monkeypatch):
+    from litloop import config as _config
+    from litloop.institutional import proxy_check
+
+    monkeypatch.setattr(proxy_check, "detect_local_proxy", lambda configured="": "http://127.0.0.1:10808")
+
+    def fake_probe(url, *, proxy_url=None, timeout=6.0):
+        if "journals.sagepub.com" in url:
+            return {"ok": False, "status": 0, "ms": 1200, "error": "SSLError"} if not proxy_url else {"ok": True, "status": 200, "ms": 320, "error": ""}
+        if "arxiv.org" in url:
+            return {"ok": True, "status": 200, "ms": 4800, "error": ""} if not proxy_url else {"ok": True, "status": 200, "ms": 700, "error": ""}
+        return {"ok": True, "status": 200, "ms": 400, "error": ""}
+
+    monkeypatch.setattr(proxy_check, "_probe_one_url", fake_probe)
+
+    res = client.post("/api/network/route-benchmark", json={"is_campus": True})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["proxy_url"] == "http://127.0.0.1:10808"
+    assert body["is_campus"] is True
+    assert set(body["recommended_hosts"]) == {"journals.sagepub.com", "arxiv.org"}
+
+    apply_res = client.post(
+        "/api/network/host-proxy",
+        json={"proxy_url": "http://127.0.0.1:10808", "hosts": ["journals.sagepub.com", "arxiv.org", "JOURNALS.SAGEPUB.COM"]},
+    )
+    assert apply_res.status_code == 200
+    applied = apply_res.json()
+    assert applied["ok"] is True
+    assert applied["proxy_url"] == "http://127.0.0.1:10808"
+    assert applied["hosts"] == ["journals.sagepub.com", "arxiv.org"]
+
+    cfg = _config.load_config()
+    assert cfg["host_proxy_url"] == "http://127.0.0.1:10808"
+    assert cfg["host_proxy_hosts"] == ["journals.sagepub.com", "arxiv.org"]

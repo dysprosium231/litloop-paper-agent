@@ -114,15 +114,27 @@ def _zotero_server_entries(cfg: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+def reset_discovery() -> None:
+    """Clear the cached zotero-mcp discovery result (e.g. after on-demand install)."""
+    global _DISCOVERED
+    _DISCOVERED = None
+
+
 def discover_zotero_mcp(config: dict[str, Any]) -> dict[str, Any] | None:
     """Find the Python that has zotero-mcp, plus the env its server runs with.
 
     Order: explicit ``zotero_mcp_python``; zotero-mcp installed alongside
-    litloop; the zotero server registered in Claude Code / Claude Desktop;
-    `zotero-mcp` on PATH; uv-tool / pipx installs. ``zotero_mcp_python`` set to
-    "off" disables the route.
+    litloop or as an isolated optional component; the zotero server registered
+    in Claude Code / Claude Desktop; `zotero-mcp` on PATH; uv-tool / pipx
+    installs. ``zotero_mcp_python`` set to "off" disables the route.
     """
     global _DISCOVERED
+    import importlib.util
+    import shutil
+    import sys
+
+    from .. import optional
+
     explicit = str(config.get("zotero_mcp_python") or "").strip()
     if explicit.lower() == "off":
         return None
@@ -133,15 +145,28 @@ def discover_zotero_mcp(config: dict[str, Any]) -> dict[str, Any] | None:
         return {"python": path, "env": {},
                 "env_script": str(config.get("zotero_mcp_env_script") or "").strip()}
     if _DISCOVERED is not None:
-        return _DISCOVERED or None
-
-    import importlib.util
-    import shutil
-    import sys
+        if _DISCOVERED:
+            return _DISCOVERED
+        if optional.installed("zotero_mcp"):
+            _DISCOVERED = {
+                "python": Path(sys.executable),
+                "env": {},
+                "env_script": str(config.get("zotero_mcp_env_script") or "").strip(),
+                "sys_path": str(optional.component_dir("zotero_mcp")),
+            }
+            return _DISCOVERED
+        return None
 
     found: dict[str, Any] = {}
     if importlib.util.find_spec("zotero_mcp") is not None:
         found = {"python": Path(sys.executable), "env": {}, "env_script": ""}
+    if not found and optional.installed("zotero_mcp"):
+        found = {
+            "python": Path(sys.executable),
+            "env": {},
+            "env_script": "",
+            "sys_path": str(optional.component_dir("zotero_mcp")),
+        }
     if not found:
         for cfg_path in _mcp_client_configs():
             try:
@@ -284,7 +309,11 @@ def _run_bridge(found: dict[str, Any], req: dict[str, Any], timeout: int) -> dic
 
     python = found["python"]
     env_script = found.get("env_script") or ""
-    req = {**req, "env_script": str(Path(env_script).expanduser()) if env_script else ""}
+    req = {
+        **req,
+        "env_script": str(Path(env_script).expanduser()) if env_script else "",
+        **({"sys_path": str(found["sys_path"])} if found.get("sys_path") else {}),
+    }
     bridge = Path(__file__).with_name("bridge.py")
     # The MCP client's env block for the zotero server (API key, WebDAV...).
     env = dict(os.environ, **found.get("env", {}), PYTHONIOENCODING="utf-8", PYTHONUTF8="1")

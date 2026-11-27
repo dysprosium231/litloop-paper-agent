@@ -106,7 +106,7 @@ export function ZoteroPage({ data, error, mode, onModeChanged, onChanged, onOpen
         {data ? (
           <>
             <Check ok={data.running} yes="Zotero 运行中" no="Zotero 未运行" />
-            <Check ok={Boolean(data.mcp)} yes="zotero-mcp 已就绪" no="未找到 zotero-mcp，在「设置 → Zotero」中填写" />
+            <Check ok={Boolean(data.mcp)} yes="zotero-mcp 已就绪" no="未找到 zotero-mcp，可在「设置 → 可选组件」或「设置 → Zotero」中一键安装" />
             {data.mcp && <WriteModeLine mode={mode} running={data.running} onDone={onModeChanged} />}
           </>
         ) : (error ?? "正在加载…")}

@@ -51,6 +51,17 @@ class Setting(BaseModel):
     value: Any = None
 
 
+class RouteBenchmarkRequest(BaseModel):
+    proxy_url: str = ""
+    is_campus: bool | None = None
+    timeout: float = 6.0
+
+
+class HostProxyApplyRequest(BaseModel):
+    proxy_url: str = ""
+    hosts: list[str] = []
+
+
 class BuiltinPreset(BaseModel):
     preset: str
 
@@ -661,6 +672,37 @@ def create_app(token: str) -> FastAPI:
             return app_settings.run_test(group)
         except KeyError as exc:
             raise HTTPException(404, "无法完成检测：此分组没有检测项") from exc
+
+    @app.post("/api/network/route-benchmark")
+    def network_route_benchmark(req: RouteBenchmarkRequest) -> dict[str, Any]:
+        from ..institutional import proxy_check
+        return proxy_check.probe_academic_routes(
+            proxy_url=req.proxy_url,
+            is_campus=req.is_campus,
+            timeout=max(1.0, min(req.timeout, 15.0)),
+        )
+
+    @app.post("/api/network/host-proxy")
+    def network_host_proxy_apply(req: HostProxyApplyRequest) -> dict[str, Any]:
+        import json
+        from .. import config as _config
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for raw in req.hosts:
+            host = str(raw).strip().lower()
+            if host and host not in seen:
+                seen.add(host)
+                cleaned.append(host)
+        _config.update_config("host_proxy_hosts", json.dumps(cleaned, ensure_ascii=False))
+        proxy_url = req.proxy_url.strip()
+        if proxy_url:
+            _config.update_config("host_proxy_url", proxy_url)
+        cfg = _config.load_config()
+        return {
+            "ok": True,
+            "proxy_url": str(cfg.get("host_proxy_url") or ""),
+            "hosts": list(cfg.get("host_proxy_hosts") or []),
+        }
 
     @app.get("/api/harnesses")
     def harnesses_list() -> list[dict[str, Any]]:

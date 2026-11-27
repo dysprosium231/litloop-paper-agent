@@ -166,11 +166,11 @@ STEPS = [
                                   "联系邮箱只发给 Crossref、OpenAlex、Unpaywall，它们要求填写。"},
     {"group": "screening", "intro": "筛选时可把摘要翻译成中文。填 DeepSeek 或 DeepL 的 Key 后由 app 翻译，不占用对话额度；也可以以后再设置。"},
     {"group": "downloads", "intro": "设置 PDF 的保存位置和文件名。Sci-Hub、LibGen 等来源可能违反出版商条款或学校规定，默认不使用，是否开启由你决定。"},
-    {"group": "network", "intro": "开启代理软件时，学校认证的流量需要直连，否则学校无法识别你的身份。选择「检测」查看当前网络和需要的设置。"},
+    {"group": "network", "intro": "开启代理软件时，学校认证与校园网直连出版商需要走直连，否则学校无法识别你的身份。可先点击「检测」查看本机网络，再用下方「学术站点分流测速」自动生成建议走代理的域名清单。"},
     {"group": "school", "intro": "下载学校订阅的期刊需要学校认证。填写学校代号并选择认证方式；不在校园网时会弹出浏览器让你登录一次。"},
     {"group": "components", "intro": "下面这些组件不装也能检索和下载开放获取文献，缺了只影响列出的功能。"
                                      "装好后选择「检测」再看一次。"},
-    {"group": "zotero", "intro": "下载的文献可推送到 Zotero。需要 Zotero 7 以上和 zotero-mcp；推荐授权本地写入，速度最快。"},
+    {"group": "zotero", "intro": "下载的文献可推送到 Zotero。需要 Zotero 7 以上和 zotero-mcp（未安装时可点「检测」后一键安装）；推荐授权本地写入，速度最快。"},
 ]
 _CONFIGURED = ("builtin_agent_model", "openalex_api_key", "elsevier_api_key", "springer_meta_api_key")
 
@@ -387,13 +387,29 @@ def test_downloads() -> list[dict[str, Any]]:
 
 
 def test_zotero() -> list[dict[str, Any]]:
+    from ..zotero import client as zotero_client
+
+    out = []
     try:
         r = _get("http://127.0.0.1:23119/connector/ping", proxies={"http": None, "https": None})
         if r.status_code == 200:
-            return [_result("Zotero", True, "Zotero 运行中")]
-        return [_result("Zotero", False, f"Zotero 没有响应（HTTP {r.status_code}）")]
+            out.append(_result("Zotero", True, "Zotero 运行中"))
+        else:
+            out.append(_result("Zotero", False, f"Zotero 没有响应（HTTP {r.status_code}）"))
     except Exception:
-        return [_result("Zotero", False, "Zotero 未运行")]
+        out.append(_result("Zotero", False, "Zotero 未运行"))
+
+    cfg = _config.load_config()
+    if zotero_client.discover_zotero_mcp(cfg):
+        out.append(_result("zotero-mcp", True, "已就绪"))
+    else:
+        out.append(_result(
+            "zotero-mcp",
+            None,
+            "未安装：推送文献和读取分类需要它，可一键安装",
+            action={"key": "zotero_mcp", "label": "一键安装"},
+        ))
+    return out
 
 
 def test_network() -> list[dict[str, Any]]:
@@ -536,6 +552,12 @@ def test_components() -> list[dict[str, Any]]:
     else:
         out.append(_result("版面分析", None, "未安装：PDF 转 Markdown 按纯文本顺序，表格和分栏可能不规整",
                            action={"key": "layout", "label": "安装（约 65 MB）"}))
+    from ..zotero import client as zotero_client
+    if zotero_client.discover_zotero_mcp(cfg):
+        out.append(_result("Zotero 桥接", True, "已安装：可将下载的文献推送到本机 Zotero"))
+    else:
+        out.append(_result("Zotero 桥接", None, "未安装 zotero-mcp：无法将文献推送到 Zotero 或读取 Zotero 分类",
+                           action={"key": "zotero_mcp", "label": "安装（约 20 MB）"}))
     from . import harnesses
     harness_cfg = str(cfg.get("agent_harness") or "auto").strip()
     if cfg.get("agent_backend") == "builtin" or harness_cfg == "builtin":

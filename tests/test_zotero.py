@@ -138,6 +138,7 @@ def test_zotero_bridge_accepts_file_stored_on_webdav(monkeypatch):
 def _isolate_discovery(monkeypatch, tmp_path):
     import importlib.util
     monkeypatch.setattr(zotero, "_DISCOVERED", None)
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path / ".litloop"))
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("APPDATA", raising=False)
@@ -212,3 +213,35 @@ def test_zotero_bridge_resolves_localhost_to_ipv4(monkeypatch):
     socket.getaddrinfo("localhost", 23119)
     socket.getaddrinfo("api.zotero.org", 443)
     assert seen == ["127.0.0.1", "api.zotero.org"]
+
+
+def test_discovers_isolated_optional_zotero_mcp_and_passes_sys_path(tmp_path, monkeypatch):
+    import json
+    import sys
+    from litloop import optional
+    from litloop.zotero import bridge as zotero_bridge
+
+    _isolate_discovery(monkeypatch, tmp_path)
+    # First discovery misses and caches empty result
+    assert zotero.discover_zotero_mcp({}) is None
+
+    # Installing into isolated component dir works immediately without restart
+    comp_dir = optional.component_dir("zotero_mcp")
+    (comp_dir / "zotero_mcp").mkdir(parents=True, exist_ok=True)
+    (comp_dir / "zotero_mcp" / "__init__.py").write_text("", encoding="utf-8")
+
+    found = zotero.discover_zotero_mcp({})
+    assert found is not None
+    assert found["python"] == Path(sys.executable)
+    assert found["sys_path"] == str(comp_dir)
+
+    seen_req = _fake_zotero_mcp(tmp_path, monkeypatch, '{"success": true, "collections": []}')
+    res = zotero.zotero_collections({})
+    assert res["success"] is True
+    sent = json.loads(seen_req.read_text(encoding="utf-8"))
+    assert sent["sys_path"] == str(comp_dir)
+
+    # bridge._setup inserts sys_path into sys.path
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    zotero_bridge._setup({"sys_path": str(comp_dir)})
+    assert sys.path[0] == str(comp_dir)

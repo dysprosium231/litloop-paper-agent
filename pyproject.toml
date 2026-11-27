@@ -26,6 +26,8 @@ dependencies = [
     # Finds "long form (SF)" pairs in abstracts for the glossary's suggestions
     # (Schwartz-Hearst; MIT, needs only `regex`).
     "abbreviations>=0.2.5",
+    # Trust OS root certificate stores (campus academic gateways, enterprise CAs).
+    "truststore>=0.10",
 ]
 
 keywords = [

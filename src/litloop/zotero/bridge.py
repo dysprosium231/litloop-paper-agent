@@ -44,6 +44,10 @@ def _source_for(identifier: str) -> str:
 
 
 def _setup(req: dict) -> None:
+    extra_path = str(req.get("sys_path") or "").strip()
+    if extra_path and extra_path not in sys.path:
+        sys.path.insert(0, extra_path)
+
     if req.get("env_script"):
         # The user's launcher sets ZOTERO_* env vars (decrypting secrets);
         # its serve() call is guarded by __main__, so this only sets env.

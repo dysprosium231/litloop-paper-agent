@@ -1,5 +1,30 @@
 # 决定与实验记录
 
+## 2026-11-27：首次引导与网络设置加入学术站点分流测速与动态 `host_proxy_hosts` 推荐
+
+- **背景**：高校透明加速（如 `scholar.buaa.edu.cn`）与个人代理混用时，不同出版商的直连/代理连通性与延迟差异很大（例如实测中 SAGE 直连失败而代理 325 ms、arXiv 直连 11.8 s 而代理 787 ms，但 ScienceDirect/Springer/Wiley 在校园网下必须直连以保留机构 IP 权限）。手动维护 `host_proxy_hosts` 门槛过高。
+- **改动**：
+  1. [src/litloop/institutional/proxy_check.py](src/litloop/institutional/proxy_check.py)：新增 `ACADEMIC_PROBE_SITES`（15 个常用出版商/预印本站点，区分 `campus_sensitive`）、`detect_local_proxy()`（优先使用已配置的 `host_proxy_url`，其次系统代理，最后探测 `10808/7890/7897/10809/1080/10801`）、`_probe_one_url()`（`Session.trust_env = False` 隔离直连与代理探测）、`recommend_site_route()`（校园网下权限敏感站点只要直连可达就保留直连；直连失败或非权限敏感站点满足 `direct >= 2000 ms` 且 `direct >= 2 * proxy` 时推荐代理）与 `probe_academic_routes()`。
+  2. [src/litloop/desktop/server.py](src/litloop/desktop/server.py) 与 [src/litloop/desktop/settings.py](src/litloop/desktop/settings.py)：新增 `POST /api/network/route-benchmark` 与 `POST /api/network/host-proxy`，并更新首次引导网络步骤提示。
+  3. [app/src/lib/api.ts](app/src/lib/api.ts) 与 [app/src/components/settings-view.tsx](app/src/components/settings-view.tsx)：新增 `RouteBenchmarkCard` 挂载在 `network` 分组（同时覆盖首次引导与「设置 → 网络」），支持一键测速、勾选微调与一键写入 `host_proxy_hosts` / `host_proxy_url`。
+
+## 2026-11-27：接入 `truststore` 自动信任操作系统根证书（兼容高校透明学术加速网关）
+
+- **背景**：高校开通的国际学术资源透明加速服务（如北航 `scholar.buaa.edu.cn`，覆盖 ScienceDirect、Springer、Wiley、SAGE、Taylor & Francis 等主流出版商）通过下发校方中间 CA 证书实现免个人代理直达。其配套命令行工具不兼容 Python 3.13/3.14（而 LitLoop 安装包内置 Python 3.14），且 Python `requests` 默认只信任 `certifi`，会在透明网关下报 `CERTIFICATE_VERIFY_FAILED`。
+- **改动**：
+  1. [pyproject.toml](pyproject.toml) 新增核心依赖 `truststore>=0.10`；
+  2. [src/litloop/__init__.py](src/litloop/__init__.py) 新增 `_enable_system_certs()`，在包初始化时自动调用 `truststore.inject_into_ssl()` 信任系统证书库（支持 `LITLOOP_SYSTEM_CERTS=0` 关闭，自动避让 ZCode 合并 CA，缺库或异常时静默降级）；
+  3. [src/litloop/optional.py](src/litloop/optional.py) 在调用 `uv pip install` 时默认注入 `UV_NATIVE_TLS=true`，使安装可选组件同样信任系统根证书。
+
+## 2026-11-26：Zotero 桥接（zotero-mcp）加入设置页「可选组件」一键隔离安装
+
+- **背景**：内置 Agent 虽已摆脱对外部 AI 客户端的依赖，但推送 Zotero 仍需通过 [src/litloop/zotero/bridge.py](src/litloop/zotero/bridge.py) 调用 `zotero-mcp`。新安装桌面端的新用户本机若未装过 `zotero-mcp-server`，归档环节会被卡住。
+- **方案**：在 [src/litloop/optional.py](src/litloop/optional.py) 新增 `"zotero_mcp"` 组件，并引入独立目录隔离（`isolated: True`，安装至 `<data dir>/components/zotero_mcp`），既复用内置 `uv` 且兼容 Windows 嵌入式 Python，又避免其依赖污染 LitLoop 主进程环境。
+- **改动**：
+  1. [src/litloop/optional.py](src/litloop/optional.py)：新增 `component_dir()`、`_verify_isolated()` 与 `"zotero_mcp"` 组件定义（`zotero-mcp-server`，约 20 MB）；安装成功后自动调用 `zotero.client.reset_discovery()` 清空缓存。
+  2. [src/litloop/zotero/client.py](src/litloop/zotero/client.py) 与 [src/litloop/zotero/bridge.py](src/litloop/zotero/bridge.py)：`discover_zotero_mcp()` 支持探测隔离目录并在空缓存后免重启重新识别；`_run_bridge()` 透传 `sys_path`，`bridge._setup()` 在引入 `zotero_mcp` 前插入 `sys.path`。
+  3. [src/litloop/desktop/settings.py](src/litloop/desktop/settings.py) 与 [app/src/components/zotero-view.tsx](app/src/components/zotero-view.tsx)：在「可选组件 → Zotero 桥接」与「Zotero → zotero-mcp」两处均提供状态检测与一键安装按钮，Zotero 页面顶部提示同步引导至设置页一键安装。
+
 ## 2026-11-26：内置 Agent 主链路优化（包 A 检索对齐与前置修复 + 包 B 筛选稳健性/内置摘要翻译/批量改判卡 + 包 C 下载与 Zotero 感知闭环）
 
 - **背景**：在内置 Agent 阶段 1/2 落地后，补齐与 MCP 工具及桌面端的链路对齐，覆盖检索过滤、思考模型兼容、内置摘要翻译、批量改判交互及下载/Zotero 闭环。

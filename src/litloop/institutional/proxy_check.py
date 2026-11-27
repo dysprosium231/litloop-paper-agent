@@ -96,3 +96,161 @@ def detect(facts: dict[str, Any] | None = None) -> dict[str, Any]:
     mode = "tun" if tun else "system" if (system or programs) else "none"
     return {"mode": mode, "programs": programs, "tun": [a.get("Name") for a in tun],
             "system_proxy": system, "direct_processes": litloop_processes()}
+
+
+ACADEMIC_PROBE_SITES: list[dict[str, Any]] = [
+    {"name": "ScienceDirect", "host": "www.sciencedirect.com", "url": "https://www.sciencedirect.com/", "campus_sensitive": True},
+    {"name": "Springer", "host": "link.springer.com", "url": "https://link.springer.com/", "campus_sensitive": True},
+    {"name": "Nature", "host": "www.nature.com", "url": "https://www.nature.com/", "campus_sensitive": True},
+    {"name": "Wiley", "host": "onlinelibrary.wiley.com", "url": "https://onlinelibrary.wiley.com/", "campus_sensitive": True},
+    {"name": "ACS", "host": "pubs.acs.org", "url": "https://pubs.acs.org/", "campus_sensitive": True},
+    {"name": "RSC", "host": "pubs.rsc.org", "url": "https://pubs.rsc.org/", "campus_sensitive": True},
+    {"name": "Taylor & Francis", "host": "www.tandfonline.com", "url": "https://www.tandfonline.com/", "campus_sensitive": True},
+    {"name": "SAGE", "host": "journals.sagepub.com", "url": "https://journals.sagepub.com/", "campus_sensitive": True},
+    {"name": "OUP", "host": "academic.oup.com", "url": "https://academic.oup.com/", "campus_sensitive": True},
+    {"name": "IEEE", "host": "ieeexplore.ieee.org", "url": "https://ieeexplore.ieee.org/", "campus_sensitive": True},
+    {"name": "arXiv", "host": "arxiv.org", "url": "https://arxiv.org/", "campus_sensitive": False},
+    {"name": "MDPI", "host": "www.mdpi.com", "url": "https://www.mdpi.com/", "campus_sensitive": False},
+    {"name": "doi.org", "host": "doi.org", "url": "https://doi.org/", "campus_sensitive": False},
+    {"name": "SSRN", "host": "papers.ssrn.com", "url": "https://papers.ssrn.com/", "campus_sensitive": False},
+    {"name": "bioRxiv", "host": "www.biorxiv.org", "url": "https://www.biorxiv.org/", "campus_sensitive": False},
+]
+
+_COMMON_PROXY_PORTS = (10808, 7890, 7897, 10809, 1080, 10801)
+
+
+def _normalize_proxy_url(raw: str) -> str:
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    if "://" not in text:
+        return f"http://{text}"
+    return text
+
+
+def detect_local_proxy(configured_url: str = "") -> str | None:
+    """Return configured proxy URL, active system proxy, or first listening local proxy port."""
+    explicit = _normalize_proxy_url(configured_url)
+    if explicit:
+        return explicit
+
+    info = detect()
+    sys_proxy = _normalize_proxy_url(str(info.get("system_proxy") or ""))
+    if sys_proxy:
+        return sys_proxy
+
+    import socket
+    for port in _COMMON_PROXY_PORTS:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.25):
+                return f"http://127.0.0.1:{port}"
+        except OSError:
+            continue
+    return None
+
+
+def _probe_one_url(url: str, *, proxy_url: str | None = None, timeout: float = 6.0) -> dict[str, Any]:
+    """Measure TCP/TLS/HTTP reachability and latency for one URL, bypassing env proxies."""
+    import time
+    import requests
+
+    session = requests.Session()
+    session.trust_env = False
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else {"http": None, "https": None}
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        )
+    }
+    t0 = time.perf_counter()
+    try:
+        with session.get(url, timeout=timeout, allow_redirects=True, stream=True, proxies=proxies, headers=headers) as resp:
+            ms = int(round((time.perf_counter() - t0) * 1000))
+            return {"ok": resp.status_code < 500, "status": resp.status_code, "ms": ms, "error": ""}
+    except requests.RequestException as exc:
+        ms = int(round((time.perf_counter() - t0) * 1000))
+        return {"ok": False, "status": 0, "ms": ms, "error": type(exc).__name__}
+    finally:
+        session.close()
+
+
+def recommend_site_route(
+    site: dict[str, Any],
+    direct: dict[str, Any],
+    proxy: dict[str, Any] | None,
+    *,
+    is_campus: bool,
+) -> dict[str, str]:
+    """Recommend direct vs proxy for one site while protecting campus IP entitlement."""
+    direct_ok = bool(direct.get("ok"))
+    if proxy is None:
+        if direct_ok:
+            return {"route": "direct", "reason": "直连可达（未检测到本地代理）"}
+        return {"route": "unavailable", "reason": "直连失败且未检测到本地代理"}
+
+    proxy_ok = bool(proxy.get("ok"))
+    if not direct_ok and proxy_ok:
+        return {"route": "proxy", "reason": "直连失败，代理可达"}
+    if not direct_ok and not proxy_ok:
+        return {"route": "unavailable", "reason": "直连与代理均不可达"}
+    if direct_ok and not proxy_ok:
+        return {"route": "direct", "reason": "直连可达，代理不可用"}
+
+    if is_campus and site.get("campus_sensitive"):
+        return {"route": "direct", "reason": "校园网下直连可用，保留机构 IP 权限"}
+
+    d_ms = int(direct.get("ms") or 0)
+    p_ms = int(proxy.get("ms") or 0)
+    if d_ms >= 2000 and p_ms > 0 and d_ms >= p_ms * 2:
+        return {"route": "proxy", "reason": f"代理明显更快（{d_ms} ms → {p_ms} ms）"}
+    return {"route": "direct", "reason": "直连速度可用，无需走代理"}
+
+
+def probe_academic_routes(
+    *,
+    proxy_url: str = "",
+    is_campus: bool | None = None,
+    configured_hosts: list[str] | None = None,
+    timeout: float = 6.0,
+) -> dict[str, Any]:
+    """Benchmark direct vs local proxy reachability across common academic sites."""
+    from concurrent.futures import ThreadPoolExecutor
+    from .. import config as _config
+
+    cfg = _config.load_config()
+    if is_campus is None:
+        is_campus = bool(cfg.get("is_campus_network"))
+    if configured_hosts is None:
+        configured_hosts = [str(h).strip().lower() for h in (cfg.get("host_proxy_hosts") or []) if str(h).strip()]
+    else:
+        configured_hosts = [str(h).strip().lower() for h in configured_hosts if str(h).strip()]
+
+    active_proxy = detect_local_proxy(proxy_url or str(cfg.get("host_proxy_url") or ""))
+
+    def _probe_site(site: dict[str, Any]) -> dict[str, Any]:
+        direct_res = _probe_one_url(site["url"], proxy_url=None, timeout=timeout)
+        proxy_res = _probe_one_url(site["url"], proxy_url=active_proxy, timeout=timeout) if active_proxy else None
+        rec = recommend_site_route(site, direct_res, proxy_res, is_campus=bool(is_campus))
+        return {
+            "name": site["name"],
+            "host": site["host"],
+            "campus_sensitive": bool(site["campus_sensitive"]),
+            "direct": direct_res,
+            "proxy": proxy_res,
+            "recommendation": rec["route"],
+            "reason": rec["reason"],
+            "currently_proxied": site["host"].lower() in configured_hosts,
+        }
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        sites = list(pool.map(_probe_site, ACADEMIC_PROBE_SITES))
+
+    recommended_hosts = [s["host"] for s in sites if s["recommendation"] == "proxy"]
+    return {
+        "proxy_url": active_proxy or "",
+        "is_campus": bool(is_campus),
+        "configured_hosts": configured_hosts,
+        "recommended_hosts": recommended_hosts,
+        "sites": sites,
+    }

@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, PageBody, PageHeader } from "@/components/page"
 import { Switch } from "@/components/ui/switch"
-import { downloadsApi, settingsApi, type AppUpdateInfo, type ComponentStatus, type HarnessInfo, type ProviderPreset, type ProviderUsage, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
+import { downloadsApi, settingsApi, type AcademicRouteSite, type AppUpdateInfo, type ComponentStatus, type HarnessInfo, type ProviderPreset, type ProviderUsage, type RouteBenchmarkResponse, type SettingField, type SettingGroup, type TestResult, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 // The native chooser exists only inside the app window, not in a browser preview.
@@ -356,6 +356,157 @@ function HarnessCards({ harnesses, onReload, onFieldUpdated }: {
   )
 }
 
+function RouteBenchmarkCard({
+  fields,
+  onFieldUpdated,
+}: {
+  fields: SettingField[]
+  onFieldUpdated?: (field: SettingField) => void
+}) {
+  const [running, setRunning] = React.useState(false)
+  const [applying, setApplying] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const [appliedMsg, setAppliedMsg] = React.useState<string | null>(null)
+  const [report, setReport] = React.useState<RouteBenchmarkResponse | null>(null)
+  const [selectedHosts, setSelectedHosts] = React.useState<string[]>([])
+
+  const proxyField = fields.find((f) => f.key === "host_proxy_url")
+  const campusField = fields.find((f) => f.key === "is_campus_network")
+  const configuredProxy = String(proxyField?.value ?? "")
+  const isCampus = Boolean(campusField?.value)
+
+  async function runBenchmark() {
+    setRunning(true)
+    setError(null)
+    setAppliedMsg(null)
+    try {
+      const res = await settingsApi.benchmarkRoutes(configuredProxy, isCampus)
+      setReport(res)
+      setSelectedHosts(res.recommended_hosts)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  function toggleHost(host: string) {
+    setSelectedHosts((prev) => (prev.includes(host) ? prev.filter((h) => h !== host) : [...prev, host]))
+    setAppliedMsg(null)
+  }
+
+  async function applySelection() {
+    if (!report) return
+    setApplying(true)
+    setError(null)
+    setAppliedMsg(null)
+    try {
+      const res = await settingsApi.applyHostProxy(report.proxy_url, selectedHosts)
+      if (proxyField && res.proxy_url && res.proxy_url !== configuredProxy) {
+        onFieldUpdated?.({ ...proxyField, value: res.proxy_url })
+      }
+      setAppliedMsg(
+        res.hosts.length > 0
+          ? `已保存 ${res.hosts.length} 个代理域名${res.proxy_url ? `（代理 ${res.proxy_url}）` : ""}`
+          : "已清空代理域名清单（全部直连）"
+      )
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="text-sm font-medium text-foreground">学术站点分流测速</div>
+          <p className="text-xs text-muted-foreground">
+            同时测试直连与本地代理对常见出版商的连通性与延迟；校园网下直连可用的订阅库会保留直连，避免丢失机构 IP 权限。
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={runBenchmark} disabled={running}>
+          {running && <LoaderIcon className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+          {running ? "测速中..." : report ? "重新测速" : "开始测速"}
+        </Button>
+      </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      {report && (
+        <div className="space-y-2.5">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{report.proxy_url ? `代理地址：${report.proxy_url}` : "未检测到本地代理"}</span>
+            <span>·</span>
+            <span>{report.is_campus ? "当前为校园网模式" : "当前为非校园网模式"}</span>
+          </div>
+
+          <div className="max-h-72 overflow-y-auto rounded-md border divide-y text-xs">
+            {report.sites.map((site: AcademicRouteSite) => {
+              const checked = selectedHosts.includes(site.host)
+              return (
+                <label
+                  key={site.host}
+                  className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/40 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleHost(site.host)}
+                      disabled={!report.proxy_url}
+                      className="h-3.5 w-3.5 rounded border-input"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 font-medium text-foreground">
+                        <span>{site.name}</span>
+                        <span className="text-[11px] font-normal text-muted-foreground truncate">{site.host}</span>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate">{site.reason}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 tabular-nums text-[11px]">
+                    <span className={site.direct.ok ? "text-foreground" : "text-destructive"}>
+                      直连 {site.direct.ok ? `${site.direct.ms} ms` : `失败 (${site.direct.error || site.direct.status})`}
+                    </span>
+                    <span className={site.proxy ? (site.proxy.ok ? "text-foreground" : "text-destructive") : "text-muted-foreground"}>
+                      代理 {site.proxy ? (site.proxy.ok ? `${site.proxy.ms} ms` : `失败 (${site.proxy.error || site.proxy.status})`) : "—"}
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 font-medium",
+                        site.recommendation === "proxy"
+                          ? "bg-primary/10 text-primary"
+                          : site.recommendation === "direct"
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                            : "bg-destructive/10 text-destructive"
+                      )}
+                    >
+                      {site.recommendation === "proxy" ? "建议代理" : site.recommendation === "direct" ? "建议直连" : "均不可达"}
+                    </span>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <span className="text-xs text-muted-foreground">
+              已勾选 {selectedHosts.length} 个域名走代理
+              {appliedMsg ? ` · ${appliedMsg}` : ""}
+            </span>
+            <Button size="sm" onClick={applySelection} disabled={applying}>
+              {applying && <LoaderIcon className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+              应用到分流清单
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function BuiltinPresetCard({ fields, onFieldUpdated }: {
   fields: SettingField[]
   onFieldUpdated: (f: SettingField) => void
@@ -628,6 +779,9 @@ export function GroupPane({ group, intro, onSaved }: { group: SettingGroup; intr
       )}
       {group.id === "builtin_agent" && (
         <BuiltinPresetCard fields={group.fields} onFieldUpdated={handleFieldSaved} />
+      )}
+      {group.id === "network" && (
+        <RouteBenchmarkCard fields={group.fields} onFieldUpdated={handleFieldSaved} />
       )}
       {group.fields.length > 0 && (() => {
         const harnessVal = String(group.fields.find((f) => f.key === "agent_harness")?.value ?? "")

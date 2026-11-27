@@ -238,3 +238,119 @@ def test_app_update_available_latest_and_network_error(client, monkeypatch):
     assert body["available"] is False
     assert body["current"] == __version__
     assert "无法检查更新" in body["error"]
+
+
+def test_zotero_mcp_isolated_install_and_settings_actions(tmp_path, monkeypatch, client):
+    import sys
+    from litloop.desktop import settings as app_settings
+    from litloop.zotero import client as zotero_client
+
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(optional, "uv_command", lambda: "uv")
+    zotero_client.reset_discovery()
+
+    # Status endpoint works for zotero_mcp
+    resp = client.get("/api/components/zotero_mcp/status")
+    assert resp.status_code == 200
+    assert resp.json()["key"] == "zotero_mcp"
+    assert resp.json()["installed"] is False
+
+    # Settings test_components and test_zotero offer one-click install when missing
+    monkeypatch.setattr(zotero_client, "discover_zotero_mcp", lambda cfg: None)
+    monkeypatch.setattr(app_settings, "_get", lambda *a, **kw: type("R", (), {"status_code": 200})())
+    comp_res = {r["name"]: r for r in app_settings.test_components()}
+    assert comp_res["Zotero 桥接"]["action"] == {"key": "zotero_mcp", "label": "安装（约 20 MB）"}
+    zot_res = {r["name"]: r for r in app_settings.test_zotero()}
+    assert zot_res["zotero-mcp"]["action"] == {"key": "zotero_mcp", "label": "一键安装"}
+
+    seen_cmd = []
+    reset_calls = []
+    monkeypatch.setattr(zotero_client, "reset_discovery", lambda: reset_calls.append(True))
+
+    class FakeProc:
+        def __init__(self, cmd, **kwargs):
+            seen_cmd.extend(cmd)
+            self.stdout = io.StringIO("Resolved 1 package\nInstalling collected packages: zotero-mcp-server\n")
+
+        def wait(self):
+            target = optional.component_dir("zotero_mcp")
+            (target / "zotero_mcp").mkdir(parents=True, exist_ok=True)
+            (target / "zotero_mcp" / "__init__.py").write_text("", encoding="utf-8")
+            return 0
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(optional.subprocess, "Popen", FakeProc)
+    monkeypatch.setattr(optional, "_verify_isolated", lambda target, mod: True)
+
+    sys_path_before = list(sys.path)
+    out = optional.install("zotero_mcp")
+    assert out["ok"] is True
+    assert "--target" in seen_cmd
+    target_dir = optional.component_dir("zotero_mcp")
+    assert seen_cmd[seen_cmd.index("--target") + 1] == str(target_dir)
+    assert str(target_dir) not in sys.path
+    assert sys.path == sys_path_before
+    assert reset_calls == [True]
+
+    # Verification failure in isolated subprocess reports ok=False
+    monkeypatch.setattr(optional, "_verify_isolated", lambda target, mod: False)
+    fail = optional.install("zotero_mcp")
+    assert fail["ok"] is False
+    assert "仍无法导入组件" in fail["log"]
+
+
+def test_uv_install_sets_native_tls_without_overriding_explicit_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("LITLOOP_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("UV_NATIVE_TLS", raising=False)
+    monkeypatch.setattr(optional, "uv_command", lambda: "uv")
+    monkeypatch.setattr(optional, "installed", lambda key: True)
+
+    seen_envs = []
+
+    class FakeProc:
+        def __init__(self, cmd, **kwargs):
+            seen_envs.append(dict(kwargs.get("env") or {}))
+            self.stdout = io.StringIO("Installed\n")
+
+        def wait(self):
+            return 0
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(optional.subprocess, "Popen", FakeProc)
+    assert optional.install("layout")["ok"] is True
+    assert seen_envs[-1]["UV_NATIVE_TLS"] == "true"
+
+    monkeypatch.setenv("UV_NATIVE_TLS", "false")
+    assert optional.install("layout")["ok"] is True
+    assert seen_envs[-1]["UV_NATIVE_TLS"] == "false"
+
+
+def test_enable_system_certs_behavior(monkeypatch):
+    import sys
+    import types
+    import litloop
+
+    calls = []
+    fake_ts = types.SimpleNamespace(inject_into_ssl=lambda: calls.append(True))
+    monkeypatch.delenv("LITLOOP_SYSTEM_CERTS", raising=False)
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    monkeypatch.setitem(sys.modules, "truststore", fake_ts)
+
+    assert litloop._enable_system_certs() is True
+    assert calls == [True]
+
+    monkeypatch.setenv("LITLOOP_SYSTEM_CERTS", "0")
+    assert litloop._enable_system_certs() is False
+    assert calls == [True]
+
+    monkeypatch.delenv("LITLOOP_SYSTEM_CERTS", raising=False)
+    monkeypatch.setenv("SSL_CERT_FILE", "/tmp/ca-bundle-merged.pem")
+    assert litloop._enable_system_certs() is False
+
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    monkeypatch.setitem(sys.modules, "truststore", None)
+    assert litloop._enable_system_certs() is False

@@ -29,6 +29,13 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "module": "onnxruntime",
         "size_mb": 65,
     },
+    "zotero_mcp": {
+        "label": "Zotero 桥接",
+        "packages": ["zotero-mcp-server"],
+        "module": "zotero_mcp",
+        "size_mb": 20,
+        "isolated": True,
+    },
 }
 
 _INSTALL_LOCK = threading.Lock()
@@ -63,6 +70,14 @@ def packages_dir() -> Path:
     return root / "packages"
 
 
+def component_dir(key: str) -> Path:
+    """Install target directory for *key*: isolated components live in `<data dir>/components/<key>`."""
+    spec = COMPONENTS.get(key) or {}
+    if spec.get("isolated"):
+        return packages_dir().parent / "components" / key
+    return packages_dir()
+
+
 def ensure_on_path() -> None:
     """Make installed components importable. Called once, when LitLoop starts."""
     folder = packages_dir()
@@ -80,11 +95,51 @@ def installed(key: str) -> bool:
     module = str(spec.get("module") or "")
     if not module:
         return False
+    if spec.get("isolated"):
+        folder = component_dir(key)
+        try:
+            return (folder / module).is_dir() or (folder / f"{module}.py").is_file()
+        except OSError:
+            return False
     ensure_on_path()
     try:
         return importlib.util.find_spec(module) is not None
     except (ImportError, ValueError):
         return False
+
+
+def _verify_isolated(target: Path, module: str) -> bool:
+    """Verify an isolated component imports cleanly in a child process."""
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.path.insert(0, sys.argv[1]); __import__(sys.argv[2])",
+                str(target),
+                module,
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        return proc.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def _verify_installed(key: str, target: Path) -> bool:
+    spec = COMPONENTS.get(key) or {}
+    if not installed(key):
+        return False
+    if spec.get("isolated"):
+        module = str(spec.get("module") or "")
+        if (target / module).is_dir() or (target / f"{module}.py").is_file():
+            return _verify_isolated(target, module)
+    return True
 
 
 def uv_command() -> str | None:
@@ -194,11 +249,12 @@ def install(key: str, *, index_url: str = "", timeout: float = 1800.0) -> dict[s
         msg = "找不到 uv：安装包应当自带，或在 PATH 里放一个 uv"
         _set_status(key, state="failed", stage="", elapsed=0.0, line=msg, ok=False, log=msg)
         return {"ok": False, "log": msg}
-    target = packages_dir()
+    target = component_dir(key)
     target.mkdir(parents=True, exist_ok=True)
     cmd = [uv, "pip", "install", "--python", sys.executable, "--target", str(target),
            *spec["packages"]]
     env = {**os.environ, "UV_LINK_MODE": "copy"}
+    env.setdefault("UV_NATIVE_TLS", "true")
     if index_url:
         env["UV_INDEX_URL"] = index_url
     if not _INSTALL_LOCK.acquire(timeout=5):
@@ -221,6 +277,7 @@ def install(key: str, *, index_url: str = "", timeout: float = 1800.0) -> dict[s
             errors="replace",
             bufsize=1,
             env=env,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except OSError as exc:
         _INSTALL_LOCK.release()
@@ -297,10 +354,14 @@ def install(key: str, *, index_url: str = "", timeout: float = 1800.0) -> dict[s
     )
     # The new directory may be new to the import system.
     importlib.invalidate_caches()
-    ensure_on_path()
-    ok = installed(key)
+    if not spec.get("isolated"):
+        ensure_on_path()
+    ok = _verify_installed(key, target)
     elapsed = round(time.monotonic() - started, 1)
     if ok:
+        if key == "zotero_mcp":
+            from .zotero import client as zotero_client
+            zotero_client.reset_discovery()
         log = tail or "已安装"
         _set_status(key, state="done", stage=stage, elapsed=elapsed, line=last_line or "已安装", ok=True, log=log)
         return {"ok": True, "log": log}

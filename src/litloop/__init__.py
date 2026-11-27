@@ -45,6 +45,25 @@ def _fix_ssl_cert_file() -> None:
 
 _fix_ssl_cert_file()
 
+
+def _enable_system_certs() -> bool:
+    """Trust the OS certificate store so campus transparent gateways and local CAs work."""
+    flag = _os.environ.get("LITLOOP_SYSTEM_CERTS", "").strip().lower()
+    if flag in ("0", "false", "off", "no"):
+        return False
+    if _os.environ.get("SSL_CERT_FILE", "").endswith("ca-bundle-merged.pem"):
+        return False
+    try:
+        import truststore
+
+        truststore.inject_into_ssl()
+        return True
+    except Exception:
+        return False
+
+
+_enable_system_certs()
+
 # Components installed on demand (the layout model) live in <data dir>/packages;
 # make them importable before anything tries `import pymupdf4llm`.
 try:

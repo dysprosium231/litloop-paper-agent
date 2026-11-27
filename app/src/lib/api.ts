@@ -443,6 +443,32 @@ export interface HarnessSyncResult {
   files: string[]
 }
 
+export interface RouteProbeStat {
+  ok: boolean
+  status: number
+  ms: number
+  error: string
+}
+
+export interface AcademicRouteSite {
+  name: string
+  host: string
+  campus_sensitive: boolean
+  direct: RouteProbeStat
+  proxy: RouteProbeStat | null
+  recommendation: "direct" | "proxy" | "unavailable"
+  reason: string
+  currently_proxied: boolean
+}
+
+export interface RouteBenchmarkResponse {
+  proxy_url: string
+  is_campus: boolean
+  configured_hosts: string[]
+  recommended_hosts: string[]
+  sites: AcademicRouteSite[]
+}
+
 export const settingsApi = {
   list: () => call<SettingGroup[]>("/api/settings"),
   save: (key: string, value: unknown) => call<SettingField>("/api/settings", { key, value }),
@@ -462,6 +488,10 @@ export const settingsApi = {
   selectHarness: (id: string) => call<HarnessInfo[]>(`/api/harnesses/${encodeURIComponent(id)}/select`, {}),
   builtinPresets: () => call<ProviderPreset[]>("/api/builtin-agent/presets"),
   applyBuiltinPreset: (preset: string) => call<SettingField[]>("/api/builtin-agent/preset", { preset }),
+  benchmarkRoutes: (proxyUrl = "", isCampus?: boolean) =>
+    call<RouteBenchmarkResponse>("/api/network/route-benchmark", { proxy_url: proxyUrl, is_campus: isCampus }),
+  applyHostProxy: (proxyUrl: string, hosts: string[]) =>
+    call<{ ok: boolean; proxy_url: string; hosts: string[] }>("/api/network/host-proxy", { proxy_url: proxyUrl, hosts }),
 }
 
 // ------------------------------------------------------------------ downloads
