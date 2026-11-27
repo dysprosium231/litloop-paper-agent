@@ -881,12 +881,16 @@ export function SettingsPage({ groups, current, onPick, onSaved, onGuide }: {
   const [checkingUpdate, setCheckingUpdate] = React.useState(false)
   const [updateCheckedFresh, setUpdateCheckedFresh] = React.useState(false)
   const [updateFetchError, setUpdateFetchError] = React.useState<string | null>(null)
+  const [installingUpdate, setInstallingUpdate] = React.useState(false)
+  const [installStage, setInstallStage] = React.useState<string | null>(null)
+  const [installError, setInstallError] = React.useState<string | null>(null)
   React.useEffect(() => {
     settingsApi.checkAppUpdate(false).then(setAppUpdate).catch(() => {})
   }, [])
   const checkAppUpdate = async () => {
     setCheckingUpdate(true)
     setUpdateFetchError(null)
+    setInstallError(null)
     try {
       const info = await settingsApi.checkAppUpdate(true)
       setAppUpdate(info)
@@ -895,6 +899,43 @@ export function SettingsPage({ groups, current, onPick, onSaved, onGuide }: {
       setUpdateFetchError(errorMessage(e))
     } finally {
       setCheckingUpdate(false)
+    }
+  }
+  const installAppUpdate = async () => {
+    setInstallingUpdate(true)
+    setInstallError(null)
+    setInstallStage("正在检查自动更新包…")
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater")
+      const { relaunch } = await import("@tauri-apps/plugin-process")
+      const update = await check()
+      if (!update) {
+        setInstallError("当前发布未检测到签名更新包，请点击下方按钮前往下载")
+        return
+      }
+      let total = 0
+      let downloaded = 0
+      await update.downloadAndInstall((ev) => {
+        if (ev.event === "Started") {
+          total = ev.data.contentLength ?? 0
+          setInstallStage("正在下载更新…")
+        } else if (ev.event === "Progress") {
+          downloaded += ev.data.chunkLength
+          setInstallStage(
+            total > 0
+              ? `正在下载更新 ${Math.min(100, Math.round((downloaded / total) * 100))}%`
+              : "正在下载更新…"
+          )
+        } else if (ev.event === "Finished") {
+          setInstallStage("下载完成，正在安装并重启…")
+        }
+      })
+      await relaunch()
+    } catch (e) {
+      setInstallError(errorMessage(e))
+    } finally {
+      setInstallingUpdate(false)
+      setInstallStage(null)
     }
   }
   const formatVersion = (v: string) => (v.startsWith("v") || v.startsWith("V") ? v.slice(1) : v)
@@ -971,6 +1012,13 @@ export function SettingsPage({ groups, current, onPick, onSaved, onGuide }: {
                 {appUpdate.notes && (
                   <p className="line-clamp-3 text-xs text-muted-foreground">{appUpdate.notes}</p>
                 )}
+                {inApp && (
+                  <Button size="sm" className="w-full" disabled={installingUpdate} onClick={installAppUpdate}>
+                    {installingUpdate && <LoaderIcon className="animate-spin" />}
+                    {installingUpdate ? (installStage || "正在更新…") : "下载并安装更新"}
+                  </Button>
+                )}
+                {installError && <p className="text-xs text-destructive">{installError}</p>}
                 {appUpdate.url && (
                   <Button variant="outline" size="sm" className="w-full" asChild>
                     <a href={appUpdate.url} target="_blank" rel="noreferrer">

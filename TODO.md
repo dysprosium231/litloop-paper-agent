@@ -26,7 +26,7 @@
 | app：初次引导与设置 | 🔶 | 「内置 Agent」模型配置与 9 家服务商一键预设已前置进首次引导及设置页首位（2026-11-24），网络设置与首次引导已加入学术站点分流测速与 `host_proxy_hosts` 动态推荐（2026-11-27）；待真机顺带走一遍新引导与测速推荐 |
 | app：术语表 | 🔶 | 待实测 7 |
 | app：下载队列与 Zotero | 🔶 | 待实测 1–5 |
-| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | `v1.18.4` NSIS（96.0 MiB）与 MSI（120.8 MiB）已在干净 Windows 虚拟机通过 Defender 扫描、向导截图、D 盘自定义目录安装（10.1s）、`1.18.3 -> 1.18.4` 覆盖升级、嵌入式后台冒烟、诊断包导出、运行中卸载（`CloseRunningApp` 17.2s）、`litloop://` 注册表校验与卸载留数据（2026-11-23，见 DECISIONS）；还差生成并填入 Tauri 自动更新公钥与按需组件版面分析点击安装实测 |
+| 发布：标准 Windows 程序（安装包与自动更新） | 🔶 | `v1.18.4` 双安装包已在干净 Windows 虚拟机通过验收（2026-11-23）；Tauri v2 自动更新插件（`plugin-updater` / `plugin-process`）、Ed25519 公钥、`TAURI_SIGNING_PRIVATE_KEY` Secret 与应用内下载重启更新界面已接通（2026-11-27）；待发新版实测端到端自动更新升级与按需组件版面分析点击安装 |
 | 完整流程（真实课题从检索到 Zotero 不用手动补救） | 🔶 | 待办池「阶段 2 剩余」：深度检索 → 批量下载 → 推送 Zotero 连起来走一遍 |
 
 ## 正在做
@@ -99,8 +99,8 @@
     - [x] 主链路优化（2026-11-26）：期刊过滤与无种子智能精选、思考标签剥离与自适应并发、内置模型按需摘要翻译、`[#n]` 定位芯片及下载/Zotero 上下文闭环。
   - **阶段 3（PDF 全文问答与分析归纳，留待后续集中开发）**：
     - [ ] 接入已下载 PDF → Markdown（带页码）的只读阅读与并发抽取工具，支持对话追问单篇全文与「分析归纳」对比表（另：用测试集存档比较各模型评分质量）。
-- [~] 安装包与自动更新（`v1.18.4` 双安装包已在云端干净 Windows 虚拟机完成 Defender 扫描、向导截图、自定义目录安装、跨版本升级、运行期卸载、深度链接注册表与诊断包导出验收，且 `v1.18.5` 已将 MSI 向导背景图 `wix-dialog.bmp` 改为左蓝右白高对比布局，见 DECISIONS）。还差：
-  - [ ] 生成并填入 Tauri 自动更新公钥（`tauri.conf.json` + GitHub Secrets）完成端到端自动更新。
+- [~] 安装包与自动更新（`v1.18.4` 双安装包已在云端干净 Windows 虚拟机完成验收，`v1.18.5` 已优化 MSI 向导背景图，2026-11-27 已接通 Tauri v2 自动更新插件、签名公钥与 `TAURI_SIGNING_PRIVATE_KEY` Secret，见 DECISIONS）。还差：
+  - [ ] 发布下一版签名安装包并实测一次端到端自动更新升级。
 
 ### 测试
 - [~] 补测试空洞（评审 14）：已补 `schools`、`resolver`、`session_broker`、PDF 归属校验、`publisher_pdf_router`、`session_store`、`publisher_access`；2026-11-05 又补 `bib_import`、`bibtex_crossref`、`http_utils`、`europepmc`、`oa_discovery`、`models`、`pdf_extractor`、`profile_health`、`remote_assist`、`camofox_api`、`cloakbrowser_compat`、`cli/commands` 的辅助函数、`extractors` 的 HTML 路由（7 家出版商 + 兜底 + 大小写不敏感，11 个）与通用适配器 `publisher_adapters/generic.py`（标题/摘要/正文/图注/参考文献/作者的回退顺序，14 个）。顺手修了四个真 bug（citekey 撞键、`to_text` 多空行、PDF 段落分隔被拼掉、远程协助页面 500）。还剩 `desktop/` 的一些分支。

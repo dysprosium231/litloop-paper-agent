@@ -247,6 +247,8 @@ def bundle(bundles: str = "") -> None:
     # The runtime only exists after staging, so the resources that pull it into
     # the bundle live in a separate overlay the plain `cargo check` never sees.
     cmd = [npm, "run", "tauri", "build", "--", "--config", "src-tauri/tauri.release.json"]
+    if os.environ.get("TAURI_SIGNING_PRIVATE_KEY", "").strip():
+        cmd += ["--config", "src-tauri/tauri.updater.json"]
     if bundles:
         cmd += ["--bundles", bundles]
     subprocess.run(cmd, cwd=ROOT / "app", check=True)

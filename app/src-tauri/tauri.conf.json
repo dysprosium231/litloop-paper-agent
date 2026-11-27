@@ -58,6 +58,12 @@
           "litloop"
         ]
       }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEM0M1QUIxNTI0Mzk3NkEKUldScWwwTlNzVm84emFTams2VE43Sjh5L2g4c3lLRkw3RHR2aWgwTHY1T0ZiWk1LcldhenZGa0MK",
+      "endpoints": [
+        "https://github.com/dysprosium231/litloop-paper-agent/releases/latest/download/latest.json"
+      ]
     }
   }
 }

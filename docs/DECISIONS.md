@@ -1,5 +1,14 @@
 # 决定与实验记录
 
+## 2026-11-27：接通 Tauri v2 应用内自动更新与签名公钥配置
+
+- **背景**：[.github/workflows/release.yml](.github/workflows/release.yml) 与 [scripts/prepare_release.py](scripts/prepare_release.py) 已支持在 `TAURI_SIGNING_PRIVATE_KEY` 存在时生成 `.exe.sig` 与 `latest.json`，但此前未生成密钥对，且桌面壳未接入 `tauri-plugin-updater` / `tauri-plugin-process`。
+- **改动**：
+  1. 生成 Ed25519 签名密钥对（私钥存本机 `~/.tauri/litloop.key` 并上传仓库 Secret `TAURI_SIGNING_PRIVATE_KEY`，公钥写入 [app/src-tauri/tauri.conf.json](app/src-tauri/tauri.conf.json) `plugins.updater.pubkey`，更新端点指向 GitHub Releases `latest.json`）。
+  2. [app/src-tauri/Cargo.toml](app/src-tauri/Cargo.toml)、[app/src-tauri/src/lib.rs](app/src-tauri/src/lib.rs) 与 [app/src-tauri/capabilities/default.json](app/src-tauri/capabilities/default.json)：接入 `tauri-plugin-updater` 与 `tauri-plugin-process`（含 `updater:default` 与 `process:allow-restart` 权限）。
+  3. [app/src-tauri/tauri.updater.json](app/src-tauri/tauri.updater.json) 与 [scripts/build_release.py](scripts/build_release.py)：仅在设置 `TAURI_SIGNING_PRIVATE_KEY` 时启用 `createUpdaterArtifacts: true`，保证本地无私钥开发打包不受阻。
+  4. [app/src/components/settings-view.tsx](app/src/components/settings-view.tsx)：设置页「版本与更新」发现新版本时，在桌面端新增「下载并安装更新」按钮（实时显示下载进度并在完成后调用 `relaunch()` 重启安装），保留原浏览器下载链接兜底。
+
 ## 2026-11-27：路线 B 核心闭环（定期追踪并回评分 + 系统综述复现与双人一致性 + 短清单按篇流水线 + 停止规则结项）
 
 - **用户决定（停止规则结项）**：确认维持现行停止规则不改（三个材料集重放「连续 2 批才停」均多读 0 篇有效文献），从 `TODO.md`「待用户决定」结项。
