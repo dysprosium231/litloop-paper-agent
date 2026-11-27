@@ -1029,3 +1029,25 @@ export const agentChatApi = {
   },
 }
 
+/** Best-effort client error reporter into backend rotating log; completely silent on failure. */
+export function reportClientError(
+  source: string,
+  message: string,
+  stack = "",
+  context = "",
+  level: "error" | "warning" | "info" = "error",
+): void {
+  void getBackend()
+    .then(({ port, token }) =>
+      fetch(`http://127.0.0.1:${port}/api/client-log`, {
+        method: "POST",
+        headers: {
+          "X-LitLoop-Token": token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ level, source, message, stack, context }),
+      }),
+    )
+    .catch(() => {})
+}
+

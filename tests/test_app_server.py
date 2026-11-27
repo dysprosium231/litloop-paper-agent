@@ -756,3 +756,33 @@ def test_app_update_endpoint_parses_release_and_errors(client, monkeypatch):
     res_to = client.get("/api/app-update?fresh=true")
     assert res_to.status_code == 200
     assert "超时" in res_to.json()["error"]
+
+
+def test_client_log_and_http_middleware_write_to_persisted_log(client, tmp_path):
+    from litloop import log
+
+    log_path = log.enable_file_logging(tmp_path / "logs")
+    assert log_path is not None
+    try:
+        res = client.post(
+            "/api/client-log",
+            json={
+                "level": "error",
+                "source": "window.onerror",
+                "message": "TypeError: boom",
+                "stack": "at App.tsx:10",
+                "context": "http://localhost:1420/",
+            },
+        )
+        assert res.status_code == 200
+        assert res.json() == {"logged": True}
+
+        bad = client.get("/api/sessions/nonexistent-id-12345")
+        assert bad.status_code == 404
+
+        lines = log.tail_file(50)
+        joined = "\n".join(lines)
+        assert "[UI:window.onerror] TypeError: boom" in joined
+        assert "[HTTP] GET /api/sessions/nonexistent-id-12345 -> 404" in joined
+    finally:
+        log.disable_file_logging()

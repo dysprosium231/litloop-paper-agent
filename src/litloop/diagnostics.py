@@ -19,7 +19,7 @@ from typing import Any
 
 from . import __version__
 from .config import DATA_DIR, load_config
-from .log import get_logger, recent
+from .log import get_logger, log_file_path, recent, tail_file
 
 log = get_logger()
 
@@ -59,7 +59,7 @@ def _uv() -> str:
 def _data_dir_summary() -> dict[str, Any]:
     """Counts only — enough to see whether something is empty or huge."""
     summary: dict[str, Any] = {"path": str(DATA_DIR)}
-    for name in ("papers", "downloads", "screening", "exports", "cache", "packages"):
+    for name in ("papers", "downloads", "screening", "exports", "cache", "packages", "logs"):
         folder = DATA_DIR / name
         if not folder.is_dir():
             summary[name] = 0
@@ -93,7 +93,8 @@ def collect(config: dict[str, Any] | None = None) -> dict[str, Any]:
         "settings": redact(dict(config)),
         "components": _components(),
         "uv": _uv(),
-        "log": recent(300),
+        "log_file": str(log_file_path() or ""),
+        "log": recent(500),
     }
 
 
@@ -110,9 +111,11 @@ def write_bundle(path: str | Path | None = None, config: dict[str, Any] | None =
     target.parent.mkdir(parents=True, exist_ok=True)
 
     data = collect(config)
+    persisted = tail_file(1000)
+    log_lines = persisted if persisted else data["log"]
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("diagnostics.json", json.dumps(data, ensure_ascii=False, indent=2))
-        archive.writestr("log.txt", "\n".join(data["log"]) or "(没有日志)")
+        archive.writestr("log.txt", "\n".join(log_lines) or "(没有日志)")
         archive.writestr("README.txt", _README)
     log.info("诊断包写到了 %s", target)
     return target

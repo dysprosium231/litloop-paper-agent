@@ -222,6 +222,14 @@ class SteeringNoteRequest(BaseModel):
     note: str
 
 
+class ClientLogRequest(BaseModel):
+    level: str = "error"
+    source: str = "frontend"
+    message: str
+    stack: str = ""
+    context: str = ""
+
+
 _OPENALEX: dict[str, Any] = {"at": 0.0, "data": None}  # see /api/quota/openalex
 _APP_UPDATE: dict[str, Any] = {"at": 0.0, "data": None}  # see /api/app-update
 _APP_UPDATE_URL = "https://api.github.com/repos/dysprosium231/litloop-paper-agent/releases/latest"
@@ -306,7 +314,30 @@ def create_app(token: str) -> FastAPI:
         if request.method != "OPTIONS" and not secrets.compare_digest(
                 request.headers.get("X-LitLoop-Token", ""), token):
             return JSONResponse({"detail": "missing or wrong token"}, status_code=401)
-        response = await call_next(request)
+        if request.method == "OPTIONS":
+            response = await call_next(request)
+            if not has_pna and request.headers.get("access-control-request-private-network") == "true":
+                response.headers["Access-Control-Allow-Private-Network"] = "true"
+            return response
+
+        from ..log import get_logger
+        app_log = get_logger()
+        t0 = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            ms = int(round((time.perf_counter() - t0) * 1000))
+            app_log.exception("[HTTP] Unhandled error on %s %s (%d ms)", request.method, request.url.path, ms)
+            raise
+        ms = int(round((time.perf_counter() - t0) * 1000))
+        status = response.status_code
+        path = request.url.path
+        if status >= 500:
+            app_log.error("[HTTP] %s %s -> %d (%d ms)", request.method, path, status, ms)
+        elif status >= 400:
+            app_log.warning("[HTTP] %s %s -> %d (%d ms)", request.method, path, status, ms)
+        elif (request.method in ("POST", "DELETE") and path != "/api/client-log") or ms >= 500:
+            app_log.info("[HTTP] %s %s -> %d (%d ms)", request.method, path, status, ms)
         if not has_pna and request.headers.get("access-control-request-private-network") == "true":
             response.headers["Access-Control-Allow-Private-Network"] = "true"
         return response
@@ -314,6 +345,26 @@ def create_app(token: str) -> FastAPI:
     @app.get("/api/health")
     def health() -> dict[str, Any]:
         return {"version": __version__, "schema": store.SCHEMA}
+
+    @app.post("/api/client-log")
+    def client_log(body: ClientLogRequest) -> dict[str, Any]:
+        from ..log import get_logger
+        app_log = get_logger()
+        lvl = str(body.level or "error").strip().lower()
+        src = str(body.source or "frontend").strip()[:40] or "frontend"
+        msg = str(body.message or "").strip()[:1000]
+        ctx = str(body.context or "").strip()[:500]
+        stack = str(body.stack or "").strip()[:3000]
+        line = f"[UI:{src}] {msg}" + (f" ({ctx})" if ctx else "")
+        if stack:
+            line += "\n" + "\n".join(f"  {ln}" for ln in stack.splitlines()[:20])
+        if lvl in ("warn", "warning"):
+            app_log.warning("%s", line)
+        elif lvl == "info":
+            app_log.info("%s", line)
+        else:
+            app_log.error("%s", line)
+        return {"logged": True}
 
     @app.get("/api/sessions")
     def sessions(limit: int = 50) -> list[dict[str, Any]]:
@@ -1274,12 +1325,27 @@ def _free_port() -> int:
 
 
 def main(argv: list[str] | None = None) -> None:
+    import os
+    import platform
+    import uvicorn
+    from ..config import DATA_DIR
+    from ..log import enable_file_logging, get_logger
+
     ap = argparse.ArgumentParser(description="LitLoop desktop app backend (127.0.0.1 only)")
     ap.add_argument("--token", required=True, help="random token every request must carry")
     ap.add_argument("--port", type=int, default=0, help="0 = pick a free port")
     args = ap.parse_args(argv)
-    import uvicorn
+    log_path = enable_file_logging()
     port = args.port or _free_port()
+    get_logger().info(
+        "[startup] LitLoop %s | pid=%d | port=%d | python=%s | data_dir=%s | log=%s",
+        __version__,
+        os.getpid(),
+        port,
+        platform.python_version(),
+        DATA_DIR,
+        log_path or "(memory-only)",
+    )
     print(json.dumps({"litloop_app_server": 1, "port": port}), flush=True)
     uvicorn.run(create_app(args.token), host="127.0.0.1", port=port, log_level="warning")
 

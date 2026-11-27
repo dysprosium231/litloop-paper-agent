@@ -1,5 +1,14 @@
 # 决定与实验记录
 
+## 2026-11-27：完善桌面端持久化轮转日志、HTTP/前端错误遥测与诊断包串联
+
+- **背景**：本地实测与用户排障此前仅靠内存最近 400 行日志与临时控制台输出，重启或前端异常后缺少跨会话记录。
+- **改动**：
+  1. [src/litloop/log.py](src/litloop/log.py)：内存环形缓冲扩至 1000 行，新增 `enable_file_logging()`（默认写入 `<DATA_DIR>/logs/litloop.log`，5 MB × 5 轮转，UTF-8）、`tail_file()`、`disable_file_logging()` 与凭据脱敏过滤器 `_RedactFilter`（自动遮蔽 `Bearer`、`sk-...`、`api_key=`、`X-LitLoop-Token`）。
+  2. [src/litloop/desktop/server.py](src/litloop/desktop/server.py)：启动时开启文件日志并记录版本/PID/端口/数据目录；HTTP 中间件记录全部 `4xx/5xx`、`POST/DELETE` 与耗时 ≥500 ms 的慢请求（安静轮询 GET 不刷屏）；新增 `POST /api/client-log` 接收前端全局未捕获异常。
+  3. [app/src/lib/api.ts](app/src/lib/api.ts) 与 [app/src/main.tsx](app/src/main.tsx)：新增 `reportClientError()` 并绑定 `window.error` / `unhandledrejection`。
+  4. [src/litloop/diagnostics.py](src/litloop/diagnostics.py)：诊断包纳入 `logs` 目录统计与 `tail_file(1000)` 持久化日志。
+
 ## 2026-11-27：接通 Tauri v2 应用内自动更新与签名公钥配置
 
 - **背景**：[.github/workflows/release.yml](.github/workflows/release.yml) 与 [scripts/prepare_release.py](scripts/prepare_release.py) 已支持在 `TAURI_SIGNING_PRIVATE_KEY` 存在时生成 `.exe.sig` 与 `latest.json`，但此前未生成密钥对，且桌面壳未接入 `tauri-plugin-updater` / `tauri-plugin-process`。

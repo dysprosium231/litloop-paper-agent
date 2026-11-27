@@ -56,3 +56,30 @@ def test_write_bundle_accepts_a_file_name_too(tmp_path):
     target = tmp_path / "custom.zip"
     assert diagnostics.write_bundle(target) == target
     assert target.is_file()
+
+
+def test_file_logging_redacts_secrets_and_feeds_bundle(tmp_path, monkeypatch):
+    import zipfile
+    from litloop import config, diagnostics, log
+
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(diagnostics, "DATA_DIR", tmp_path)
+    log_path = log.enable_file_logging(tmp_path / "logs")
+    assert log_path is not None and log_path.name == "litloop.log"
+    try:
+        logger = log.get_logger()
+        logger.info("Using key sk-secret1234567890 and Bearer abcdefghijklmnop and api_key=mysecretvalue")
+        lines = log.tail_file(50)
+        joined = "\n".join(lines)
+        assert "sk-***" in joined
+        assert "secret1234567890" not in joined
+        assert "abcdefghijklmnop" not in joined
+        assert "mysecretvalue" not in joined
+
+        bundle = diagnostics.write_bundle(tmp_path / "diag.zip", config={})
+        with zipfile.ZipFile(bundle) as zf:
+            log_txt = zf.read("log.txt").decode("utf-8")
+        assert "sk-***" in log_txt
+        assert "secret1234567890" not in log_txt
+    finally:
+        log.disable_file_logging()
