@@ -309,11 +309,20 @@ def create_app(token: str) -> FastAPI:
         cors_kwargs["allow_private_network"] = True
     app.add_middleware(CORSMiddleware, **cors_kwargs)
 
+    def _with_cors(request: Request, response: JSONResponse) -> JSONResponse:
+        origin = request.headers.get("origin")
+        if origin and origin in ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+        if not has_pna and request.headers.get("access-control-request-private-network") == "true":
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
+
     @app.middleware("http")
     async def require_token(request: Request, call_next):
         if request.method != "OPTIONS" and not secrets.compare_digest(
                 request.headers.get("X-LitLoop-Token", ""), token):
-            return JSONResponse({"detail": "missing or wrong token"}, status_code=401)
+            return _with_cors(request, JSONResponse({"detail": "missing or wrong token"}, status_code=401))
         if request.method == "OPTIONS":
             response = await call_next(request)
             if not has_pna and request.headers.get("access-control-request-private-network") == "true":
@@ -325,10 +334,13 @@ def create_app(token: str) -> FastAPI:
         t0 = time.perf_counter()
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception as exc:
             ms = int(round((time.perf_counter() - t0) * 1000))
             app_log.exception("[HTTP] Unhandled error on %s %s (%d ms)", request.method, request.url.path, ms)
-            raise
+            return _with_cors(
+                request,
+                JSONResponse({"detail": f"后台处理请求出错（{type(exc).__name__}），请查看日志"}, status_code=500),
+            )
         ms = int(round((time.perf_counter() - t0) * 1000))
         status = response.status_code
         path = request.url.path

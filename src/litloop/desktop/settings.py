@@ -510,15 +510,18 @@ def _egress_checks(cfg: dict[str, Any]) -> list[dict[str, Any]]:
 def test_screening() -> list[dict[str, Any]]:
     """Translate one sentence with the chosen service."""
     from . import translate
-    config = load_config()
-    name = translate.provider(config)
-    label = {"deepseek": "DeepSeek", "deepl": "DeepL", "agent": "Agent"}[name]
+    cfg = _config.load_config()
+    name = translate.provider(cfg)
+    label = {"builtin": "内置 Agent", "deepseek": "DeepSeek", "deepl": "DeepL", "agent": "Agent"}.get(name, name)
     if name == "agent":
         return [_result("翻译服务", None, "由 Agent 在评分时翻译，无需检测")]
-    if not str(config.get(f"{name}_api_key") or "").strip():
+    if name == "builtin":
+        if not translate.is_ready(cfg):
+            return [_result(label, None, "尚未配置内置 Agent 模型，请在「设置 → 内置 Agent」中填写")]
+    elif not str(cfg.get(f"{name}_api_key") or "").strip():
         return [_result(label, None, "未填写 Key")]
     try:
-        out = translate.translate_text("Amorphous calcium phosphate nanoparticles release doxorubicin at pH 5.5.", config)
+        out = translate.translate_text("Amorphous calcium phosphate nanoparticles release doxorubicin at pH 5.5.", cfg)
     except translate.TranslationError as exc:
         return [_result(label, False, str(exc))]
     return [_result(label, True, f"可用，示例译文：{out}")]

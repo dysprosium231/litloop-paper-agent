@@ -786,3 +786,38 @@ def test_client_log_and_http_middleware_write_to_persisted_log(client, tmp_path)
         assert "[HTTP] GET /api/sessions/nonexistent-id-12345 -> 404" in joined
     finally:
         log.disable_file_logging()
+
+
+def test_screening_test_handles_agent_and_builtin(client, config_home, monkeypatch):
+    from litloop import config
+    from litloop.desktop import translate
+
+    config.update_config("translation_provider", "agent")
+    res_agent = client.post("/api/settings/test/screening")
+    assert res_agent.status_code == 200
+    assert res_agent.json()["results"][0]["ok"] is None
+
+    config.update_config("translation_provider", "builtin")
+    res_unready = client.post("/api/settings/test/screening")
+    assert res_unready.status_code == 200
+    assert res_unready.json()["results"][0]["ok"] is None
+
+    monkeypatch.setattr(translate, "is_ready", lambda cfg=None: True)
+    monkeypatch.setattr(translate, "translate_text", lambda text, cfg=None: "示例中文摘要。")
+    res_ok = client.post("/api/settings/test/screening")
+    assert res_ok.status_code == 200
+    assert res_ok.json()["results"][0]["ok"] is True
+    assert "示例中文摘要" in res_ok.json()["results"][0]["detail"]
+
+
+def test_unhandled_error_returns_json_500_with_cors(client, monkeypatch):
+    from litloop.desktop import settings as app_settings
+
+    def _boom(group):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(app_settings, "run_test", _boom)
+    res = client.post("/api/settings/test/screening", headers={"Origin": "http://tauri.localhost"})
+    assert res.status_code == 500
+    assert "RuntimeError" in res.json()["detail"]
+    assert res.headers.get("access-control-allow-origin") == "http://tauri.localhost"

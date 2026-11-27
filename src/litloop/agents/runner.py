@@ -69,11 +69,17 @@ def _messages_for(protocol: str, transcript: list[dict[str, Any]]) -> list[dict[
             if results:
                 out.append({"role": "user", "content": results})
             continue
-        out.append({"role": "assistant", "content": turn.get("text") or None,
-                    "tool_calls": [{"id": call["id"], "type": "function",
-                                    "function": {"name": call["name"],
-                                                 "arguments": _json(call["arguments"])}}
-                                   for call in calls]})
+        msg: dict[str, Any] = {"role": "assistant", "content": turn.get("text") or (None if calls else "")}
+        if calls:
+            msg["tool_calls"] = [
+                {
+                    "id": call["id"],
+                    "type": "function",
+                    "function": {"name": call["name"], "arguments": _json(call["arguments"])},
+                }
+                for call in calls
+            ]
+        out.append(msg)
         for call in calls:
             out.append({"role": "tool", "tool_call_id": call["id"], "content": call["result"]})
     return out

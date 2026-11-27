@@ -396,11 +396,11 @@ export default function App() {
     if (shown.length && !shown.some((p) => paperKey(p) === current)) setCurrent(paperKey(shown[0]))
   }, [shown, current])
 
-  // Read again on each return to screening: the settings page may have changed it.
+  // Read again on each return to screening or onboarding completion: settings may have changed.
   const [translation, setTranslation] = React.useState<TranslationInfo | null>(null)
   React.useEffect(() => {
-    if (section === "screen") api.translation().then(setTranslation).catch(() => setTranslation(null))
-  }, [section])
+    if (section === "screen" && !guide) api.translation().then(setTranslation).catch(() => setTranslation(null))
+  }, [section, guide])
   const translateAbstract = React.useCallback(async () => {
     if (!sid || !paper) return
     await api.translate(sid, paper)
@@ -760,8 +760,17 @@ export default function App() {
               ) : glossary ? (
                 <GlossaryPage onBack={() => setGlossary(false)} />
               ) : history ? (
-                <HistoryPage onBack={() => setHistory(false)}
-                  onOpen={(s) => { setSid(s); setHistory(false) }}
+                <HistoryPage onBack={() => {
+                    api.sessions().then(setSessions).catch(() => {})
+                    setHistory(false)
+                    reload()
+                  }}
+                  onOpen={(s) => {
+                    api.sessions().then(setSessions).catch(() => {})
+                    if (s === sid) reload()
+                    else setSid(s)
+                    setHistory(false)
+                  }}
                   onDownloaded={(job) => { setHistory(false); openJob(job) }} />
               ) : (<>
           <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-background px-4 py-3">

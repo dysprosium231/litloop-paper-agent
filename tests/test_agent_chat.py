@@ -815,3 +815,21 @@ def test_propose_download_selection_dedup_and_retry_download_and_context(monkeyp
     r_q = chat_agent.execute_action(sid, msg["id"], card_queue["id"])
     assert r_q["ok"] is True
     assert "Elsevier" in r_q["result"]["message"]
+
+
+def test_messages_for_openai_omits_empty_tool_calls():
+    from litloop.agents import runner
+
+    msgs = runner._messages_for(
+        "openai",
+        [
+            {"role": "user", "text": "第一轮提问"},
+            {"role": "assistant", "text": "纯文本回答"},
+            {"role": "assistant", "text": "", "calls": [{"id": "c1", "name": "list_papers", "arguments": {}, "result": "ok"}]},
+        ],
+    )
+    assert msgs[0] == {"role": "user", "content": "第一轮提问"}
+    assert msgs[1] == {"role": "assistant", "content": "纯文本回答"}
+    assert "tool_calls" not in msgs[1]
+    assert len(msgs[2]["tool_calls"]) == 1
+    assert msgs[3] == {"role": "tool", "tool_call_id": "c1", "content": "ok"}

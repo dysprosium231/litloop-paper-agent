@@ -7,6 +7,7 @@ import { api, downloadsApi, errorMessage, historyApi, watchesApi, type DualRevie
 import { cn } from "@/lib/utils"
 
 const MODE = { quick: "快速检索", deep: "深度检索" } as Record<string, string>
+const dirOf = (file: string) => file.replace(/[\\/][^\\/]+$/, "")
 
 /**
  * Screening history: every session, grouped by its question, with how far it
@@ -59,7 +60,7 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
   const [note, setNote] = React.useState<{ text: string; folder?: string; bad?: boolean } | null>(null)
   const exportAs = (format: "bibtex" | "ris" | "doi") =>
     historyApi.export(s.session, format).then((r) => {
-      const folder = r.file.replace(/[\\/][^\\/]+$/, "")
+      const folder = dirOf(r.file)
       setNote({ text: `已导出 ${r.count} 篇：${r.file}`, folder })
     }).catch((e) => setNote({ text: errorMessage(e), bad: true }))
   const watch = () =>
@@ -116,7 +117,7 @@ function SessionRow({ entry: s, onOpen, onDownloaded }: {
               <span className="min-w-0 truncate" title={note.text}>{note.text}</span>
               {note.folder && (
                 <button type="button" className="flex shrink-0 items-center gap-1 text-primary hover:underline"
-                  onClick={() => downloadsApi.open(note.folder!).catch(() => {})}>
+                  onClick={() => downloadsApi.open(note.folder!).catch((e) => setNote({ text: `无法打开文件夹：${errorMessage(e)}`, bad: true }))}>
                   <FolderOpenIcon className="size-3.5" />打开文件夹
                 </button>
               )}
@@ -266,15 +267,15 @@ function PrismaLine({ session, onNote }: {
   ]
   const exportFlow = () =>
     historyApi.prismaExport(session).then((r) => {
-      onNote({ text: `已导出检索流程：${r.file}`, folder: r.file.replace(/[\/][^\/]+$/, "") })
+      onNote({ text: `已导出检索流程：${r.file}`, folder: dirOf(r.file) })
     }).catch((e) => onNote({ text: errorMessage(e), bad: true }))
   const exportRepro = () =>
     historyApi.reproExport(session).then((r) => {
-      onNote({ text: `已导出复现存档：${r.file}`, folder: r.file.replace(/[\/][^\/]+$/, "") })
+      onNote({ text: `已导出复现存档：${r.file}`, folder: dirOf(r.file) })
     }).catch((e) => onNote({ text: errorMessage(e), bad: true }))
   const exportBlind = () =>
     historyApi.blindReviewExport(session).then((r) => {
-      onNote({ text: `已导出盲评包（${r.count} 篇）：${r.file}`, folder: r.file.replace(/[\/][^\/]+$/, "") })
+      onNote({ text: `已导出盲评包（${r.count} 篇）：${r.file}`, folder: dirOf(r.file) })
     }).catch((e) => onNote({ text: errorMessage(e), bad: true }))
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
