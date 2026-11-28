@@ -203,6 +203,12 @@ class BatchUpdate(BaseModel):
 class ChatStreamRequest(BaseModel):
     message: str
     view: dict[str, Any] | None = None
+    model: str | None = None
+    reasoning_effort: str | None = None
+
+
+class ChatTruncateRequest(BaseModel):
+    from_message_id: int
 
 
 class ActionConfirmRequest(BaseModel):
@@ -1174,16 +1180,21 @@ def create_app(token: str) -> FastAPI:
 
     @app.get("/api/agent/chat/{session_id}")
     def agent_chat_get(session_id: str) -> dict[str, Any]:
+        from ..agents import chat_agent
+        from ..config import load_config
+
         sid = _chat_session_id(session_id)
         return {
             "session_id": sid,
             "messages": db.list_agent_messages(sid),
             "steering_notes": db.list_steering_notes(sid, active_only=True),
+            "model_info": chat_agent.chat_model_info(load_config()),
         }
 
     @app.post("/api/agent/chat/{session_id}/stream")
     def agent_chat_stream(session_id: str, body: ChatStreamRequest) -> StreamingResponse:
         from ..agents import chat_agent
+        from ..agents.client import REASONING_EFFORTS
         from ..config import load_config
 
         sid = _chat_session_id(session_id)
@@ -1191,6 +1202,10 @@ def create_app(token: str) -> FastAPI:
         if not text:
             raise HTTPException(400, "发送的消息不能为空")
         cfg = load_config()
+        if body.model and body.model.strip():
+            cfg["builtin_agent_model"] = body.model.strip()
+        if body.reasoning_effort and body.reasoning_effort.strip().lower() in REASONING_EFFORTS:
+            cfg["builtin_agent_reasoning_effort"] = body.reasoning_effort.strip().lower()
 
         def event_stream():
             for ev in chat_agent.stream_chat_turn(sid, text, view=body.view, config=cfg):
@@ -1206,6 +1221,13 @@ def create_app(token: str) -> FastAPI:
     def agent_chat_clear(session_id: str) -> dict[str, Any]:
         sid = _chat_session_id(session_id)
         return {"cleared": db.clear_agent_messages(sid)}
+
+    @app.post("/api/agent/chat/{session_id}/truncate")
+    def agent_chat_truncate(session_id: str, body: ChatTruncateRequest) -> dict[str, Any]:
+        sid = _chat_session_id(session_id)
+        if body.from_message_id <= 0:
+            raise HTTPException(400, "消息编号不正确")
+        return {"deleted": db.truncate_agent_messages_from(sid, body.from_message_id)}
 
     @app.post("/api/agent/actions/confirm")
     def agent_action_confirm(body: ActionConfirmRequest) -> dict[str, Any]:
@@ -1239,13 +1261,13 @@ def create_app(token: str) -> FastAPI:
         sid = _chat_session_id(session_id)
         note = body.note.strip()
         if not note:
-            raise HTTPException(400, "纠偏备注不能为空")
+            raise HTTPException(400, "补充筛选要求不能为空")
         return db.add_steering_note(sid, note)
 
     @app.delete("/api/agent/steering/{note_id}")
     def agent_steering_delete(note_id: int) -> dict[str, Any]:
         if not db.remove_steering_note(note_id):
-            raise HTTPException(404, "未找到该纠偏备注")
+            raise HTTPException(404, "未找到该补充筛选要求")
         return {"removed": True}
 
     @app.post("/api/downloads/parse")

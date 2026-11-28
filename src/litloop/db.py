@@ -2083,6 +2083,21 @@ def clear_agent_messages(session_id: str, *, db_file: Path | str | None = None) 
         return int(cur.rowcount)
 
 
+def truncate_agent_messages_from(
+    session_id: str,
+    from_message_id: int,
+    *,
+    db_file: Path | str | None = None,
+) -> int:
+    """Delete ``session_id`` chat messages with ``id >= from_message_id`` and return deleted count."""
+    with transaction(db_file) as conn:
+        cur = conn.execute(
+            "DELETE FROM agent_messages WHERE session_id = ? AND id >= ?",
+            (session_id, int(from_message_id)),
+        )
+        return int(cur.rowcount)
+
+
 def migrate_agent_session(
     from_session: str,
     to_session: str,

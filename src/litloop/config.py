@@ -217,6 +217,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "builtin_agent_model": "",
     "builtin_agent_plan_model": "",
     "builtin_agent_rate_model": "",
+    "builtin_agent_reasoning_effort": "off",
     "translation_provider": "deepseek",
     "deepseek_api_key": "",
     "deepl_api_key": "",

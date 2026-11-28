@@ -115,6 +115,9 @@ GROUPS: list[dict[str, Any]] = [
             {"key": "builtin_agent_rate_model", "label": "评分模型", "type": "text",
              "placeholder": "留空沿用模型名",
              "help": "逐批读摘要评分时使用，可填更快更省的模型"},
+            {"key": "builtin_agent_reasoning_effort", "label": "思考等级", "type": "select",
+             "options": [["off", "关闭（默认，速度最快）"], ["low", "低"], ["medium", "中"], ["high", "高"]],
+             "help": "开启后模型先推理再作答，适合复杂筛选与对话；部分模型不支持时请保持关闭"},
         ],
     },
     {

@@ -872,17 +872,17 @@ export default function App() {
                 onTranslate={translateAbstract}
               />
             </div>
-            {drawerOpen && (
-              <AgentDrawer
-                sessionId={sid ?? "__draft__"}
-                sessionTitle={record?.question ?? null}
-                currentPaper={paper}
-                onClose={() => setDrawerOpen(false)}
-                onActionConfirmed={handleAgentActionConfirmed}
-                onSelectPaperByNumber={handleSelectPaperByNumber}
-              />
-            )}
           </div>
+          {drawerOpen && (
+            <AgentDrawer
+              sessionId={sid ?? "__draft__"}
+              sessionTitle={record?.question ?? null}
+              currentPaper={paper}
+              onClose={() => setDrawerOpen(false)}
+              onActionConfirmed={handleAgentActionConfirmed}
+              onSelectPaperByNumber={handleSelectPaperByNumber}
+            />
+          )}
           </>)}
             </React.Suspense>
           )}

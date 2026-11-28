@@ -240,6 +240,8 @@ def estimate_cost(usage_by_model: dict[str, dict[str, int]]) -> dict[str, Any]:
     }
 
 ANTHROPIC_VERSION = "2023-06-01"
+REASONING_EFFORTS = ("off", "low", "medium", "high")
+_ANTHROPIC_THINKING_BUDGET: dict[str, int] = {"low": 1024, "medium": 4096, "high": 8192}
 _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 _THINK_CLOSED_RE = re.compile(r"<think\b[^>]*>.*?</think>", re.IGNORECASE | re.DOTALL)
 _THINK_UNCLOSED_RE = re.compile(r"<think\b[^>]*>.*\Z", re.IGNORECASE | re.DOTALL)
@@ -276,12 +278,17 @@ def model_config(config: dict[str, Any] | None = None, *, task: str = "default")
         model = (config.get("builtin_agent_plan_model") or "").strip() or model
     elif task == "rate":
         model = (config.get("builtin_agent_rate_model") or "").strip() or model
+    raw_effort = str(config.get("builtin_agent_reasoning_effort") or "off").strip().lower()
+    effort = raw_effort if raw_effort in REASONING_EFFORTS else "off"
+    if task == "rate":
+        effort = "off"
     return {
         "provider": provider,
         "protocol": PROVIDERS[provider]["protocol"],
         "base_url": base_url.rstrip("/"),
         "api_key": (config.get("builtin_agent_api_key") or "").strip(),
         "model": model,
+        "reasoning_effort": effort,
     }
 
 
@@ -308,6 +315,7 @@ def _headers(cfg: dict[str, str]) -> dict[str, str]:
 def _payload(cfg: dict[str, str], messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None,
              max_tokens: int, system: str) -> dict[str, Any]:
     body: dict[str, Any] = {"model": cfg["model"], "max_tokens": max_tokens}
+    effort = (cfg.get("reasoning_effort") or "off").strip().lower()
     if cfg["protocol"] == "anthropic":
         body["messages"] = [m for m in messages if m.get("role") != "system"]
         if system:
@@ -316,6 +324,10 @@ def _payload(cfg: dict[str, str], messages: list[dict[str, Any]], tools: list[di
             body["tools"] = [{"name": t["name"], "description": t.get("description", ""),
                               "input_schema": t.get("parameters") or {"type": "object", "properties": {}}}
                              for t in tools]
+        if effort in _ANTHROPIC_THINKING_BUDGET:
+            budget = _ANTHROPIC_THINKING_BUDGET[effort]
+            body["thinking"] = {"type": "enabled", "budget_tokens": budget}
+            body["max_tokens"] = max(max_tokens, budget + 2048)
         return body
     body["messages"] = ([{"role": "system", "content": system}] if system else []) + messages
     if tools:
@@ -323,18 +335,32 @@ def _payload(cfg: dict[str, str], messages: list[dict[str, Any]], tools: list[di
                           "function": {"name": t["name"], "description": t.get("description", ""),
                                        "parameters": t.get("parameters") or {"type": "object", "properties": {}}}}
                          for t in tools]
+    if effort in ("low", "medium", "high"):
+        is_deepseek = "deepseek.com" in cfg["base_url"].lower() or cfg["model"].lower().startswith("deepseek-")
+        if is_deepseek:
+            body["thinking"] = {"type": "enabled"}
+        else:
+            body["reasoning_effort"] = effort
+        body["max_tokens"] = max(max_tokens, 4096)
     return body
 
 
 def _parse(cfg: dict[str, str], data: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {"text": "", "tool_calls": [], "stop": "", "usage": data.get("usage") or {}}
     if cfg["protocol"] == "anthropic":
+        anth_reasoning: list[str] = []
         for block in data.get("content") or []:
             if block.get("type") == "text":
                 out["text"] += block.get("text", "")
+            elif block.get("type") == "thinking":
+                t = block.get("thinking")
+                if t:
+                    anth_reasoning.append(str(t))
             elif block.get("type") == "tool_use":
                 out["tool_calls"].append({"id": block.get("id", ""), "name": block.get("name", ""),
                                           "arguments": block.get("input") or {}})
+        if anth_reasoning:
+            out["reasoning"] = "".join(anth_reasoning)
         out["stop"] = data.get("stop_reason") or ""
         return out
     reasoning_parts: list[str] = []
@@ -479,9 +505,11 @@ def _post(url: str, headers: dict[str, str], body: dict[str, Any], config: dict[
 
 def chat(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None, *,
          config: dict[str, Any] | None = None, system: str = "", max_tokens: int = 2048,
-         timeout: float = 120, task: str = "default") -> dict[str, Any]:
+         timeout: float = 120, task: str = "default", reasoning_effort: str | None = None) -> dict[str, Any]:
     """One round trip. ``tools`` are ``{"name", "description", "parameters"}``."""
     cfg = model_config(config, task=task)
+    if reasoning_effort and reasoning_effort.strip().lower() in REASONING_EFFORTS:
+        cfg["reasoning_effort"] = reasoning_effort.strip().lower()
     if not cfg["model"]:
         raise ValueError("还没有填模型名")
     if not cfg["api_key"] and cfg["protocol"] == "anthropic":
@@ -569,9 +597,11 @@ def _parse_openai_sse(
 def _parse_anthropic_sse(
     lines: Iterable[str],
     on_delta: Callable[[str], None] | None = None,
+    on_reasoning: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     current_event = ""
     text_parts: list[str] = []
+    reasoning_parts: list[str] = []
     blocks: dict[int, dict[str, Any]] = {}
     tool_calls: list[dict[str, Any]] = []
     stop = ""
@@ -628,6 +658,11 @@ def _parse_anthropic_sse(
                 text_parts.append(txt)
                 if on_delta is not None:
                     on_delta(txt)
+            elif btype == "thinking" and cb.get("thinking"):
+                r_txt = str(cb["thinking"])
+                reasoning_parts.append(r_txt)
+                if on_reasoning is not None:
+                    on_reasoning(r_txt)
         elif etype == "content_block_delta":
             idx = int(ev.get("index") or 0)
             delta = ev.get("delta") or {}
@@ -638,6 +673,12 @@ def _parse_anthropic_sse(
                     text_parts.append(txt)
                     if on_delta is not None:
                         on_delta(txt)
+            elif dtype == "thinking_delta":
+                r_txt = delta.get("thinking") or ""
+                if r_txt:
+                    reasoning_parts.append(r_txt)
+                    if on_reasoning is not None:
+                        on_reasoning(r_txt)
             elif dtype == "input_json_delta":
                 blk = blocks.get(idx)
                 if blk is not None:
@@ -658,7 +699,10 @@ def _parse_anthropic_sse(
     for idx in sorted(blocks):
         _finish_block(blocks[idx])
 
-    return {"text": "".join(text_parts), "tool_calls": tool_calls, "stop": stop, "usage": usage}
+    out: dict[str, Any] = {"text": "".join(text_parts), "tool_calls": tool_calls, "stop": stop, "usage": usage}
+    if reasoning_parts:
+        out["reasoning"] = "".join(reasoning_parts)
+    return out
 
 
 def _parse_sse_lines(
@@ -668,7 +712,7 @@ def _parse_sse_lines(
     on_reasoning: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     if cfg["protocol"] == "anthropic":
-        return _parse_anthropic_sse(lines, on_delta)
+        return _parse_anthropic_sse(lines, on_delta, on_reasoning=on_reasoning)
     return _parse_openai_sse(lines, on_delta, on_reasoning=on_reasoning)
 
 
@@ -862,11 +906,14 @@ def chat_stream(
     max_tokens: int = 2048,
     timeout: float = 120,
     task: str = "default",
+    reasoning_effort: str | None = None,
     on_delta: Callable[[str], None] | None = None,
     on_reasoning: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Streaming round trip over OpenAI or Anthropic SSE, returning the same shape as ``chat()``."""
     cfg = model_config(config, task=task)
+    if reasoning_effort and reasoning_effort.strip().lower() in REASONING_EFFORTS:
+        cfg["reasoning_effort"] = reasoning_effort.strip().lower()
     if not cfg["model"]:
         raise ValueError("还没有填模型名")
     if not cfg["api_key"] and cfg["protocol"] == "anthropic":

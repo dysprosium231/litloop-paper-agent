@@ -70,6 +70,8 @@ def _messages_for(protocol: str, transcript: list[dict[str, Any]]) -> list[dict[
                 out.append({"role": "user", "content": results})
             continue
         msg: dict[str, Any] = {"role": "assistant", "content": turn.get("text") or (None if calls else "")}
+        if calls and turn.get("reasoning"):
+            msg["reasoning_content"] = str(turn["reasoning"])
         if calls:
             msg["tool_calls"] = [
                 {

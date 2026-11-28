@@ -439,7 +439,11 @@ def test_agent_chat_read_clear_and_steering_routes(client, session):
 
     draft = client.get("/api/agent/chat/__draft__")
     assert draft.status_code == 200
-    assert draft.json() == {"session_id": "__draft__", "messages": [], "steering_notes": []}
+    draft_body = draft.json()
+    assert draft_body["session_id"] == "__draft__"
+    assert draft_body["messages"] == []
+    assert draft_body["steering_notes"] == []
+    assert "model_info" in draft_body
 
     assert client.post(f"/api/agent/steering/{session}", json={"note": "   "}).status_code == 400
     note_res = client.post(f"/api/agent/steering/{session}", json={"note": "优先实验验证类论文"})
@@ -821,3 +825,46 @@ def test_unhandled_error_returns_json_500_with_cors(client, monkeypatch):
     assert res.status_code == 500
     assert "RuntimeError" in res.json()["detail"]
     assert res.headers.get("access-control-allow-origin") == "http://tauri.localhost"
+
+
+def test_agent_chat_model_info_stream_overrides_and_truncate(client, config_home, monkeypatch):
+    from litloop import config, db
+    from litloop.agents import chat_agent
+
+    config.update_config("builtin_agent_preset", "deepseek")
+    config.update_config("builtin_agent_model", "deepseek-chat")
+    config.update_config("builtin_agent_reasoning_effort", "low")
+
+    m1 = db.add_agent_message("__draft__", "user", "第一问")
+    m2 = db.add_agent_message("__draft__", "assistant", "第一答")
+    m3 = db.add_agent_message("__draft__", "user", "第二问")
+
+    got = client.get("/api/agent/chat/__draft__").json()
+    assert got["model_info"]["model"] == "deepseek-chat"
+    assert got["model_info"]["reasoning_effort"] == "low"
+    assert "deepseek-reasoner" in got["model_info"]["suggestions"]
+
+    seen_cfg: dict[str, object] = {}
+
+    def fake_stream(sid, text, *, view=None, config=None):
+        seen_cfg["model"] = (config or {}).get("builtin_agent_model")
+        seen_cfg["effort"] = (config or {}).get("builtin_agent_reasoning_effort")
+        yield {"type": "delta", "text": "ok"}
+        yield {
+            "type": "done",
+            "message": {"id": 99, "session_id": sid, "role": "assistant", "content": "ok", "actions": [], "created": "now"},
+        }
+
+    monkeypatch.setattr(chat_agent, "stream_chat_turn", fake_stream)
+    res_stream = client.post(
+        "/api/agent/chat/__draft__/stream",
+        json={"message": "试试", "model": "deepseek-reasoner", "reasoning_effort": "high"},
+    )
+    assert res_stream.status_code == 200
+    assert seen_cfg == {"model": "deepseek-reasoner", "effort": "high"}
+
+    assert client.post("/api/agent/chat/__draft__/truncate", json={"from_message_id": 0}).status_code == 400
+    res_trunc = client.post("/api/agent/chat/__draft__/truncate", json={"from_message_id": m2["id"]})
+    assert res_trunc.status_code == 200 and res_trunc.json()["deleted"] == 2
+    assert [m["id"] for m in db.list_agent_messages("__draft__")] == [m1["id"]]
+    assert m3["id"] not in [m["id"] for m in db.list_agent_messages("__draft__")]

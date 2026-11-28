@@ -12,7 +12,54 @@ from typing import Any, Iterator
 from .. import db
 from ..terms import glossary
 from . import runner
-from .client import chat_stream, estimate_cost, model_config
+from .client import PROVIDER_PRESETS, chat_stream, estimate_cost, model_config
+
+
+def chat_model_info(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return active chat model, thinking effort, and suggested models for the drawer switcher."""
+    if config is None:
+        from ..config import load_config
+
+        config = load_config()
+    cfg = model_config(config)
+    preset_id = str(config.get("builtin_agent_preset") or "").strip().lower()
+    base_url = cfg["base_url"].rstrip("/").lower()
+    matched_preset = next(
+        (
+            p
+            for p in PROVIDER_PRESETS
+            if (preset_id and p["id"] == preset_id)
+            or (base_url and str(p.get("base_url") or "").rstrip("/").lower() == base_url)
+        ),
+        None,
+    )
+    plan_model = str(config.get("builtin_agent_plan_model") or "").strip()
+    rate_model = str(config.get("builtin_agent_rate_model") or "").strip()
+    candidates: list[str] = [cfg["model"], plan_model, rate_model]
+    if matched_preset:
+        candidates.extend(
+            [
+                str(matched_preset.get("model") or ""),
+                str(matched_preset.get("plan_model") or ""),
+                str(matched_preset.get("rate_model") or ""),
+            ]
+        )
+    suggestions: list[str] = []
+    for m in candidates:
+        s = m.strip()
+        if s and s not in suggestions:
+            suggestions.append(s)
+    return {
+        "provider": cfg["provider"],
+        "protocol": cfg["protocol"],
+        "preset": preset_id or (str(matched_preset["id"]) if matched_preset else ""),
+        "base_url": cfg["base_url"],
+        "model": cfg["model"],
+        "plan_model": plan_model,
+        "rate_model": rate_model,
+        "reasoning_effort": cfg["reasoning_effort"],
+        "suggestions": suggestions,
+    }
 
 _MAX_TOOL_ROUNDS = 5
 _ABSTRACT_LIMIT = 1500
@@ -937,7 +984,10 @@ def stream_chat_turn(
                     }
                 )
 
-            transcript.append({"role": "assistant", "text": round_text, "calls": step_calls})
+            turn_entry: dict[str, Any] = {"role": "assistant", "text": round_text, "calls": step_calls}
+            if reply.get("reasoning"):
+                turn_entry["reasoning"] = str(reply["reasoning"])
+            transcript.append(turn_entry)
 
         usage_summary = estimate_cost(usage_by_model) if usage_by_model else None
         assistant_msg = db.add_agent_message(

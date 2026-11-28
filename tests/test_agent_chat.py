@@ -833,3 +833,45 @@ def test_messages_for_openai_omits_empty_tool_calls():
     assert "tool_calls" not in msgs[1]
     assert len(msgs[2]["tool_calls"]) == 1
     assert msgs[3] == {"role": "tool", "tool_call_id": "c1", "content": "ok"}
+
+
+def test_messages_for_openai_preserves_reasoning_content_on_tool_calls():
+    from litloop.agents import runner
+
+    msgs = runner._messages_for(
+        "openai",
+        [
+            {
+                "role": "assistant",
+                "text": "",
+                "reasoning": "先查列表",
+                "calls": [{"id": "c1", "name": "list_papers", "arguments": {}, "result": "ok"}],
+            }
+        ],
+    )
+    assert msgs[0]["reasoning_content"] == "先查列表"
+    assert len(msgs[0]["tool_calls"]) == 1
+
+
+def test_truncate_agent_messages_from_and_chat_model_info():
+    m1 = db.add_agent_message("sess-trunc", "user", "q1")
+    m2 = db.add_agent_message("sess-trunc", "assistant", "a1")
+    m3 = db.add_agent_message("sess-trunc", "user", "q2")
+    m4 = db.add_agent_message("sess-trunc", "assistant", "a2")
+    assert [m["id"] for m in db.list_agent_messages("sess-trunc")] == [m1["id"], m2["id"], m3["id"], m4["id"]]
+
+    deleted = db.truncate_agent_messages_from("sess-trunc", m3["id"])
+    assert deleted == 2
+    assert [m["id"] for m in db.list_agent_messages("sess-trunc")] == [m1["id"], m2["id"]]
+
+    info = chat_agent.chat_model_info({
+        "builtin_agent_preset": "deepseek",
+        "builtin_agent_provider": "openai",
+        "builtin_agent_base_url": "https://api.deepseek.com/v1",
+        "builtin_agent_model": "deepseek-chat",
+        "builtin_agent_reasoning_effort": "medium",
+    })
+    assert info["model"] == "deepseek-chat"
+    assert info["reasoning_effort"] == "medium"
+    assert "deepseek-chat" in info["suggestions"]
+    assert "deepseek-reasoner" in info["suggestions"]

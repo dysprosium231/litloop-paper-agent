@@ -106,3 +106,61 @@ def test_a_model_that_calls_the_tool_passes(monkeypatch):
         {"function": {"name": "ping", "arguments": '{"n": 1}'}}]}}]})
     reply = client.test_model({"builtin_agent_api_key": "k", "builtin_agent_model": "m"})
     assert reply["ok"] is True and "支持工具调用" in reply["detail"]
+
+
+def test_reasoning_effort_payloads_and_anthropic_sse_thinking():
+    msgs = [{"role": "user", "content": "hi"}]
+
+    off_cfg = client.model_config({"builtin_agent_provider": "openai", "builtin_agent_model": "gpt-4.1"})
+    off_body = client._payload(off_cfg, msgs, None, 2048, "")
+    assert "thinking" not in off_body and "reasoning_effort" not in off_body
+
+    ds_cfg = client.model_config({
+        "builtin_agent_provider": "openai",
+        "builtin_agent_base_url": "https://api.deepseek.com/v1",
+        "builtin_agent_model": "deepseek-chat",
+        "builtin_agent_reasoning_effort": "medium",
+    })
+    ds_body = client._payload(ds_cfg, msgs, None, 2048, "")
+    assert ds_body["thinking"] == {"type": "enabled"}
+    assert ds_body["max_tokens"] >= 4096
+
+    oai_cfg = client.model_config({
+        "builtin_agent_provider": "openai",
+        "builtin_agent_model": "o4-mini",
+        "builtin_agent_reasoning_effort": "high",
+    })
+    oai_body = client._payload(oai_cfg, msgs, None, 2048, "")
+    assert oai_body["reasoning_effort"] == "high"
+
+    rate_cfg = client.model_config({
+        "builtin_agent_provider": "openai",
+        "builtin_agent_model": "o4-mini",
+        "builtin_agent_reasoning_effort": "high",
+    }, task="rate")
+    assert rate_cfg["reasoning_effort"] == "off"
+
+    ant_cfg = client.model_config({
+        "builtin_agent_provider": "anthropic",
+        "builtin_agent_model": "claude-sonnet-4-5",
+        "builtin_agent_reasoning_effort": "low",
+    })
+    ant_body = client._payload(ant_cfg, msgs, None, 2048, "")
+    assert ant_body["thinking"] == {"type": "enabled", "budget_tokens": 1024}
+    assert ant_body["max_tokens"] >= 3072
+
+    sse_lines = [
+        'event: content_block_start',
+        'data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}',
+        'event: content_block_delta',
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"step1 "}}',
+        'event: content_block_delta',
+        'data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"答案"}}',
+    ]
+    r_chunks: list[str] = []
+    d_chunks: list[str] = []
+    parsed = client._parse_sse_lines(ant_cfg, sse_lines, d_chunks.append, on_reasoning=r_chunks.append)
+    assert r_chunks == ["step1 "]
+    assert d_chunks == ["答案"]
+    assert parsed["reasoning"] == "step1 "
+    assert parsed["text"] == "答案"

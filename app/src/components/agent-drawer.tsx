@@ -1,13 +1,22 @@
 import * as React from "react"
 import {
   BotIcon,
+  BrainIcon,
   CheckCircle2Icon,
+  CheckIcon,
+  ChevronDownIcon,
+  CopyIcon,
+  CpuIcon,
   LoaderIcon,
+  Maximize2Icon,
+  Minimize2Icon,
   PlusIcon,
+  RotateCcwIcon,
   SendIcon,
   SparklesIcon,
   SquareIcon,
   Trash2Icon,
+  Undo2Icon,
   XCircleIcon,
   XIcon,
 } from "lucide-react"
@@ -20,9 +29,12 @@ import {
   agentChatApi,
   errorMessage,
   rating,
+  settingsApi,
   type AgentActionCard,
   type AgentMessage,
+  type AgentModelInfo,
   type AgentViewContext,
+  type ReasoningEffort,
   type RunUsage,
   type SteeringNote,
 } from "@/lib/api"
@@ -39,6 +51,59 @@ const STATUS_META: Record<AgentActionCard["status"], { label: string; className:
   confirmed: { label: "已确认", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
   cancelled: { label: "已取消", className: "bg-muted text-muted-foreground" },
   failed: { label: "执行失败", className: "bg-destructive/15 text-destructive" },
+}
+
+const EFFORT_OPTIONS: { value: ReasoningEffort; label: string }[] = [
+  { value: "off", label: "关闭" },
+  { value: "low", label: "低" },
+  { value: "medium", label: "中" },
+  { value: "high", label: "高" },
+]
+
+const FLOAT_SIZE_KEY = "litloop.agentFloatSize"
+const DEFAULT_FLOAT_SIZE = { w: 420, h: 620 }
+
+function readFloatSize(): { w: number; h: number } {
+  try {
+    const raw = localStorage.getItem(FLOAT_SIZE_KEY)
+    if (!raw) return DEFAULT_FLOAT_SIZE
+    const parsed = JSON.parse(raw) as { w?: number; h?: number }
+    const w = Number(parsed?.w)
+    const h = Number(parsed?.h)
+    if (Number.isFinite(w) && Number.isFinite(h)) {
+      return {
+        w: Math.max(360, Math.min(760, Math.round(w))),
+        h: Math.max(420, Math.min(860, Math.round(h))),
+      }
+    }
+  } catch {
+    /* ignore storage errors */
+  }
+  return DEFAULT_FLOAT_SIZE
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    /* fall back to textarea */
+  }
+  try {
+    const ta = document.createElement("textarea")
+    ta.value = text
+    ta.style.position = "fixed"
+    ta.style.opacity = "0"
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand("copy")
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
 }
 
 function formatUsage(usage?: RunUsage | null): string | null {
@@ -486,7 +551,7 @@ function ActionCardView({
                 />
               </label>
               <label className="block space-y-1">
-                <span className="text-muted-foreground">纠偏备注</span>
+                <span className="text-muted-foreground">补充筛选要求（可选）</span>
                 <Input
                   value={String(params.steering_note ?? "")}
                   onChange={(e) => setField("steering_note", e.target.value)}
@@ -737,6 +802,13 @@ export function AgentDrawer({
 }: AgentDrawerProps) {
   const [messages, setMessages] = React.useState<AgentMessage[]>([])
   const [steeringNotes, setSteeringNotes] = React.useState<SteeringNote[]>([])
+  const [modelInfo, setModelInfo] = React.useState<AgentModelInfo | null>(null)
+  const [modelMenuOpen, setModelMenuOpen] = React.useState(false)
+  const [customModelInput, setCustomModelInput] = React.useState("")
+  const [savingControl, setSavingControl] = React.useState(false)
+  const [expanded, setExpanded] = React.useState(false)
+  const [floatSize, setFloatSize] = React.useState<{ w: number; h: number }>(readFloatSize)
+  const [copiedId, setCopiedId] = React.useState<number | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [input, setInput] = React.useState("")
@@ -773,6 +845,7 @@ export function AgentDrawer({
     setStreamActions([])
     setToolLabel(null)
     setStreamError(null)
+    setModelMenuOpen(false)
     setLoading(true)
     setLoadError(null)
 
@@ -783,6 +856,10 @@ export function AgentDrawer({
         if (cancelled) return
         setMessages(res.messages)
         setSteeringNotes(res.steering_notes.filter((n) => n.active))
+        if (res.model_info) {
+          setModelInfo(res.model_info)
+          setCustomModelInput(res.model_info.model || "")
+        }
       })
       .catch((e) => {
         if (cancelled) return
@@ -873,6 +950,10 @@ export function AgentDrawer({
             }
           },
           controller.signal,
+          {
+            model: modelInfo?.model || undefined,
+            reasoning_effort: modelInfo?.reasoning_effort,
+          },
         )
       } catch (e) {
         if ((e as Error)?.name === "AbortError") {
@@ -915,8 +996,115 @@ export function AgentDrawer({
         setToolLabel(null)
       }
     },
-    [input, streaming, sessionId, currentPaper],
+    [input, streaming, sessionId, currentPaper, modelInfo?.model, modelInfo?.reasoning_effort],
   )
+
+  const handleSelectModel = async (nextModel: string) => {
+    const trimmed = nextModel.trim()
+    if (!trimmed || savingControl) return
+    setSavingControl(true)
+    setModelInfo((prev) => (prev ? {
+      ...prev,
+      model: trimmed,
+      suggestions: prev.suggestions.includes(trimmed) ? prev.suggestions : [trimmed, ...prev.suggestions],
+    } : prev))
+    setCustomModelInput(trimmed)
+    setModelMenuOpen(false)
+    try {
+      await settingsApi.save("builtin_agent_model", trimmed)
+    } catch (e) {
+      setStreamError(errorMessage(e))
+    } finally {
+      setSavingControl(false)
+    }
+  }
+
+  const handleEffortChange = async (effort: ReasoningEffort) => {
+    if (savingControl) return
+    setSavingControl(true)
+    setModelInfo((prev) => (prev ? { ...prev, reasoning_effort: effort } : prev))
+    try {
+      await settingsApi.save("builtin_agent_reasoning_effort", effort)
+    } catch (e) {
+      setStreamError(errorMessage(e))
+    } finally {
+      setSavingControl(false)
+    }
+  }
+
+  const handleCopyMessage = async (id: number, text: string) => {
+    const ok = await copyText(text)
+    if (ok) {
+      setCopiedId(id)
+      setTimeout(() => {
+        setCopiedId((cur) => (cur === id ? null : cur))
+      }, 1500)
+    }
+  }
+
+  const truncateFromIndex = async (idx: number): Promise<boolean> => {
+    const target = messages[idx]
+    if (!target) return false
+    if (target.id > 0) {
+      try {
+        await agentChatApi.truncate(sessionId, target.id)
+      } catch (e) {
+        setStreamError(errorMessage(e))
+        return false
+      }
+    }
+    setMessages((prev) => prev.slice(0, idx))
+    setStreamError(null)
+    return true
+  }
+
+  const handleWithdrawUserMessage = async (idx: number) => {
+    if (streaming) return
+    const target = messages[idx]
+    if (!target || target.role !== "user") return
+    if (await truncateFromIndex(idx)) {
+      setInput(target.content)
+      requestAnimationFrame(() => inputRef.current?.focus())
+    }
+  }
+
+  const handleResendFromIndex = async (userIdx: number) => {
+    if (streaming) return
+    const target = messages[userIdx]
+    if (!target || target.role !== "user") return
+    if (await truncateFromIndex(userIdx)) {
+      void sendMessage(target.content)
+    }
+  }
+
+  const startCornerResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (expanded) return
+    e.preventDefault()
+    const x0 = e.clientX
+    const y0 = e.clientY
+    const w0 = floatSize.w
+    const h0 = floatSize.h
+    let nextW = w0
+    let nextH = h0
+    const maxW = Math.min(760, Math.max(400, window.innerWidth - 32))
+    const maxH = Math.min(860, Math.max(460, window.innerHeight - 80))
+    const move = (ev: PointerEvent) => {
+      nextW = Math.max(360, Math.min(maxW, Math.round(w0 + (x0 - ev.clientX))))
+      nextH = Math.max(420, Math.min(maxH, Math.round(h0 + (y0 - ev.clientY))))
+      setFloatSize({ w: nextW, h: nextH })
+    }
+    const up = () => {
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+      try {
+        localStorage.setItem(FLOAT_SIZE_KEY, JSON.stringify({ w: nextW, h: nextH }))
+      } catch {
+        /* ignore */
+      }
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+  }
 
   const handleStop = () => {
     stoppedByUserRef.current = true
@@ -971,22 +1159,59 @@ export function AgentDrawer({
   }, [])
 
   const scopeLabel = sessionId === "__draft__" || !sessionTitle ? "新检索草稿" : sessionTitle
+  const floatingStyle = expanded
+    ? undefined
+    : {
+        width: `min(${floatSize.w}px, calc(100vw - 2rem))`,
+        height: `min(${floatSize.h}px, calc(100vh - 5rem))`,
+      }
+
+  const lastUserIndex = React.useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === "user") return i
+    }
+    return -1
+  }, [messages])
 
   return (
     <aside
       aria-label="内置 Agent 助手"
-      className="flex min-h-0 w-[380px] shrink-0 flex-col border-l bg-background"
+      style={floatingStyle}
+      className={cn(
+        "fixed right-4 bottom-4 z-40 flex flex-col overflow-hidden rounded-xl border bg-background shadow-2xl ring-1 ring-foreground/10",
+        expanded && "h-[min(800px,calc(100vh-4.5rem))] w-[min(660px,calc(100vw-2.5rem))]",
+      )}
     >
+      {!expanded && (
+        <div
+          role="separator"
+          aria-label="拖拽调节窗口大小"
+          title="拖拽调整对话窗大小"
+          onPointerDown={startCornerResize}
+          className="absolute top-0 left-0 z-10 size-3.5 cursor-nwse-resize"
+        />
+      )}
+
       {/* 顶部栏 */}
       <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3.5 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <BotIcon className="size-4 shrink-0 text-primary" />
           <span className="shrink-0 text-sm font-medium">内置 Agent 助手</span>
-          <Badge variant="secondary" className="max-w-[130px] truncate text-[11px] font-normal" title={scopeLabel}>
+          <Badge variant="secondary" className="max-w-[140px] truncate text-[11px] font-normal" title={scopeLabel}>
             {scopeLabel}
           </Badge>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="size-7 p-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setExpanded((v) => !v)}
+            title={expanded ? "还原窗口大小" : "放大对话窗"}
+            aria-label={expanded ? "还原窗口大小" : "放大对话窗"}
+          >
+            {expanded ? <Minimize2Icon className="size-3.5" /> : <Maximize2Icon className="size-3.5" />}
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -1011,10 +1236,107 @@ export function AgentDrawer({
         </div>
       </div>
 
-      {/* 纠偏备注条 */}
+      {/* 模型与思考等级控制条 */}
+      {modelInfo && (
+        <div className="relative shrink-0 border-b bg-muted/15 px-3.5 py-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              disabled={streaming || savingControl}
+              onClick={() => setModelMenuOpen((o) => !o)}
+              title="切换当前对话使用的模型"
+              className="flex min-w-0 items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+            >
+              <CpuIcon className="size-3 shrink-0 text-muted-foreground" />
+              <span className="max-w-[140px] truncate font-mono">{modelInfo.model || "未配置模型"}</span>
+              <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" />
+            </button>
+
+            <div className="flex shrink-0 items-center gap-1" title="调节模型思考深度（关闭时响应最快）">
+              <BrainIcon className="size-3 text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">思考</span>
+              <div className="inline-flex rounded-md border bg-background p-0.5">
+                {EFFORT_OPTIONS.map((opt) => {
+                  const active = modelInfo.reasoning_effort === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={streaming || savingControl}
+                      onClick={() => void handleEffortChange(opt.value)}
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] leading-none transition-colors",
+                        active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {modelMenuOpen && (
+            <div className="mt-2 space-y-1.5 rounded-lg border bg-popover p-2 text-xs shadow-md">
+              {modelInfo.suggestions.length > 0 && (
+                <div className="space-y-0.5">
+                  <div className="px-1 text-[10px] text-muted-foreground">快捷切换模型（同步保存到设置）</div>
+                  <div className="flex flex-wrap gap-1">
+                    {modelInfo.suggestions.map((m) => {
+                      const active = m === modelInfo.model
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => void handleSelectModel(m)}
+                          className={cn(
+                            "rounded-md border px-2 py-1 font-mono text-[11px] transition-colors",
+                            active
+                              ? "border-primary bg-primary/10 font-medium text-primary"
+                              : "bg-background hover:bg-accent",
+                          )}
+                        >
+                          {m}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <Input
+                  value={customModelInput}
+                  onChange={(e) => setCustomModelInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      void handleSelectModel(customModelInput)
+                    } else if (e.key === "Escape") {
+                      setModelMenuOpen(false)
+                    }
+                  }}
+                  placeholder="或输入其他模型名…"
+                  className="h-7 font-mono text-[11px]"
+                />
+                <Button
+                  size="sm"
+                  className="h-7 shrink-0 px-2.5 text-[11px]"
+                  disabled={!customModelInput.trim() || savingControl}
+                  onClick={() => void handleSelectModel(customModelInput)}
+                >
+                  应用
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 补充筛选要求区 */}
       <div className="shrink-0 border-b bg-muted/25 px-3.5 py-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-medium text-muted-foreground">纠偏备注</span>
+          <span className="text-[11px] font-medium text-muted-foreground">补充筛选要求</span>
           {!addingNote && (
             <button
               type="button"
@@ -1025,6 +1347,11 @@ export function AgentDrawer({
             </button>
           )}
         </div>
+        {steeringNotes.length === 0 && !addingNote && (
+          <p className="mt-0.5 text-[11px] text-muted-foreground/80">
+            写下后续评分和续跑要遵守的规则（如「不要纯综述」）
+          </p>
+        )}
         {steeringNotes.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {steeringNotes.map((n) => (
@@ -1035,7 +1362,7 @@ export function AgentDrawer({
                 <span className="truncate">{n.note}</span>
                 <button
                   type="button"
-                  aria-label="删除纠偏备注"
+                  aria-label="删除补充筛选要求"
                   onClick={() => void handleRemoveNote(n.id)}
                   className="shrink-0 text-muted-foreground hover:text-foreground"
                 >
@@ -1060,7 +1387,7 @@ export function AgentDrawer({
                   setNoteInput("")
                 }
               }}
-              placeholder="输入后续检索或筛选偏好…"
+              placeholder="例如：只保留实验验证论文、排除纯综述…"
               className="h-7 text-xs"
             />
             <Button size="sm" className="h-7 px-2.5 text-xs" disabled={noteBusy} onClick={() => void handleAddNote()}>
@@ -1114,12 +1441,22 @@ export function AgentDrawer({
           </div>
         )}
 
-        {messages.map((m) => {
+        {messages.map((m, idx) => {
           const isUser = m.role === "user"
           const usageText = !isUser ? formatUsage(m.usage) : null
           const reasoningText = !isUser ? reasoningMap[m.id] : undefined
+          let prevUserIdx = -1
+          if (!isUser) {
+            for (let j = idx - 1; j >= 0; j -= 1) {
+              if (messages[j].role === "user") {
+                prevUserIdx = j
+                break
+              }
+            }
+          }
+          const isCopied = copiedId === m.id
           return (
-            <div key={m.id} className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+            <div key={m.id} className={cn("group flex flex-col", isUser ? "items-end" : "items-start")}>
               {reasoningText && <ReasoningBlock text={reasoningText} />}
               <div
                 className={cn(
@@ -1143,9 +1480,55 @@ export function AgentDrawer({
                   ))}
                 </div>
               )}
-              {usageText && (
-                <span className="mt-1 px-1 text-[11px] text-muted-foreground">{usageText}</span>
-              )}
+              <div className="mt-1 flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
+                {usageText && <span>{usageText}</span>}
+                {!streaming && (
+                  <div className="flex items-center gap-1.5 opacity-70 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyMessage(m.id, m.content)}
+                      className="inline-flex items-center gap-0.5 hover:text-foreground"
+                      title="复制内容"
+                    >
+                      {isCopied ? <CheckIcon className="size-3 text-emerald-600" /> : <CopyIcon className="size-3" />}
+                      <span>{isCopied ? "已复制" : "复制"}</span>
+                    </button>
+                    {isUser && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleWithdrawUserMessage(idx)}
+                          className="inline-flex items-center gap-0.5 hover:text-foreground"
+                          title="撤回此消息及后续对话并放回输入框"
+                        >
+                          <Undo2Icon className="size-3" />
+                          <span>撤回编辑</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleResendFromIndex(idx)}
+                          className="inline-flex items-center gap-0.5 hover:text-foreground"
+                          title="从此处重新发送"
+                        >
+                          <RotateCcwIcon className="size-3" />
+                          <span>重发</span>
+                        </button>
+                      </>
+                    )}
+                    {!isUser && prevUserIdx >= 0 && (
+                      <button
+                        type="button"
+                        onClick={() => void handleResendFromIndex(prevUserIdx)}
+                        className="inline-flex items-center gap-0.5 hover:text-foreground"
+                        title="重新生成回复"
+                      >
+                        <RotateCcwIcon className="size-3" />
+                        <span>重试</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )
         })}
@@ -1188,7 +1571,19 @@ export function AgentDrawer({
         )}
 
         {streamError && (
-          <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{streamError}</div>
+          <div className="flex items-center justify-between gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <span className="min-w-0 break-words">{streamError}</span>
+            {!streaming && lastUserIndex >= 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 shrink-0 px-2 text-[11px]"
+                onClick={() => void handleResendFromIndex(lastUserIndex)}
+              >
+                重试
+              </Button>
+            )}
+          </div>
         )}
       </div>
 

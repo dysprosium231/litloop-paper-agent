@@ -916,6 +916,20 @@ export interface SteeringNote {
   created: string
 }
 
+export type ReasoningEffort = "off" | "low" | "medium" | "high"
+
+export interface AgentModelInfo {
+  provider: string
+  protocol: string
+  preset: string
+  base_url: string
+  model: string
+  plan_model: string
+  rate_model: string
+  reasoning_effort: ReasoningEffort
+  suggestions: string[]
+}
+
 export interface AgentViewContext {
   current_paper?: {
     doi?: string | null
@@ -957,11 +971,15 @@ function parseSseBlock(block: string): AgentChatEvent | null {
 
 export const agentChatApi = {
   load: (sessionId: string) =>
-    call<{ session_id: string; messages: AgentMessage[]; steering_notes: SteeringNote[] }>(
+    call<{ session_id: string; messages: AgentMessage[]; steering_notes: SteeringNote[]; model_info?: AgentModelInfo }>(
       `/api/agent/chat/${encodeURIComponent(sessionId)}`,
     ),
   clear: (sessionId: string) =>
     call<{ cleared: number }>(`/api/agent/chat/${encodeURIComponent(sessionId)}/clear`, {}),
+  truncate: (sessionId: string, fromMessageId: number) =>
+    call<{ deleted: number }>(`/api/agent/chat/${encodeURIComponent(sessionId)}/truncate`, {
+      from_message_id: fromMessageId,
+    }),
   confirmAction: (sessionId: string, messageId: number, actionId: string, params?: Record<string, unknown>) =>
     call<{ ok: boolean; action: AgentActionCard; result?: Record<string, unknown>; error?: string | null }>(
       "/api/agent/actions/confirm",
@@ -982,15 +1000,19 @@ export const agentChatApi = {
     view: AgentViewContext | undefined,
     onEvent: (ev: AgentChatEvent) => void,
     signal?: AbortSignal,
+    options?: { model?: string; reasoning_effort?: ReasoningEffort },
   ): Promise<void> => {
     const { port, token } = await getBackend()
+    const payload: Record<string, unknown> = { message, view }
+    if (options?.model) payload.model = options.model
+    if (options?.reasoning_effort) payload.reasoning_effort = options.reasoning_effort
     const res = await fetch(`http://127.0.0.1:${port}/api/agent/chat/${encodeURIComponent(sessionId)}/stream`, {
       method: "POST",
       headers: {
         "X-LitLoop-Token": token,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message, view }),
+      body: JSON.stringify(payload),
       signal,
     })
     if (!res.ok) {
